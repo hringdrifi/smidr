@@ -1,0 +1,48 @@
+{
+  "name": "smidr",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint",
+    "test": "vitest run src/lib/__tests",
+    "test:watch": "vitest src/lib/__tests",
+    "test:gui": "playwright test"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "jszip": "^3.10.1",
+    "konva": "^10.3.0",
+    "lucide-react": "^1.14.0",
+    "octokit": "^5.0.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-konva": "^19.2.4",
+    "tailwind-merge": "^3.5.0",
+    "xz-decompress": "^0.2.3",
+    "zundo": "^2.3.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@playwright/test": "^1.60.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.18",
+    "globals": "^15.14.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "typescript-eslint": "^8.19.1",
+    "vite": "^6.0.7",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.1.7"
+  }
+}

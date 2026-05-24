@@ -1,0 +1,1205 @@
+import { create, StateCreator } from 'zustand';
+import { temporal } from 'zundo';
+import { PhysicalKey, ProjectSettings, EditorSettings, SmidrProject } from '@/types/keyboard';
+import { UniversalAction, MacroAction, ComboEntry } from '@/types/actions';
+import { deserializeMacros, serializeMacros } from './protocols/vial-macro-converter';
+import { Language } from './i18n';
+import { sortKeys } from './sorting';
+import { hidTransport } from './transport/hid';
+import { ViaProtocol } from './protocols/via';
+import { vialCodeToAction } from './protocols/vial-action-converter';
+import { parseKeyboardDefinition } from './parser';
+import { convertVialToSmidr, packLayoutOptions } from './protocols/vial-converter';
+import { VialProtocol } from './protocols/vial';
+import { DeviceCapability } from './transport/types';
+import { qmkStringToAction, actionToQmkString } from './protocols/via-action-converter';
+import { getStoredTheme, setStoredTheme, getStoredLanguage, setStoredLanguage } from './storage';
+import { getKeyVertices, PADDING_X } from './canvas-utils';
+
+export type RuntimeKey = PhysicalKey & { id: string };
+
+export const getCenteredTransform = (keys: PhysicalKey[], activeOptions: Record<string, number> = {}) => {
+  const visKeys = keys.filter(k => !k.group || (activeOptions[k.group] ?? 0) === k.option);
+  
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  visKeys.forEach(k => {
+    const vertices = getKeyVertices(k);
+    vertices.forEach(v => {
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    });
+  });
+
+  const hasKeys = visKeys.length > 0;
+  const keyboardWidth = hasKeys ? (maxX - minX) : 0;
+  const keyboardCenterX = hasKeys ? (minX + keyboardWidth / 2) : 0;
+
+  const container = typeof document !== 'undefined' ? document.getElementById('keyboard-canvas-container') : null;
+  const stageWidth = container ? container.clientWidth : 1000;
+
+  const resetX = stageWidth / 2 - PADDING_X - keyboardCenterX;
+  const resetY = 0;
+
+  return { scale: 1, x: resetX, y: resetY };
+};
+
+export interface KeyboardState {
+  settings: ProjectSettings;
+  editorSettings: EditorSettings;
+  transform: { scale: number, x: number, y: number };
+  keys: RuntimeKey[];
+  baseKeys: RuntimeKey[]; // Original keys before overrides
+
+  // History Actions
+  undo: () => void;
+  redo: () => void;
+
+  // Global Actions
+  updateSettings: (settings: Partial<ProjectSettings>) => void;
+  updateEditorSettings: (settings: Partial<EditorSettings>) => void;
+  setTransform: (transform: { scale: number, x: number, y: number }) => void;
+  setActiveOption: (groupId: string, value: number) => void;
+  
+  // Key Manipulation
+  addKey: (key: Partial<PhysicalKey>) => void;
+  addKeys: (keys: Partial<PhysicalKey>[], options?: { skipCollision?: boolean }) => void;
+  updateKey: (id: string, key: Partial<PhysicalKey>, round?: boolean) => void;
+  batchUpdateKeys: (ids: string[], updates: Partial<PhysicalKey> | ((key: PhysicalKey) => Partial<PhysicalKey>), round?: boolean) => void;
+  removeKey: (id: string) => void;
+  loadKeys: (newKeys: PhysicalKey[]) => void;
+  
+  // Selection
+  selectedKeyIds: string[];
+  focusedKeyId: string | null;
+  selectionAnchorId: string | null;
+  setSelectedKeyIds: (ids: string[]) => void;
+  setFocusedKeyId: (id: string | null) => void;
+  setSelectionAnchorId: (id: string | null) => void;
+  toggleKeySelection: (id: string, multi: boolean) => void;
+
+  // Editor Modes & Layers
+  appMode: 'design' | 'remap';
+  setAppMode: (mode: 'design' | 'remap') => void;
+  editorMode: 'layout' | 'matrix' | 'hardware' | 'keymap';
+  setEditorMode: (mode: 'layout' | 'matrix' | 'hardware' | 'keymap') => void;
+  currentLayer: number;
+  setCurrentLayer: (layer: number) => void;
+  setKeycode: (keyId: string, layer: number, action: UniversalAction) => void;
+
+  // Remap Mode Specific
+  connectedDevice: { vid: number; pid: number; productName?: string; manufacturerName?: string } | null;
+  setConnectedDevice: (device: KeyboardState['connectedDevice']) => void;
+  deviceCapabilities: DeviceCapability | null;
+  setDeviceCapabilities: (caps: DeviceCapability | null) => void;
+  remoteKeymap: Record<number, UniversalAction[]>; // layer -> array of actions
+  setRemoteKeymap: (keymap: Record<number, UniversalAction[]>) => void;
+  syncKeymap: () => Promise<void>;
+  syncOfflineState: () => Promise<void>;
+  updateRemoteKeycode: (layer: number, index: number, action: UniversalAction) => void;
+  updateDeviceKeycode: (layer: number, row: number, col: number, action: UniversalAction) => Promise<void>;
+  
+  // Macros & Combos
+  remoteMacros: MacroAction[][];
+  remoteCombos: ComboEntry[];
+  setRemoteMacros: (macros: MacroAction[][]) => void;
+  setRemoteCombos: (combos: ComboEntry[]) => void;
+  updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
+  updateRemoteCombo: (index: number, combo: ComboEntry) => Promise<void>;
+  syncMacrosAndCombos: (existingProtocol?: VialProtocol) => Promise<void>;
+
+  // Matrix Painting
+  setMatrixPosition: (id: string, row: number | undefined, col: number | undefined) => void;
+  painter: { currentRow: number; currentCol: number; autoIncrement: 'col' | 'row' | 'none'; };
+  setPainter: (painter: Partial<KeyboardState['painter']>) => void;
+  paintKey: (id: string) => void;
+  matrixSubMode: 'paint' | 'manual';
+  setMatrixSubMode: (mode: 'paint' | 'manual') => void;
+  
+  // Hardware/Pins
+  setPin: (type: 'row' | 'col' | 'feature', index: number | string, pin: string) => void;
+  
+  // Layout Tools
+  alignSelectedKeys: (type: 'left' | 'right' | 'top' | 'bottom' | 'center-x' | 'center-y') => void;
+  distributeSelectedKeys: (type: 'horizontal' | 'vertical') => void;
+
+  // Layout Option Group Management
+  addLayoutOptionGroup: (name: string) => string;
+  removeLayoutOptionGroup: (groupId: string) => void;
+  addLayoutOptionChoice: (groupId: string, choiceName: string) => void;
+  removeLayoutOptionChoice: (groupId: string, choiceIndex: number) => void;
+  renameLayoutOptionChoice: (groupId: string, choiceIndex: number, newName: string) => void;
+  setLayoutOptionGroupType: (groupId: string, type: 'toggle' | 'list') => void;
+
+  // Project Management
+  currentProjectId: string | null;
+  isProjectOpen: boolean;
+  loadProject: (project: SmidrProject, preserveTransform?: boolean) => void;
+  importKeyboardDefinition: (input: any) => void;
+  setIsProjectOpen: (open: boolean) => void;
+  isHardwareModalOpen: boolean;
+  setIsHardwareModalOpen: (open: boolean) => void;
+  resetProject: (keepOpen?: boolean) => void;
+
+  // Matrix Tools
+  clearMatrixMap: () => void;
+  generateMatrix: (rows: number, cols: number) => void;
+  autoAssignMatrix: () => void;
+
+  // i18n
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  historyId: number;
+  canvasDimensions: { width: number, height: number };
+  setCanvasDimensions: (dimensions: { width: number, height: number }) => void;
+  previewKeys: RuntimeKey[] | null;
+  setPreviewKeys: (keys: RuntimeKey[] | null) => void;
+  commitPreviewKeys: () => void;
+
+  // Clipboard
+  clipboard: RuntimeKey[];
+  copyKeys: () => void;
+  pasteKeys: () => void;
+
+  // Parameter Capture
+  isCapturingParam: boolean;
+  setIsCapturingParam: (capturing: boolean) => void;
+}
+
+const generateRandomVialUid = (): string => {
+  const p1 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
+  const p2 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
+  return `0x${p1}${p2}`;
+};
+
+const initialState: Partial<KeyboardState> = {
+  settings: {
+    name: 'New Project',
+    manufacturer: 'Custom',
+    description: 'A custom keyboard layout',
+    vendorProductId: 0xFEED0001,
+    vialUid: generateRandomVialUid(),
+    matrix: { rows: 0, cols: 0 },
+    pins: { rows: [], cols: [] },
+    hardware: { mcu: 'rp2040', board: 'promicro', diodeDirection: 'ROW2COL' },
+    features: { rgb: false, encoder: false, oled: false, vial: true, via: true },
+    layers: 4,
+    layoutOptions: {},
+    activeOptions: {},
+  },
+  editorSettings: { 
+    gridSnap: 0.25, 
+    gridVisible: true, 
+    syncOrigin: true, 
+    keepPosOnOriginChange: false, 
+    theme: getStoredTheme() ?? 'dark', 
+    showMatrixLines: false, 
+    sortThresholdY: 0.25,
+    debugMode: false
+  },
+  transform: { scale: 1, x: 0, y: 0 },
+  keys: [],
+  baseKeys: [],
+  selectedKeyIds: [],
+  focusedKeyId: null,
+  selectionAnchorId: null,
+  appMode: 'remap',
+  editorMode: 'layout',
+  currentLayer: 0,
+  connectedDevice: null,
+  deviceCapabilities: null,
+  remoteKeymap: {},
+  remoteMacros: Array(16).fill(null).map(() => []),
+  remoteCombos: [],
+  painter: { currentRow: 0, currentCol: 0, autoIncrement: 'col' },
+  matrixSubMode: 'paint',
+  currentProjectId: null,
+  isProjectOpen: false,
+  isHardwareModalOpen: false,
+  language: getStoredLanguage(),
+  historyId: 0,
+  canvasDimensions: { width: 1000, height: 800 },
+  previewKeys: null,
+  clipboard: [],
+  isCapturingParam: false,
+};
+
+const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
+const roundRot = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Consistency Middleware
+ */
+const withConsistency = (config: any): any => (set: any, get: any, api: any) => config(
+  (args: any) => {
+    const currentState = get();
+    const nextUpdate = typeof args === 'function' ? (args as any)(currentState) : args;
+    const nextState = { ...currentState, ...nextUpdate };
+
+    // Prune selections if keys changed (and not in preview mode)
+    if (nextState.keys && nextState.selectedKeyIds && !nextState.previewKeys) {
+      const validSelected = nextState.selectedKeyIds.filter((id: string) => 
+        nextState.keys.some((k: PhysicalKey) => k.id === id)
+      );
+      if (validSelected.length !== nextState.selectedKeyIds.length) {
+        nextUpdate.selectedKeyIds = validSelected;
+      }
+    }
+
+    if (nextState.keys && nextState.focusedKeyId && !nextState.previewKeys) {
+      const exists = nextState.keys.some((k: PhysicalKey) => k.id === nextState.focusedKeyId);
+      if (!exists) {
+        nextUpdate.focusedKeyId = null;
+      }
+    }
+
+    set(nextUpdate);
+  },
+  get,
+  api
+);
+
+export const useKeyboardStore = create<KeyboardState>()(
+  withConsistency(
+    temporal(
+      (set, get) => ({
+        ...initialState as KeyboardState,
+
+        undo: (): void => (useKeyboardStore as any).temporal.getState().undo(),
+        redo: (): void => (useKeyboardStore as any).temporal.getState().redo(),
+
+        setPreviewKeys: (pk: RuntimeKey[] | null) => set({ previewKeys: pk }),
+        commitPreviewKeys: () => set((s) => ({
+          keys: s.previewKeys || s.keys,
+          previewKeys: null
+        })),
+
+        setIsCapturingParam: (capturing: boolean) => set({ isCapturingParam: capturing }),
+
+        updateSettings: (sets: Partial<ProjectSettings>) => set((s) => ({ 
+          settings: { ...s.settings, ...sets } 
+        })),
+
+        updateEditorSettings: (es: Partial<EditorSettings>) => {
+          if (es.theme) setStoredTheme(es.theme);
+          set((s) => ({
+            editorSettings: { ...s.editorSettings, ...es }
+          }));
+        },
+
+        setTransform: (t: { scale: number, x: number, y: number }) => set({ transform: t }),
+
+        syncKeymap: async () => {
+          const s = get();
+          if (!s.connectedDevice) return;
+          
+          try {
+            const isVial = !!s.settings.features?.vial;
+            const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+
+            await protocol.initialize(hidTransport);
+            set({ deviceCapabilities: protocol.capabilities });
+
+            const layerCount = await protocol.getLayerCount();
+            set((state) => ({
+              settings: {
+                ...state.settings,
+                layers: layerCount
+              }
+            }));
+            const matrixRows = s.settings.matrix?.rows || 6;
+            const matrixCols = s.settings.matrix?.cols || 16;
+            
+            const newRemoteKeymap: Record<number, UniversalAction[]> = {};
+
+            for (let l = 0; l < Math.min(layerCount, 16); l++) {
+              const layerActions: UniversalAction[] = [];
+              const keysToFetch = matrixRows * matrixCols; 
+              const keysPerPacket = 14;
+
+              if (isVial) {
+                // High-speed batch fetch for Vial
+                const layerOffset = l * matrixRows * matrixCols * 2;
+                console.log(`Layer ${l}: Syncing ${keysToFetch} keys (Matrix: ${matrixRows}x${matrixCols}) at offset ${layerOffset}`);
+                for (let k = 0; k < keysToFetch; k += keysPerPacket) {
+                  try {
+                    const offset = layerOffset + k * 2;
+                    const buffer = await (protocol as VialProtocol).getKeymapBuffer(offset, keysPerPacket * 2);
+                    
+                    if (!buffer || buffer.length === 0) {
+                      throw new Error(`Empty buffer returned for offset ${offset}`);
+                    }
+
+                    for (let i = 0; i < keysPerPacket; i++) {
+                      const keyIdx = k + i;
+                      if (keyIdx >= keysToFetch) break;
+                      
+                      const bIdx = i * 2;
+                      if (bIdx + 1 >= buffer.length) break;
+
+                      const val = (buffer[bIdx] << 8) | buffer[bIdx + 1];
+                      const row = Math.floor(keyIdx / matrixCols);
+                      const col = keyIdx % matrixCols;
+                      
+                      // Safety check for matrix bounds
+                      const targetIdx = row * 32 + col;
+                      layerActions[targetIdx] = vialCodeToAction(val);
+                    }
+                  } catch (e) {
+                    console.error(`Layer ${l} Error: Failed at key offset ${k}. Error:`, e);
+                    break;
+                  }
+                }
+              } else {
+                // Fallback for VIA: fetch one by one
+                const coords = new Set<string>();
+                s.keys.forEach(k => {
+                  if (k.row !== undefined && k.col !== undefined) {
+                    coords.add(`${k.row},${k.col}`);
+                  }
+                });
+                for (const coord of Array.from(coords)) {
+                  const [row, col] = coord.split(',').map(Number);
+                  const action = await protocol.getKey(l, row, col);
+                  layerActions[row * 32 + col] = action;
+                }
+              }
+              newRemoteKeymap[l] = layerActions;
+            }
+
+            // Also merge the fetched physical keymap directly into editor keys
+            const updatedKeys = s.keys.map(k => {
+              if (k.row === undefined || k.col === undefined) return k;
+              const flatIndex = k.row * 32 + k.col;
+              const keymap = { ...k.keymap };
+              Object.keys(newRemoteKeymap).forEach(lStr => {
+                const l = Number(lStr);
+                const action = newRemoteKeymap[l]?.[flatIndex];
+                if (action) {
+                  keymap[l] = action;
+                }
+              });
+              return { ...k, keymap };
+            });
+
+            set({ remoteKeymap: newRemoteKeymap, keys: updatedKeys, baseKeys: updatedKeys });
+            
+            // Auto-sync macros and combos if it is a Vial device
+            if (isVial) {
+              try {
+                await get().syncMacrosAndCombos(protocol as VialProtocol);
+              } catch (macroErr) {
+                console.error('Failed to sync macros and combos inside syncKeymap:', macroErr);
+              }
+            }
+          } catch (err) {
+            console.error('Keymap sync failed:', err);
+            throw err;
+          }
+        },
+
+        setRemoteMacros: (macros: MacroAction[][]) => set({ remoteMacros: macros }),
+        setRemoteCombos: (combos: ComboEntry[]) => set({ remoteCombos: combos }),
+
+        syncMacrosAndCombos: async (existingProtocol?: VialProtocol) => {
+          const s = get();
+          if (!s.connectedDevice || !s.settings.features?.vial) return;
+          
+          try {
+            console.log('Syncing macros and combos from device...');
+            let protocol: VialProtocol;
+            if (existingProtocol) {
+              protocol = existingProtocol;
+            } else {
+              protocol = new VialProtocol();
+              await protocol.initialize(hidTransport);
+            }
+            
+            // 1. Fetch Macros
+            const macroCount = await protocol.getMacrosCount();
+            const memorySize = await protocol.getMacroMemorySize();
+            console.log(`Device reported macros count: ${macroCount}, memory size: ${memorySize}`);
+            
+            const rawBuffer = await protocol.getMacrosBuffer(memorySize, macroCount);
+            const vialVer = await protocol.getVialVersion();
+            const isAdvanced = (vialVer & 0xFFFF) >= 2;
+            const deserialized = deserializeMacros(rawBuffer, macroCount, isAdvanced ? 2 : 1);
+            
+            // 2. Fetch Combos
+            const entriesCount = await protocol.getDynamicEntriesCount();
+            console.log(`Device reported combos count: ${entriesCount.combos}`);
+            let fetchedCombos: ComboEntry[] = [];
+            if (entriesCount.combos > 0) {
+              fetchedCombos = await protocol.getCombos(entriesCount.combos);
+            }
+            
+            set({ remoteMacros: deserialized, remoteCombos: fetchedCombos });
+            console.log('Macros and combos sync completed successfully.');
+          } catch (err) {
+            console.error('Failed to sync macros and combos:', err);
+          }
+        },
+
+        updateRemoteMacro: async (id: number, actions: MacroAction[]) => {
+          const s = get();
+          if (!s.connectedDevice || !s.settings.features?.vial) return;
+          
+          try {
+            const protocol = new VialProtocol();
+            await protocol.initialize(hidTransport);
+            
+            const memorySize = await protocol.getMacroMemorySize();
+            const vialVer = await protocol.getVialVersion();
+            const isAdvanced = (vialVer & 0xFFFF) >= 2;
+            
+            // Clone and update the local macro state
+            const updatedMacros = s.remoteMacros.map((m, idx) => idx === id ? actions : m);
+            
+            // Serialize
+            const buffer = serializeMacros(updatedMacros, isAdvanced ? 2 : 1);
+            console.log(`Writing macros buffer: ${buffer.length} bytes / max ${memorySize} bytes`);
+            
+            await protocol.setMacrosBuffer(buffer, memorySize);
+            set({ remoteMacros: updatedMacros });
+            console.log(`Macro ${id} updated on device.`);
+          } catch (err) {
+            console.error(`Failed to update macro ${id}:`, err);
+            throw err;
+          }
+        },
+
+        updateRemoteCombo: async (index: number, combo: ComboEntry) => {
+          const s = get();
+          if (!s.connectedDevice || !s.settings.features?.vial) return;
+          
+          try {
+            const protocol = new VialProtocol();
+            await protocol.initialize(hidTransport);
+            
+            await protocol.setCombo(index, combo);
+            
+            const updatedCombos = [...s.remoteCombos];
+            updatedCombos[index] = combo;
+            set({ remoteCombos: updatedCombos });
+            console.log(`Combo ${index} updated on device.`);
+          } catch (err) {
+            console.error(`Failed to update combo ${index}:`, err);
+            throw err;
+          }
+        },
+ 
+        syncOfflineState: async () => {
+          const s = get();
+          if (!s.connectedDevice) return;
+          
+          console.log('[Offline Sync] Checking for keymap sync disparities (UI-priority)...');
+          try {
+            const isVial = !!s.settings.features?.vial;
+            const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+
+            await protocol.initialize(hidTransport);
+            
+            // Sync all matrix positions configured in the project keys
+            for (const key of s.keys) {
+              if (key.row === undefined || key.col === undefined) continue;
+              
+              for (let l = 0; l < (s.settings.layers || 4); l++) {
+                const localAction = key.keymap?.[l];
+                if (!localAction) continue;
+                
+                // Fetch the actual action from the physical device
+                const action = await protocol.getKey(l, key.row!, key.col!);
+                const remoteCode = actionToQmkString(action);
+                const localCode = actionToQmkString(localAction);
+                
+                if (localCode !== remoteCode) {
+                  console.log(`[Offline Sync] Syncing Row:${key.row} Col:${key.col} Layer:${l} -> Device (Setting ${localCode} over ${remoteCode})`);
+                  await protocol.setKey(l, key.row!, key.col!, localAction);
+                  s.updateRemoteKeycode(l, key.row! * 32 + key.col!, localAction);
+                }
+              }
+            }
+            console.log('[Offline Sync] Sync complete. Device and editor keymaps are aligned.');
+          } catch (err) {
+            console.error('[Offline Sync] Auto-sync encountered an error:', err);
+          }
+        },
+
+        setActiveOption: (g: string, i: number) => set((s) => {
+          const newActiveOptions = { ...s.settings.activeOptions, [g]: i };
+          const { optionKeys } = s.settings;
+          
+          let newKeys = [...(s.baseKeys && s.baseKeys.length > 0 ? s.baseKeys : s.keys)];
+          
+          // 1. If it's a Vial keyboard, sync layout options to physical device if connected
+          if (s.settings.features?.vial) {
+            // Update physical device if connected
+            if (s.connectedDevice) {
+              const labels = Object.keys(s.settings.layoutOptions || {})
+                .sort((a, b) => Number(a) - Number(b))
+                .map(key => {
+                  const opt = s.settings.layoutOptions[key];
+                  if (opt.type === 'toggle') {
+                    return opt.name;
+                  } else {
+                    return [opt.name, ...(opt.choices || [])];
+                  }
+                });
+              const mask = packLayoutOptions(newActiveOptions, labels);
+              const protocol = new VialProtocol();
+              protocol.initialize(hidTransport)
+                .then(() => protocol.setLayoutOptions(mask))
+                .then(() => {
+                  console.log('Successfully synced layout options to device.');
+                }).catch(err => {
+                  console.error('Failed to sync layout options to device:', err);
+                });
+            }
+          } 
+          // 2. Fallback to classic VIA style property overrides
+          else if (optionKeys) {
+            Object.entries(newActiveOptions).forEach(([groupId, choiceId]) => {
+              const choiceOverrides = optionKeys[groupId]?.[choiceId.toString()];
+              if (choiceOverrides) {
+                newKeys = newKeys.map((k, idx) => {
+                  const overrides = choiceOverrides[idx.toString()];
+                  if (overrides) return { ...k, ...overrides };
+                  return k;
+                });
+              }
+            });
+          }
+          // 3. Auto-align to (0,0) if not in Design-Layout mode
+          const isDesignLayout = s.appMode === 'design' && s.editorMode === 'layout';
+          if (!isDesignLayout && newKeys.length > 0) {
+            // Find visible keys to determine the bounding box
+            const visibleKeys = newKeys.filter(k => {
+              if (!k.group) return true;
+              return newActiveOptions[k.group] === k.option;
+            });
+
+            if (visibleKeys.length > 0) {
+              let minX = Math.min(...visibleKeys.map(k => k.x));
+              let minY = Math.min(...visibleKeys.map(k => k.y));
+
+              if (minX !== 0 || minY !== 0) {
+                newKeys = newKeys.map(k => ({
+                  ...k,
+                  x: roundCoord(k.x - minX),
+                  y: roundCoord(k.y - minY),
+                  rx: roundCoord((k.rx ?? k.x) - minX),
+                  ry: roundCoord((k.ry ?? k.y) - minY),
+                }));
+              }
+            }
+          }
+          
+          return {
+            settings: { ...s.settings, activeOptions: newActiveOptions },
+            keys: newKeys
+          };
+        }),
+
+        addKey: (k: Partial<PhysicalKey>) => get().addKeys([k]),
+
+        addKeys: (ks: Partial<PhysicalKey>[], options?: { skipCollision?: boolean }) => set((s) => {
+          const newKeysList = [...s.keys];
+          const newSelectedIds: string[] = [];
+          let lastId = s.focusedKeyId;
+
+          ks.forEach(k => {
+            const id = crypto.randomUUID();
+            const fk = lastId ? newKeysList.find(i => i.id === lastId) : null;
+            
+            let nx = k.x !== undefined ? roundCoord(k.x) : (fk ? roundCoord(fk.x + (fk.w || 1)) : 0);
+            let ny = k.y !== undefined ? roundCoord(k.y) : (fk ? roundCoord(fk.y) : 0);
+            const w = roundCoord(k.w ?? 1);
+            const h = roundCoord(k.h ?? 1);
+
+            const isOcc = (x: number, y: number) => newKeysList.some(i => {
+              if (i.group && i.option !== s.settings.activeOptions[i.group]) return false;
+              const EPS = 0.001;
+              return x < i.x + i.w - EPS && x + w > i.x + EPS && y < i.y + i.h - EPS && y + h > i.y + EPS;
+            });
+
+            if (!options?.skipCollision && isOcc(nx, ny)) {
+              let f = false;
+              const sn = s.editorSettings.gridSnap;
+              for (let y = ny; y < 20 && !f; y = roundCoord(y + sn)) {
+                for (let x = (y === ny ? nx : 0); x < 20 && !f; x = roundCoord(x + sn)) {
+                  if (!isOcc(x, y)) { nx = x; ny = y; f = true; }
+                }
+              }
+            }
+
+            const newKey: PhysicalKey = {
+              label: '',
+              ...k,
+              id,
+              x: nx,
+              y: ny,
+              w,
+              h,
+              r: roundRot(k.r ?? 0),
+              rx: roundCoord(k.rx ?? nx),
+              ry: roundCoord(k.ry ?? ny),
+            };
+            
+            newKeysList.push(newKey as RuntimeKey);
+            newSelectedIds.push(id);
+            lastId = id;
+          });
+
+          return { 
+            keys: newKeysList, 
+            baseKeys: newKeysList,
+            selectedKeyIds: newSelectedIds, 
+            focusedKeyId: lastId,
+            selectionAnchorId: lastId
+          };
+        }),
+
+        updateKey: (id: string, uk: Partial<PhysicalKey>, r: boolean = false) => set((s) => {
+          const u = { ...uk };
+          if (u.x !== undefined) u.x = r ? roundCoord(Number(u.x)) : Number(u.x);
+          if (u.y !== undefined) u.y = r ? roundCoord(Number(u.y)) : Number(u.y);
+          if (u.rx !== undefined) u.rx = r ? roundCoord(Number(u.rx)) : Number(u.rx);
+          if (u.ry !== undefined) u.ry = r ? roundCoord(Number(u.ry)) : Number(u.ry);
+          if (u.w !== undefined) u.w = r ? roundCoord(Number(u.w)) : Number(u.w);
+          if (u.h !== undefined) u.h = r ? roundCoord(Number(u.h)) : Number(u.h);
+          if (u.r !== undefined) u.r = r ? roundRot(Number(u.r)) : Number(u.r);
+          return { keys: s.keys.map(k => k.id === id ? { ...k, ...u } : k) };
+        }),
+
+        batchUpdateKeys: (ids: string[], updates: Partial<PhysicalKey> | ((key: PhysicalKey) => Partial<PhysicalKey>), r: boolean = false) => set((s) => ({
+          keys: s.keys.map(k => {
+            if (!ids.includes(k.id)) return k;
+            const u = typeof updates === 'function' ? updates(k) : updates;
+            const pu = { ...u };
+            if (pu.x !== undefined) pu.x = r ? roundCoord(Number(pu.x)) : Number(pu.x);
+            if (pu.y !== undefined) pu.y = r ? roundCoord(Number(pu.y)) : Number(pu.y);
+            if (pu.rx !== undefined) pu.rx = r ? roundCoord(Number(pu.rx)) : Number(pu.rx);
+            if (pu.ry !== undefined) pu.ry = r ? roundCoord(Number(pu.ry)) : Number(pu.ry);
+            if (pu.w !== undefined) pu.w = r ? roundCoord(Number(pu.w)) : Number(pu.w);
+            if (pu.h !== undefined) pu.h = r ? roundCoord(Number(pu.h)) : Number(pu.h);
+            if (pu.r !== undefined) pu.r = r ? roundRot(Number(pu.r)) : Number(pu.r);
+            return { ...k, ...pu };
+          })
+        })),
+
+        removeKey: (id: string) => set((s) => {
+          const newKeys = s.keys.filter(k => k.id !== id);
+          return { 
+            keys: newKeys,
+            baseKeys: newKeys,
+            selectedKeyIds: s.selectedKeyIds.filter(i => i !== id),
+            focusedKeyId: s.focusedKeyId === id ? null : s.focusedKeyId,
+            selectionAnchorId: s.selectionAnchorId === id ? null : s.selectionAnchorId
+          };
+        }),
+
+        loadKeys: (newKeys: PhysicalKey[]) => set({ 
+          keys: newKeys.map(k => ({ ...k, id: k.id || crypto.randomUUID() })) as RuntimeKey[], 
+          baseKeys: newKeys.map(k => ({ ...k, id: k.id || crypto.randomUUID() })) as RuntimeKey[],
+          selectedKeyIds: [],
+          focusedKeyId: null,
+          selectionAnchorId: null,
+        }),
+
+        setSelectedKeyIds: (ids: string[]) => set({ selectedKeyIds: ids }),
+        setFocusedKeyId: (id: string | null) => set({ focusedKeyId: id }),
+        setSelectionAnchorId: (id: string | null) => set({ selectionAnchorId: id }),
+        
+        toggleKeySelection: (id: string, multi: boolean) => set((s) => {
+          if (multi) {
+            const isSelected = s.selectedKeyIds.includes(id);
+            const newIds = isSelected ? s.selectedKeyIds.filter(i => i !== id) : [...s.selectedKeyIds, id];
+            return { selectedKeyIds: newIds, focusedKeyId: id, selectionAnchorId: id };
+          } else {
+            return { selectedKeyIds: [id], focusedKeyId: id, selectionAnchorId: id };
+          }
+        }),
+
+        setAppMode: (m: 'design' | 'remap') => set({ appMode: m, selectedKeyIds: [] }),
+        setEditorMode: (m: 'layout' | 'matrix' | 'hardware' | 'keymap') => set({ editorMode: m, selectedKeyIds: [] }),
+
+        setConnectedDevice: (d: KeyboardState['connectedDevice']) => set({ connectedDevice: d }),
+        setDeviceCapabilities: (caps: DeviceCapability | null) => set({ deviceCapabilities: caps }),
+        setRemoteKeymap: (km: Record<number, UniversalAction[]>) => set({ remoteKeymap: km }),
+        updateRemoteKeycode: (l: number, i: number, action: UniversalAction) => set((s) => {
+          const newKm = { ...s.remoteKeymap };
+          if (!newKm[l]) newKm[l] = [];
+          const newLayer = [...newKm[l]];
+          newLayer[i] = action;
+          newKm[l] = newLayer;
+          return { remoteKeymap: newKm };
+        }),
+        updateDeviceKeycode: async (layer: number, row: number, col: number, action: UniversalAction) => {
+          const { connectedDevice, updateRemoteKeycode, settings } = get();
+          if (!connectedDevice) return;
+          try {
+            const isVial = !!settings.features?.vial;
+            const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+
+            await protocol.initialize(hidTransport);
+            
+            console.log(`[VIA/Vial Write via AST] Layer:${layer} Row:${row} Col:${col}`, action);
+            await protocol.setKey(layer, row, col, action);
+            updateRemoteKeycode(layer, row * 32 + col, action);
+
+            // ALSO update corresponding key in editor keys state
+            set((s) => {
+              const updatedKeys = s.keys.map(k => {
+                if (k.row === row && k.col === col) {
+                  return { ...k, keymap: { ...k.keymap, [layer]: action } };
+                }
+                return k;
+              });
+              return { keys: updatedKeys, baseKeys: updatedKeys };
+            });
+          } catch (err) {
+            console.error('Failed to update device keycode:', err);
+          }
+        },
+
+        copyKeys: () => set((s) => ({
+          clipboard: s.keys.filter(k => s.selectedKeyIds.includes(k.id)).map(k => ({ ...k }))
+        })),
+
+        pasteKeys: () => {
+          const { clipboard, addKeys } = get();
+          if (clipboard.length > 0) {
+            // Apply a slight offset (0.25u) to avoid perfect overlap
+            const offset = 0.25;
+            const newKeys = clipboard.map(k => ({
+              ...k,
+              id: undefined, // remove ID so addKeys generates new ones
+              x: roundCoord((k.x ?? 0) + offset),
+              y: roundCoord((k.y ?? 0) + offset),
+              rx: roundCoord((k.rx ?? 0) + offset),
+              ry: roundCoord((k.ry ?? 0) + offset),
+            }));
+            addKeys(newKeys as Partial<PhysicalKey>[], { skipCollision: true });
+          }
+        },
+        setCurrentLayer: (l: number) => set({ currentLayer: l }),
+
+        setKeycode: (id: string, l: number, action: UniversalAction) => set((s) => ({
+          keys: s.keys.map(k => k.id === id ? { ...k, keymap: { ...k.keymap, [l]: action } } : k)
+        })),
+
+        setMatrixPosition: (id: string, row: number | undefined, col: number | undefined) => set((s) => ({
+          keys: s.keys.map(k => k.id === id ? { ...k, row, col } : k)
+        })),
+
+        setPainter: (p: Partial<KeyboardState['painter']>) => set((s) => ({ painter: { ...s.painter, ...p } })),
+        
+        paintKey: (id: string) => set((s) => {
+          const { currentRow: r, currentCol: c, autoIncrement: a } = s.painter;
+          const nextRow = a === 'row' ? r + 1 : r;
+          const nextCol = a === 'col' ? c + 1 : c;
+          return {
+            keys: s.keys.map(k => k.id === id ? { ...k, row: r, col: c } : k),
+            painter: { ...s.painter, currentRow: nextRow, currentCol: nextCol }
+          };
+        }),
+
+        setMatrixSubMode: (m: 'paint' | 'manual') => set({ matrixSubMode: m, selectedKeyIds: [] }),
+
+        setPin: (type: 'row' | 'col' | 'feature', idx: number | string, pin: string) => set((s) => {
+          const p = { ...s.settings.pins };
+          if (type === 'row') { p.rows = [...p.rows]; (p.rows as any)[idx as number] = pin; }
+          if (type === 'col') { p.cols = [...p.cols]; (p.cols as any)[idx as number] = pin; }
+          if (type === 'feature') (p as any)[idx as string] = pin;
+          return {
+            settings: { ...s.settings, pins: p }
+          };
+        }),
+
+        alignSelectedKeys: (t: 'left' | 'right' | 'top' | 'bottom' | 'center-x' | 'center-y') => set((s) => {
+          const sk = s.keys.filter(k => s.selectedKeyIds.includes(k.id));
+          if (sk.length < 2) return s;
+
+          const minX = Math.min(...sk.map(k => k.x));
+          const maxX = Math.max(...sk.map(k => k.x + k.w));
+          const minY = Math.min(...sk.map(k => k.y));
+          const maxY = Math.max(...sk.map(k => k.y + k.h));
+          const midX = (minX + maxX) / 2;
+          const midY = (minY + maxY) / 2;
+
+          return {
+            keys: s.keys.map(k => {
+              if (!s.selectedKeyIds.includes(k.id)) return k;
+              let u: Partial<PhysicalKey> = {};
+              if (t === 'left') u.x = minX;
+              if (t === 'right') u.x = maxX - k.w;
+              if (t === 'top') u.y = minY;
+              if (t === 'bottom') u.y = maxY - k.h;
+              if (t === 'center-x') u.x = midX - k.w / 2;
+              if (t === 'center-y') u.y = midY - k.h / 2;
+
+              const dx = u.x !== undefined ? u.x - k.x : 0;
+              const dy = u.y !== undefined ? u.y - k.y : 0;
+              u.rx = k.rx + dx;
+              u.ry = k.ry + dy;
+              
+              if (u.x !== undefined) u.x = roundCoord(u.x);
+              if (u.y !== undefined) u.y = roundCoord(u.y);
+              if (u.rx !== undefined) u.rx = roundCoord(u.rx);
+              if (u.ry !== undefined) u.ry = roundCoord(u.ry);
+
+              return { ...k, ...u };
+            })
+          };
+        }),
+
+        distributeSelectedKeys: (t: 'horizontal' | 'vertical') => set((s) => {
+          const sk = s.keys.filter(k => s.selectedKeyIds.includes(k.id));
+          if (sk.length < 3) return s;
+          const updates: Record<string, Partial<PhysicalKey>> = {};
+          
+          if (t === 'horizontal') {
+            const sorted = [...sk].sort((a, b) => a.x - b.x);
+            const minX = sorted[0].x;
+            const maxX = sorted[sorted.length - 1].x + sorted[sorted.length - 1].w;
+            const totalW = sorted.reduce((sum, k) => sum + k.w, 0);
+            const gap = (maxX - minX - totalW) / (sk.length - 1);
+            let curX = minX;
+            sorted.forEach(k => {
+              const fx = roundCoord(curX);
+              const dx = fx - k.x;
+              updates[k.id] = { x: fx, rx: roundCoord(k.rx + dx) };
+              curX += k.w + gap;
+            });
+          } else {
+            const sorted = [...sk].sort((a, b) => a.y - b.y);
+            const minY = sorted[0].y;
+            const maxY = sorted[sorted.length - 1].y + sorted[sorted.length - 1].h;
+            const totalH = sorted.reduce((sum, k) => sum + k.h, 0);
+            const gap = (maxY - minY - totalH) / (sk.length - 1);
+            let curY = minY;
+            sorted.forEach(k => {
+              const fy = roundCoord(curY);
+              const dy = fy - k.y;
+              updates[k.id] = { y: fy, ry: roundCoord(k.ry + dy) };
+              curY += k.h + gap;
+            });
+          }
+          return { keys: s.keys.map(k => updates[k.id] ? { ...k, ...updates[k.id] } : k) };
+        }),
+
+        addLayoutOptionGroup: (name: string) => {
+          const id = crypto.randomUUID();
+          set((s) => ({
+            settings: {
+              ...s.settings,
+              layoutOptions: { ...s.settings.layoutOptions, [id]: { name, type: 'toggle' } },
+              activeOptions: { ...s.settings.activeOptions, [id]: 0 }
+            }
+          }));
+          return id;
+        },
+
+        removeLayoutOptionGroup: (id: string) => set((s) => {
+          const { [id]: _, ...remOpt } = s.settings.layoutOptions;
+          const { [id]: __, ...remAct } = s.settings.activeOptions;
+          return {
+            settings: { ...s.settings, layoutOptions: remOpt, activeOptions: remAct },
+            keys: s.keys.map(k => k.group === id ? { ...k, group: undefined, option: undefined } : k)
+          };
+        }),
+
+        addLayoutOptionChoice: (id: string, name: string) => set((s) => {
+          const g = s.settings.layoutOptions[id];
+          if (!g || g.type === 'toggle') return s;
+          return {
+            settings: {
+              ...s.settings,
+              layoutOptions: { ...s.settings.layoutOptions, [id]: { ...g, choices: [...(g.choices || []), name] } }
+            }
+          };
+        }),
+
+        removeLayoutOptionChoice: (id: string, idx: number) => set((s: KeyboardState) => {
+          const g = s.settings.layoutOptions[id];
+          if (!g || g.type === 'toggle' || !g.choices) return s;
+          const newChoices = g.choices.filter((_, i) => i !== idx);
+          return {
+            settings: {
+              ...s.settings,
+              layoutOptions: { ...s.settings.layoutOptions, [id]: { ...g, choices: newChoices } },
+              activeOptions: { ...s.settings.activeOptions, [id]: Math.min(s.settings.activeOptions[id] || 0, Math.max(0, newChoices.length - 1)) }
+            },
+            keys: s.keys.map(k => {
+              if (k.group !== id || k.option === undefined) return k;
+              if (k.option === idx) return { ...k, option: 0 };
+              if (k.option > idx) return { ...k, option: k.option - 1 };
+              return k;
+            })
+          };
+        }),
+
+        renameLayoutOptionChoice: (id: string, idx: number, name: string) => set((s: KeyboardState) => {
+          const g = s.settings.layoutOptions[id];
+          if (!g || g.type === 'toggle' || !g.choices) return s;
+          const newChoices = [...g.choices];
+          newChoices[idx] = name;
+          return {
+            settings: { ...s.settings, layoutOptions: { ...s.settings.layoutOptions, [id]: { ...g, choices: newChoices } } }
+          };
+        }),
+
+        setLayoutOptionGroupType: (id: string, type: 'toggle' | 'list') => set((s: KeyboardState) => {
+          const g = s.settings.layoutOptions[id];
+          if (!g) return s;
+          const newChoices = type === 'list' ? ['Default'] : undefined;
+          return {
+            settings: {
+              ...s.settings,
+              layoutOptions: { ...s.settings.layoutOptions, [id]: { ...g, type, choices: newChoices } },
+              activeOptions: { ...s.settings.activeOptions, [id]: 0 }
+            }
+          };
+        }),
+
+        loadProject: (project: SmidrProject, preserveTransform = false) => set((s: KeyboardState) => {
+          // Extract keys and id/updatedAt, rest is settings
+          const { id, updatedAt, keys: rawKeys, ...settings } = project;
+
+          // Assign fresh runtime IDs to all keys (id is not persisted)
+          let newKeys = rawKeys.map(k => ({
+            ...k,
+            id: crypto.randomUUID(),
+            keymap: k.keymap as Record<number, UniversalAction> | undefined
+          })) as RuntimeKey[];
+
+          const isDesignLayout = s.appMode === 'design';
+          if (!isDesignLayout && newKeys.length > 0) {
+            const visibleKeys = newKeys.filter(k => {
+              if (!k.group) return true;
+              return (settings.activeOptions[k.group] ?? 0) === k.option;
+            });
+            if (visibleKeys.length > 0) {
+              let minX = Math.min(...visibleKeys.map(k => k.x));
+              let minY = Math.min(...visibleKeys.map(k => k.y));
+              if (minX !== 0 || minY !== 0) {
+                newKeys = newKeys.map(k => ({
+                  ...k,
+                  x: roundCoord(k.x - minX),
+                  y: roundCoord(k.y - minY),
+                  rx: roundCoord((k.rx ?? k.x) - minX),
+                  ry: roundCoord((k.ry ?? k.y) - minY),
+                }));
+              }
+            }
+          }
+
+          const sameProject = s.currentProjectId === id;
+          const nextTransform = (preserveTransform || sameProject)
+            ? s.transform
+            : getCenteredTransform(newKeys, settings.activeOptions || {});
+
+          return {
+            settings: settings as ProjectSettings,
+            keys: newKeys,
+            baseKeys: newKeys,
+            currentProjectId: id || null,
+            isProjectOpen: true,
+            selectedKeyIds: [],
+            focusedKeyId: null,
+            editorMode: 'layout',
+            currentLayer: 0,
+            transform: nextTransform,
+          };
+        }),
+
+        importKeyboardDefinition: (input: any) => {
+          const isDebug = get().editorSettings.debugMode;
+          console.log('[Import] Debug Mode State:', isDebug);
+          
+          if (isDebug) console.log('[Import] Input received:', input);
+
+          try {
+            // Update debug console immediately with raw input
+            if (typeof window !== 'undefined' && (window as any).setAppDebug) {
+              (window as any).setAppDebug({
+                type: 'import',
+                raw: input
+              });
+            }
+
+            const result = parseKeyboardDefinition(input);
+            const { keys, name, vendorProductId, layoutOptions, optionKeys } = result;
+            
+            // Update again with parsed info if successful
+            if (typeof window !== 'undefined' && (window as any).setAppDebug) {
+              (window as any).setAppDebug({
+                type: 'import',
+                raw: input,
+                parsed: { keys: keys.length, name, vendorProductId }
+              });
+            }
+            
+            if (isDebug) {
+              console.log('[Import] Parsed Keys:', keys.length);
+              console.log('[Import] Metadata:', { name, vendorProductId });
+            }
+
+            // Calculate matrix size from key row/col
+            let maxRow = 0;
+            let maxCol = 0;
+            keys.forEach(k => {
+              if (k.row !== undefined && k.row > maxRow) maxRow = k.row;
+              if (k.col !== undefined && k.col > maxCol) maxCol = k.col;
+            });
+            const hasMatrix = keys.some(k => k.row !== undefined);
+
+            set((s: KeyboardState) => {
+              const baseKeys = [...keys];
+              let appliedKeys = [...keys];
+              
+              // Apply choice 0 overrides by default for all groups
+              if (optionKeys) {
+                Object.keys(layoutOptions || {}).forEach(groupId => {
+                  const choiceOverrides = optionKeys[groupId]?.["0"];
+                  if (choiceOverrides) {
+                    appliedKeys = appliedKeys.map((k, idx) => {
+                      const overrides = choiceOverrides[idx.toString()];
+                      if (overrides) return { ...k, ...overrides };
+                      return k;
+                    });
+                  }
+                });
+              }
+              // 3. Auto-align to (0,0) if not in Design-Layout mode
+              const isDesignLayout = s.appMode === 'design'; // Since editorMode is being set to 'layout' below
+              if (!isDesignLayout && appliedKeys.length > 0) {
+                // For initial import, assume all keys are visible since activeOptions is empty
+                let minX = Math.min(...appliedKeys.map(k => k.x));
+                let minY = Math.min(...appliedKeys.map(k => k.y));
+                if (minX !== 0 || minY !== 0) {
+                  appliedKeys = appliedKeys.map(k => ({
+                    ...k,
+                    x: roundCoord(k.x - minX),
+                    y: roundCoord(k.y - minY),
+                    rx: roundCoord((k.rx ?? k.x) - minX),
+                    ry: roundCoord((k.ry ?? k.y) - minY),
+                  }));
+                }
+              }
+
+              // Assign fresh runtime IDs
+              const keysWithIds = appliedKeys.map(k => ({ ...k, id: crypto.randomUUID() }));
+              const baseKeysWithIds = baseKeys.map(k => ({ ...k, id: crypto.randomUUID() }));
+
+              return {
+                keys: keysWithIds,
+                baseKeys: baseKeysWithIds,
+                settings: {
+                  ...s.settings,
+                  name: name || s.settings.name,
+                  vendorProductId: vendorProductId || s.settings.vendorProductId,
+                  layoutOptions: layoutOptions || {},
+                  activeOptions: {},
+                  optionKeys: optionKeys || {},
+                  matrix: {
+                    rows: hasMatrix ? maxRow + 1 : s.settings.matrix.rows,
+                    cols: hasMatrix ? maxCol + 1 : s.settings.matrix.cols,
+                  }
+                },
+                selectedKeyIds: [],
+                focusedKeyId: null,
+                editorMode: 'layout',
+                currentLayer: 0,
+                transform: getCenteredTransform(keysWithIds, {}),
+              };
+            });
+          } catch (err: any) {
+            if (isDebug) console.error('[Import] Error:', err);
+            throw err;
+          }
+        },
+
+        setIsProjectOpen: (o: boolean) => set({ isProjectOpen: o }),
+        setIsHardwareModalOpen: (o: boolean) => set({ isHardwareModalOpen: o }),
+
+        resetProject: (keepOpen = false) => set((s: KeyboardState) => ({
+          settings: {
+            ...initialState.settings,
+            vialUid: generateRandomVialUid()
+          } as ProjectSettings,
+          keys: [],
+          currentProjectId: null,
+          isProjectOpen: keepOpen,
+          selectedKeyIds: [],
+          focusedKeyId: null,
+          editorMode: 'layout',
+          currentLayer: 0,
+          transform: { scale: 1, x: 0, y: 0 },
+        })),
+
+        clearMatrixMap: () => set((s: KeyboardState) => ({
+          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined }))
+        })),
+
+        generateMatrix: (rows: number, cols: number) => {
+          const newKeys: Partial<PhysicalKey>[] = [];
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              newKeys.push({ x: c, y: r, w: 1, h: 1, label: '' });
+            }
+          }
+          get().addKeys(newKeys, { skipCollision: true });
+        },
+
+        autoAssignMatrix: () => set((s: KeyboardState) => {
+          const visKeys = s.keys.filter(k => !k.group || s.settings.activeOptions[k.group] === k.option);
+          const sorted = sortKeys(visKeys, s.editorSettings.sortThresholdY);
+          let currentRow = 0;
+          let currentCol = 0;
+          const idToMatrix: Record<string, { row: number, col: number }> = {};
+          sorted.forEach((k: PhysicalKey, i: number) => {
+            if (i > 0) {
+              const prev = sorted[i-1];
+              if (Math.abs(k.y - prev.y) > s.editorSettings.sortThresholdY) {
+                currentRow++;
+                currentCol = 0;
+              } else {
+                currentCol++;
+              }
+            }
+            idToMatrix[k.id!] = { row: currentRow, col: currentCol };
+          });
+          return {
+            keys: s.keys.map(k => idToMatrix[k.id!] ? { ...k, ...idToMatrix[k.id!] } : k),
+            painter: { ...s.painter, currentRow: 0, currentCol: 0 }
+          };
+        }),
+
+        setLanguage: (lang: Language) => {
+          setStoredLanguage(lang);
+          set({ language: lang });
+        },
+
+        setCanvasDimensions: (d: { width: number, height: number }) => {
+          set({ canvasDimensions: d });
+        },
+      }),
+      {
+        partialize: (state: KeyboardState) => ({
+          settings: state.settings,
+          keys: state.keys,
+          historyId: state.historyId,
+        }),
+        equality: (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b),
+        limit: 50,
+      }
+
+    )
+  )
+);
