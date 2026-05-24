@@ -240,7 +240,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
-              <img src="/icon.png" alt="Smiðr Logo" className="w-full h-full object-cover" />
+              <img src={`${import.meta.env.BASE_URL}icon.png`} alt="Smiðr Logo" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-lg font-black tracking-tighter text-[var(--text-highlight)]">Smiðr</h1>
           </div>
