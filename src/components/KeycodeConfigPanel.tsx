@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { KEYCODES, Keycode } from '@/lib/keycodes';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
-import { Search, Info, Check, Keyboard } from 'lucide-react';
+import { Info, Check, Keyboard } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -15,55 +14,7 @@ function cn(...inputs: ClassValue[]) {
 
 const MODIFIERS: Modifier[] = ['LCTL', 'LSFT', 'LALT', 'LGUI', 'RCTL', 'RSFT', 'RALT', 'RGUI'];
 
-const QMK_ORDER = [
-  'transparent',
-  'none',
-  // Letters (A-Z)
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  // Numbers (1-0)
-  '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-  // Core edit & nav
-  'ENT', 'ESC', 'BSPC', 'TAB', 'SPC',
-  // Symbols
-  'MINS', 'EQL', 'LBRC', 'RBRC', 'BSLS', 'NUHS', 'SCLN', 'QUOT', 'GRV', 'COMM', 'DOT', 'SLSH',
-  // Functions
-  'CAPS', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-  'PSCR', 'SLCK', 'PAUS', 'INS', 'HOME', 'PGUP', 'DEL', 'END', 'PGDN',
-  // Arrow keys
-  'RIGHT', 'LEFT', 'DOWN', 'UP',
-  // Numpad
-  'NLCK', 'PSLS', 'PAST', 'PMNS', 'PPLS', 'PENT',
-  'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P0', 'PDOT',
-  // Specialized ISO/JIS & extra keys
-  'NUBS', 'APP', 'PEQL',
-  'YEN', 'RO', 'MHEN', 'HENK', 'KANA',
-  // Modifiers
-  'LCTL', 'LSFT', 'LALT', 'LGUI', 'RCTL', 'RSFT', 'RALT', 'RGUI'
-];
 
-const getQmkIndex = (code: string) => {
-  const idx = QMK_ORDER.indexOf(code);
-  return idx === -1 ? 9999 : idx;
-};
-
-const uniqueCodes = new Set<string>();
-const rawSelectable = [
-  { code: 'transparent', label: '▽ (Transparent)', category: 'Special' as const },
-  { code: 'none', label: 'None', category: 'Special' as const },
-  ...KEYCODES.filter(k => (k.category === 'Basic' || k.category === 'ISO/JIS') && k.code !== 'ISO_ENT_GHOST')
-];
-
-const deduplicatedSelectable: Keycode[] = [];
-for (const item of rawSelectable) {
-  if (!uniqueCodes.has(item.code)) {
-    uniqueCodes.add(item.code);
-    deduplicatedSelectable.push(item);
-  }
-}
-
-const SELECTABLE_KEYCODES: Keycode[] = deduplicatedSelectable.sort((a, b) => {
-  return getQmkIndex(a.code) - getQmkIndex(b.code);
-});
 
 export const KeycodeConfigPanel = () => {
   const {
@@ -73,14 +24,11 @@ export const KeycodeConfigPanel = () => {
   } = useKeyboardStore();
   const { t } = useTranslation();
 
-  const [searchQuery, setSearchQuery] = useState('');
-
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
 
   useEffect(() => {
     setIsCapturingParam(false);
-    setSearchQuery('');
   }, [selectedKeyId, setIsCapturingParam]);
 
   if (selectedKeyIds.length !== 1 || !selectedKey) {
@@ -292,17 +240,7 @@ export const KeycodeConfigPanel = () => {
     currentType = 'tap';
   }
 
-  // Filter selectable keycodes
-  const localizedKeycodes = SELECTABLE_KEYCODES.map(k => {
-    if (k.code === 'transparent') return { ...k, description: t('keycode.transparentDesc') || 'Passes through the keycode of the layer below' };
-    if (k.code === 'none') return { ...k, description: t('keycode.noneDesc') || 'Does nothing' };
-    return k;
-  });
 
-  const filteredKeycodes = localizedKeycodes.filter(k =>
-    k.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    k.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   // Get current active keycode code
   let currentActiveCode = 'transparent';
@@ -429,9 +367,9 @@ export const KeycodeConfigPanel = () => {
           </div>
         )}
 
-        {/* Keycode Search & Selection */}
+        {/* Keycode Selection */}
         {(action.action === 'tap' || action.action === 'trans' || action.action === 'none' || action.action === 'lt' || action.action === 'mt') && (
-          <div className="flex flex-col gap-2 flex-1 min-h-[220px]">
+          <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
               {action.action === 'tap' || action.action === 'trans' || action.action === 'none'
                 ? (t('keymap.currentKeycode') || 'Keycode')
@@ -440,18 +378,6 @@ export const KeycodeConfigPanel = () => {
                 : (t('keycodeConfig.tapKeycode') || 'Tap Keycode')}
             </label>
             
-            {/* Search Input */}
-            <div className="relative shrink-0">
-              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('keycodeConfig.searchKeycode') || 'Search keycode...'}
-                className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg pl-9 pr-4 py-2 text-xs text-[var(--text-highlight)] focus:outline-none focus:border-amber-500 transition-colors"
-              />
-            </div>
-
             {/* Current Value Pill */}
             <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-app)]/20 border border-[var(--border-main)] text-[10px] shrink-0 font-medium">
               <div className="flex items-center gap-2">
@@ -476,45 +402,6 @@ export const KeycodeConfigPanel = () => {
                     : (t('keymap.captureTapKey') || 'Select')}
                 </span>
               </button>
-            </div>
-
-            {/* Scrollable Keycode Grid */}
-            <div className="flex-1 min-h-0 border border-[var(--border-main)] rounded-lg overflow-hidden bg-[var(--bg-app)]/10 flex flex-col">
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 flex flex-col gap-0.5">
-                {filteredKeycodes.length === 0 ? (
-                  <div className="p-6 text-center text-[10px] italic text-[var(--text-muted)]">
-                    {t('keycodeConfig.noResults') || 'No keycodes found'}
-                  </div>
-                ) : (
-                  filteredKeycodes.map(k => {
-                    const isSelected = k.code === currentActiveCode;
-                    return (
-                      <button
-                        key={k.code}
-                        onClick={() => handleKeycodeSelection(k.code)}
-                        className={cn(
-                          "w-full text-left px-2.5 py-2 rounded text-[10px] font-bold transition-all flex items-center justify-between group",
-                          isSelected
-                            ? "bg-amber-500 text-zinc-950 shadow-sm"
-                            : "hover:bg-[var(--bg-hover)] text-[var(--text-main)]"
-                        )}
-                        title={k.description || k.code}
-                      >
-                        <div className="flex flex-col gap-0.5 max-w-[85%] truncate">
-                          <span className="truncate">{k.label}</span>
-                          <span className={cn(
-                            "text-[8px] truncate leading-none font-medium",
-                            isSelected ? "text-zinc-800" : "text-[var(--text-muted)] group-hover:text-[var(--text-dim)]"
-                          )}>
-                            {k.code}
-                          </span>
-                        </div>
-                        {isSelected && <Check size={12} className="text-zinc-950 stroke-[3]" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
             </div>
           </div>
         )}

@@ -1037,7 +1037,7 @@ export const TRANSLATIONS = {
       selectKey: 'キーを1つ選択して、高度な割り当てを設定します。',
       actionType: 'アクションタイプ',
       typeBasic: 'タップキー',
-      typeMomentary: 'レイヤーホールド中切替',
+      typeMomentary: 'レイヤー一時切替',
       typeToggle: 'レイヤートグル切替',
       typeTo: 'レイヤー置換',
       typeTap: 'レイヤータップ',
