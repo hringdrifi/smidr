@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, RefreshCcw, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles } from 'lucide-react';
+import { Cpu, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { KeyboardCanvas } from './KeyboardCanvas';
@@ -14,23 +14,10 @@ import { hidTransport } from '@/lib/transport/hid';
 
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, syncKeymap, currentLayer, setCurrentLayer, settings } = useKeyboardStore();
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const { connectedDevice, currentLayer, setCurrentLayer, settings } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
   const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
-
-  const handleRefresh = async () => {
-    if (!connectedDevice) return;
-    setIsRefreshing(true);
-    try {
-      await syncKeymap();
-    } catch (err) {
-      console.error('Refresh failed:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   return (
     <div className="flex-1 relative flex flex-col overflow-hidden bg-[var(--bg-app)]">
@@ -45,7 +32,7 @@ export const RemapView: React.FC = () => {
               </div>
               
               {/* Position ZoomControls relative to the top of the KeycodePanel */}
-              <div className="absolute inset-x-0 bottom-[425px] h-0 z-[160]">
+              <div className="absolute inset-x-0 bottom-[400px] h-0 z-[160]">
                 <ZoomControls />
               </div>
                 
@@ -73,7 +60,7 @@ export const RemapView: React.FC = () => {
 
                 {/* Right Side Floating Panel (Layout Options) (Swapped from Left Side) */}
                 {isLeftPanelOpen && (
-                  <div className="absolute top-4 right-20 bottom-[441px] w-72 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
+                  <div className="absolute top-4 right-20 bottom-[416px] w-72 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <SlidersHorizontal size={16} className="text-amber-500" />
@@ -91,7 +78,7 @@ export const RemapView: React.FC = () => {
 
                 {/* Left Side Floating Panel (Keycode Config) */}
                 {isKeycodeConfigOpen && (
-                  <div className="absolute top-4 left-20 bottom-[441px] w-72 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300">
+                  <div className="absolute top-4 left-20 bottom-[416px] w-72 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300">
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Wrench size={16} className="text-amber-500" />
@@ -109,7 +96,7 @@ export const RemapView: React.FC = () => {
 
                 {/* Left Side Floating Panel (Macros & Combos) */}
                 {isMacrosCombosOpen && (
-                  <div className="absolute top-4 left-20 bottom-[441px] w-80 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300">
+                  <div className="absolute top-4 left-20 bottom-[416px] w-80 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300">
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <WandSparkles size={16} className="text-amber-500" />
@@ -127,45 +114,8 @@ export const RemapView: React.FC = () => {
 
                 {/* Left Side Floating Widgets (Swapped from Right Side) */}
                 <div className="absolute top-4 left-4 z-[100] flex flex-col gap-4">
+                  {/* Keycode Config & Macros Buttons — single pill */}
                   <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
-                    {Array.from({ length: settings.layers || 4 }).map((_, layer) => (
-                      <button
-                        key={layer}
-                        onClick={() => setCurrentLayer(layer)}
-                        className={cn(
-                          "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group font-bold text-[12px]",
-                          currentLayer === layer 
-                            ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
-                            : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
-                        )}
-                      >
-                        {layer}
-                        <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                          {t('common.layer')} {layer}
-                        </div>
-                      </button>
-                    ))}
-
-                    <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
-
-                    <button 
-                      onClick={handleRefresh}
-                      disabled={isRefreshing}
-                      className={cn(
-                        "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
-                        isRefreshing ? "opacity-50 cursor-wait text-amber-500" : "text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)]"
-                      )}
-                    >
-                      <RefreshCcw size={16} className={cn(isRefreshing && "animate-spin")} />
-                      <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                        {isRefreshing ? (t('remap.refreshing') || 'Refreshing...') : (t('remap.refreshSync') || 'Refresh Sync')}
-                      </div>
-                    </button>
-
-                  </div>
-
-                  {/* Keycode Config & Macros Buttons — separate pill */}
-                  <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500 animate-out fade-out duration-300">
                     <button 
                       onClick={() => {
                         setIsKeycodeConfigOpen(!isKeycodeConfigOpen);
@@ -208,7 +158,7 @@ export const RemapView: React.FC = () => {
                   </div>
                 </div>
               
-              <div className="absolute bottom-0 left-0 right-0 h-[425px] bg-[var(--bg-panel)] border-t border-[var(--border-main)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[150] flex flex-col overflow-hidden">
+              <div className="absolute bottom-0 left-0 right-0 h-[400px] bg-[var(--bg-panel)] border-t border-[var(--border-main)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[150] flex flex-col overflow-hidden">
                 <KeycodePanel />
               </div>
             </div>

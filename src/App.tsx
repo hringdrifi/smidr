@@ -619,7 +619,7 @@ export default function App() {
                 <div 
                   className="absolute inset-x-0 h-0 z-[160] transition-all duration-300"
                   style={{ 
-                    bottom: editorMode === 'keymap' ? '425px' : (editorMode === 'layout' || editorMode === 'matrix') ? '288px' : '0px' 
+                    bottom: editorMode === 'keymap' ? '400px' : (editorMode === 'layout' || editorMode === 'matrix') ? '288px' : '0px' 
                   }}
                 >
                   <ZoomControls />
@@ -695,7 +695,7 @@ export default function App() {
                     <div 
                       className="absolute top-4 right-20 w-72 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-right-8 duration-300 transition-all duration-300"
                       style={{
-                        bottom: editorMode === 'keymap' ? '441px' : (editorMode === 'layout' || editorMode === 'matrix') ? '304px' : '16px'
+                        bottom: editorMode === 'keymap' ? '416px' : (editorMode === 'layout' || editorMode === 'matrix') ? '304px' : '16px'
                       }}
                     >
                       <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
@@ -718,7 +718,7 @@ export default function App() {
                     <div 
                       className="absolute top-4 left-20 w-72 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300 transition-all duration-300"
                       style={{
-                        bottom: editorMode === 'keymap' ? '441px' : (editorMode === 'layout' || editorMode === 'matrix') ? '304px' : '16px'
+                        bottom: editorMode === 'keymap' ? '416px' : (editorMode === 'layout' || editorMode === 'matrix') ? '304px' : '16px'
                       }}
                     >
                       <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
@@ -739,68 +739,23 @@ export default function App() {
                   {/* Left Side Floating Widgets */}
                   <div className="absolute top-4 left-4 z-[100] flex flex-col gap-4">
                     {editorMode === 'keymap' && (
-                      <React.Fragment>
-                        {/* Layer + Add/Remove pill */}
-                        <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
-                          {Array.from({ length: settings.layers }).map((_, layer) => (
-                            <button
-                              key={layer}
-                              onClick={() => setCurrentLayer(layer)}
-                              className={cn(
-                                "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group font-bold text-[12px]",
-                                currentLayer === layer 
-                                  ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
-                                  : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
-                              )}
-                            >
-                              {layer}
-                              <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                                {t('common.layer')} {layer}
-                              </div>
-                            </button>
-                          ))}
-                          
-                          <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
-                          
-                          <button 
-                            onClick={() => updateSettings({ layers: Math.min(32, settings.layers + 1) })}
-                            className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
-                          >
-                            <Plus size={16} />
-                            <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                              Layer +
-                            </div>
-                          </button>
-                          <button 
-                            onClick={() => updateSettings({ layers: Math.max(1, settings.layers - 1) })}
-                            className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
-                          >
-                            <span className="text-xl leading-none -translate-y-px">-</span>
-                            <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                              Layer -
-                            </div>
-                          </button>
-                        </div>
-
-                        {/* Keycode Config Button - separate pill */}
-                        <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
-                          <button 
-                            onClick={() => setIsKeycodeConfigOpen(!isKeycodeConfigOpen)}
-                            className={cn(
-                              "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
-                              isKeycodeConfigOpen 
-                                ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
-                                : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
-                            )}
-                            title={t('keycodeConfig.title') || 'Keycode Config'}
-                          >
-                            <Wrench size={18} className={cn("transition-transform duration-500", isKeycodeConfigOpen && "rotate-45 scale-110")} />
-                            <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                              {t('keycodeConfig.title') || 'Keycode Config'}
-                            </div>
-                          </button>
-                        </div>
-                      </React.Fragment>
+                      <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
+                        <button 
+                          onClick={() => setIsKeycodeConfigOpen(!isKeycodeConfigOpen)}
+                          className={cn(
+                            "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
+                            isKeycodeConfigOpen 
+                              ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
+                              : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+                          )}
+                          title={t('keycodeConfig.title') || 'Keycode Config'}
+                        >
+                          <Wrench size={18} className={cn("transition-transform duration-500", isKeycodeConfigOpen && "rotate-45 scale-110")} />
+                          <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
+                            {t('keycodeConfig.title') || 'Keycode Config'}
+                          </div>
+                        </button>
+                      </div>
                     )}
                     
                     <EditorTools floating />
@@ -813,7 +768,7 @@ export default function App() {
                 <div 
                   className={cn(
                     "absolute bottom-0 left-0 right-0 bg-[var(--bg-panel)] border-t border-[var(--border-main)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[150] flex flex-col overflow-hidden transition-all",
-                    editorMode === 'keymap' ? "h-[425px]" : "h-72"
+                    editorMode === 'keymap' ? "h-[400px]" : "h-72"
                   )}
                 >
                   {editorMode === 'keymap' ? <KeycodePanel /> : editorMode === 'matrix' ? <MatrixPropertyPanel /> : <PropertyPanel />}

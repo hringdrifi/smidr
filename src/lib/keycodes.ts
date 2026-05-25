@@ -23,7 +23,8 @@ export const KEYCODES: Keycode[] = [
   // --- BASIC (ANSI Full Layout) ---
   // ==========================================
   // Row 0
-  { code: 'ESC', label: 'Esc', category: 'Basic', row: 0 },
+  { code: 'transparent', label: '▽', category: 'Basic', row: 0, description: 'Passes through the keycode of the layer below (Transparent)' },
+  { code: 'ESC', label: 'Esc', category: 'Basic', row: 0, spacer: 0.25 },
   { code: 'F1', label: 'F1', category: 'Basic', row: 0, spacer: 1.0 },
   { code: 'F2', label: 'F2', category: 'Basic', row: 0 },
   { code: 'F3', label: 'F3', category: 'Basic', row: 0 },
@@ -41,7 +42,8 @@ export const KEYCODES: Keycode[] = [
   { code: 'PAUS', label: 'Pause', category: 'Basic', row: 0 },
 
   // Row 1
-  { code: 'GRV', label: '~\n`', category: 'Basic', row: 1 },
+  { code: 'none', label: 'None', category: 'Basic', row: 1, description: 'Disables the key (No action)' },
+  { code: 'GRV', label: '~\n`', category: 'Basic', row: 1, spacer: 0.25 },
   { code: '1', label: '!\n1', category: 'Basic', row: 1 },
   { code: '2', label: '@\n2', category: 'Basic', row: 1 },
   { code: '3', label: '#\n3', category: 'Basic', row: 1 },
@@ -64,7 +66,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PMNS', label: '-', category: 'Basic', row: 1 },
 
   // Row 2
-  { code: 'TAB', label: 'Tab', category: 'Basic', row: 2, width: 1.5 },
+  { code: 'TAB', label: 'Tab', category: 'Basic', row: 2, width: 1.5, spacer: 1.25 },
   ...['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(k => ({ code: k, label: k, category: 'Basic' as const, row: 2 })),
   { code: 'LBRC', label: '{\n[', category: 'Basic', row: 2 },
   { code: 'RBRC', label: '}\n]', category: 'Basic', row: 2 },
@@ -78,7 +80,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PPLS', label: '+', category: 'Basic', row: 2 },
 
   // Row 3
-  { code: 'CAPS', label: 'Caps', category: 'Basic', row: 3, width: 1.75 },
+  { code: 'CAPS', label: 'Caps', category: 'Basic', row: 3, width: 1.75, spacer: 1.25 },
   ...['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'].map(k => ({ code: k, label: k, category: 'Basic' as const, row: 3 })),
   { code: 'SCLN', label: ':\n;', category: 'Basic', row: 3 },
   { code: 'QUOT', label: '"\n\'', category: 'Basic', row: 3 },
@@ -89,7 +91,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PCMM', label: ',', category: 'Basic', row: 3 },
 
   // Row 4
-  { code: 'LSFT', label: 'LShift', category: 'Basic', row: 4, width: 2.25 },
+  { code: 'LSFT', label: 'LShift', category: 'Basic', row: 4, width: 2.25, spacer: 1.25 },
   ...['Z', 'X', 'C', 'V', 'B', 'N', 'M'].map(k => ({ code: k, label: k, category: 'Basic' as const, row: 4 })),
   { code: 'COMM', label: '<\n,', category: 'Basic', row: 4 },
   { code: 'DOT', label: '>\n.', category: 'Basic', row: 4 },
@@ -102,7 +104,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PEQL', label: '=', category: 'Basic', row: 4 },
 
   // Row 5
-  { code: 'LCTL', label: 'LCtrl', category: 'Basic', row: 5, width: 1.25 },
+  { code: 'LCTL', label: 'LCtrl', category: 'Basic', row: 5, width: 1.25, spacer: 1.25 },
   { code: 'LGUI', label: 'LGui', category: 'Basic', row: 5, width: 1.25 },
   { code: 'LALT', label: 'LAlt', category: 'Basic', row: 5, width: 1.25 },
   { code: 'SPC', label: 'Space', category: 'Basic', row: 5, width: 6.25 },
@@ -121,7 +123,8 @@ export const KEYCODES: Keycode[] = [
   // --- ISO/JIS (JIS Full Layout) ---
   // ==========================================
   // Row 0
-  { code: 'ESC', label: 'Esc', category: 'ISO/JIS', row: 0 },
+  { code: 'transparent', label: '▽', category: 'ISO/JIS', row: 0, description: 'Passes through the keycode of the layer below (Transparent)' },
+  { code: 'ESC', label: 'Esc', category: 'ISO/JIS', row: 0, spacer: 0.25 },
   { code: 'F1', label: 'F1', category: 'ISO/JIS', row: 0, spacer: 1.0 },
   { code: 'F2', label: 'F2', category: 'ISO/JIS', row: 0 },
   { code: 'F3', label: 'F3', category: 'ISO/JIS', row: 0 },
@@ -139,7 +142,8 @@ export const KEYCODES: Keycode[] = [
   { code: 'PAUS', label: 'Pause', category: 'ISO/JIS', row: 0 },
 
   // Row 1
-  { code: 'GRV', label: '~\n`', category: 'ISO/JIS', row: 1 },
+  { code: 'none', label: 'None', category: 'ISO/JIS', row: 1, description: 'Disables the key (No action)' },
+  { code: 'GRV', label: '~\n`', category: 'ISO/JIS', row: 1, spacer: 0.25 },
   { code: '1', label: '!\n1', category: 'ISO/JIS', row: 1 },
   { code: '2', label: '@\n2', category: 'ISO/JIS', row: 1 },
   { code: '3', label: '#\n3', category: 'ISO/JIS', row: 1 },
@@ -163,7 +167,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PMNS', label: '-', category: 'ISO/JIS', row: 1 },
 
   // Row 2
-  { code: 'TAB', label: 'Tab', category: 'ISO/JIS', row: 2, width: 1.5 },
+  { code: 'TAB', label: 'Tab', category: 'ISO/JIS', row: 2, width: 1.5, spacer: 1.25 },
   ...['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(k => ({ code: k, label: k, category: 'ISO/JIS' as const, row: 2 })),
   { code: 'LBRC', label: '{\n[', category: 'ISO/JIS', row: 2 },
   { code: 'RBRC', label: '}\n]', category: 'ISO/JIS', row: 2 },
@@ -177,7 +181,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PPLS', label: '+', category: 'ISO/JIS', row: 2 },
 
   // Row 3
-  { code: 'CAPS', label: 'Caps', category: 'ISO/JIS', row: 3, width: 1.75 },
+  { code: 'CAPS', label: 'Caps', category: 'ISO/JIS', row: 3, width: 1.75, spacer: 1.25 },
   ...['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'].map(k => ({ code: k, label: k, category: 'ISO/JIS' as const, row: 3 })),
   { code: 'SCLN', label: ':\n;', category: 'ISO/JIS', row: 3 },
   { code: 'QUOT', label: '"\n\'', category: 'ISO/JIS', row: 3 },
@@ -189,7 +193,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PCMM', label: ',', category: 'ISO/JIS', row: 3 },
 
   // Row 4
-  { code: 'LSFT', label: 'LShift', category: 'ISO/JIS', row: 4, width: 1.25 },
+  { code: 'LSFT', label: 'LShift', category: 'ISO/JIS', row: 4, width: 1.25, spacer: 1.25 },
   { code: 'NUBS', label: '\\', category: 'ISO/JIS', row: 4 },
   ...['Z', 'X', 'C', 'V', 'B', 'N', 'M'].map(k => ({ code: k, label: k, category: 'ISO/JIS' as const, row: 4 })),
   { code: 'COMM', label: ',', category: 'ISO/JIS', row: 4 },
@@ -204,7 +208,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'PEQL', label: '=', category: 'ISO/JIS', row: 4 },
 
   // Row 5
-  { code: 'LCTL', label: 'LCtrl', category: 'ISO/JIS', row: 5, width: 1.25 },
+  { code: 'LCTL', label: 'LCtrl', category: 'ISO/JIS', row: 5, width: 1.25, spacer: 1.25 },
   { code: 'LGUI', label: 'LGui', category: 'ISO/JIS', row: 5, width: 1.25 },
   { code: 'LALT', label: 'LAlt', category: 'ISO/JIS', row: 5, width: 1.25 },
   { code: 'MHEN', label: '無変換', category: 'ISO/JIS', row: 5, width: 1.25 },

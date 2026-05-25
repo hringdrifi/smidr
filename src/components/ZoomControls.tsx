@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Plus, Minus, Scan, Grid, MousePointer2, Hash } from 'lucide-react';
+import { Plus, Minus, Scan, Grid, MousePointer2, Hash, RefreshCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -18,10 +18,28 @@ export const ZoomControls = () => {
     keys,
     settings,
     canvasDimensions,
-    appMode
+    appMode,
+    currentLayer,
+    setCurrentLayer,
+    updateSettings,
+    connectedDevice,
+    syncKeymap
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeMenu, setActiveMenu] = React.useState<'grid' | 'mouse' | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const handleRefresh = async () => {
+    if (!connectedDevice) return;
+    setIsRefreshing(true);
+    try {
+      await syncKeymap();
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleZoom = (delta: number) => {
     const newScale = Math.min(Math.max(transform.scale + delta, 0.1), 3.0);
@@ -69,6 +87,76 @@ export const ZoomControls = () => {
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200]">
       {/* Control Bar */}
       <div className="relative flex items-center gap-1.5 bg-[var(--bg-panel)]/90 backdrop-blur border border-[var(--border-main)] p-1.5 rounded-lg shadow-2xl">
+        {/* Layer Selector & Refresh Sync */}
+        {(appMode === 'remap' || editorMode === 'keymap') && (
+          <>
+            <div className="flex items-center gap-1 bg-[var(--bg-app)] border border-[var(--border-main)] rounded p-0.5">
+              {Array.from({ length: settings.layers || 4 }).map((_, layer) => (
+                <button
+                  key={layer}
+                  onClick={() => setCurrentLayer(layer)}
+                  className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded text-[11px] font-bold transition-all relative group",
+                    currentLayer === layer 
+                      ? "bg-amber-500 text-zinc-950 font-black shadow-sm" 
+                      : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+                  )}
+                >
+                  {layer}
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                    {t('common.layer')} {layer}
+                  </div>
+                </button>
+              ))}
+
+              {appMode === 'design' && (
+                <>
+                  <div className="w-px h-4 bg-[var(--border-main)] mx-0.5" />
+                  <button 
+                    onClick={() => updateSettings({ layers: Math.min(32, settings.layers + 1) })}
+                    className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
+                  >
+                    <Plus size={12} />
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      Layer +
+                    </div>
+                  </button>
+                  <button 
+                    onClick={() => updateSettings({ layers: Math.max(1, settings.layers - 1) })}
+                    className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
+                  >
+                    <span className="text-sm font-bold leading-none -translate-y-px">-</span>
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      Layer -
+                    </div>
+                  </button>
+                </>
+              )}
+
+              {appMode === 'remap' && connectedDevice && (
+                <>
+                  <div className="w-px h-4 bg-[var(--border-main)] mx-0.5" />
+                  <button 
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className={cn(
+                      "w-7 h-7 flex items-center justify-center rounded transition-all relative group",
+                      isRefreshing ? "opacity-50 cursor-wait text-amber-500" : "text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)]"
+                    )}
+                  >
+                    <RefreshCcw size={12} className={cn(isRefreshing && "animate-spin")} />
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      {isRefreshing ? (t('remap.refreshing') || 'Refreshing...') : (t('remap.refreshSync') || 'Refresh Sync')}
+                    </div>
+                  </button>
+                </>
+              )}
+            </div>
+            
+            <div className="w-px h-4 bg-[var(--border-main)] mx-1" />
+          </>
+        )}
+
         {/* Popovers Container */}
         {appMode !== 'remap' && editorMode === 'layout' && activeMenu && (
           <>

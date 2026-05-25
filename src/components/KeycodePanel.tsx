@@ -36,13 +36,7 @@ export const KeycodePanel = () => {
       ]
     : KEYCODES.filter(k => k.category === activeTab);
 
-  if (activeTab === 'Basic' || activeTab === 'ISO/JIS') {
-    filteredKeycodes = [
-      { code: 'transparent', label: '▽', category: activeTab, row: -1, description: t('keycode.transparentDesc') || 'Passes through the keycode of the layer below' },
-      { code: 'none', label: 'None', category: activeTab, row: -1, description: t('keycode.noneDesc') || 'Does nothing' },
-      ...filteredKeycodes
-    ];
-  }
+
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -285,7 +279,7 @@ export const KeycodePanel = () => {
           )}>
             {isPhysicalTab ? (
               rows.map(rowIdx => (
-                <div key={rowIdx} className={cn("flex gap-1 justify-start", isPhysicalTab && rowIdx === 1 && "mt-3")}>
+                <div key={rowIdx} className="flex gap-1 justify-start">
                   {filteredKeycodes
                     .filter(k => k.row === rowIdx)
                     .map((k, idx) => {
