@@ -200,7 +200,7 @@ const initialState: Partial<KeyboardState> = {
     vialUid: generateRandomVialUid(),
     matrix: { rows: 0, cols: 0 },
     pins: { rows: [], cols: [] },
-    hardware: { mcu: 'rp2040', board: 'promicro', diodeDirection: 'ROW2COL' },
+    hardware: { mcu: 'rp2040', board: 'promicro', diodeDirection: 'COL2ROW' },
     features: { rgb: false, encoder: false, oled: false, vial: true, via: true },
     layers: 4,
     layoutOptions: {},

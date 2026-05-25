@@ -217,7 +217,7 @@ export const HardwareSettingsPanel = () => {
     'GP0', 'GP1', 'GP2', 'GP3', 'GP4', 'GP5', 'GP6', 'GP7',
     'GP8', 'GP9', 'GP10', 'GP11', 'GP12', 'GP13', 'GP14', 'GP15',
     'GP16', 'GP17', 'GP18', 'GP19', 'GP20', 'GP21', 'GP22',
-    'GP26', 'GP27', 'GP28', 'GP29'
+    'GP23', 'GP24', 'GP25', 'GP26', 'GP27', 'GP28', 'GP29'
   ];
 
   const atmega32u4Pins = [
@@ -361,7 +361,7 @@ export const HardwareSettingsPanel = () => {
           <div className="space-y-1">
             <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.diodeDir')}</label>
             <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
-              {(['ROW2COL', 'COL2ROW'] as const).map(dir => (
+              {(['COL2ROW', 'ROW2COL'] as const).map(dir => (
                 <button
                   key={dir}
                   onClick={() => updateHardware({ diodeDirection: dir })}
