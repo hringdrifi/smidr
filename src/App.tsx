@@ -141,7 +141,7 @@ export default function App() {
   const handleExportVialZip = async () => {
     const zipBlob = await generateVialZip({ settings, keys });
     if (zipBlob) {
-      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_vial_qmk.zip`, zipBlob);
+      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_vial.zip`, zipBlob);
     }
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
