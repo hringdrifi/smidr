@@ -120,7 +120,17 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
 ### 9.1 AST 駆動型キーコード制御 (AST-Driven Keycode Operations)
 - **基本仕様**: UI（`KeycodePanel` など）とプロトコルドライバーとの間でのキー設定のやり取りは、テキストの文字列処理ではなく、すべて `UniversalAction` AST データ構造を経由して型安全に行われます。
 - **処理の流れ**: UI 上でのキーコード変更 ➔ `qmkStringToAction` 経由で AST 化 ➔ プロトコル抽象層の `protocol.setKey()` を呼び出し ➔ 各ドライバー（ZMK / VIA / Vial）で適切なエンコードを実行。
-- **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`type: 'layer-tap'`）で対象レイヤーとキーコードの書き換えを実行します。
+- **型短縮・正規化 (UniversalAction Types)**: QMKおよびZMKの標準仕様と一致するよう、以下の通り短縮された型キー名を使用します。
+  - `tap` (旧 `basic`): 単一キー押下。`keycode` 属性にターゲットキーを保持。
+  - `trans` (旧 `transparent`): 透過キー。
+  - `none`: 無操作キー。
+  - `mo` (旧 `layer_momentary`): レイヤーホールド中切り替え（Momentary）。
+  - `tg` (旧 `layer_toggle`): レイヤートグル切り替え（Toggle）。
+  - `to` (旧 `layer_to`): レイヤー置換切り替え（Replace）。
+  - `lt` (旧 `layer-tap`): レイヤータップ（Holdで対象レイヤー、Tapでキー入力）。
+  - `mt` (旧 `mod-tap`): モッドタップ（Holdで修飾キー、Tapでキー入力）。
+  - `mod` (旧 `modifier`): 修飾キー同時押し（修飾キー + 通常キーのコンボ）。
+- **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`type: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
 
 ### 9.2 デバイス指向の自己適応型 UI (Device-Oriented Self-Adaptive UI)
 - **仕様**: 接続された物理デバイスのケイパビリティフラグ（`DeviceCapability`: `hasMacros`, `hasLighting` など）を監視し、デバイスのサポート状況に応じてエディタの UI を自己適応的に制御します。
