@@ -48,12 +48,8 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     },
     usb: {
       device_version: '1.0.0',
-      pid: (settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`).toUpperCase().startsWith('0X') 
-        ? (settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`) 
-        : `0x${(settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`)}`,
-      vid: (settings.vid || `0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`).toUpperCase().startsWith('0X') 
-        ? (settings.vid || `0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`) 
-        : `0x${(settings.vid || `0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`)}`
+      vid: `0x${((settings.vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
+      pid: `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`
     },
     layouts: {
       LAYOUT: {

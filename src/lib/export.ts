@@ -9,8 +9,35 @@ import { actionToQmkString } from './protocols/via-action-converter';
 export const generateViaJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }) => {
   const { settings, keys } = state;
 
+  // Format labels from layoutOptions
+  const labels: any[] = [];
+  const groupIds = Object.keys(settings.layoutOptions || {}).map(Number).sort((a, b) => a - b);
+  groupIds.forEach(groupId => {
+    const opt = settings.layoutOptions[groupId.toString()];
+    if (opt.type === 'list' && opt.choices) {
+      labels.push([opt.name, ...opt.choices]);
+    } else {
+      labels.push(opt.name);
+    }
+  });
+
+  // Prepare keys with correct matrix and layout option labels for KLE export
+  const viaKeys = keys.map(key => {
+    let label = '';
+    if (key.row !== undefined && key.col !== undefined) {
+      label = `${key.row},${key.col}`;
+    }
+    if (key.group !== undefined && key.option !== undefined) {
+      label += `\n\n\n${key.group},${key.option}`;
+    }
+    return {
+      ...key,
+      label
+    };
+  });
+
   // Generate KLE for VIA
-  const kleData = exportKLE(keys);
+  const kleData = exportKLE(viaKeys);
 
   // Generate Keymaps array for VIA (layers -> rows -> cols)
   const layersCount = settings.layers || 4;
@@ -34,12 +61,8 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
 
   return {
     name: settings.name,
-    vendorId: (settings.vid || `0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`).toUpperCase().startsWith('0X') 
-      ? (settings.vid || `0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`) 
-      : `0x${(settings.vid || `0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`)}`,
-    productId: (settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`).toUpperCase().startsWith('0X') 
-      ? (settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`) 
-      : `0x${(settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`)}`,
+    vendorId: `0x${((settings.vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
+    productId: `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     manufacturer: settings.manufacturer,
     description: settings.description,
     firmwareVersion: 1,
@@ -55,7 +78,9 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
       cols: settings.matrix.cols,
     },
     layouts: {
+      labels: labels.length > 0 ? labels : undefined,
       keymap: kleData,
+      optionKeys: settings.optionKeys,
     },
     keymaps: keymaps
   };
