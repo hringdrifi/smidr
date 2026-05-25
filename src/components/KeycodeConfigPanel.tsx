@@ -76,10 +76,19 @@ export const KeycodeConfigPanel = () => {
     } else if (action.action === 'lt' || action.action === 'mt') {
       if (action.tapAction.action === 'tap') {
         existingKeycode = action.tapAction.keycode;
-      } else if (action.tapAction.action === 'trans' || action.tapAction.action === 'none') {
-        existingKeycode = action.tapAction.action;
+      } else if (action.tapAction.action === 'trans') {
+        existingKeycode = 'TRNS';
+      } else if (action.tapAction.action === 'none') {
+        existingKeycode = 'NO';
       }
+    } else if (action.action === 'trans') {
+      existingKeycode = 'TRNS';
+    } else if (action.action === 'none') {
+      existingKeycode = 'NO';
     }
+
+    const isTrans = (kc: string | undefined) => !kc || kc === 'trans' || kc === 'transparent' || kc === 'TRNS';
+    const isNone = (kc: string | undefined) => kc === 'none' || kc === 'NO';
 
     let newAction: UniversalAction;
     switch (actVal) {
@@ -94,9 +103,9 @@ export const KeycodeConfigPanel = () => {
         break;
       case 'lt': {
         let tapAction: UniversalAction = { action: 'trans' };
-        if (existingKeycode === 'none') {
+        if (isNone(existingKeycode)) {
           tapAction = { action: 'none' };
-        } else if (existingKeycode && existingKeycode !== 'transparent') {
+        } else if (existingKeycode && !isTrans(existingKeycode)) {
           tapAction = { action: 'tap', keycode: existingKeycode as any };
         }
         newAction = { action: 'lt', layerId: existingLayerId, tapAction };
@@ -104,9 +113,9 @@ export const KeycodeConfigPanel = () => {
       }
       case 'mt': {
         let tapAction: UniversalAction = { action: 'trans' };
-        if (existingKeycode === 'none') {
+        if (isNone(existingKeycode)) {
           tapAction = { action: 'none' };
-        } else if (existingKeycode && existingKeycode !== 'transparent') {
+        } else if (existingKeycode && !isTrans(existingKeycode)) {
           tapAction = { action: 'tap', keycode: existingKeycode as any };
         }
         newAction = { action: 'mt', modifiers: existingModifiers, tapAction };
@@ -114,15 +123,19 @@ export const KeycodeConfigPanel = () => {
       }
       case 'tap':
       default: {
-        if (existingKeycode === 'none') {
+        if (isNone(existingKeycode)) {
           newAction = { action: 'none' };
-        } else if (existingKeycode && existingKeycode !== 'transparent') {
+        } else if (existingKeycode && !isTrans(existingKeycode)) {
           newAction = { action: 'tap', keycode: existingKeycode as any };
           if (existingModifiers && existingModifiers.length > 0) {
             newAction.mods = existingModifiers;
           }
         } else {
-          newAction = { action: 'trans' };
+          if (existingModifiers && existingModifiers.length > 0) {
+            newAction = { action: 'tap', keycode: 'TRNS', mods: existingModifiers };
+          } else {
+            newAction = { action: 'trans' };
+          }
         }
         break;
       }
@@ -193,13 +206,24 @@ export const KeycodeConfigPanel = () => {
         baseKeycode = 'NO';
       }
 
-      const nextAction: UniversalAction = {
-        action: 'tap',
-        keycode: baseKeycode
-      };
-
+      let nextAction: UniversalAction;
       if (nextModifiers.length > 0) {
-        nextAction.mods = nextModifiers;
+        nextAction = {
+          action: 'tap',
+          keycode: baseKeycode,
+          mods: nextModifiers
+        };
+      } else {
+        if (baseKeycode === 'TRNS') {
+          nextAction = { action: 'trans' };
+        } else if (baseKeycode === 'NO') {
+          nextAction = { action: 'none' };
+        } else {
+          nextAction = {
+            action: 'tap',
+            keycode: baseKeycode
+          };
+        }
       }
       updateSelectedAction(nextAction);
     }

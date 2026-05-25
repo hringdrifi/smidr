@@ -170,7 +170,12 @@ export const formatActionLabel = (action: UniversalAction | undefined): LabelNod
       return { type: 'empty' };
     case 'tap': {
       const match = KEYCODES.find(kc => kc.code === action.keycode);
-      const baseLabel = match?.label || action.keycode;
+      let baseLabel = match?.label || action.keycode;
+      if (action.keycode === 'TRNS') {
+        baseLabel = '▽';
+      } else if (action.keycode === 'NO') {
+        baseLabel = '';
+      }
       if (action.mods && action.mods.length > 0) {
         const modAbbrev: Record<Modifier, string> = {
           'LCTL': 'CTL', 'RCTL': 'CTL',

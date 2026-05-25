@@ -129,7 +129,9 @@ export const KeycodePanel = () => {
       if (action.action === 'lt' || action.action === 'mt') {
         updateSelectedAction({ ...action, tapAction: clickedAction });
       } else if (action.action === 'tap' && action.mods !== undefined) {
-        const targetKey = clickedAction.action === 'tap' ? clickedAction.keycode : 'TRNS';
+        const targetKey = clickedAction.action === 'tap' 
+          ? clickedAction.keycode 
+          : (clickedAction.action === 'none' ? 'NO' : 'TRNS');
         updateSelectedAction({ ...action, keycode: targetKey });
       } else {
         updateSelectedAction(clickedAction);
@@ -158,7 +160,9 @@ export const KeycodePanel = () => {
       if (action.action === 'lt' || action.action === 'mt') {
         updateSelectedAction({ ...action, tapAction: clickedAction });
       } else if (action.action === 'tap' && action.mods !== undefined) {
-        const targetKey = clickedAction.action === 'tap' ? clickedAction.keycode : 'TRNS';
+        const targetKey = clickedAction.action === 'tap' 
+          ? clickedAction.keycode 
+          : (clickedAction.action === 'none' ? 'NO' : 'TRNS');
         updateSelectedAction({ ...action, keycode: targetKey as any });
       }
     } else {
