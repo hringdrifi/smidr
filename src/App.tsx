@@ -18,8 +18,9 @@ import { UnlockModal } from '@/components/UnlockModal';
 import { useKeyboardStore } from '@/lib/store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { generateSmidrProjectJson, downloadJson, downloadBlob } from '@/lib/export';
+import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson } from '@/lib/export';
 import { generateQmkZip } from '@/lib/qmk';
+import { generateVialZip } from '@/lib/vial';
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
 import { UniversalAction } from '@/types/actions';
 import { SmidrProject, PhysicalKey } from '@/types/keyboard';
@@ -128,14 +129,25 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
-  const handleExportZip = async () => {
+  const handleExportViaZip = async () => {
     const zipBlob = await generateQmkZip({ settings, keys });
     if (zipBlob) {
-      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_qmk.zip`, zipBlob);
+      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_via_qmk.zip`, zipBlob);
     }
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
   };
+
+  const handleExportVialZip = async () => {
+    const zipBlob = await generateVialZip({ settings, keys });
+    if (zipBlob) {
+      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_vial_qmk.zip`, zipBlob);
+    }
+    setIsProjectMenuOpen(false);
+    setIsExportMenuOpen(false);
+  };
+
+
 
   const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -495,12 +507,20 @@ export default function App() {
                             <FileDown size={14} className="text-amber-500" />
                             <span>{t('header.exportProject')} (.smidr)</span>
                           </button>
+
                           <button 
-                            onClick={handleExportZip}
+                            onClick={handleExportViaZip}
                             className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
                           >
                             <Download size={14} className="text-amber-500" />
-                            <span>{t('header.exportQmk')} (.zip)</span>
+                            <span>{t('header.exportViaZip')}</span>
+                          </button>
+                          <button 
+                            onClick={handleExportVialZip}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                          >
+                            <Download size={14} className="text-amber-500" />
+                            <span>{t('header.exportVialZip')}</span>
                           </button>
                         </div>
                       </div>

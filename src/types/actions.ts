@@ -26,7 +26,7 @@ export type UniversalKey =
   | "UP" | "DOWN" | "LEFT" | "RIGHT"
   | "INS" | "DEL" | "HOME" | "END" | "PGUP" | "PGDN"
   // ロックキー (KC_ を除去)
-  | "NLCK" | "SLCK" | "PSCR" | "PAUS"
+  | "NLCK" | "SCRL" | "PSCR" | "PAUS"
   // 統一された修飾キー
   | "LCTL" | "LSFT" | "LALT" | "LGUI"
   | "RCTL" | "RSFT" | "RALT" | "RGUI"

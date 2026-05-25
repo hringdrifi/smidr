@@ -38,7 +38,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'F11', label: 'F11', category: 'Basic', row: 0 },
   { code: 'F12', label: 'F12', category: 'Basic', row: 0 },
   { code: 'PSCR', label: 'PrtSc', category: 'Basic', row: 0, spacer: 0.25 },
-  { code: 'SLCK', label: 'ScrLk', category: 'Basic', row: 0 },
+  { code: 'SCRL', label: 'ScrLk', category: 'Basic', row: 0 },
   { code: 'PAUS', label: 'Pause', category: 'Basic', row: 0 },
 
   // Row 1
@@ -138,7 +138,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'F11', label: 'F11', category: 'ISO/JIS', row: 0 },
   { code: 'F12', label: 'F12', category: 'ISO/JIS', row: 0 },
   { code: 'PSCR', label: 'PrtSc', category: 'ISO/JIS', row: 0, spacer: 0.25 },
-  { code: 'SLCK', label: 'ScrLk', category: 'ISO/JIS', row: 0 },
+  { code: 'SCRL', label: 'ScrLk', category: 'ISO/JIS', row: 0 },
   { code: 'PAUS', label: 'Pause', category: 'ISO/JIS', row: 0 },
 
   // Row 1

@@ -118,7 +118,7 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
 
   // Lock keys
   "NLCK": { qmk: "KC_NLCK", hid: 0x0053 },
-  "SLCK": { qmk: "KC_SLCK", hid: 0x0047 },
+  "SCRL": { qmk: "KC_SCRL", hid: 0x0047 },
   "PSCR": { qmk: "KC_PSCR", hid: 0x0046 },
   "PAUS": { qmk: "KC_PAUS", hid: 0x0048 },
 

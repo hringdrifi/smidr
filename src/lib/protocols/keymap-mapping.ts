@@ -72,7 +72,7 @@ export const HID_TO_QMK: Record<number, string> = {
   0x0044: 'KC_F11',
   0x0045: 'KC_F12',
   0x0046: 'KC_PSCR',
-  0x0047: 'KC_SLCK',
+  0x0047: 'KC_SCRL',
   0x0048: 'KC_PAUS',
   0x0049: 'KC_INS',
   0x004A: 'KC_HOME',
