@@ -187,7 +187,7 @@ export const MODIFIER_MASKS: Record<Modifier, number> = {
 // Decodes standard 16-bit QMK keycodes into the unified UniversalAction AST
 export function viaCodeToAction(value: number): UniversalAction {
   // Transparent (Pass-through)
-  if (value === 0x0001) return { type: 'transparent' };
+  if (value === 0x0001) return { type: 'trans' };
   
   // None (No Action)
   if (value === 0x0000) return { type: 'none' };
@@ -211,23 +211,23 @@ export function viaCodeToAction(value: number): UniversalAction {
     });
 
     const innerAction = viaCodeToAction(innerHid);
-    const key = innerAction.type === 'basic' ? innerAction.key : 'TRNS';
-    return { type: 'modifier', modifiers, key };
+    const keycode = innerAction.type === 'tap' ? innerAction.keycode : 'TRNS';
+    return { type: 'mod', modifiers, keycode };
   }
 
   // Layer Momentary MO(n) -> 0x5200 - 0x520F range
   if (value >= 0x5200 && value <= 0x520F) {
-    return { type: 'layer_momentary', layerId: value - 0x5200 };
+    return { type: 'mo', layerId: value - 0x5200 };
   }
 
   // Layer Toggle TG(n) -> 0x5210 - 0x521F range
   if (value >= 0x5210 && value <= 0x521F) {
-    return { type: 'layer_toggle', layerId: value - 0x5210 };
+    return { type: 'tg', layerId: value - 0x5210 };
   }
 
   // Layer To TO(n) -> 0x5220 - 0x522F range
   if (value >= 0x5220 && value <= 0x522F) {
-    return { type: 'layer_to', layerId: value - 0x5220 };
+    return { type: 'to', layerId: value - 0x5220 };
   }
 
   // Layer Tap LT(layer, key) -> 0x4000 - 0x4FFF range
@@ -235,7 +235,7 @@ export function viaCodeToAction(value: number): UniversalAction {
     const layerId = (value & 0x0F00) >> 8;
     const innerHid = value & 0x00FF;
     const innerAction = viaCodeToAction(innerHid);
-    return { type: 'layer_tap', layerId, tapAction: innerAction };
+    return { type: 'lt', layerId, tapAction: innerAction };
   }
 
   // Mod Tap MT(mod, key) -> 0x2000 - 0x3FFF range
@@ -256,7 +256,7 @@ export function viaCodeToAction(value: number): UniversalAction {
         }
       }
     });
-    return { type: 'mod_tap', modifiers, tapAction };
+    return { type: 'mt', modifiers, tapAction };
   }
 
   // Macro execution -> 0x7700 range
@@ -273,7 +273,7 @@ export function viaCodeToAction(value: number): UniversalAction {
 
   // Basic keys lookup
   if (HID_TO_UNIVERSAL[value]) {
-    return { type: 'basic', key: HID_TO_UNIVERSAL[value] };
+    return { type: 'tap', keycode: HID_TO_UNIVERSAL[value] };
   }
 
   // Escape hatch for unsupported raw codes
@@ -283,29 +283,29 @@ export function viaCodeToAction(value: number): UniversalAction {
 // Encodes UniversalAction AST back into standard 16-bit QMK dynamic keycodes
 export function actionToViaCode(action: UniversalAction): number {
   switch (action.type) {
-    case 'transparent':
+    case 'trans':
       return 0x0001;
     case 'none':
       return 0x0000;
-    case 'basic':
-      return KEY_MAP[action.key]?.hid ?? 0x0000;
-    case 'modifier': {
+    case 'tap':
+      return KEY_MAP[action.keycode]?.hid ?? 0x0000;
+    case 'mod': {
       let mask = 0;
       action.modifiers.forEach(m => { mask |= MODIFIER_MASKS[m]; });
-      const innerCode = KEY_MAP[action.key]?.hid ?? 0x0000;
+      const innerCode = KEY_MAP[action.keycode]?.hid ?? 0x0000;
       return ((mask & 0x1F) << 8) | (innerCode & 0xFF);
     }
-    case 'layer_momentary':
+    case 'mo':
       return 0x5200 + (action.layerId & 0xF);
-    case 'layer_toggle':
+    case 'tg':
       return 0x5210 + (action.layerId & 0xF);
-    case 'layer_to':
+    case 'to':
       return 0x5220 + (action.layerId & 0xF);
-    case 'layer_tap': {
+    case 'lt': {
       const innerCode = actionToViaCode(action.tapAction);
       return 0x4000 | ((action.layerId & 0xF) << 8) | (innerCode & 0xFF);
     }
-    case 'mod_tap': {
+    case 'mt': {
       const innerCode = actionToViaCode(action.tapAction);
       let modBits = 0;
       action.modifiers.forEach(m => { modBits |= MODIFIER_MASKS[m]; });
@@ -333,31 +333,31 @@ export function actionToViaCode(action: UniversalAction): number {
 // Converts UniversalAction AST into QMK C-macro string notations (for info.json/keymap.c exports)
 export function actionToQmkString(action: UniversalAction): string {
   switch (action.type) {
-    case 'transparent':
+    case 'trans':
       return 'KC_TRNS';
     case 'none':
       return 'KC_NO';
-    case 'basic':
-      return KEY_MAP[action.key]?.qmk ?? 'KC_NO';
-    case 'modifier': {
-      const innerQmk = KEY_MAP[action.key]?.qmk ?? 'KC_NO';
+    case 'tap':
+      return KEY_MAP[action.keycode]?.qmk ?? 'KC_NO';
+    case 'mod': {
+      const innerQmk = KEY_MAP[action.keycode]?.qmk ?? 'KC_NO';
       let result = innerQmk;
       action.modifiers.forEach(mod => {
         result = `${mod}(${result})`;
       });
       return result;
     }
-    case 'layer_momentary':
+    case 'mo':
       return `MO(${action.layerId})`;
-    case 'layer_toggle':
+    case 'tg':
       return `TG(${action.layerId})`;
-    case 'layer_to':
+    case 'to':
       return `TO(${action.layerId})`;
-    case 'layer_tap': {
+    case 'lt': {
       const innerQmk = actionToQmkString(action.tapAction);
       return `LT(${action.layerId}, ${innerQmk})`;
     }
-    case 'mod_tap': {
+    case 'mt': {
       const innerQmk = actionToQmkString(action.tapAction);
       const mods = action.modifiers.map(m => `MOD_${m}`).join(' | ');
       return `MT(${mods}, ${innerQmk})`;
@@ -382,7 +382,7 @@ export function actionToQmkString(action: UniversalAction): string {
 export function qmkStringToAction(qmkStr: string): UniversalAction {
   const trimmed = qmkStr.trim();
   
-  if (trimmed === 'KC_TRNS') return { type: 'transparent' };
+  if (trimmed === 'KC_TRNS') return { type: 'trans' };
   if (trimmed === 'KC_NO') return { type: 'none' };
 
   // Nested modifiers LCTL(LSFT(KC_A)) or shortcuts C(S(KC_A))
@@ -397,17 +397,17 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
     const mod = (shortcutMap[modName] || modName) as Modifier;
     
     const innerAction = qmkStringToAction(innerStr);
-    if (innerAction.type === 'modifier') {
+    if (innerAction.type === 'mod') {
       return {
-        type: 'modifier',
+        type: 'mod',
         modifiers: [mod, ...innerAction.modifiers],
-        key: innerAction.key
+        keycode: innerAction.keycode
       };
-    } else if (innerAction.type === 'basic') {
+    } else if (innerAction.type === 'tap') {
       return {
-        type: 'modifier',
+        type: 'mod',
         modifiers: [mod],
-        key: innerAction.key
+        keycode: innerAction.keycode
       };
     }
   }
@@ -425,41 +425,41 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
     else if (macroName === 'MEH') modifiers = ['LCTL', 'LSFT', 'LALT'];
     else if (macroName === 'HYPR') modifiers = ['LCTL', 'LSFT', 'LALT', 'LGUI'];
     
-    const targetKey = innerAction.type === 'basic' ? innerAction.key : (innerAction.type === 'modifier' ? innerAction.key : 'TRNS');
+    const targetKey = innerAction.type === 'tap' ? innerAction.keycode : (innerAction.type === 'mod' ? innerAction.keycode : 'TRNS');
     
-    if (innerAction.type === 'modifier') {
+    if (innerAction.type === 'mod') {
       return {
-        type: 'modifier',
+        type: 'mod',
         modifiers: [...modifiers, ...innerAction.modifiers],
-        key: targetKey
+        keycode: targetKey
       };
     } else {
       return {
-        type: 'modifier',
+        type: 'mod',
         modifiers,
-        key: targetKey
+        keycode: targetKey
       };
     }
   }
 
   // MO(n)
   let match = trimmed.match(/^MO\((\d+)\)$/);
-  if (match) return { type: 'layer_momentary', layerId: parseInt(match[1]) };
+  if (match) return { type: 'mo', layerId: parseInt(match[1]) };
 
   // TG(n)
   match = trimmed.match(/^TG\((\d+)\)$/);
-  if (match) return { type: 'layer_toggle', layerId: parseInt(match[1]) };
+  if (match) return { type: 'tg', layerId: parseInt(match[1]) };
 
   // TO(n)
   match = trimmed.match(/^TO\((\d+)\)$/);
-  if (match) return { type: 'layer_to', layerId: parseInt(match[1]) };
+  if (match) return { type: 'to', layerId: parseInt(match[1]) };
 
   // LT(layer, key)
   match = trimmed.match(/^LT\((\d+)\s*,\s*([^)]+)\)$/);
   if (match) {
     const layerId = parseInt(match[1]);
     const tapAction = qmkStringToAction(match[2]);
-    return { type: 'layer_tap', layerId, tapAction };
+    return { type: 'lt', layerId, tapAction };
   }
 
   // MT(mod, key)
@@ -476,7 +476,7 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
         modifiers.push(cleanMod as Modifier);
       }
     });
-    return { type: 'mod_tap', modifiers, tapAction };
+    return { type: 'mt', modifiers, tapAction };
   }
 
   // MACRO(n)
@@ -492,7 +492,7 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
 
   // Basic keys lookup
   if (QMK_TO_UNIVERSAL[trimmed]) {
-    return { type: 'basic', key: QMK_TO_UNIVERSAL[trimmed] };
+    return { type: 'tap', keycode: QMK_TO_UNIVERSAL[trimmed] };
   }
 
   return { type: 'custom', protocol: 'qmk', rawCode: trimmed };

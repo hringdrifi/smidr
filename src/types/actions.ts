@@ -46,31 +46,28 @@ export type UniversalKey =
 export type Modifier = "LCTL" | "LSFT" | "LALT" | "LGUI" | "RCTL" | "RSFT" | "RALT" | "RGUI";
 
 export type UniversalAction =
-  | { type: "transparent" }                                              // ▽ (レイヤー継承)
+  | { type: "trans" }                                              // ▽ (レイヤー継承)
   | { type: "none" }                                                     // キー割り当てなし
-  | { type: "basic"; key: UniversalKey }                                 // 通常キー単体押し (例: "A", "SPC")
-  | { type: "modifier"; modifiers: Modifier[]; key: UniversalKey }       // 修飾キー+キー同時押し
-  | { type: "layer_momentary"; layerId: number }                         // 一時レイヤー遷移 (MO)
-  | { type: "layer_toggle"; layerId: number }                            // レイヤー有効化トグル (TG)
-  | { type: "layer_to"; layerId: number }                                // レイヤー直接切り替え (TO)
-  | { type: "layer_tap"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
-  | { type: "mod_tap"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
+  | { type: "tap"; keycode: UniversalKey }                                 // 通常キー単体押し (例: "A", "SPC")
+  | { type: "mod"; modifiers: Modifier[]; keycode: UniversalKey }       // 修飾キー+キー同時押し
+  | { type: "mo"; layerId: number }                                     // 一時レイヤー遷移 (MO)
+  | { type: "tg"; layerId: number }                                        // レイヤー有効化トグル (TG)
+  | { type: "to"; layerId: number }                                            // レイヤー直接切り替え (TO)
+  | { type: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
+  | { type: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
   | { type: "macro"; macroId: number }                                   // マクロ
   | { type: "lighting"; command: "TOGGLE" | "MODE_UP" | "MODE_DOWN" | "BRIGHTNESS_UP" | "BRIGHTNESS_DOWN" } // 統一ライティング操作
   | { type: "custom"; protocol: "qmk" | "zmk"; rawCode: string };        // エスケープハッチ
 
 export interface MacroAction {
-  type: 'text' | 'tap' | 'down' | 'up' | 'delay';
+  action: 'text' | 'tap' | 'down' | 'up' | 'delay';
   text?: string;
-  keys?: string[]; // UniversalKey or custom raw code strings like "0x1234"
+  keycodes?: string[]; // UniversalKey or custom raw code strings like "0x1234"
   duration?: number; // Delay in milliseconds
 }
 
 export interface ComboEntry {
-  input1: UniversalAction;
-  input2: UniversalAction;
-  input3: UniversalAction;
-  input4: UniversalAction;
+  inputs: UniversalAction[];
   output: UniversalAction;
 }
 

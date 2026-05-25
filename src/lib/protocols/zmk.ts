@@ -169,14 +169,14 @@ export class ZmkProtocol implements IProtocolDriver {
         for (let c = 0; c < 32; c++) {
           if (l === 0) {
             if (r === 2 && c === 4) {
-              this.simulatedKeymap[l][r][c] = { type: 'basic', key: 'A' };
+              this.simulatedKeymap[l][r][c] = { type: 'tap', keycode: 'A' };
             } else if (r === 2 && c === 5) {
-              this.simulatedKeymap[l][r][c] = { type: 'basic', key: 'B' };
+              this.simulatedKeymap[l][r][c] = { type: 'tap', keycode: 'B' };
             } else if (r === 3 && c === 8) {
               this.simulatedKeymap[l][r][c] = { 
-                type: 'layer_tap', 
+                type: 'lt', 
                 layerId: 1, 
-                tapAction: { type: 'basic', key: 'SPC' } 
+                tapAction: { type: 'tap', keycode: 'SPC' } 
               };
             } else {
               this.simulatedKeymap[l][r][c] = { type: 'transparent' };

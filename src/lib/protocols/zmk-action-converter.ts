@@ -112,7 +112,7 @@ export const ZMK_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(ZMK
 }, {} as Record<string, UniversalKey>);
 
 // Recursively parses ZMK nested modifiers like LC(LS(A))
-export function parseZmkModifiedKey(str: string): { modifiers: Modifier[], key: UniversalKey } | null {
+export function parseZmkModifiedKey(str: string): { modifiers: Modifier[], keycode: UniversalKey } | null {
   const match = str.match(/^(LC|LS|LA|LG|RC|RS|RA|RG)\((.+)\)$/);
   if (match) {
     const sh = match[1];
@@ -128,13 +128,13 @@ export function parseZmkModifiedKey(str: string): { modifiers: Modifier[], key: 
     if (parsedInner) {
       return {
         modifiers: [mod, ...parsedInner.modifiers],
-        key: parsedInner.key
+        keycode: parsedInner.keycode
       };
     } else {
       const uKey = ZMK_TO_UNIVERSAL[inner] || inner;
       return {
         modifiers: [mod],
-        key: uKey as UniversalKey
+        keycode: uKey as UniversalKey
       };
     }
   }
@@ -144,22 +144,22 @@ export function parseZmkModifiedKey(str: string): { modifiers: Modifier[], key: 
 // Helper to convert UniversalAction AST to ZMK DTS string notation (e.g. for dynamic keymap compilation)
 export function actionToZmkString(action: UniversalAction): string {
   switch (action.type) {
-    case 'transparent':
+    case 'trans':
       return '&trans';
     case 'none':
       return '&none';
-    case 'basic': {
-      const zKey = ZMK_KEY_MAP[action.key] || action.key;
-      if (action.key.startsWith('MOUSE_BTN')) {
+    case 'tap': {
+      const zKey = ZMK_KEY_MAP[action.keycode] || action.keycode;
+      if (action.keycode.startsWith('MOUSE_BTN')) {
         return `&mkp ${zKey}`;
       }
-      if (action.key.startsWith('MOUSE_') && (action.key as string) !== 'MOUSE_BTN') {
+      if (action.keycode.startsWith('MOUSE_') && (action.keycode as string) !== 'MOUSE_BTN') {
         return `&mmv ${zKey}`;
       }
       return `&kp ${zKey}`;
     }
-    case 'modifier': {
-      const zKey = ZMK_KEY_MAP[action.key] || action.key;
+    case 'mod': {
+      const zKey = ZMK_KEY_MAP[action.keycode] || action.keycode;
       let result = zKey;
       const shortcutMap: Record<Modifier, string> = {
         'LCTL': 'LC', 'LSFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
@@ -171,17 +171,17 @@ export function actionToZmkString(action: UniversalAction): string {
       });
       return `&kp ${result}`;
     }
-    case 'layer_momentary':
+    case 'mo':
       return `&mo ${action.layerId}`;
-    case 'layer_toggle':
+    case 'tg':
       return `&tog ${action.layerId}`;
-    case 'layer_to':
+    case 'to':
       return `&to ${action.layerId}`;
-    case 'layer_tap': {
+    case 'lt': {
       const inner = actionToZmkString(action.tapAction).replace(/^&kp\s+/, '');
       return `&lt ${action.layerId} ${inner}`;
     }
-    case 'mod_tap': {
+    case 'mt': {
       const inner = actionToZmkString(action.tapAction).replace(/^&kp\s+/, '');
       const mods = action.modifiers.map(m => ZMK_KEY_MAP[m] || m).join(' ');
       return `&mt ${mods} ${inner}`;
@@ -209,27 +209,27 @@ export function actionToZmkString(action: UniversalAction): string {
 export function zmkStringToAction(zmkStr: string): UniversalAction {
   const trimmed = zmkStr.trim();
 
-  if (trimmed === '&trans') return { type: 'transparent' };
+  if (trimmed === '&trans') return { type: 'trans' };
   if (trimmed === '&none') return { type: 'none' };
 
   // momentary layer (&mo 1)
   let match = trimmed.match(/^&mo\s+(\d+)$/);
-  if (match) return { type: 'layer_momentary', layerId: parseInt(match[1]) };
+  if (match) return { type: 'mo', layerId: parseInt(match[1]) };
 
   // layer toggle (&tog 1)
   match = trimmed.match(/^&tog\s+(\d+)$/);
-  if (match) return { type: 'layer_toggle', layerId: parseInt(match[1]) };
+  if (match) return { type: 'tg', layerId: parseInt(match[1]) };
 
   // layer to (&to 1)
   match = trimmed.match(/^&to\s+(\d+)$/);
-  if (match) return { type: 'layer_to', layerId: parseInt(match[1]) };
+  if (match) return { type: 'to', layerId: parseInt(match[1]) };
 
   // layer tap (&lt 1 SPACE)
   match = trimmed.match(/^&lt\s+(\d+)\s+([^\s]+)$/);
   if (match) {
     const layerId = parseInt(match[1]);
     const tapAction = zmkStringToAction(`&kp ${match[2]}`);
-    return { type: 'layer_tap', layerId, tapAction };
+    return { type: 'lt', layerId, tapAction };
   }
 
   // mod tap (&mt LCTRL SPACE or &mt LCTRL LSHIFT SPACE)
@@ -241,7 +241,7 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
       const clean = m.trim();
       return ZMK_TO_UNIVERSAL[clean] || clean;
     }) as Modifier[];
-    return { type: 'mod_tap', modifiers, tapAction };
+    return { type: 'mt', modifiers, tapAction };
   }
 
   // macro (&macro_0)
@@ -253,7 +253,7 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
   if (match) {
     const inner = match[2];
     if (ZMK_TO_UNIVERSAL[inner]) {
-      return { type: 'basic', key: ZMK_TO_UNIVERSAL[inner] };
+      return { type: 'tap', keycode: ZMK_TO_UNIVERSAL[inner] };
     }
   }
 
@@ -263,10 +263,10 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
     const inner = match[1];
     const parsedMod = parseZmkModifiedKey(inner);
     if (parsedMod) {
-      return { type: 'modifier', modifiers: parsedMod.modifiers, key: parsedMod.key };
+      return { type: 'mod', modifiers: parsedMod.modifiers, keycode: parsedMod.keycode };
     }
     if (ZMK_TO_UNIVERSAL[inner]) {
-      return { type: 'basic', key: ZMK_TO_UNIVERSAL[inner] };
+      return { type: 'tap', keycode: ZMK_TO_UNIVERSAL[inner] };
     }
   }
 
@@ -277,6 +277,6 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
 export function actionToZmkRpc(action: UniversalAction): any {
   return {
     behaviorId: action.type,
-    param: action.type === 'basic' ? ZMK_KEY_MAP[action.key] : null
+    param: action.type === 'tap' ? ZMK_KEY_MAP[action.keycode] : null
   };
 }

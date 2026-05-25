@@ -72,10 +72,10 @@ export function deserializeMacro(data: Uint8Array, protocolVersion: number): Mac
           
           // Append to previous sequence if it is of the same type
           const lastAction = actions[actions.length - 1];
-          if (lastAction && lastAction.type === actionType && lastAction.keys) {
-            lastAction.keys.push(qmkKey);
+          if (lastAction && lastAction.action === actionType && lastAction.keycodes) {
+            lastAction.keycodes.push(qmkKey);
           } else {
-            actions.push({ type: actionType, keys: [qmkKey] });
+            actions.push({ action: actionType, keycodes: [qmkKey] });
           }
           
           i += length;
@@ -83,7 +83,7 @@ export function deserializeMacro(data: Uint8Array, protocolVersion: number): Mac
           if (i + 3 >= data.length) break;
           // delay decoding
           const delay = (data[i + 2] - 1) + (data[i + 3] - 1) * 255;
-          actions.push({ type: 'delay', duration: delay });
+          actions.push({ action: 'delay', duration: delay });
           i += 4;
         } else {
           // Skipping malformed byte sequence
@@ -92,10 +92,10 @@ export function deserializeMacro(data: Uint8Array, protocolVersion: number): Mac
       } else {
         const ch = String.fromCharCode(data[i]);
         const lastAction = actions[actions.length - 1];
-        if (lastAction && lastAction.type === 'text') {
+        if (lastAction && lastAction.action === 'text') {
           lastAction.text += ch;
         } else {
-          actions.push({ type: 'text', text: ch });
+          actions.push({ action: 'text', text: ch });
         }
         i++;
       }
@@ -110,20 +110,20 @@ export function deserializeMacro(data: Uint8Array, protocolVersion: number): Mac
         const qmkKey = qmkCodeToKey(kc);
         
         const lastAction = actions[actions.length - 1];
-        if (lastAction && lastAction.type === actionType && lastAction.keys) {
-          lastAction.keys.push(qmkKey);
+        if (lastAction && lastAction.action === actionType && lastAction.keycodes) {
+          lastAction.keycodes.push(qmkKey);
         } else {
-          actions.push({ type: actionType, keys: [qmkKey] });
+          actions.push({ action: actionType, keycodes: [qmkKey] });
         }
         
         i += 2;
       } else {
         const ch = String.fromCharCode(data[i]);
         const lastAction = actions[actions.length - 1];
-        if (lastAction && lastAction.type === 'text') {
+        if (lastAction && lastAction.action === 'text') {
           lastAction.text += ch;
         } else {
-          actions.push({ type: 'text', text: ch });
+          actions.push({ action: 'text', text: ch });
         }
         i++;
       }
@@ -158,12 +158,12 @@ export function serializeMacro(actions: MacroAction[], protocolVersion: number):
   const bytes: number[] = [];
   
   for (const action of actions) {
-    if (action.type === 'text') {
+    if (action.action === 'text') {
       const textBytes = new TextEncoder().encode(action.text || '');
       for (let j = 0; j < textBytes.length; j++) {
         bytes.push(textBytes[j]);
       }
-    } else if (action.type === 'delay') {
+    } else if (action.action === 'delay') {
       if (protocolVersion >= 2) {
         const d = action.duration || 0;
         bytes.push(SS_QMK_PREFIX);
@@ -172,9 +172,9 @@ export function serializeMacro(actions: MacroAction[], protocolVersion: number):
         bytes.push(Math.floor(d / 255) + 1);
       }
     } else { // tap, down, up
-      const keys = action.keys || [];
-      const actType = action.type;
-      for (const k of keys) {
+      const keycodes = action.keycodes || [];
+      const actType = action.action;
+      for (const k of keycodes) {
         const kc = keyToQmkCode(k);
         if (protocolVersion >= 2) {
           bytes.push(SS_QMK_PREFIX);

@@ -62,23 +62,23 @@ export const KeycodePanel = () => {
   const selectedKey = keys.find(k => k.id === selectedKeyId);
   const hasMatrix = selectedKey && selectedKey.row !== undefined;
 
-  let action: UniversalAction = { type: 'transparent' };
+  let action: UniversalAction = { type: 'trans' };
   if (selectedKey) {
     if (useKeyboardStore.getState().appMode === 'remap') {
       if (hasMatrix) {
         const flatIndex = selectedKey.row! * 32 + selectedKey.col!;
-        action = remoteKeymap[currentLayer]?.[flatIndex] || { type: 'transparent' };
+        action = remoteKeymap[currentLayer]?.[flatIndex] || { type: 'trans' };
       }
     } else {
-      action = selectedKey.keymap?.[currentLayer] || { type: 'transparent' };
+      action = selectedKey.keymap?.[currentLayer] || { type: 'trans' };
     }
   }
 
-  const isLT = action.type === 'layer_tap';
-  const ltLayer = action.type === 'layer_tap' ? action.layerId : 1;
-  const ltKc = action.type === 'layer_tap' 
-    ? (action.tapAction.type === 'basic' ? action.tapAction.key : action.tapAction.type)
-    : 'transparent';
+  const isLT = action.type === 'lt';
+  const ltLayer = action.type === 'lt' ? action.layerId : 1;
+  const ltKc = action.type === 'lt' 
+    ? (action.tapAction.type === 'tap' ? action.tapAction.keycode : action.tapAction.type)
+    : 'trans';
 
   const updateSelectedAction = (newAction: UniversalAction) => {
     if (!selectedKey) return;
@@ -94,9 +94,9 @@ export const KeycodePanel = () => {
 
   const handleLtLayerChange = (newLayer: number) => {
     const newAction: UniversalAction = {
-      type: 'layer_tap',
+      type: 'lt',
       layerId: newLayer,
-      tapAction: action.type === 'layer_tap' ? action.tapAction : { type: 'transparent' }
+      tapAction: action.type === 'lt' ? action.tapAction : { type: 'trans' }
     };
     updateSelectedAction(newAction);
   };
@@ -104,15 +104,15 @@ export const KeycodePanel = () => {
   const handleLtKcChange = (newKc: string) => {
     let tapAction: UniversalAction;
     if (newKc === 'transparent') {
-      tapAction = { type: 'transparent' };
+      tapAction = { type: 'trans' };
     } else if (newKc === 'none') {
       tapAction = { type: 'none' };
     } else {
-      tapAction = { type: 'basic', key: newKc as UniversalKey };
+      tapAction = { type: 'tap', keycode: newKc as UniversalKey };
     }
 
     const newAction: UniversalAction = {
-      type: 'layer_tap',
+      type: 'lt',
       layerId: ltLayer,
       tapAction: tapAction
     };
@@ -125,18 +125,18 @@ export const KeycodePanel = () => {
     if (isCapturingParam && selectedKey) {
       let clickedAction: UniversalAction;
       if (code === 'transparent') {
-        clickedAction = { type: 'transparent' };
+        clickedAction = { type: 'trans' };
       } else if (code === 'none') {
         clickedAction = { type: 'none' };
       } else {
-        clickedAction = { type: 'basic', key: code as UniversalKey };
+        clickedAction = { type: 'tap', keycode: code as UniversalKey };
       }
 
-      if (action.type === 'layer_tap' || action.type === 'mod_tap') {
+      if (action.type === 'lt' || action.type === 'mt') {
         updateSelectedAction({ ...action, tapAction: clickedAction });
-      } else if (action.type === 'modifier') {
-        const targetKey = clickedAction.type === 'basic' ? clickedAction.key : 'TRNS';
-        updateSelectedAction({ ...action, key: targetKey });
+      } else if (action.type === 'mod') {
+        const targetKey = clickedAction.type === 'tap' ? clickedAction.keycode : 'TRNS';
+        updateSelectedAction({ ...action, keycode: targetKey });
       } else {
         updateSelectedAction(clickedAction);
       }
@@ -147,21 +147,21 @@ export const KeycodePanel = () => {
     let clickedAction: UniversalAction;
 
     if (code === 'transparent') {
-      clickedAction = { type: 'transparent' };
+      clickedAction = { type: 'trans' };
     } else if (code === 'none') {
       clickedAction = { type: 'none' };
     } else if (code.startsWith('MO(')) {
       const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'layer_momentary', layerId };
+      clickedAction = { type: 'mo', layerId };
     } else if (code.startsWith('TG(')) {
       const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'layer_toggle', layerId };
+      clickedAction = { type: 'tg', layerId };
     } else if (code.startsWith('TO(')) {
       const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'layer_to', layerId };
+      clickedAction = { type: 'to', layerId };
     } else if (code.startsWith('LT(')) {
       const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'layer_tap', layerId, tapAction: { type: 'transparent' } };
+      clickedAction = { type: 'lt', layerId, tapAction: { type: 'trans' } };
     } else if (code.startsWith('MACRO_')) {
       const macroId = parseInt(code.split('_')[1] || '0', 10);
       clickedAction = { type: 'macro', macroId };
@@ -175,7 +175,7 @@ export const KeycodePanel = () => {
       };
       clickedAction = { type: 'lighting', command: lightingMap[code] };
     } else {
-      clickedAction = { type: 'basic', key: code as UniversalKey };
+      clickedAction = { type: 'tap', keycode: code as UniversalKey };
     }
 
     updateSelectedAction(clickedAction);

@@ -164,17 +164,17 @@ export const labelNodeToText = (node: LabelNode): string => {
 export const formatActionLabel = (action: UniversalAction | undefined): LabelNode => {
   if (!action) return { type: 'text', text: '▽' };
   switch (action.type) {
-    case 'transparent':
+    case 'trans':
       return { type: 'text', text: '▽' };
     case 'none':
       return { type: 'empty' };
-    case 'basic': {
-      const match = KEYCODES.find(kc => kc.code === action.key);
-      return { type: 'text', text: match?.label || action.key };
+    case 'tap': {
+      const match = KEYCODES.find(kc => kc.code === action.keycode);
+      return { type: 'text', text: match?.label || action.keycode };
     }
-    case 'modifier': {
-      const baseMatch = KEYCODES.find(kc => kc.code === action.key);
-      const baseLabel = baseMatch?.label || action.key || '';
+    case 'mod': {
+      const baseMatch = KEYCODES.find(kc => kc.code === action.keycode);
+      const baseLabel = baseMatch?.label || action.keycode || '';
       
       const modAbbrev: Record<Modifier, string> = {
         'LCTL': 'CTL', 'RCTL': 'CTL',
@@ -190,15 +190,15 @@ export const formatActionLabel = (action: UniversalAction | undefined): LabelNod
       }
       return { type: 'text', text: `${abbreviatedMods.join('+')}\n${baseLabel}` };
     }
-    case 'layer_momentary':
+    case 'mo':
       return { type: 'layer_action', variant: 'momentary', layerId: action.layerId };
-    case 'layer_toggle':
+    case 'tg':
       return { type: 'layer_action', variant: 'toggle', layerId: action.layerId };
-    case 'layer_to':
+    case 'to':
       return { type: 'layer_action', variant: 'to', layerId: action.layerId };
-    case 'layer_tap':
+    case 'lt':
       return { type: 'layer_tap', layerId: action.layerId, tapLabel: formatActionLabel(action.tapAction) };
-    case 'mod_tap':
+    case 'mt':
       return { type: 'mod_tap', modifiers: action.modifiers, tapLabel: formatActionLabel(action.tapAction) };
     case 'macro':
       return { type: 'text', text: `Macro\n${action.macroId}` };
