@@ -2,6 +2,7 @@
 
 import { useKeyboardStore } from "@/lib/store";
 import { useEffect } from "react";
+import { GoogleAnalytics } from "./GoogleAnalytics";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const theme = useKeyboardStore((s) => s.editorSettings.theme);
@@ -15,7 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={theme}>
+      <GoogleAnalytics />
       {children}
     </div>
   );
 }
+
