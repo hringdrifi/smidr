@@ -54,7 +54,8 @@ export const TRANSLATIONS = {
       changeLanguage: 'Change Language',
       undo: 'Undo (Ctrl+Z)',
       redo: 'Redo (Ctrl+Y)',
-      exportJson: 'Export JSON',
+      exportProject: 'Export Project',
+      importProject: 'Import Project',
       exportQmk: 'Export QMK Source',
     },
     sidebar: {
@@ -319,7 +320,8 @@ export const TRANSLATIONS = {
       changeLanguage: '更改语言',
       undo: '撤销 (Ctrl+Z)',
       redo: '重做 (Ctrl+Y)',
-      exportJson: '导出 JSON',
+      exportProject: '导出项目',
+      importProject: '导入项目',
       exportQmk: '导出 QMK 源码',
     },
     sidebar: {
@@ -584,7 +586,8 @@ export const TRANSLATIONS = {
       changeLanguage: '언어 변경',
       undo: '실행 취소 (Ctrl+Z)',
       redo: '다시 실행 (Ctrl+Y)',
-      exportJson: 'JSON 내보내기',
+      exportProject: '프로젝트 내보내기',
+      importProject: '프로젝트 가져오기',
       exportQmk: 'QMK 소스 내보내기',
     },
     sidebar: {
@@ -849,7 +852,8 @@ export const TRANSLATIONS = {
       changeLanguage: '言語を切り替え',
       undo: '元に戻す (Ctrl+Z)',
       redo: 'やり直し (Ctrl+Y)',
-      exportJson: 'プロジェクトファイルを書き出し',
+      exportProject: 'プロジェクトをエクスポート',
+      importProject: 'プロジェクトをインポート',
       exportQmk: 'QMKソースをダウンロード',
     },
     sidebar: {
@@ -1114,7 +1118,8 @@ export const TRANSLATIONS = {
       changeLanguage: 'Cambiar Idioma',
       undo: 'Deshacer (Ctrl+Z)',
       redo: 'Rehacer (Ctrl+Y)',
-      exportJson: 'Exportar JSON',
+      exportProject: 'Exportar Proyecto',
+      importProject: 'Importar Proyecto',
       exportQmk: 'Exportar Código QMK',
     },
     sidebar: {
@@ -1379,7 +1384,8 @@ export const TRANSLATIONS = {
       changeLanguage: 'Sprache ändern',
       undo: 'Rückgängig (Strg+Z)',
       redo: 'Wiederholen (Strg+Y)',
-      exportJson: 'JSON exportieren',
+      exportProject: 'Projekt exportieren',
+      importProject: 'Projekt importieren',
       exportQmk: 'QMK-Quellcode exportieren',
     },
     sidebar: {
