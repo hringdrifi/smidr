@@ -132,7 +132,7 @@ export default function App() {
   const handleExportViaZip = async () => {
     const zipBlob = await generateQmkZip({ settings, keys });
     if (zipBlob) {
-      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_via_qmk.zip`, zipBlob);
+      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_qmk.zip`, zipBlob);
     }
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
