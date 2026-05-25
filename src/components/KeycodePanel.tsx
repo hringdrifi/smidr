@@ -138,41 +138,66 @@ export const KeycodePanel = () => {
       return;
     }
 
-    let clickedAction: UniversalAction;
+    const isNormalKeycode = !code.startsWith('MO(') && 
+                            !code.startsWith('TG(') && 
+                            !code.startsWith('TO(') && 
+                            !code.startsWith('LT(') && 
+                            !code.startsWith('MACRO_') && 
+                            !['RGB_TOG', 'RGB_MOD', 'RGB_RMOD', 'RGB_VAI', 'RGB_VAD'].includes(code);
 
-    if (code === 'transparent') {
-      clickedAction = { type: 'trans' };
-    } else if (code === 'none') {
-      clickedAction = { type: 'none' };
-    } else if (code.startsWith('MO(')) {
-      const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'mo', layerId };
-    } else if (code.startsWith('TG(')) {
-      const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'tg', layerId };
-    } else if (code.startsWith('TO(')) {
-      const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'to', layerId };
-    } else if (code.startsWith('LT(')) {
-      const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
-      clickedAction = { type: 'lt', layerId, tapAction: { type: 'trans' } };
-    } else if (code.startsWith('MACRO_')) {
-      const macroId = parseInt(code.split('_')[1] || '0', 10);
-      clickedAction = { type: 'macro', macroId };
-    } else if (['RGB_TOG', 'RGB_MOD', 'RGB_RMOD', 'RGB_VAI', 'RGB_VAD'].includes(code)) {
-      const lightingMap: Record<string, any> = {
-        'RGB_TOG': 'TOGGLE',
-        'RGB_MOD': 'MODE_UP',
-        'RGB_RMOD': 'MODE_DOWN',
-        'RGB_VAI': 'BRIGHTNESS_UP',
-        'RGB_VAD': 'BRIGHTNESS_DOWN'
-      };
-      clickedAction = { type: 'lighting', command: lightingMap[code] };
+    if (isNormalKeycode && (action.type === 'lt' || action.type === 'mt' || action.type === 'mod')) {
+      let clickedAction: UniversalAction;
+      if (code === 'transparent') {
+        clickedAction = { type: 'trans' };
+      } else if (code === 'none') {
+        clickedAction = { type: 'none' };
+      } else {
+        clickedAction = { type: 'tap', keycode: code as UniversalKey };
+      }
+
+      if (action.type === 'lt' || action.type === 'mt') {
+        updateSelectedAction({ ...action, tapAction: clickedAction });
+      } else if (action.type === 'mod') {
+        const targetKey = clickedAction.type === 'tap' ? clickedAction.keycode : 'TRNS';
+        updateSelectedAction({ ...action, keycode: targetKey as any });
+      }
     } else {
-      clickedAction = { type: 'tap', keycode: code as UniversalKey };
-    }
+      let clickedAction: UniversalAction;
 
-    updateSelectedAction(clickedAction);
+      if (code === 'transparent') {
+        clickedAction = { type: 'trans' };
+      } else if (code === 'none') {
+        clickedAction = { type: 'none' };
+      } else if (code.startsWith('MO(')) {
+        const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
+        clickedAction = { type: 'mo', layerId };
+      } else if (code.startsWith('TG(')) {
+        const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
+        clickedAction = { type: 'tg', layerId };
+      } else if (code.startsWith('TO(')) {
+        const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
+        clickedAction = { type: 'to', layerId };
+      } else if (code.startsWith('LT(')) {
+        const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
+        clickedAction = { type: 'lt', layerId, tapAction: { type: 'trans' } };
+      } else if (code.startsWith('MACRO_')) {
+        const macroId = parseInt(code.split('_')[1] || '0', 10);
+        clickedAction = { type: 'macro', macroId };
+      } else if (['RGB_TOG', 'RGB_MOD', 'RGB_RMOD', 'RGB_VAI', 'RGB_VAD'].includes(code)) {
+        const lightingMap: Record<string, any> = {
+          'RGB_TOG': 'TOGGLE',
+          'RGB_MOD': 'MODE_UP',
+          'RGB_RMOD': 'MODE_DOWN',
+          'RGB_VAI': 'BRIGHTNESS_UP',
+          'RGB_VAD': 'BRIGHTNESS_DOWN'
+        };
+        clickedAction = { type: 'lighting', command: lightingMap[code] };
+      } else {
+        clickedAction = { type: 'tap', keycode: code as UniversalKey };
+      }
+
+      updateSelectedAction(clickedAction);
+    }
 
     const visKeys = keys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option);
     const sortedKeys = sortKeys(visKeys, editorSettings.sortThresholdY);
