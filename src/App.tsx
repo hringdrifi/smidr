@@ -14,6 +14,7 @@ import { DeviceConnector } from '@/components/DeviceConnector';
 import { HardwareSettingsPanel } from '@/components/HardwareSettingsPanel';
 import { MatrixPropertyPanel } from '@/components/MatrixPropertyPanel';
 import { KeycodeConfigPanel } from '@/components/KeycodeConfigPanel';
+import { UnlockModal } from '@/components/UnlockModal';
 import { useKeyboardStore } from '@/lib/store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -867,6 +868,7 @@ export default function App() {
 
         </div>
       )}
+      <UnlockModal />
       {editorSettings.debugMode && <DebugOverlay />}
     </div>
   );

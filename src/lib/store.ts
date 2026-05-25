@@ -136,6 +136,16 @@ export interface KeyboardState {
   renameLayoutOptionChoice: (groupId: string, choiceIndex: number, newName: string) => void;
   setLayoutOptionGroupType: (groupId: string, type: 'toggle' | 'list') => void;
 
+  unlockState: {
+    showModal: boolean;
+    progress: number;
+    status: 'idle' | 'holding' | 'success' | 'failed';
+    statusText: string;
+    unlockKeys: { row: number; col: number }[];
+  };
+  setUnlockState: (state: Partial<KeyboardState['unlockState']>) => void;
+  performDeviceUnlock: (protocol: VialProtocol) => Promise<boolean>;
+
   // Project Management
   currentProjectId: string | null;
   isProjectOpen: boolean;
@@ -227,6 +237,13 @@ const initialState: Partial<KeyboardState> = {
   previewKeys: null,
   clipboard: [],
   isCapturingParam: false,
+  unlockState: {
+    showModal: false,
+    progress: 0,
+    status: 'idle',
+    statusText: '',
+    unlockKeys: [],
+  },
 };
 
 const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
@@ -293,6 +310,92 @@ export const useKeyboardStore = create<KeyboardState>()(
         },
 
         setTransform: (t: { scale: number, x: number, y: number }) => set({ transform: t }),
+
+        setUnlockState: (state: Partial<KeyboardState['unlockState']>) => set((s: any) => ({
+          unlockState: { ...s.unlockState, ...state }
+        })),
+
+        performDeviceUnlock: async (protocol: VialProtocol): Promise<boolean> => {
+          const { setUnlockState } = get();
+
+          let unlockKeys: { row: number; col: number }[] = [];
+          try {
+            unlockKeys = await protocol.getUnlockKeys();
+            console.log("Device unlock keys:", unlockKeys);
+          } catch (keysErr) {
+            console.warn("Failed to fetch unlock keys from device:", keysErr);
+          }
+
+          setUnlockState({
+            showModal: true,
+            progress: 0,
+            status: 'holding',
+            statusText: 'Press and hold the unlock key combination on your keyboard.',
+            unlockKeys
+          });
+
+          try {
+            await protocol.unlockStart();
+            const startTime = Date.now();
+            const timeoutMs = 30000;
+            let maxCounter = 1;
+            
+            while (Date.now() - startTime < timeoutMs) {
+              const poll = await protocol.unlockPoll();
+              if (poll.unlocked === 1) {
+                setUnlockState({
+                  progress: 100,
+                  status: 'success',
+                  statusText: 'Unlock successful! Continuing write operation...'
+                });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                setUnlockState({ showModal: false });
+                return true;
+              }
+              
+              const curVal = poll.unlockCounter;
+              maxCounter = Math.max(maxCounter, curVal);
+              const progressPercent = maxCounter > 0 
+                ? Math.round(((maxCounter - curVal) / maxCounter) * 100)
+                : 0;
+              
+              setUnlockState({
+                progress: Math.min(99, Math.max(0, progressPercent)),
+                status: 'holding',
+                statusText: `Holding... ${progressPercent}%`
+              });
+              
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            setUnlockState({
+              status: 'failed',
+              statusText: 'Unlock timed out. Please try again.'
+            });
+            try {
+              await protocol.lock();
+            } catch (lockErr) {
+              console.warn('Failed to lock device on timeout:', lockErr);
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            setUnlockState({ showModal: false });
+            return false;
+          } catch (err: any) {
+            console.error('Unlock error:', err);
+            setUnlockState({
+              status: 'failed',
+              statusText: err.message || 'Unlock failed.'
+            });
+            try {
+              await protocol.lock();
+            } catch (lockErr) {
+              console.warn('Failed to lock device on error:', lockErr);
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            setUnlockState({ showModal: false });
+            return false;
+          }
+        },
 
         syncKeymap: async () => {
           const s = get();
@@ -453,6 +556,15 @@ export const useKeyboardStore = create<KeyboardState>()(
             const protocol = new VialProtocol();
             await protocol.initialize(hidTransport);
             
+            const unlockStatus = await protocol.getUnlockStatus();
+            if (unlockStatus === 0) {
+              console.log("Device is locked, starting unlock flow...");
+              const success = await get().performDeviceUnlock(protocol);
+              if (!success) {
+                throw new Error("Unlock cancelled or failed.");
+              }
+            }
+            
             const memorySize = await protocol.getMacroMemorySize();
             const vialVer = await protocol.getVialVersion();
             const isAdvanced = (vialVer & 0xFFFF) >= 2;
@@ -480,6 +592,15 @@ export const useKeyboardStore = create<KeyboardState>()(
           try {
             const protocol = new VialProtocol();
             await protocol.initialize(hidTransport);
+            
+            const unlockStatus = await protocol.getUnlockStatus();
+            if (unlockStatus === 0) {
+              console.log("Device is locked, starting unlock flow...");
+              const success = await get().performDeviceUnlock(protocol);
+              if (!success) {
+                throw new Error("Unlock cancelled or failed.");
+              }
+            }
             
             await protocol.setCombo(index, combo);
             
@@ -747,6 +868,17 @@ export const useKeyboardStore = create<KeyboardState>()(
             const protocol = isVial ? new VialProtocol() : new ViaProtocol();
 
             await protocol.initialize(hidTransport);
+            
+            if (isVial) {
+              const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
+              if (unlockStatus === 0) {
+                console.log("Device is locked, starting unlock flow...");
+                const success = await get().performDeviceUnlock(protocol as VialProtocol);
+                if (!success) {
+                  throw new Error("Unlock cancelled or failed.");
+                }
+              }
+            }
             
             console.log(`[VIA/Vial Write via AST] Layer:${layer} Row:${row} Col:${col}`, action);
             await protocol.setKey(layer, row, col, action);

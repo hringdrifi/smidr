@@ -14,12 +14,15 @@ import { UniversalAction, ComboEntry, MacroAction } from '@/types/actions';
 import { vialCodeToAction, actionToVialCode } from './vial-action-converter';
 
 export enum VialCommand {
-  GetVersion = 0xFE, // Common Vial check
   GetKeyboardId = 0x00,
   GetSize = 0x01,
   GetDef = 0x02,
-  GetUnlockStatus = 0x03,
-  Unlock = 0x04,
+  GetEncoder = 0x03,
+  SetEncoder = 0x04,
+  GetUnlockStatus = 0x05,
+  UnlockStart = 0x06,
+  UnlockPoll = 0x07,
+  Lock = 0x08,
 }
 
 export class VialProtocol extends ViaProtocol {
@@ -82,11 +85,73 @@ export class VialProtocol extends ViaProtocol {
   // Vial commands: response has no prefix echo, data starts at [0]
   async getVialVersion(): Promise<number> {
     const data = new Uint8Array(32);
-    data[0] = VialCommand.GetVersion;
+    data[0] = 0xFE; // Vial Prefix (CMD_VIA_VIAL_PREFIX)
+    data[1] = VialCommand.GetKeyboardId; // 0x00
     await this.sendReport(data);
     const resp = await this.waitForReport();
     // Reference: vial_protocol = uint32 LE at data[0:4]
     return (resp[3] << 24) | (resp[2] << 16) | (resp[1] << 8) | resp[0];
+  }
+
+  // Reference: keyboard_comm.py line 452
+  async getUnlockStatus(): Promise<number> {
+    const data = new Uint8Array(32);
+    data[0] = 0xFE; // CMD_VIA_VIAL_PREFIX
+    data[1] = VialCommand.GetUnlockStatus; // 0x05
+    await this.sendReport(data);
+    const resp = await this.waitForReport();
+    return resp[0];
+  }
+
+  // Reference: keyboard_comm.py line 458
+  async unlockStart(): Promise<void> {
+    const data = new Uint8Array(32);
+    data[0] = 0xFE; // CMD_VIA_VIAL_PREFIX
+    data[1] = VialCommand.UnlockStart; // 0x06
+    await this.sendReport(data);
+    await this.waitForReport(); // ACK
+  }
+
+  // Reference: keyboard_comm.py line 462
+  async unlockPoll(): Promise<{ unlocked: number; unlockCounterMax: number; unlockCounter: number }> {
+    const data = new Uint8Array(32);
+    data[0] = 0xFE; // CMD_VIA_VIAL_PREFIX
+    data[1] = VialCommand.UnlockPoll; // 0x07
+    await this.sendReport(data);
+    const resp = await this.waitForReport();
+    return {
+      unlocked: resp[0],
+      unlockCounterMax: resp[1],
+      unlockCounter: resp[2]
+    };
+  }
+
+  // Reference: keyboard_comm.py line 455
+  async lock(): Promise<void> {
+    const data = new Uint8Array(32);
+    data[0] = 0xFE; // CMD_VIA_VIAL_PREFIX
+    data[1] = VialCommand.Lock; // 0x08
+    await this.sendReport(data);
+    await this.waitForReport(); // ACK
+  }
+
+  // Reference: keyboard_comm.py line 469
+  async getUnlockKeys(): Promise<{ row: number; col: number }[]> {
+    const data = new Uint8Array(32);
+    data[0] = 0xFE; // CMD_VIA_VIAL_PREFIX
+    data[1] = VialCommand.GetUnlockStatus; // 0x05
+    await this.sendReport(data);
+    const resp = await this.waitForReport();
+    
+    const keys: { row: number; col: number }[] = [];
+    for (let x = 0; x < 15; x++) {
+      const row = resp[2 + x * 2];
+      const col = resp[3 + x * 2];
+      if (row !== 255 && col !== 255) {
+        keys.push({ row, col });
+      }
+    }
+    return keys;
   }
 
   // Reference: keyboard_comm.py line 126 — keyboard_id = uint64 LE at data[4:12]
