@@ -61,6 +61,7 @@ export const TRANSLATIONS = {
       exportVia: 'Export VIA JSON',
       exportViaZip: 'Export QMK/VIA Source (.zip)',
       exportVialZip: 'Export Vial Source (.zip)',
+      exportZmkZip: 'Export ZMK Source (.zip)',
     },
     sidebar: {
       editorMode: 'Editor Mode',
@@ -331,6 +332,7 @@ export const TRANSLATIONS = {
       exportVia: '导出 VIA JSON',
       exportViaZip: '导出 QMK/VIA 源码 (.zip)',
       exportVialZip: '导出 Vial 源码 (.zip)',
+      exportZmkZip: '导出 ZMK 源码 (.zip)',
     },
     sidebar: {
       editorMode: '编辑模式',
@@ -601,6 +603,7 @@ export const TRANSLATIONS = {
       exportVia: 'VIA JSON 내보내기',
       exportViaZip: 'QMK/VIA 소스 (.zip) 내보내기',
       exportVialZip: 'Vial 소스 (.zip) 내보내기',
+      exportZmkZip: 'ZMK 소스 (.zip) 내보내기',
     },
     sidebar: {
       editorMode: '에디터 모드',
@@ -871,6 +874,7 @@ export const TRANSLATIONS = {
       exportVia: 'VIA JSONをダウンロード',
       exportViaZip: 'QMK/VIAソース (.zip) をダウンロード',
       exportVialZip: 'Vialソース (.zip) をダウンロード',
+      exportZmkZip: 'ZMKソース (.zip) をダウンロード',
     },
     sidebar: {
       editorMode: 'エディタモード',
@@ -1141,6 +1145,7 @@ export const TRANSLATIONS = {
       exportVia: 'Exportar VIA JSON',
       exportViaZip: 'Exportar Código QMK/VIA (.zip)',
       exportVialZip: 'Exportar Código Vial (.zip)',
+      exportZmkZip: 'Exportar Código ZMK (.zip)',
     },
     sidebar: {
       editorMode: 'Modo de Edición',
@@ -1411,6 +1416,7 @@ export const TRANSLATIONS = {
       exportVia: 'VIA-JSON exportieren',
       exportViaZip: 'QMK/VIA-Quellcode (.zip) exportieren',
       exportVialZip: 'Vial-Quellcode (.zip) exportieren',
+      exportZmkZip: 'ZMK-Quellcode (.zip) exportieren',
     },
     sidebar: {
       editorMode: 'Editor-Modus',
