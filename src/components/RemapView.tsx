@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, RefreshCcw, Usb, SlidersHorizontal, X, Sliders, Wrench, Sparkles } from 'lucide-react';
+import { Cpu, RefreshCcw, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { KeyboardCanvas } from './KeyboardCanvas';
@@ -112,7 +112,7 @@ export const RemapView: React.FC = () => {
                   <div className="absolute top-4 left-20 bottom-[441px] w-80 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300">
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Sparkles size={16} className="text-amber-500" />
+                        <WandSparkles size={16} className="text-amber-500" />
                         <span className="text-xs font-black uppercase tracking-widest text-amber-500">Macros & Combos</span>
                       </div>
                       <button onClick={() => setIsMacrosCombosOpen(false)} className="p-1 hover:bg-amber-500/20 rounded transition-colors text-amber-500">
@@ -199,7 +199,7 @@ export const RemapView: React.FC = () => {
                         )}
                         title="Macros & Combos"
                       >
-                        <Sparkles size={18} className={cn("transition-transform duration-500", isMacrosCombosOpen && "scale-110")} />
+                        <WandSparkles size={18} className={cn("transition-transform duration-500", isMacrosCombosOpen && "scale-110")} />
                         <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
                           Macros & Combos
                         </div>

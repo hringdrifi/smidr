@@ -4,7 +4,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { MacroAction, ComboEntry, UniversalAction, UniversalKey } from '@/types/actions';
 import { KEY_MAP } from '@/lib/protocols/via-action-converter';
 import { 
-  Sparkles, 
+  WandSparkles, 
   Trash2, 
   Plus, 
   Clock, 
@@ -71,8 +71,8 @@ export const MacrosCombosPanel: React.FC = () => {
       const actions: MacroAction[] = [{ type: 'text', text: textValue }];
       await updateRemoteMacro(selectedMacroId, actions);
       showMessage('Macro updated on keyboard!', 'success');
-    } catch (err) {
-      showMessage('Failed to save macro', 'error');
+    } catch (err: any) {
+      showMessage(err.message || 'Failed to save macro', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -83,8 +83,8 @@ export const MacrosCombosPanel: React.FC = () => {
     try {
       await updateRemoteMacro(selectedMacroId, actions);
       showMessage('Macro sequence updated!', 'success');
-    } catch (err) {
-      showMessage('Failed to save macro', 'error');
+    } catch (err: any) {
+      showMessage(err.message || 'Failed to save macro', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -173,8 +173,8 @@ export const MacrosCombosPanel: React.FC = () => {
       await updateRemoteCombo(idx, combo);
       setEditingComboIdx(null);
       showMessage(`Combo ${idx} saved to device!`, 'success');
-    } catch (err) {
-      showMessage('Failed to save combo', 'error');
+    } catch (err: any) {
+      showMessage(err.message || 'Failed to save combo', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -207,7 +207,7 @@ export const MacrosCombosPanel: React.FC = () => {
               : "text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-hover)]"
           )}
         >
-          <Sparkles size={14} />
+          <WandSparkles size={14} />
           Macros
         </button>
         <button

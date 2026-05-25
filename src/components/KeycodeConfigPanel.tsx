@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { KEYCODES, Keycode } from '@/lib/keycodes';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
-import { Search, Info, Check, Sparkles, Keyboard } from 'lucide-react';
+import { Search, Info, Check, Keyboard } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
