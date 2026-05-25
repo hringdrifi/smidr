@@ -179,10 +179,10 @@ export class ZmkProtocol implements IProtocolDriver {
                 tapAction: { type: 'tap', keycode: 'SPC' } 
               };
             } else {
-              this.simulatedKeymap[l][r][c] = { type: 'transparent' };
+              this.simulatedKeymap[l][r][c] = { type: 'trans' };
             }
           } else {
-            this.simulatedKeymap[l][r][c] = { type: 'transparent' };
+            this.simulatedKeymap[l][r][c] = { type: 'trans' };
           }
         }
       }
@@ -202,7 +202,7 @@ export class ZmkProtocol implements IProtocolDriver {
   async getKey(layer: number, row: number, col: number): Promise<UniversalAction> {
     const action = this.simulatedKeymap[layer]?.[row]?.[col];
     if (action) return action;
-    return { type: 'transparent' };
+    return { type: 'trans' };
   }
 
   async setKey(layer: number, row: number, col: number, action: UniversalAction): Promise<void> {
