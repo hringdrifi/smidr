@@ -66,109 +66,108 @@ export const ZoomControls = () => {
   };
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-[200]">
-      {/* Popovers Container */}
-      {appMode !== 'remap' && editorMode === 'layout' && activeMenu && (
-        <>
-          <div className="fixed inset-0" onClick={() => setActiveMenu(null)} />
-          
-          {activeMenu === 'grid' && (
-            <div className="absolute bottom-full left-0 mb-2 w-56 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] p-4 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <section className="space-y-4">
-                <div className="flex items-center gap-2 mb-2 text-[var(--text-muted)]">
-                  <Grid size={12} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{t('zoom.gridSettings')}</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-main)] font-medium">{t('zoom.showGrid')}</span>
-                  <button 
-                    onClick={() => updateEditorSettings({ gridVisible: !editorSettings.gridVisible })}
-                    className={cn(
-                      "w-8 h-4 rounded-full transition-colors relative",
-                      editorSettings.gridVisible ? 'bg-amber-500' : 'bg-zinc-700'
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all",
-                      editorSettings.gridVisible ? 'left-[18px]' : 'left-[2px]'
-                    )} />
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-[var(--text-main)] font-medium">{t('zoom.snapInterval')}</span>
-                    <span className="text-amber-500 font-mono font-bold">{editorSettings.gridSnap}u</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {[1, 0.5, 0.25, 0.125, 0.1].map(snap => (
-                      <button
-                        key={snap}
-                        onClick={() => updateEditorSettings({ gridSnap: snap })}
-                        className={cn(
-                          "px-2 py-1 rounded text-[9px] font-bold transition-all border",
-                          editorSettings.gridSnap === snap 
-                            ? "bg-amber-500 text-zinc-950 border-amber-600" 
-                            : "bg-[var(--bg-button)] text-[var(--text-main)] border-[var(--border-main)] hover:bg-zinc-700"
-                        )}
-                      >
-                        {snap}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
-
-          {activeMenu === 'mouse' && (
-            <div className="absolute bottom-full left-[44px] mb-2 w-56 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] p-4 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <section className="space-y-4">
-                <div className="flex items-center gap-2 mb-2 text-[var(--text-muted)]">
-                  <MousePointer2 size={12} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">{t('zoom.mouseBehavior')}</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-main)] font-medium">{t('zoom.syncPivot')}</span>
-                  <button 
-                    onClick={() => updateEditorSettings({ syncOrigin: !editorSettings.syncOrigin })}
-                    className={cn(
-                      "w-8 h-4 rounded-full transition-colors relative",
-                      editorSettings.syncOrigin ? 'bg-amber-500' : 'bg-zinc-700'
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all",
-                      editorSettings.syncOrigin ? 'left-[18px]' : 'left-[2px]'
-                    )} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-[var(--text-main)] font-medium whitespace-nowrap">{t('zoom.fixedKey')}</span>
-                  <button 
-                    onClick={() => updateEditorSettings({ keepPosOnOriginChange: !editorSettings.keepPosOnOriginChange })}
-                    className={cn(
-                      "w-8 h-4 rounded-full transition-colors relative",
-                      editorSettings.keepPosOnOriginChange ? 'bg-amber-500' : 'bg-zinc-700'
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all",
-                      editorSettings.keepPosOnOriginChange ? 'left-[18px]' : 'left-[2px]'
-                    )} />
-                  </button>
-                </div>
-              </section>
-            </div>
-          )}
-        </>
-      )}
-
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200]">
       {/* Control Bar */}
-      <div className="flex items-center gap-1.5 bg-[var(--bg-panel)]/90 backdrop-blur border border-[var(--border-main)] p-1.5 rounded-lg shadow-2xl">
+      <div className="relative flex items-center gap-1.5 bg-[var(--bg-panel)]/90 backdrop-blur border border-[var(--border-main)] p-1.5 rounded-lg shadow-2xl">
+        {/* Popovers Container */}
+        {appMode !== 'remap' && editorMode === 'layout' && activeMenu && (
+          <>
+            <div className="fixed inset-0" onClick={() => setActiveMenu(null)} />
+            
+            {activeMenu === 'grid' && (
+              <div className="absolute bottom-full left-0 mb-2 w-56 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] p-4 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2 text-[var(--text-muted)]">
+                    <Grid size={12} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{t('zoom.gridSettings')}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-[var(--text-main)] font-medium">{t('zoom.showGrid')}</span>
+                    <button 
+                      onClick={() => updateEditorSettings({ gridVisible: !editorSettings.gridVisible })}
+                      className={cn(
+                        "w-8 h-4 rounded-full transition-colors relative",
+                        editorSettings.gridVisible ? 'bg-amber-500' : 'bg-zinc-700'
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all",
+                        editorSettings.gridVisible ? 'left-[18px]' : 'left-[2px]'
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-[var(--text-main)] font-medium">{t('zoom.snapInterval')}</span>
+                      <span className="text-amber-500 font-mono font-bold">{editorSettings.gridSnap}u</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {[1, 0.5, 0.25, 0.125, 0.1].map(snap => (
+                        <button
+                          key={snap}
+                          onClick={() => updateEditorSettings({ gridSnap: snap })}
+                          className={cn(
+                            "px-2 py-1 rounded text-[9px] font-bold transition-all border",
+                            editorSettings.gridSnap === snap 
+                              ? "bg-amber-500 text-zinc-950 border-amber-600" 
+                              : "bg-[var(--bg-button)] text-[var(--text-main)] border-[var(--border-main)] hover:bg-zinc-700"
+                          )}
+                        >
+                          {snap}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeMenu === 'mouse' && (
+              <div className="absolute bottom-full left-[44px] mb-2 w-56 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] p-4 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2 text-[var(--text-muted)]">
+                    <MousePointer2 size={12} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{t('zoom.mouseBehavior')}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-[var(--text-main)] font-medium">{t('zoom.syncPivot')}</span>
+                    <button 
+                      onClick={() => updateEditorSettings({ syncOrigin: !editorSettings.syncOrigin })}
+                      className={cn(
+                        "w-8 h-4 rounded-full transition-colors relative",
+                        editorSettings.syncOrigin ? 'bg-amber-500' : 'bg-zinc-700'
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all",
+                        editorSettings.syncOrigin ? 'left-[18px]' : 'left-[2px]'
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-[var(--text-main)] font-medium whitespace-nowrap">{t('zoom.fixedKey')}</span>
+                    <button 
+                      onClick={() => updateEditorSettings({ keepPosOnOriginChange: !editorSettings.keepPosOnOriginChange })}
+                      className={cn(
+                        "w-8 h-4 rounded-full transition-colors relative",
+                        editorSettings.keepPosOnOriginChange ? 'bg-amber-500' : 'bg-zinc-700'
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all",
+                        editorSettings.keepPosOnOriginChange ? 'left-[18px]' : 'left-[2px]'
+                      )} />
+                    </button>
+                  </div>
+                </section>
+              </div>
+            )}
+          </>
+        )}
         {appMode !== 'remap' && editorMode === 'layout' && (
           <>
             <button 

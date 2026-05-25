@@ -259,9 +259,9 @@ export function viaCodeToAction(value: number): UniversalAction {
     return { type: 'mod_tap', modifiers, tapAction };
   }
 
-  // Macro execution -> 0x5700 range
-  if (value >= 0x5700 && value <= 0x570F) {
-    return { type: 'macro', macroId: value - 0x5700 };
+  // Macro execution -> 0x7700 range
+  if (value >= 0x7700 && value <= 0x771F) {
+    return { type: 'macro', macroId: value - 0x7700 };
   }
 
   // Backlight / lighting commands -> 0x7C00 range
@@ -312,7 +312,7 @@ export function actionToViaCode(action: UniversalAction): number {
       return 0x2000 | ((modBits & 0x1F) << 8) | (innerCode & 0xFF);
     }
     case 'macro':
-      return 0x5700 + (action.macroId & 0xF);
+      return 0x7700 + (action.macroId & 0x1F);
     case 'lighting':
       if (action.command === 'TOGGLE') return 0x7C00;
       if (action.command === 'MODE_UP') return 0x7C01;

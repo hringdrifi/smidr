@@ -73,8 +73,8 @@ describe('protocols conversion tests', () => {
     });
 
     it('should convert macro calls and lighting actions', () => {
-      expect(viaCodeToAction(0x5701)).toEqual({ type: 'macro', macroId: 1 });
-      expect(actionToViaCode({ type: 'macro', macroId: 1 })).toBe(0x5701);
+      expect(viaCodeToAction(0x7701)).toEqual({ type: 'macro', macroId: 1 });
+      expect(actionToViaCode({ type: 'macro', macroId: 1 })).toBe(0x7701);
 
       expect(viaCodeToAction(0x7C00)).toEqual({ type: 'lighting', command: 'TOGGLE' });
       expect(actionToViaCode({ type: 'lighting', command: 'TOGGLE' })).toBe(0x7C00);
