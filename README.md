@@ -1,4 +1,4 @@
-# Smiðr (スミズル) — Custom Keyboard Designer
+# Smiðr (スミズル) — Custom Keyboard Forge
 
 Smiðr は、直感的な操作でカスタムキーボードの物理レイアウト、マトリックス配線、およびハードウェア構成を設計できる次世代のウェブベース・キーボードエディタです。
 

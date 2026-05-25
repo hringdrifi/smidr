@@ -756,7 +756,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
       {!isProjectOpen && appMode === 'design' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/50 backdrop-blur-[2px]">
           <div className="w-20 h-20 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-dim)] mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in zoom-in duration-500">
-            <FolderOpen size={40} className="text-amber-500/40" />
+            <FolderOpen size={40} className="text-amber-500" />
           </div>
           
           <h2 className="text-2xl font-bold text-[var(--text-highlight)] mb-3 tracking-tight">

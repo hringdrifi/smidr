@@ -33,7 +33,7 @@ export const TRANSLATIONS = {
       parseFailed: 'Failed to parse JSON file',
       selectKeysDesc: 'Select keys on the canvas to edit properties.',
       emptyProjectTitle: 'Please open a project',
-      emptyProjectDesc: 'Create a new project or open an existing one from the top right menu to start designing.',
+      emptyProjectDesc: 'Create a new project or open an existing one from the top-left header menu to start designing.',
     },
     languages: {
       en: 'English',
@@ -297,7 +297,7 @@ export const TRANSLATIONS = {
       parseFailed: '解析 JSON 文件失败',
       selectKeysDesc: '在画布上选择按键以编辑属性。',
       emptyProjectTitle: '请打开项目',
-      emptyProjectDesc: '从右上角菜单创建新项目或打开现有项目以开始设计。',
+      emptyProjectDesc: '从左上方页眉菜单创建新项目或打开现有项目以开始设计。',
     },
     languages: {
       en: '英文',
@@ -561,7 +561,7 @@ export const TRANSLATIONS = {
       parseFailed: 'JSON 파일 파싱에 실패했습니다',
       selectKeysDesc: '캔버스에서 키를 선택하여 속성을 편집하세요.',
       emptyProjectTitle: '프로젝트를 열어주세요',
-      emptyProjectDesc: '우측 상단 메뉴에서 새 프로젝트를 만들거나 기존 프로젝트를 열어 디자인을 시작하세요.',
+      emptyProjectDesc: '좌측 상단 헤더 메뉴에서 새 프로젝트를 만들거나 기존 프로젝트를 열어 디자인을 시작하세요.',
     },
     languages: {
       en: '영어',
@@ -825,7 +825,7 @@ export const TRANSLATIONS = {
       parseFailed: 'JSONファイルの解析に失敗しました',
       selectKeysDesc: 'キャンバス上のキーを選択してプロパティを編集します。',
       emptyProjectTitle: 'プロジェクトを開いてください',
-      emptyProjectDesc: '右上のメニューから新しいプロジェクト（✨）を作成するか、既存のプロジェクト（📁）を開いて設計を開始してください。',
+      emptyProjectDesc: '画面左上のヘッダーメニューから新しいプロジェクトを作成するか、既存のプロジェクトを開いて設計を開始してください。',
     },
     languages: {
       en: '英語',
@@ -1089,7 +1089,7 @@ export const TRANSLATIONS = {
       parseFailed: 'Error al analizar el archivo JSON',
       selectKeysDesc: 'Seleccione teclas en el lienzo para editar propiedades.',
       emptyProjectTitle: 'Por favor, abra un proyecto',
-      emptyProjectDesc: 'Cree un nuevo proyecto o abra uno existente desde el menú superior derecho para comenzar a diseñar.',
+      emptyProjectDesc: 'Cree un nuevo proyecto o abra uno existente desde el menú superior izquierdo en la cabecera para comenzar a diseñar.',
     },
     languages: {
       en: 'Inglés',
@@ -1353,7 +1353,7 @@ export const TRANSLATIONS = {
       parseFailed: 'Fehler beim Parsen der JSON-Datei',
       selectKeysDesc: 'Wählen Sie Tasten auf der Leinwand aus, um Eigenschaften zu bearbeiten.',
       emptyProjectTitle: 'Bitte öffnen Sie ein Projekt',
-      emptyProjectDesc: 'Erstellen Sie ein neues Projekt oder öffnen Sie ein vorhandenes im Menü oben rechts, um mit der Gestaltung zu beginnen.',
+      emptyProjectDesc: 'Erstellen Sie ein neues Projekt oder öffnen Sie ein vorhandenes im Menü oben links in der Kopfzeile, um mit der Gestaltung zu beginnen.',
     },
     languages: {
       en: 'Englisch',

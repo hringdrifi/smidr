@@ -216,7 +216,7 @@ export const RemapView: React.FC = () => {
         ) : (
           <div className="flex-1 relative flex flex-col items-center justify-center text-center p-8 select-none">
             <div className="w-20 h-20 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-dim)] mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-              <Usb size={40} className="text-amber-500/40" />
+              <Usb size={40} className="text-amber-500" />
             </div>
             <h2 className="text-2xl font-bold text-[var(--text-highlight)] mb-3">{t('remap.connectKeyboard') || 'Connect your keyboard'}</h2>
             <p className="text-sm text-[var(--text-muted)] max-w-sm mb-10 leading-relaxed">
