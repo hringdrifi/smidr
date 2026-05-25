@@ -54,7 +54,10 @@ export const RemapView: React.FC = () => {
                   <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-500">
                     {/* Layout Options Toggle Button */}
                     <button
-                      onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+                      onClick={() => {
+                        setIsLeftPanelOpen(!isLeftPanelOpen);
+                        if (isMacrosCombosOpen) setIsMacrosCombosOpen(false);
+                      }}
                       className={cn(
                         "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
                         isLeftPanelOpen 
@@ -68,6 +71,30 @@ export const RemapView: React.FC = () => {
                         {t('sidebar.layoutOptions')}
                       </div>
                     </button>
+
+                    {settings.features?.vial && (
+                      <>
+                        <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
+                        <button 
+                          onClick={() => {
+                            setIsMacrosCombosOpen(!isMacrosCombosOpen);
+                            if (isLeftPanelOpen) setIsLeftPanelOpen(false);
+                          }}
+                          className={cn(
+                            "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
+                            isMacrosCombosOpen 
+                              ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
+                              : "text-[var(--text-dim)] hover:text-white hover:bg-[var(--bg-hover)]"
+                          )}
+                          title="Macros & Combos"
+                        >
+                          <WandSparkles size={18} className={cn("transition-transform duration-500", isMacrosCombosOpen && "scale-110")} />
+                          <div className="absolute right-full mr-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
+                            Macros & Combos
+                          </div>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -107,9 +134,9 @@ export const RemapView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Left Side Floating Panel (Macros & Combos) */}
+                {/* Right Side Floating Panel (Macros & Combos) */}
                 {isMacrosCombosOpen && (
-                  <div className="absolute top-4 left-20 bottom-[416px] w-80 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-left-8 duration-300">
+                  <div className="absolute top-4 right-20 bottom-[416px] w-80 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <WandSparkles size={16} className="text-amber-500" />
@@ -132,7 +159,6 @@ export const RemapView: React.FC = () => {
                     <button 
                       onClick={() => {
                         setIsKeycodeConfigOpen(!isKeycodeConfigOpen);
-                        if (isMacrosCombosOpen) setIsMacrosCombosOpen(false);
                       }}
                       className={cn(
                         "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
@@ -147,27 +173,6 @@ export const RemapView: React.FC = () => {
                         {t('keycodeConfig.title') || 'Keymap Config'}
                       </div>
                     </button>
-
-                    {settings.features?.vial && (
-                      <button 
-                        onClick={() => {
-                          setIsMacrosCombosOpen(!isMacrosCombosOpen);
-                          if (isKeycodeConfigOpen) setIsKeycodeConfigOpen(false);
-                        }}
-                        className={cn(
-                          "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
-                          isMacrosCombosOpen 
-                            ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
-                            : "text-[var(--text-dim)] hover:text-white hover:bg-[var(--bg-hover)]"
-                        )}
-                        title="Macros & Combos"
-                      >
-                        <WandSparkles size={18} className={cn("transition-transform duration-500", isMacrosCombosOpen && "scale-110")} />
-                        <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                          Macros & Combos
-                        </div>
-                      </button>
-                    )}
 
                     {hasDeletableSelection && (
                       <>
