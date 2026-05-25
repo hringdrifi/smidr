@@ -173,6 +173,8 @@ export interface KeyboardState {
 
   // Clipboard
   clipboard: RuntimeKey[];
+  matrixClipboard: { row?: number; col?: number }[];
+  actionClipboard: UniversalAction[];
   copyKeys: () => void;
   pasteKeys: () => void;
 
@@ -236,6 +238,8 @@ const initialState: Partial<KeyboardState> = {
   canvasDimensions: { width: 1000, height: 800 },
   previewKeys: null,
   clipboard: [],
+  matrixClipboard: [],
+  actionClipboard: [],
   isCapturingParam: false,
   unlockState: {
     showModal: false,
@@ -913,24 +917,145 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
         },
 
-        copyKeys: () => set((s) => ({
-          clipboard: s.keys.filter(k => s.selectedKeyIds.includes(k.id)).map(k => ({ ...k }))
-        })),
+        copyKeys: () => set((s) => {
+          const selectedKeys = s.keys.filter(k => s.selectedKeyIds.includes(k.id));
+          const sortedSelectedKeys = sortKeys(selectedKeys, s.editorSettings.sortThresholdY) as RuntimeKey[];
+
+          if (s.editorMode === 'matrix') {
+            return {
+              matrixClipboard: sortedSelectedKeys.map(k => ({ row: k.row, col: k.col }))
+            };
+          } else if (s.editorMode === 'keymap') {
+            return {
+              actionClipboard: sortedSelectedKeys.map(k => {
+                if (s.appMode === 'remap') {
+                  if (k.row !== undefined && k.col !== undefined) {
+                    const flatIndex = k.row * 32 + k.col;
+                    return s.remoteKeymap[s.currentLayer]?.[flatIndex] || { type: 'trans' as const };
+                  }
+                  return { type: 'trans' as const };
+                } else {
+                  return k.keymap?.[s.currentLayer] || { type: 'trans' as const };
+                }
+              })
+            };
+          } else {
+            // Layout mode copy (only if not in remap mode)
+            if (s.appMode === 'remap') return {};
+            return {
+              clipboard: sortedSelectedKeys.map(k => ({ ...k }))
+            };
+          }
+        }),
 
         pasteKeys: () => {
-          const { clipboard, addKeys } = get();
-          if (clipboard.length > 0) {
-            // Apply a slight offset (0.25u) to avoid perfect overlap
-            const offset = 0.25;
-            const newKeys = clipboard.map(k => ({
-              ...k,
-              id: undefined, // remove ID so addKeys generates new ones
-              x: roundCoord((k.x ?? 0) + offset),
-              y: roundCoord((k.y ?? 0) + offset),
-              rx: roundCoord((k.rx ?? 0) + offset),
-              ry: roundCoord((k.ry ?? 0) + offset),
-            }));
-            addKeys(newKeys as Partial<PhysicalKey>[], { skipCollision: true });
+          const { appMode, editorMode, currentLayer, clipboard, matrixClipboard, actionClipboard, addKeys } = get();
+
+          if (editorMode === 'matrix') {
+            if (matrixClipboard.length === 0) return;
+            set((s) => {
+              const targetKeys = sortKeys(s.keys.filter(k => s.selectedKeyIds.includes(k.id)), s.editorSettings.sortThresholdY) as RuntimeKey[];
+              if (targetKeys.length === 0) return {};
+
+              const updatedKeys = s.keys.map(k => {
+                const targetIdx = targetKeys.findIndex(tk => tk.id === k.id);
+                if (targetIdx !== -1) {
+                  const clipItem = matrixClipboard.length === 1 ? matrixClipboard[0] : matrixClipboard[targetIdx];
+                  if (clipItem) {
+                    return { ...k, row: clipItem.row, col: clipItem.col };
+                  }
+                }
+                return k;
+              });
+
+              return { keys: updatedKeys, baseKeys: updatedKeys };
+            });
+          } else if (editorMode === 'keymap') {
+            if (actionClipboard.length === 0) return;
+            const s = get();
+            const targetKeys = sortKeys(s.keys.filter(k => s.selectedKeyIds.includes(k.id)), s.editorSettings.sortThresholdY) as RuntimeKey[];
+            if (targetKeys.length === 0) return;
+
+            // 1. Instantly update the local UI state
+            set((state) => {
+              const updatedKeys = state.keys.map(k => {
+                const targetIdx = targetKeys.findIndex(tk => tk.id === k.id);
+                if (targetIdx !== -1) {
+                  const action = actionClipboard.length === 1 ? actionClipboard[0] : actionClipboard[targetIdx];
+                  if (action) {
+                    return { ...k, keymap: { ...k.keymap, [currentLayer]: action } };
+                  }
+                }
+                return k;
+              });
+
+              let newRemoteKeymap = { ...state.remoteKeymap };
+              if (appMode === 'remap') {
+                if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
+                const newLayer = [...newRemoteKeymap[currentLayer]];
+                targetKeys.forEach((tk, idx) => {
+                  if (tk.row !== undefined && tk.col !== undefined) {
+                    const action = actionClipboard.length === 1 ? actionClipboard[0] : actionClipboard[idx];
+                    if (action) {
+                      newLayer[tk.row * 32 + tk.col] = action;
+                    }
+                  }
+                });
+                newRemoteKeymap[currentLayer] = newLayer;
+              }
+
+              return { keys: updatedKeys, baseKeys: updatedKeys, remoteKeymap: newRemoteKeymap };
+            });
+
+            // 2. If connected to a device in remap mode, sync to device
+            if (appMode === 'remap' && s.connectedDevice) {
+              const runDeviceUpdates = async () => {
+                try {
+                  const isVial = !!s.settings.features?.vial;
+                  const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+                  await protocol.initialize(hidTransport);
+
+                  if (isVial) {
+                    const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
+                    if (unlockStatus === 0) {
+                      const success = await s.performDeviceUnlock(protocol as VialProtocol);
+                      if (!success) throw new Error("Unlock failed.");
+                    }
+                  }
+
+                  // Set each key sequentially
+                  for (let i = 0; i < targetKeys.length; i++) {
+                    const tk = targetKeys[i];
+                    if (tk.row !== undefined && tk.col !== undefined) {
+                      const action = actionClipboard.length === 1 ? actionClipboard[0] : actionClipboard[i];
+                      if (action) {
+                        console.log(`[VIA/Vial Paste Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
+                        await protocol.setKey(currentLayer, tk.row, tk.col, action);
+                      }
+                    }
+                  }
+                } catch (err) {
+                  console.error('Failed to paste to device:', err);
+                }
+              };
+              runDeviceUpdates();
+            }
+          } else {
+            // Layout mode paste (only if not in remap mode)
+            if (appMode === 'remap') return;
+            if (clipboard.length > 0) {
+              // Apply a slight offset (0.25u) to avoid perfect overlap
+              const offset = 0.25;
+              const newKeys = clipboard.map(k => ({
+                ...k,
+                id: undefined, // remove ID so addKeys generates new ones
+                x: roundCoord((k.x ?? 0) + offset),
+                y: roundCoord((k.y ?? 0) + offset),
+                rx: roundCoord((k.rx ?? 0) + offset),
+                ry: roundCoord((k.ry ?? 0) + offset),
+              }));
+              addKeys(newKeys as Partial<PhysicalKey>[], { skipCollision: true });
+            }
           }
         },
         setCurrentLayer: (l: number) => set({ currentLayer: l }),

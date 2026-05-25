@@ -320,12 +320,12 @@ export const KeycodeConfigPanel = () => {
             className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg px-3 py-2 text-xs font-bold text-[var(--text-highlight)] focus:outline-none focus:border-amber-500 cursor-pointer transition-colors"
           >
             <option value="tap">{t('keycodeConfig.typeBasic') || 'Basic Key / Transparent'}</option>
+            <option value="mod">{t('keycodeConfig.typeModifier') || 'Modifiers (Combo)'}</option>
+            <option value="mt">{t('keycodeConfig.typeModTap') || 'Modifier Tap (MT)'}</option>
             <option value="mo">{t('keycodeConfig.typeMomentary') || 'Momentary Layer (MO)'}</option>
             <option value="tg">{t('keycodeConfig.typeToggle') || 'Toggle Layer (TG)'}</option>
             <option value="to">{t('keycodeConfig.typeTo') || 'Direct Layer (TO)'}</option>
             <option value="lt">{t('keycodeConfig.typeTap') || 'Layer Tap (LT)'}</option>
-            <option value="mt">{t('keycodeConfig.typeModTap') || 'Modifier Tap (MT)'}</option>
-            <option value="mod">{t('keycodeConfig.typeModifier') || 'Modifiers (Combo)'}</option>
           </select>
         </div>
       </div>

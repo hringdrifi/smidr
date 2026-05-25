@@ -99,15 +99,11 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           redo();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        if (!readonlyGeometry) {
-          e.preventDefault();
-          copyKeys();
-        }
+        e.preventDefault();
+        copyKeys();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        if (!readonlyGeometry) {
-          e.preventDefault();
-          pasteKeys();
-        }
+        e.preventDefault();
+        pasteKeys();
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (selectedKeyIds.length > 0 && !readonlyGeometry) {
           e.preventDefault();

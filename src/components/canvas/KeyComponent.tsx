@@ -305,8 +305,8 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
       case 'layer_tap':
         return (
           <Group listening={true}>
-            {renderTapText(label.tapLabel, centerY - 9)}
-            {renderLayerTapHoldPill(label.layerId, centerY + 9)}
+            {renderLayerTapHoldPill(label.layerId, centerY - 9)}
+            {renderTapText(label.tapLabel, centerY + 9)}
           </Group>
         );
 
@@ -314,8 +314,8 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
         const modText = label.modifiers.map(m => m.replace(/^[LR]/, '')).join('+');
         return (
           <Group listening={true}>
-            {renderTapText(label.tapLabel, centerY - 9)}
-            {renderHoldPill(modText, centerY + 9)}
+            {renderHoldPill(modText, centerY - 9)}
+            {renderTapText(label.tapLabel, centerY + 9)}
           </Group>
         );
       }
