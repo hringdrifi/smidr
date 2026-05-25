@@ -386,7 +386,6 @@ export const HardwareSettingsPanel = () => {
             { id: 'encoder', label: t('hardware.encoder'), icon: Gauge },
             { id: 'oled', label: t('hardware.oled'), icon: Monitor },
             { id: 'via', label: t('hardware.via'), icon: Database },
-            { id: 'vial', label: t('hardware.vial'), icon: ShieldCheck },
           ].map(feat => (
             <React.Fragment key={feat.id}>
               <button
@@ -401,38 +400,39 @@ export const HardwareSettingsPanel = () => {
                 <feat.icon size={18} />
                 <span className="text-xs font-bold leading-none">{feat.label}</span>
               </button>
-              
-              {feat.id === 'vial' && settings.features.vial && (
-                <div className="col-span-2 mt-2 p-3 bg-[var(--bg-app)] border border-amber-500/20 rounded-lg animate-in fade-in slide-in-from-top-1 duration-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">{t('hardware.vialSpec')}</span>
-                    <button 
-                      onClick={() => {
-                        const p1 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
-                        const p2 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
-                        updateSettings({ vialUid: `0x${p1}${p2}` });
-                      }}
-                      className="text-[9px] text-[var(--text-muted)] hover:text-amber-500 transition-colors"
-                    >
-                      {t('hardware.genId')}
-                    </button>
-                  </div>
-                  <PinInput 
-                    label={t('hardware.vialUid')} 
-                    value={settings.vialUid || '0x0000000000000000'} 
-                    onChange={(v) => {
-                      const cleanHex = v.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
-                      updateSettings({ vialUid: `0x${cleanHex}` });
-                    }} 
-                    placeholder="e.g. 0xFB23... (Automatically derived)"
-                  />
-                  <p className="mt-2 text-[9px] text-[var(--text-muted)] leading-relaxed italic">
-                    {t('hardware.vialDesc')}
-                  </p>
-                </div>
-              )}
             </React.Fragment>
           ))}
+        </div>
+      </Section>
+
+      {/* Vial Settings */}
+      <Section title={t('hardware.vialSpec')} icon={ShieldCheck}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">{t('hardware.vialSpec')}</span>
+            <button 
+              onClick={() => {
+                const p1 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
+                const p2 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
+                updateSettings({ vialUid: `0x${p1}${p2}` });
+              }}
+              className="text-[9px] text-[var(--text-muted)] hover:text-amber-500 transition-colors"
+            >
+              {t('hardware.genId')}
+            </button>
+          </div>
+          <PinInput 
+            label={t('hardware.vialUid')} 
+            value={settings.vialUid || '0x0000000000000000'} 
+            onChange={(v) => {
+              const cleanHex = v.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+              updateSettings({ vialUid: `0x${cleanHex}` });
+            }} 
+            placeholder="e.g. 0xFB23... (Automatically derived)"
+          />
+          <p className="text-[9px] text-[var(--text-muted)] leading-relaxed italic">
+            {t('hardware.vialDesc')}
+          </p>
         </div>
       </Section>
 
