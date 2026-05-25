@@ -846,7 +846,21 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
         }),
 
-        setAppMode: (m: 'design' | 'remap') => set({ appMode: m, selectedKeyIds: [] }),
+        setAppMode: (m: 'design' | 'remap') => {
+          if (m === 'design') {
+            hidTransport.disconnect().catch(err => {
+              console.error('Failed to disconnect keyboard on design mode switch:', err);
+            });
+            set({
+              appMode: m,
+              selectedKeyIds: [],
+              connectedDevice: null,
+              deviceCapabilities: null
+            });
+          } else {
+            set({ appMode: m, selectedKeyIds: [] });
+          }
+        },
         setEditorMode: (m: 'layout' | 'matrix' | 'hardware' | 'keymap') => set({ editorMode: m, selectedKeyIds: [] }),
 
         setConnectedDevice: (d: KeyboardState['connectedDevice']) => set({ connectedDevice: d }),
