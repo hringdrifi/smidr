@@ -62,7 +62,7 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
 
   // Lock keys
   "NLCK": "KP_NUM",
-  "SLCK": "SLCK",
+  "SCRL": "SLCK",
   "PSCR": "PSCRN",
   "PAUS": "PAUSE_BREAK",
 
