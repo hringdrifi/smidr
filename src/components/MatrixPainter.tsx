@@ -24,6 +24,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
         <div className="flex bg-[var(--bg-app)] p-0.5 rounded-lg border border-[var(--border-main)]/50">
           <button
             onClick={() => setMatrixSubMode('paint')}
+            title={t('matrix.painterDesc')}
             className={cn(
               "flex items-center gap-1.5 px-2.5 h-7 rounded-[6px] text-[10px] font-bold uppercase transition-all",
               matrixSubMode === 'paint' 
@@ -157,6 +158,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
       <div className="flex bg-[var(--bg-app)] p-1 rounded-lg border border-[var(--border-main)]">
         <button
           onClick={() => setMatrixSubMode('paint')}
+          title={t('matrix.painterDesc')}
           className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
             matrixSubMode === 'paint' 
               ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
@@ -181,12 +183,6 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
 
       {matrixSubMode === 'paint' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-200">
-          <div className="p-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)]/50">
-            <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">
-              {t('matrix.painterDesc')}
-            </p>
-          </div>
-
           <div className="space-y-4">
             <div className="flex gap-4">
               <div className="flex-1 space-y-1">
