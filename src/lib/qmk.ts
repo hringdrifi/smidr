@@ -47,7 +47,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
       rows: settings.pins.rows
     },
     usb: {
-      device_version: '0.0.1',
+      device_version: '1.0.0',
       pid: (settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`).toUpperCase().startsWith('0X') 
         ? (settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`) 
         : `0x${(settings.pid || `0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`)}`,
