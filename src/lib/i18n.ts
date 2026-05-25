@@ -241,7 +241,7 @@ export const TRANSLATIONS = {
       newNamePrompt: 'New Choice Name',
     },
     keycodeConfig: {
-      title: 'Keycode Config',
+      title: 'Keymap Config',
       selectKey: 'Select a single key to configure advanced actions.',
       actionType: 'Action Type',
       typeBasic: 'Tap Key',
@@ -272,6 +272,7 @@ export const TRANSLATIONS = {
       disconnect: 'Disconnect',
       connect: 'Connect',
       connecting: 'Connecting...',
+      deleteAssignment: 'Delete Keymap',
     }
   },
   zh: {
@@ -505,7 +506,7 @@ export const TRANSLATIONS = {
       newNamePrompt: '新选项名称',
     },
     keycodeConfig: {
-      title: '键码配置',
+      title: '键映射配置',
       selectKey: '选择单个按键以配置高级动作。',
       actionType: '动作类型',
       typeBasic: '点击键',
@@ -536,6 +537,7 @@ export const TRANSLATIONS = {
       disconnect: '断开连接',
       connect: '连接',
       connecting: '连接中...',
+      deleteAssignment: '清除键映射',
     }
   },
   ko: {
@@ -769,7 +771,7 @@ export const TRANSLATIONS = {
       newNamePrompt: '새 선택 이름',
     },
     keycodeConfig: {
-      title: '키코드 설정',
+      title: '키맵 설정',
       selectKey: '단일 키를 선택하여 고급 동작을 구성합니다.',
       actionType: '동작 유형',
       typeBasic: '탭 키',
@@ -800,6 +802,7 @@ export const TRANSLATIONS = {
       disconnect: '연결 해제',
       connect: '연결',
       connecting: '연결 중...',
+      deleteAssignment: '키맵 삭제',
     }
   },
   ja: {
@@ -1033,7 +1036,7 @@ export const TRANSLATIONS = {
       newNamePrompt: '新しい選択肢名',
     },
     keycodeConfig: {
-      title: 'キーコード設定',
+      title: 'キーマップ設定',
       selectKey: 'キーを1つ選択して、高度な割り当てを設定します。',
       actionType: 'アクションタイプ',
       typeBasic: 'タップキー',
@@ -1064,6 +1067,7 @@ export const TRANSLATIONS = {
       disconnect: '切断',
       connect: '接続',
       connecting: '接続中...',
+      deleteAssignment: 'キーマップ削除',
     }
   },
   es: {
@@ -1297,7 +1301,7 @@ export const TRANSLATIONS = {
       newNamePrompt: 'Nuevo Nombre de Opción',
     },
     keycodeConfig: {
-      title: 'Configuración de Códigos',
+      title: 'Configuración de Mapa de Teclas',
       selectKey: 'Seleccione una sola tecla para configurar acciones avanzadas.',
       actionType: 'Tipo de Acción',
       typeBasic: 'Tecla de Pulsación',
@@ -1328,6 +1332,7 @@ export const TRANSLATIONS = {
       disconnect: 'Desconectar',
       connect: 'Conectar',
       connecting: 'Conectando...',
+      deleteAssignment: 'Eliminar mapa de teclas',
     }
   },
   de: {
@@ -1561,7 +1566,7 @@ export const TRANSLATIONS = {
       newNamePrompt: 'Neuer Auswahlname',
     },
     keycodeConfig: {
-      title: 'Tastencode-Konfiguration',
+      title: 'Keymap-Konfiguration',
       selectKey: 'Wählen Sie eine Taste für erweiterte Aktionen.',
       actionType: 'Aktionstyp',
       typeBasic: 'Tap-Taste',
@@ -1592,6 +1597,7 @@ export const TRANSLATIONS = {
       disconnect: 'Trennen',
       connect: 'Verbinden',
       connecting: 'Verbinden...',
+      deleteAssignment: 'Tastenbelegung löschen',
     }
   }
 };

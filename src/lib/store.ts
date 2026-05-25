@@ -177,6 +177,8 @@ export interface KeyboardState {
   actionClipboard: UniversalAction[];
   copyKeys: () => void;
   pasteKeys: () => void;
+  deleteSelectedKeycodes: () => Promise<void>;
+  setSelectedKeycode: (action: UniversalAction) => Promise<void>;
 
   // Parameter Capture
   isCapturingParam: boolean;
@@ -1055,6 +1057,125 @@ export const useKeyboardStore = create<KeyboardState>()(
                 ry: roundCoord((k.ry ?? 0) + offset),
               }));
               addKeys(newKeys as Partial<PhysicalKey>[], { skipCollision: true });
+            }
+          }
+        },
+
+        deleteSelectedKeycodes: async () => {
+          const s = get();
+          const { appMode, currentLayer, selectedKeyIds, keys, settings, connectedDevice } = s;
+          if (selectedKeyIds.length === 0) return;
+
+          const targetKeys = keys.filter(k => selectedKeyIds.includes(k.id));
+          const newAction: UniversalAction = { action: 'trans' };
+
+          // 1. Update local state instantly
+          set((state) => {
+            const updatedKeys = state.keys.map(k => {
+              if (selectedKeyIds.includes(k.id)) {
+                return { ...k, keymap: { ...k.keymap, [currentLayer]: newAction } };
+              }
+              return k;
+            });
+
+            let newRemoteKeymap = { ...state.remoteKeymap };
+            if (appMode === 'remap') {
+              if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
+              const newLayer = [...newRemoteKeymap[currentLayer]];
+              targetKeys.forEach(tk => {
+                if (tk.row !== undefined && tk.col !== undefined) {
+                  newLayer[tk.row * 32 + tk.col] = newAction;
+                }
+              });
+              newRemoteKeymap[currentLayer] = newLayer;
+            }
+
+            return { keys: updatedKeys, baseKeys: updatedKeys, remoteKeymap: newRemoteKeymap };
+          });
+
+          // 2. If connected to a device in remap mode, sync to device sequentially
+          if (appMode === 'remap' && connectedDevice) {
+            try {
+              const isVial = !!settings.features?.vial;
+              const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+              await protocol.initialize(hidTransport);
+
+              if (isVial) {
+                const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
+                if (unlockStatus === 0) {
+                  const success = await s.performDeviceUnlock(protocol as VialProtocol);
+                  if (!success) throw new Error("Unlock failed.");
+                }
+              }
+
+              // Set each key sequentially
+              for (const tk of targetKeys) {
+                if (tk.row !== undefined && tk.col !== undefined) {
+                  console.log(`[VIA/Vial Delete Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, newAction);
+                  await protocol.setKey(currentLayer, tk.row, tk.col, newAction);
+                }
+              }
+            } catch (err) {
+              console.error('Failed to delete keycodes on device:', err);
+            }
+          }
+        },
+
+        setSelectedKeycode: async (action: UniversalAction) => {
+          const s = get();
+          const { appMode, currentLayer, selectedKeyIds, keys, settings, connectedDevice } = s;
+          if (selectedKeyIds.length === 0) return;
+
+          const targetKeys = keys.filter(k => selectedKeyIds.includes(k.id));
+
+          // 1. Update local state instantly
+          set((state) => {
+            const updatedKeys = state.keys.map(k => {
+              if (selectedKeyIds.includes(k.id)) {
+                return { ...k, keymap: { ...k.keymap, [currentLayer]: action } };
+              }
+              return k;
+            });
+
+            let newRemoteKeymap = { ...state.remoteKeymap };
+            if (appMode === 'remap') {
+              if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
+              const newLayer = [...newRemoteKeymap[currentLayer]];
+              targetKeys.forEach(tk => {
+                if (tk.row !== undefined && tk.col !== undefined) {
+                  newLayer[tk.row * 32 + tk.col] = action;
+                }
+              });
+              newRemoteKeymap[currentLayer] = newLayer;
+            }
+
+            return { keys: updatedKeys, baseKeys: updatedKeys, remoteKeymap: newRemoteKeymap };
+          });
+
+          // 2. If connected to a device in remap mode, sync to device sequentially
+          if (appMode === 'remap' && connectedDevice) {
+            try {
+              const isVial = !!settings.features?.vial;
+              const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+              await protocol.initialize(hidTransport);
+
+              if (isVial) {
+                const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
+                if (unlockStatus === 0) {
+                  const success = await s.performDeviceUnlock(protocol as VialProtocol);
+                  if (!success) throw new Error("Unlock failed.");
+                }
+              }
+
+              // Set each key sequentially
+              for (const tk of targetKeys) {
+                if (tk.row !== undefined && tk.col !== undefined) {
+                  console.log(`[VIA/Vial Bulk Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
+                  await protocol.setKey(currentLayer, tk.row, tk.col, action);
+                }
+              }
+            } catch (err) {
+              console.error('Failed to update keycodes on device:', err);
             }
           }
         },

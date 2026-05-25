@@ -34,7 +34,8 @@ export default function App() {
   const { 
     editorMode, setEditorMode, settings, updateSettings, keys,
     currentLayer, setCurrentLayer, currentProjectId, loadProject,
-    editorSettings, updateEditorSettings, connectedDevice
+    editorSettings, updateEditorSettings, connectedDevice,
+    selectedKeyIds, deleteSelectedKeycodes
   } = storeState;
 
   // Use zundo temporal store for reactive undo/redo states
@@ -54,6 +55,15 @@ export default function App() {
   const isDirty = pastStates.length !== lastSavedHistoryLength;
   const [isRestoring, setIsRestoring] = React.useState(false);
   const remapFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const hasDeletableSelection = React.useMemo(() => {
+    if (selectedKeyIds.length === 0) return false;
+    return keys.some(k => {
+      if (!selectedKeyIds.includes(k.id)) return false;
+      const action = k.keymap?.[currentLayer];
+      return action && action.action !== 'trans';
+    });
+  }, [selectedKeyIds, keys, currentLayer]);
 
   const refreshProjectList = () => {
     setSavedProjects(listProjects());
@@ -724,7 +734,7 @@ export default function App() {
                       <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Wrench size={16} className="text-amber-500" />
-                          <span className="text-xs font-black uppercase tracking-widest text-amber-500">{t('keycodeConfig.title') || 'Keycode Config'}</span>
+                          <span className="text-xs font-black uppercase tracking-widest text-amber-500">{t('keycodeConfig.title') || 'Keymap Config'}</span>
                         </div>
                         <button onClick={() => setIsKeycodeConfigOpen(false)} className="p-1 hover:bg-amber-500/20 rounded transition-colors text-amber-500">
                           <X size={14} />
@@ -748,13 +758,29 @@ export default function App() {
                               ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
                               : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
                           )}
-                          title={t('keycodeConfig.title') || 'Keycode Config'}
+                          title={t('keycodeConfig.title') || 'Keymap Config'}
                         >
                           <Wrench size={18} className={cn("transition-transform duration-500", isKeycodeConfigOpen && "rotate-45 scale-110")} />
                           <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                            {t('keycodeConfig.title') || 'Keycode Config'}
+                            {t('keycodeConfig.title') || 'Keymap Config'}
                           </div>
                         </button>
+
+                        {hasDeletableSelection && (
+                          <>
+                            <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5 animate-in fade-in duration-200" />
+                            <button 
+                              onClick={deleteSelectedKeycodes}
+                              className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group text-red-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 animate-in fade-in zoom-in duration-200"
+                              title={t('remap.deleteAssignment') || 'Delete Keymap'}
+                            >
+                              <Trash2 size={18} className="transition-transform duration-300 group-hover:scale-110" />
+                              <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
+                                {t('remap.deleteAssignment') || 'Delete Keymap'}
+                              </div>
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                     

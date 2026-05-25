@@ -16,7 +16,7 @@ function cn(...inputs: ClassValue[]) {
 
 export const KeycodePanel = () => {
   const { 
-    keys, selectedKeyIds, setKeycode, setSelectedKeyIds, currentLayer, 
+    keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
     deviceCapabilities, isCapturingParam, setIsCapturingParam
   } = useKeyboardStore();
@@ -75,15 +75,7 @@ export const KeycodePanel = () => {
     : 'trans';
 
   const updateSelectedAction = (newAction: UniversalAction) => {
-    if (!selectedKey) return;
-    if (useKeyboardStore.getState().appMode === 'remap') {
-      const { updateDeviceKeycode } = useKeyboardStore.getState();
-      if (hasMatrix) {
-        updateDeviceKeycode(currentLayer, selectedKey.row!, selectedKey.col!, newAction);
-      }
-    } else {
-      setKeycode(selectedKey.id!, currentLayer, newAction);
-    }
+    setSelectedKeycode(newAction);
   };
 
   const handleLtLayerChange = (newLayer: number) => {
@@ -203,13 +195,15 @@ export const KeycodePanel = () => {
       updateSelectedAction(clickedAction);
     }
 
-    const visKeys = keys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option);
-    const sortedKeys = sortKeys(visKeys, editorSettings.sortThresholdY);
-    
-    const lastSelectedIndex = Math.max(...selectedKeyIds.map(id => sortedKeys.findIndex(k => k.id === id)));
-    if (lastSelectedIndex !== -1 && sortedKeys.length > 0) {
-      const nextIndex = (lastSelectedIndex + 1) % sortedKeys.length;
-      setSelectedKeyIds([sortedKeys[nextIndex].id!]);
+    if (selectedKeyIds.length === 1) {
+      const visKeys = keys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option);
+      const sortedKeys = sortKeys(visKeys, editorSettings.sortThresholdY);
+      
+      const lastSelectedIndex = Math.max(...selectedKeyIds.map(id => sortedKeys.findIndex(k => k.id === id)));
+      if (lastSelectedIndex !== -1 && sortedKeys.length > 0) {
+        const nextIndex = (lastSelectedIndex + 1) % sortedKeys.length;
+        setSelectedKeyIds([sortedKeys[nextIndex].id!]);
+      }
     }
   };
 

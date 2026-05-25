@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles } from 'lucide-react';
+import { Cpu, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles, Trash2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { KeyboardCanvas } from './KeyboardCanvas';
@@ -14,10 +14,23 @@ import { hidTransport } from '@/lib/transport/hid';
 
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, currentLayer, setCurrentLayer, settings } = useKeyboardStore();
+  const { connectedDevice, currentLayer, setCurrentLayer, settings, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
   const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
+
+  const hasDeletableSelection = React.useMemo(() => {
+    if (selectedKeyIds.length === 0) return false;
+    return keys.some(k => {
+      if (!selectedKeyIds.includes(k.id)) return false;
+      if (k.row !== undefined && k.col !== undefined) {
+        const flatIndex = k.row * 32 + k.col;
+        const action = remoteKeymap[currentLayer]?.[flatIndex];
+        return action && action.action !== 'trans';
+      }
+      return false;
+    });
+  }, [selectedKeyIds, keys, currentLayer, remoteKeymap]);
 
   return (
     <div className="flex-1 relative flex flex-col overflow-hidden bg-[var(--bg-app)]">
@@ -82,7 +95,7 @@ export const RemapView: React.FC = () => {
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Wrench size={16} className="text-amber-500" />
-                        <span className="text-xs font-black uppercase tracking-widest text-amber-500">{t('keycodeConfig.title') || 'Keycode Config'}</span>
+                        <span className="text-xs font-black uppercase tracking-widest text-amber-500">{t('keycodeConfig.title') || 'Keymap Config'}</span>
                       </div>
                       <button onClick={() => setIsKeycodeConfigOpen(false)} className="p-1 hover:bg-amber-500/20 rounded transition-colors text-amber-500">
                         <X size={14} />
@@ -114,7 +127,7 @@ export const RemapView: React.FC = () => {
 
                 {/* Left Side Floating Widgets (Swapped from Right Side) */}
                 <div className="absolute top-4 left-4 z-[100] flex flex-col gap-4">
-                  {/* Keycode Config & Macros Buttons — single pill */}
+                  {/* Keymap Config & Macros Buttons — single pill */}
                   <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
                     <button 
                       onClick={() => {
@@ -127,11 +140,11 @@ export const RemapView: React.FC = () => {
                           ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
                           : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
                       )}
-                      title={t('keycodeConfig.title') || 'Keycode Config'}
+                      title={t('keycodeConfig.title') || 'Keymap Config'}
                     >
                       <Wrench size={18} className={cn("transition-transform duration-500", isKeycodeConfigOpen && "rotate-45 scale-110")} />
                       <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                        {t('keycodeConfig.title') || 'Keycode Config'}
+                        {t('keycodeConfig.title') || 'Keymap Config'}
                       </div>
                     </button>
 
@@ -154,6 +167,22 @@ export const RemapView: React.FC = () => {
                           Macros & Combos
                         </div>
                       </button>
+                    )}
+
+                    {hasDeletableSelection && (
+                      <>
+                        <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5 animate-in fade-in duration-200" />
+                        <button 
+                          onClick={deleteSelectedKeycodes}
+                          className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group text-red-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 animate-in fade-in zoom-in duration-200"
+                          title={t('remap.deleteAssignment') || 'Delete Keymap'}
+                        >
+                          <Trash2 size={18} className="transition-transform duration-300 group-hover:scale-110" />
+                          <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
+                            {t('remap.deleteAssignment') || 'Delete Keymap'}
+                          </div>
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
