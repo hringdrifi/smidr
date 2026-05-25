@@ -267,7 +267,7 @@ export const TRANSLATIONS = {
     },
     remap: {
       connectKeyboard: 'Connect your keyboard',
-      connectKeyboardDesc: 'Plug in your VIA/Vial or ZMK Studio compatible keyboard and click the connect button above to start remapping.',
+      connectKeyboardDesc: 'Plug in your VIA/Vial or ZMK Studio compatible keyboard and click the "Connect" button to start remapping.',
       refreshing: 'Refreshing...',
       refreshSync: 'Refresh Sync',
       disconnect: 'Disconnect',
@@ -533,7 +533,7 @@ export const TRANSLATIONS = {
     },
     remap: {
       connectKeyboard: '连接您的键盘',
-      connectKeyboardDesc: '插入兼容 VIA/Vial 或 ZMK Studio 的键盘，并点击上方的连接按钮开始重映射。',
+      connectKeyboardDesc: '插入兼容 VIA/Vial 或 ZMK Studio 的键盘，并点击“连接”按钮开始重映射。',
       refreshing: '刷新中...',
       refreshSync: '刷新同步',
       disconnect: '断开连接',
@@ -799,7 +799,7 @@ export const TRANSLATIONS = {
     },
     remap: {
       connectKeyboard: '키보드 연결',
-      connectKeyboardDesc: 'VIA/Vial 또는 ZMK Studio 호환 키보드를 연결하고 상단의 연결 버튼을 클릭하여 리매핑을 시작하세요.',
+      connectKeyboardDesc: 'VIA/Vial 또는 ZMK Studio 호환 키보드를 연결하고 "연결" 버튼을 클릭하여 리매핑을 시작하세요.',
       refreshing: '새로고침 중...',
       refreshSync: '동기화 새로고침',
       disconnect: '연결 해제',
@@ -1065,7 +1065,7 @@ export const TRANSLATIONS = {
     },
     remap: {
       connectKeyboard: 'キーボードを接続',
-      connectKeyboardDesc: 'VIA / Vial または ZMK Studio 互換キーボードを接続し、上のボタンを押してリマップを開始してください。',
+      connectKeyboardDesc: 'VIA / Vial または ZMK Studio 互換キーボードを接続し、「接続」ボタンを押してリマップを開始してください。',
       refreshing: '更新中...',
       refreshSync: '同期を更新',
       disconnect: '切断',
@@ -1331,7 +1331,7 @@ export const TRANSLATIONS = {
     },
     remap: {
       connectKeyboard: 'Conecta tu teclado',
-      connectKeyboardDesc: 'Conecta tu teclado compatible con VIA/Vial o ZMK Studio y haz clic en el botón de conectar arriba para comenzar.',
+      connectKeyboardDesc: 'Conecta tu teclado compatible con VIA/Vial o ZMK Studio y haz clic en el botón "Conectar" para comenzar.',
       refreshing: 'Actualizando...',
       refreshSync: 'Sincronizar de Nuevo',
       disconnect: 'Desconectar',
@@ -1597,7 +1597,7 @@ export const TRANSLATIONS = {
     },
     remap: {
       connectKeyboard: 'Verbinden Sie Ihre Tastatur',
-      connectKeyboardDesc: 'Schließen Sie Ihre VIA/Vial oder ZMK Studio kompatible Tastatur an und klicken Sie auf die Schaltfläche, um zu beginnen.',
+      connectKeyboardDesc: 'Schließen Sie Ihre VIA/Vial oder ZMK Studio kompatible Tastatur an und klicken Sie auf „Verbinden“, um zu beginnen.',
       refreshing: 'Aktualisieren...',
       refreshSync: 'Synchronisierung aktualisieren',
       disconnect: 'Trennen',
