@@ -46,18 +46,17 @@ export type UniversalKey =
 export type Modifier = "LCTL" | "LSFT" | "LALT" | "LGUI" | "RCTL" | "RSFT" | "RALT" | "RGUI";
 
 export type UniversalAction =
-  | { type: "trans" }                                              // ▽ (レイヤー継承)
-  | { type: "none" }                                                     // キー割り当てなし
-  | { type: "tap"; keycode: UniversalKey }                                 // 通常キー単体押し (例: "A", "SPC")
-  | { type: "mod"; modifiers: Modifier[]; keycode: UniversalKey }       // 修飾キー+キー同時押し
-  | { type: "mo"; layerId: number }                                     // 一時レイヤー遷移 (MO)
-  | { type: "tg"; layerId: number }                                        // レイヤー有効化トグル (TG)
-  | { type: "to"; layerId: number }                                            // レイヤー直接切り替え (TO)
-  | { type: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
-  | { type: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
-  | { type: "macro"; macroId: number }                                   // マクロ
-  | { type: "lighting"; command: "TOGGLE" | "MODE_UP" | "MODE_DOWN" | "BRIGHTNESS_UP" | "BRIGHTNESS_DOWN" } // 統一ライティング操作
-  | { type: "custom"; protocol: "qmk" | "zmk"; rawCode: string };        // エスケープハッチ
+  | { action: "trans" }                                              // ▽ (レイヤー継承)
+  | { action: "none" }                                                     // キー割り当てなし
+  | { action: "tap"; keycode: UniversalKey; mods?: Modifier[] }            // 通常キー単体押し (例: "A", "SPC", "mods"配列で修飾キー同時押しも兼用)
+  | { action: "mo"; layerId: number }                                     // 一時レイヤー遷移 (MO)
+  | { action: "tg"; layerId: number }                                        // レイヤー有効化トグル (TG)
+  | { action: "to"; layerId: number }                                            // レイヤー直接切り替え (TO)
+  | { action: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
+  | { action: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
+  | { action: "macro"; macroId: number }                                   // マクロ
+  | { action: "lighting"; command: "TOGGLE" | "MODE_UP" | "MODE_DOWN" | "BRIGHTNESS_UP" | "BRIGHTNESS_DOWN" } // 統一ライティング操作
+  | { action: "custom"; protocol: "qmk" | "zmk"; rawCode: string };        // エスケープハッチ
 
 export interface MacroAction {
   action: 'text' | 'tap' | 'down' | 'up' | 'delay';

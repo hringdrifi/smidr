@@ -187,10 +187,10 @@ export const MODIFIER_MASKS: Record<Modifier, number> = {
 // Decodes standard 16-bit QMK keycodes into the unified UniversalAction AST
 export function viaCodeToAction(value: number): UniversalAction {
   // Transparent (Pass-through)
-  if (value === 0x0001) return { type: 'trans' };
+  if (value === 0x0001) return { action: 'trans' };
   
   // None (No Action)
-  if (value === 0x0000) return { type: 'none' };
+  if (value === 0x0000) return { action: 'none' };
 
   // Ordinary modifier + key combo -> 0x0100 - 0x1FFF range (QK_MODS)
   if (value >= 0x0100 && value <= 0x1FFF) {
@@ -211,23 +211,23 @@ export function viaCodeToAction(value: number): UniversalAction {
     });
 
     const innerAction = viaCodeToAction(innerHid);
-    const keycode = innerAction.type === 'tap' ? innerAction.keycode : 'TRNS';
-    return { type: 'mod', modifiers, keycode };
+    const keycode = innerAction.action === 'tap' ? innerAction.keycode : 'TRNS';
+    return { action: 'tap', keycode, mods: modifiers };
   }
 
   // Layer Momentary MO(n) -> 0x5200 - 0x520F range
   if (value >= 0x5200 && value <= 0x520F) {
-    return { type: 'mo', layerId: value - 0x5200 };
+    return { action: 'mo', layerId: value - 0x5200 };
   }
 
   // Layer Toggle TG(n) -> 0x5210 - 0x521F range
   if (value >= 0x5210 && value <= 0x521F) {
-    return { type: 'tg', layerId: value - 0x5210 };
+    return { action: 'tg', layerId: value - 0x5210 };
   }
 
   // Layer To TO(n) -> 0x5220 - 0x522F range
   if (value >= 0x5220 && value <= 0x522F) {
-    return { type: 'to', layerId: value - 0x5220 };
+    return { action: 'to', layerId: value - 0x5220 };
   }
 
   // Layer Tap LT(layer, key) -> 0x4000 - 0x4FFF range
@@ -235,7 +235,7 @@ export function viaCodeToAction(value: number): UniversalAction {
     const layerId = (value & 0x0F00) >> 8;
     const innerHid = value & 0x00FF;
     const innerAction = viaCodeToAction(innerHid);
-    return { type: 'lt', layerId, tapAction: innerAction };
+    return { action: 'lt', layerId, tapAction: innerAction };
   }
 
   // Mod Tap MT(mod, key) -> 0x2000 - 0x3FFF range
@@ -256,44 +256,45 @@ export function viaCodeToAction(value: number): UniversalAction {
         }
       }
     });
-    return { type: 'mt', modifiers, tapAction };
+    return { action: 'mt', modifiers, tapAction };
   }
 
   // Macro execution -> 0x7700 range
   if (value >= 0x7700 && value <= 0x771F) {
-    return { type: 'macro', macroId: value - 0x7700 };
+    return { action: 'macro', macroId: value - 0x7700 };
   }
 
   // Backlight / lighting commands -> 0x7C00 range
-  if (value === 0x7C00) return { type: 'lighting', command: 'TOGGLE' };
-  if (value === 0x7C01) return { type: 'lighting', command: 'MODE_UP' };
-  if (value === 0x7C02) return { type: 'lighting', command: 'MODE_DOWN' };
-  if (value === 0x7C03) return { type: 'lighting', command: 'BRIGHTNESS_UP' };
-  if (value === 0x7C04) return { type: 'lighting', command: 'BRIGHTNESS_DOWN' };
+  if (value === 0x7C00) return { action: 'lighting', command: 'TOGGLE' };
+  if (value === 0x7C01) return { action: 'lighting', command: 'MODE_UP' };
+  if (value === 0x7C02) return { action: 'lighting', command: 'MODE_DOWN' };
+  if (value === 0x7C03) return { action: 'lighting', command: 'BRIGHTNESS_UP' };
+  if (value === 0x7C04) return { action: 'lighting', command: 'BRIGHTNESS_DOWN' };
 
   // Basic keys lookup
   if (HID_TO_UNIVERSAL[value]) {
-    return { type: 'tap', keycode: HID_TO_UNIVERSAL[value] };
+    return { action: 'tap', keycode: HID_TO_UNIVERSAL[value] };
   }
 
   // Escape hatch for unsupported raw codes
-  return { type: 'custom', protocol: 'qmk', rawCode: `0x${value.toString(16).toUpperCase()}` };
+  return { action: 'custom', protocol: 'qmk', rawCode: `0x${value.toString(16).toUpperCase()}` };
 }
 
 // Encodes UniversalAction AST back into standard 16-bit QMK dynamic keycodes
 export function actionToViaCode(action: UniversalAction): number {
-  switch (action.type) {
+  switch (action.action) {
     case 'trans':
       return 0x0001;
     case 'none':
       return 0x0000;
-    case 'tap':
+    case 'tap': {
+      if (action.mods && action.mods.length > 0) {
+        let mask = 0;
+        action.mods.forEach(m => { mask |= MODIFIER_MASKS[m]; });
+        const innerCode = KEY_MAP[action.keycode]?.hid ?? 0x0000;
+        return ((mask & 0x1F) << 8) | (innerCode & 0xFF);
+      }
       return KEY_MAP[action.keycode]?.hid ?? 0x0000;
-    case 'mod': {
-      let mask = 0;
-      action.modifiers.forEach(m => { mask |= MODIFIER_MASKS[m]; });
-      const innerCode = KEY_MAP[action.keycode]?.hid ?? 0x0000;
-      return ((mask & 0x1F) << 8) | (innerCode & 0xFF);
     }
     case 'mo':
       return 0x5200 + (action.layerId & 0xF);
@@ -332,20 +333,21 @@ export function actionToViaCode(action: UniversalAction): number {
 
 // Converts UniversalAction AST into QMK C-macro string notations (for info.json/keymap.c exports)
 export function actionToQmkString(action: UniversalAction): string {
-  switch (action.type) {
+  switch (action.action) {
     case 'trans':
       return 'KC_TRNS';
     case 'none':
       return 'KC_NO';
-    case 'tap':
+    case 'tap': {
+      if (action.mods && action.mods.length > 0) {
+        const innerQmk = KEY_MAP[action.keycode]?.qmk ?? 'KC_NO';
+        let result = innerQmk;
+        action.mods.forEach(mod => {
+          result = `${mod}(${result})`;
+        });
+        return result;
+      }
       return KEY_MAP[action.keycode]?.qmk ?? 'KC_NO';
-    case 'mod': {
-      const innerQmk = KEY_MAP[action.keycode]?.qmk ?? 'KC_NO';
-      let result = innerQmk;
-      action.modifiers.forEach(mod => {
-        result = `${mod}(${result})`;
-      });
-      return result;
     }
     case 'mo':
       return `MO(${action.layerId})`;
@@ -382,8 +384,8 @@ export function actionToQmkString(action: UniversalAction): string {
 export function qmkStringToAction(qmkStr: string): UniversalAction {
   const trimmed = qmkStr.trim();
   
-  if (trimmed === 'KC_TRNS') return { type: 'trans' };
-  if (trimmed === 'KC_NO') return { type: 'none' };
+  if (trimmed === 'KC_TRNS') return { action: 'trans' };
+  if (trimmed === 'KC_NO') return { action: 'none' };
 
   // Nested modifiers LCTL(LSFT(KC_A)) or shortcuts C(S(KC_A))
   const modMatch = trimmed.match(/^(LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|C|S|A|G)\((.+)\)$/);
@@ -397,19 +399,13 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
     const mod = (shortcutMap[modName] || modName) as Modifier;
     
     const innerAction = qmkStringToAction(innerStr);
-    if (innerAction.type === 'mod') {
-      return {
-        type: 'mod',
-        modifiers: [mod, ...innerAction.modifiers],
-        keycode: innerAction.keycode
-      };
-    } else if (innerAction.type === 'tap') {
-      return {
-        type: 'mod',
-        modifiers: [mod],
-        keycode: innerAction.keycode
-      };
-    }
+    const targetKey = innerAction.action === 'tap' ? innerAction.keycode : 'TRNS';
+    const innerMods = innerAction.action === 'tap' ? (innerAction.mods || []) : [];
+    return {
+      action: 'tap',
+      keycode: targetKey,
+      mods: [mod, ...innerMods]
+    };
   }
 
   // Multi-modifiers LCA(KC_A), MEH(KC_A), HYPR(KC_A)
@@ -425,41 +421,33 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
     else if (macroName === 'MEH') modifiers = ['LCTL', 'LSFT', 'LALT'];
     else if (macroName === 'HYPR') modifiers = ['LCTL', 'LSFT', 'LALT', 'LGUI'];
     
-    const targetKey = innerAction.type === 'tap' ? innerAction.keycode : (innerAction.type === 'mod' ? innerAction.keycode : 'TRNS');
-    
-    if (innerAction.type === 'mod') {
-      return {
-        type: 'mod',
-        modifiers: [...modifiers, ...innerAction.modifiers],
-        keycode: targetKey
-      };
-    } else {
-      return {
-        type: 'mod',
-        modifiers,
-        keycode: targetKey
-      };
-    }
+    const targetKey = innerAction.action === 'tap' ? innerAction.keycode : 'TRNS';
+    const innerMods = innerAction.action === 'tap' ? (innerAction.mods || []) : [];
+    return {
+      action: 'tap',
+      keycode: targetKey,
+      mods: [...modifiers, ...innerMods]
+    };
   }
 
   // MO(n)
   let match = trimmed.match(/^MO\((\d+)\)$/);
-  if (match) return { type: 'mo', layerId: parseInt(match[1]) };
+  if (match) return { action: 'mo', layerId: parseInt(match[1]) };
 
   // TG(n)
   match = trimmed.match(/^TG\((\d+)\)$/);
-  if (match) return { type: 'tg', layerId: parseInt(match[1]) };
+  if (match) return { action: 'tg', layerId: parseInt(match[1]) };
 
   // TO(n)
   match = trimmed.match(/^TO\((\d+)\)$/);
-  if (match) return { type: 'to', layerId: parseInt(match[1]) };
+  if (match) return { action: 'to', layerId: parseInt(match[1]) };
 
   // LT(layer, key)
   match = trimmed.match(/^LT\((\d+)\s*,\s*([^)]+)\)$/);
   if (match) {
     const layerId = parseInt(match[1]);
     const tapAction = qmkStringToAction(match[2]);
-    return { type: 'lt', layerId, tapAction };
+    return { action: 'lt', layerId, tapAction };
   }
 
   // MT(mod, key)
@@ -476,24 +464,24 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
         modifiers.push(cleanMod as Modifier);
       }
     });
-    return { type: 'mt', modifiers, tapAction };
+    return { action: 'mt', modifiers, tapAction };
   }
 
   // MACRO(n)
   match = trimmed.match(/^MACRO\((\d+)\)$/);
-  if (match) return { type: 'macro', macroId: parseInt(match[1]) };
+  if (match) return { action: 'macro', macroId: parseInt(match[1]) };
 
   // RGB / Light
-  if (trimmed === 'RGB_TOG') return { type: 'lighting', command: 'TOGGLE' };
-  if (trimmed === 'RGB_MOD') return { type: 'lighting', command: 'MODE_UP' };
-  if (trimmed === 'RGB_RMOD') return { type: 'lighting', command: 'MODE_DOWN' };
-  if (trimmed === 'RGB_VAI') return { type: 'lighting', command: 'BRIGHTNESS_UP' };
-  if (trimmed === 'RGB_VAD') return { type: 'lighting', command: 'BRIGHTNESS_DOWN' };
+  if (trimmed === 'RGB_TOG') return { action: 'lighting', command: 'TOGGLE' };
+  if (trimmed === 'RGB_MOD') return { action: 'lighting', command: 'MODE_UP' };
+  if (trimmed === 'RGB_RMOD') return { action: 'lighting', command: 'MODE_DOWN' };
+  if (trimmed === 'RGB_VAI') return { action: 'lighting', command: 'BRIGHTNESS_UP' };
+  if (trimmed === 'RGB_VAD') return { action: 'lighting', command: 'BRIGHTNESS_DOWN' };
 
   // Basic keys lookup
   if (QMK_TO_UNIVERSAL[trimmed]) {
-    return { type: 'tap', keycode: QMK_TO_UNIVERSAL[trimmed] };
+    return { action: 'tap', keycode: QMK_TO_UNIVERSAL[trimmed] };
   }
 
-  return { type: 'custom', protocol: 'qmk', rawCode: trimmed };
+  return { action: 'custom', protocol: 'qmk', rawCode: trimmed };
 }

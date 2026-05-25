@@ -169,20 +169,20 @@ export class ZmkProtocol implements IProtocolDriver {
         for (let c = 0; c < 32; c++) {
           if (l === 0) {
             if (r === 2 && c === 4) {
-              this.simulatedKeymap[l][r][c] = { type: 'tap', keycode: 'A' };
+              this.simulatedKeymap[l][r][c] = { action: 'tap', keycode: 'A' };
             } else if (r === 2 && c === 5) {
-              this.simulatedKeymap[l][r][c] = { type: 'tap', keycode: 'B' };
+              this.simulatedKeymap[l][r][c] = { action: 'tap', keycode: 'B' };
             } else if (r === 3 && c === 8) {
               this.simulatedKeymap[l][r][c] = { 
-                type: 'lt', 
+                action: 'lt', 
                 layerId: 1, 
-                tapAction: { type: 'tap', keycode: 'SPC' } 
+                tapAction: { action: 'tap', keycode: 'SPC' } 
               };
             } else {
-              this.simulatedKeymap[l][r][c] = { type: 'trans' };
+              this.simulatedKeymap[l][r][c] = { action: 'trans' };
             }
           } else {
-            this.simulatedKeymap[l][r][c] = { type: 'trans' };
+            this.simulatedKeymap[l][r][c] = { action: 'trans' };
           }
         }
       }
@@ -202,7 +202,7 @@ export class ZmkProtocol implements IProtocolDriver {
   async getKey(layer: number, row: number, col: number): Promise<UniversalAction> {
     const action = this.simulatedKeymap[layer]?.[row]?.[col];
     if (action) return action;
-    return { type: 'trans' };
+    return { action: 'trans' };
   }
 
   async setKey(layer: number, row: number, col: number, action: UniversalAction): Promise<void> {

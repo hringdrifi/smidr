@@ -157,8 +157,8 @@ describe('useKeyboardStore', () => {
     useKeyboardStore.setState({ editorMode: 'keymap', appMode: 'design', currentLayer: 0 });
 
     store.addKeys([
-      { x: 0, y: 0, w: 1, h: 1, keymap: { 0: { type: 'tap', keycode: 'A' } } },
-      { x: 1, y: 0, w: 1, h: 1, keymap: { 0: { type: 'tap', keycode: 'B' } } }
+      { x: 0, y: 0, w: 1, h: 1, keymap: { 0: { action: 'tap', keycode: 'A' } } },
+      { x: 1, y: 0, w: 1, h: 1, keymap: { 0: { action: 'tap', keycode: 'B' } } }
     ], { skipCollision: true });
 
     let state = useKeyboardStore.getState();
@@ -169,8 +169,8 @@ describe('useKeyboardStore', () => {
     store.copyKeys();
     state = useKeyboardStore.getState();
     expect(state.actionClipboard).toHaveLength(2);
-    expect(state.actionClipboard[0]).toEqual({ type: 'tap', keycode: 'A' });
-    expect(state.actionClipboard[1]).toEqual({ type: 'tap', keycode: 'B' });
+    expect(state.actionClipboard[0]).toEqual({ action: 'tap', keycode: 'A' });
+    expect(state.actionClipboard[1]).toEqual({ action: 'tap', keycode: 'B' });
 
     // Add target keys
     store.addKeys([
@@ -186,8 +186,8 @@ describe('useKeyboardStore', () => {
     store.pasteKeys();
     state = useKeyboardStore.getState();
 
-    expect(state.keys[2].keymap?.[0]).toEqual({ type: 'tap', keycode: 'A' });
-    expect(state.keys[3].keymap?.[0]).toEqual({ type: 'tap', keycode: 'B' });
+    expect(state.keys[2].keymap?.[0]).toEqual({ action: 'tap', keycode: 'A' });
+    expect(state.keys[3].keymap?.[0]).toEqual({ action: 'tap', keycode: 'B' });
   });
 
   it('should handle copying and pasting universal actions in keymap mode (remap app mode)', () => {
@@ -195,8 +195,8 @@ describe('useKeyboardStore', () => {
     const remoteKeymap: Record<number, UniversalAction[]> = {
       0: []
     };
-    remoteKeymap[0][0] = { type: 'tap', keycode: 'X' };
-    remoteKeymap[0][1] = { type: 'tap', keycode: 'Y' };
+    remoteKeymap[0][0] = { action: 'tap', keycode: 'X' };
+    remoteKeymap[0][1] = { action: 'tap', keycode: 'Y' };
 
     useKeyboardStore.setState({ 
       editorMode: 'keymap', 
@@ -218,8 +218,8 @@ describe('useKeyboardStore', () => {
     store.copyKeys();
     state = useKeyboardStore.getState();
     expect(state.actionClipboard).toHaveLength(2);
-    expect(state.actionClipboard[0]).toEqual({ type: 'tap', keycode: 'X' });
-    expect(state.actionClipboard[1]).toEqual({ type: 'tap', keycode: 'Y' });
+    expect(state.actionClipboard[0]).toEqual({ action: 'tap', keycode: 'X' });
+    expect(state.actionClipboard[1]).toEqual({ action: 'tap', keycode: 'Y' });
 
     // Add target keys
     store.addKeys([
@@ -236,12 +236,12 @@ describe('useKeyboardStore', () => {
     state = useKeyboardStore.getState();
 
     // Verify local keys updated
-    expect(state.keys[2].keymap?.[0]).toEqual({ type: 'tap', keycode: 'X' });
-    expect(state.keys[3].keymap?.[0]).toEqual({ type: 'tap', keycode: 'Y' });
+    expect(state.keys[2].keymap?.[0]).toEqual({ action: 'tap', keycode: 'X' });
+    expect(state.keys[3].keymap?.[0]).toEqual({ action: 'tap', keycode: 'Y' });
 
     // Verify remote keymap updated
-    expect(state.remoteKeymap[0][32]).toEqual({ type: 'tap', keycode: 'X' });
-    expect(state.remoteKeymap[0][33]).toEqual({ type: 'tap', keycode: 'Y' });
+    expect(state.remoteKeymap[0][32]).toEqual({ action: 'tap', keycode: 'X' });
+    expect(state.remoteKeymap[0][33]).toEqual({ action: 'tap', keycode: 'Y' });
   });
 
   it('should align keys correctly', () => {

@@ -163,32 +163,25 @@ export const labelNodeToText = (node: LabelNode): string => {
 
 export const formatActionLabel = (action: UniversalAction | undefined): LabelNode => {
   if (!action) return { type: 'text', text: '▽' };
-  switch (action.type) {
+  switch (action.action) {
     case 'trans':
       return { type: 'text', text: '▽' };
     case 'none':
       return { type: 'empty' };
     case 'tap': {
       const match = KEYCODES.find(kc => kc.code === action.keycode);
-      return { type: 'text', text: match?.label || action.keycode };
-    }
-    case 'mod': {
-      const baseMatch = KEYCODES.find(kc => kc.code === action.keycode);
-      const baseLabel = baseMatch?.label || action.keycode || '';
-      
-      const modAbbrev: Record<Modifier, string> = {
-        'LCTL': 'CTL', 'RCTL': 'CTL',
-        'LSFT': 'SFT', 'RSFT': 'SFT',
-        'LALT': 'ALT', 'RALT': 'ALT',
-        'LGUI': 'GUI', 'RGUI': 'GUI'
-      };
-      
-      const abbreviatedMods = action.modifiers.map(mod => modAbbrev[mod] || mod);
-      
-      if (abbreviatedMods.length === 0) {
-        return { type: 'text', text: baseLabel || 'Mods' };
+      const baseLabel = match?.label || action.keycode;
+      if (action.mods && action.mods.length > 0) {
+        const modAbbrev: Record<Modifier, string> = {
+          'LCTL': 'CTL', 'RCTL': 'CTL',
+          'LSFT': 'SFT', 'RSFT': 'SFT',
+          'LALT': 'ALT', 'RALT': 'ALT',
+          'LGUI': 'GUI', 'RGUI': 'GUI'
+        };
+        const abbreviatedMods = action.mods.map(mod => modAbbrev[mod] || mod);
+        return { type: 'text', text: `${abbreviatedMods.join('+')}\n${baseLabel}` };
       }
-      return { type: 'text', text: `${abbreviatedMods.join('+')}\n${baseLabel}` };
+      return { type: 'text', text: baseLabel || '' };
     }
     case 'mo':
       return { type: 'layer_action', variant: 'momentary', layerId: action.layerId };

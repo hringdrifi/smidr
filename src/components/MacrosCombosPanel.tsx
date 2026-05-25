@@ -150,13 +150,13 @@ export const MacrosCombosPanel: React.FC = () => {
   // --- Combos local save handlers ---
   const [editingComboIdx, setEditingComboIdx] = useState<number | null>(null);
   const [comboInputs, setComboInputs] = useState<UniversalAction[]>([
-    { type: 'none' }, { type: 'none' }, { type: 'none' }, { type: 'none' }
+    { action: 'none' }, { action: 'none' }, { action: 'none' }, { action: 'none' }
   ]);
-  const [comboOutput, setComboOutput] = useState<UniversalAction>({ type: 'none' });
+  const [comboOutput, setComboOutput] = useState<UniversalAction>({ action: 'none' });
 
   const startEditingCombo = (idx: number, combo: ComboEntry) => {
     setEditingComboIdx(idx);
-    const pads = Array.from({ length: 4 }, (_, i) => combo.inputs[i] || { type: 'none' });
+    const pads = Array.from({ length: 4 }, (_, i) => combo.inputs[i] || { action: 'none' });
     setComboInputs(pads);
     setComboOutput(combo.output);
   };
@@ -164,10 +164,10 @@ export const MacrosCombosPanel: React.FC = () => {
   const saveCombo = async (idx: number) => {
     setIsSaving(true);
     try {
-      const inputs = comboInputs.filter(inp => inp.type !== 'none');
+      const inputs = comboInputs.filter(inp => inp.action !== 'none');
       const combo: ComboEntry = {
         inputs,
-        output: comboOutput || { type: 'none' }
+        output: comboOutput || { action: 'none' }
       };
       await updateRemoteCombo(idx, combo);
       setEditingComboIdx(null);
@@ -180,14 +180,14 @@ export const MacrosCombosPanel: React.FC = () => {
   };
 
   const updateComboKey = (slotIdx: number, val: string) => {
-    const action: UniversalAction = val === 'none' ? { type: 'none' } : { type: 'tap', keycode: val as UniversalKey };
+    const action: UniversalAction = val === 'none' ? { action: 'none' } : { action: 'tap', keycode: val as UniversalKey };
     const inputs = [...comboInputs];
     inputs[slotIdx] = action;
     setComboInputs(inputs);
   };
 
   const updateComboOutput = (val: string) => {
-    const action: UniversalAction = val === 'none' ? { type: 'none' } : { type: 'tap', keycode: val as UniversalKey };
+    const action: UniversalAction = val === 'none' ? { action: 'none' } : { action: 'tap', keycode: val as UniversalKey };
     setComboOutput(action);
   };
 
@@ -504,7 +504,7 @@ export const MacrosCombosPanel: React.FC = () => {
                           <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Trigger key inputs (Max 4)</span>
                           <div className="grid grid-cols-4 gap-2">
                             {comboInputs.map((input, slotIdx) => {
-                              const keyStr = input.type === 'tap' ? input.keycode : 'none';
+                              const keyStr = input.action === 'tap' ? input.keycode : 'none';
                               return (
                                 <select
                                   key={slotIdx}
@@ -525,7 +525,7 @@ export const MacrosCombosPanel: React.FC = () => {
                         <div className="flex items-center justify-between border-t border-[var(--border-main)] pt-3 mt-1">
                           <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Trigger Output Key</span>
                           <select
-                            value={comboOutput.type === 'tap' ? comboOutput.keycode : 'none'}
+                            value={comboOutput.action === 'tap' ? comboOutput.keycode : 'none'}
                             onChange={(e) => updateComboOutput(e.target.value)}
                             className="w-40 h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-amber-500 font-bold select-arrow"
                           >
@@ -542,7 +542,7 @@ export const MacrosCombosPanel: React.FC = () => {
                         <div className="flex items-center gap-1.5">
                           {/* List non-none trigger inputs */}
                           {combo.inputs
-                            .filter(i => i.type === 'tap')
+                            .filter(i => i.action === 'tap')
                             .map((i, sIdx) => (
                               <span 
                                 key={sIdx}
@@ -556,7 +556,7 @@ export const MacrosCombosPanel: React.FC = () => {
                         <ArrowRight size={14} className="text-zinc-600 shrink-0 mx-2" />
                         
                         <span className="h-6 px-2.5 bg-amber-500/10 border border-amber-500/20 rounded flex items-center justify-center text-[10px] font-mono text-amber-500 font-bold">
-                          {combo.output.type === 'tap' ? combo.output.keycode : 'NONE'}
+                          {combo.output.action === 'tap' ? combo.output.keycode : 'NONE'}
                         </span>
                       </div>
                     )}

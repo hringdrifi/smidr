@@ -423,7 +423,7 @@ export class VialProtocol extends ViaProtocol {
         vialCodeToAction(k2),
         vialCodeToAction(k3),
         vialCodeToAction(k4)
-      ].filter(act => act.type !== 'none');
+      ].filter(act => act.action !== 'none');
 
       combos.push({
         inputs,
@@ -441,10 +441,10 @@ export class VialProtocol extends ViaProtocol {
     data[3] = idx;
     
     const view = new DataView(data.buffer, data.byteOffset);
-    view.setUint16(4, actionToVialCode(combo.inputs[0] || { type: 'none' }), true);
-    view.setUint16(6, actionToVialCode(combo.inputs[1] || { type: 'none' }), true);
-    view.setUint16(8, actionToVialCode(combo.inputs[2] || { type: 'none' }), true);
-    view.setUint16(10, actionToVialCode(combo.inputs[3] || { type: 'none' }), true);
+    view.setUint16(4, actionToVialCode(combo.inputs[0] || { action: 'none' }), true);
+    view.setUint16(6, actionToVialCode(combo.inputs[1] || { action: 'none' }), true);
+    view.setUint16(8, actionToVialCode(combo.inputs[2] || { action: 'none' }), true);
+    view.setUint16(10, actionToVialCode(combo.inputs[3] || { action: 'none' }), true);
     view.setUint16(12, actionToVialCode(combo.output), true);
     
     await this.sendReport(data);

@@ -931,11 +931,11 @@ export const useKeyboardStore = create<KeyboardState>()(
                 if (s.appMode === 'remap') {
                   if (k.row !== undefined && k.col !== undefined) {
                     const flatIndex = k.row * 32 + k.col;
-                    return s.remoteKeymap[s.currentLayer]?.[flatIndex] || { type: 'trans' as const };
+                    return s.remoteKeymap[s.currentLayer]?.[flatIndex] || { action: 'trans' as const };
                   }
-                  return { type: 'trans' as const };
+                  return { action: 'trans' as const };
                 } else {
-                  return k.keymap?.[s.currentLayer] || { type: 'trans' as const };
+                  return k.keymap?.[s.currentLayer] || { action: 'trans' as const };
                 }
               })
             };

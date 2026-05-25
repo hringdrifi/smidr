@@ -13,7 +13,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const MODIFIERS: Modifier[] = ['LCTL', 'RCTL', 'LSFT', 'RSFT', 'LALT', 'RALT', 'LGUI', 'RGUI'];
+const MODIFIERS: Modifier[] = ['LCTL', 'LSFT', 'LALT', 'LGUI', 'RCTL', 'RSFT', 'RALT', 'RGUI'];
 
 const QMK_ORDER = [
   'transparent',
@@ -95,14 +95,14 @@ export const KeycodeConfigPanel = () => {
   }
 
   const hasMatrix = selectedKey.row !== undefined;
-  let action: UniversalAction = { type: 'trans' };
+  let action: UniversalAction = { action: 'trans' };
   if (appMode === 'remap') {
     if (hasMatrix) {
       const flatIndex = selectedKey.row! * 32 + selectedKey.col!;
-      action = remoteKeymap[currentLayer]?.[flatIndex] || { type: 'trans' };
+      action = remoteKeymap[currentLayer]?.[flatIndex] || { action: 'trans' };
     }
   } else {
-    action = selectedKey.keymap?.[currentLayer] || { type: 'trans' };
+    action = selectedKey.keymap?.[currentLayer] || { action: 'trans' };
   }
 
   const updateSelectedAction = (newAction: UniversalAction) => {
@@ -113,70 +113,68 @@ export const KeycodeConfigPanel = () => {
     } else {
       setKeycode(selectedKey.id!, currentLayer, newAction);
     }
-  };  const handleActionTypeChange = (type: string) => {
+  };
+
+  const handleActionTypeChange = (actVal: string) => {
     const existingLayerId = ('layerId' in action) ? (action as any).layerId : 1;
-    const existingModifiers = ('modifiers' in action) ? (action as any).modifiers : [];
+    let existingModifiers = ('modifiers' in action) ? (action as any).modifiers : [];
 
     let existingKeycode: string | undefined = undefined;
-    if (action.type === 'tap') {
+    if (action.action === 'tap') {
       existingKeycode = action.keycode;
-    } else if (action.type === 'lt' || action.type === 'mt') {
-      if (action.tapAction.type === 'tap') {
-        existingKeycode = action.tapAction.keycode;
-      } else if (action.tapAction.type === 'trans' || action.tapAction.type === 'none') {
-        existingKeycode = action.tapAction.type;
+      if (action.mods) {
+        existingModifiers = action.mods;
       }
-    } else if (action.type === 'mod') {
-      existingKeycode = action.keycode;
+    } else if (action.action === 'lt' || action.action === 'mt') {
+      if (action.tapAction.action === 'tap') {
+        existingKeycode = action.tapAction.keycode;
+      } else if (action.tapAction.action === 'trans' || action.tapAction.action === 'none') {
+        existingKeycode = action.tapAction.action;
+      }
     }
 
     let newAction: UniversalAction;
-    switch (type) {
+    switch (actVal) {
       case 'mo':
-        newAction = { type: 'mo', layerId: existingLayerId };
+        newAction = { action: 'mo', layerId: existingLayerId };
         break;
       case 'tg':
-        newAction = { type: 'tg', layerId: existingLayerId };
+        newAction = { action: 'tg', layerId: existingLayerId };
         break;
       case 'to':
-        newAction = { type: 'to', layerId: existingLayerId };
+        newAction = { action: 'to', layerId: existingLayerId };
         break;
       case 'lt': {
-        let tapAction: UniversalAction = { type: 'trans' };
+        let tapAction: UniversalAction = { action: 'trans' };
         if (existingKeycode === 'none') {
-          tapAction = { type: 'none' };
+          tapAction = { action: 'none' };
         } else if (existingKeycode && existingKeycode !== 'transparent') {
-          tapAction = { type: 'tap', keycode: existingKeycode as any };
+          tapAction = { action: 'tap', keycode: existingKeycode as any };
         }
-        newAction = { type: 'lt', layerId: existingLayerId, tapAction };
+        newAction = { action: 'lt', layerId: existingLayerId, tapAction };
         break;
       }
       case 'mt': {
-        let tapAction: UniversalAction = { type: 'trans' };
+        let tapAction: UniversalAction = { action: 'trans' };
         if (existingKeycode === 'none') {
-          tapAction = { type: 'none' };
+          tapAction = { action: 'none' };
         } else if (existingKeycode && existingKeycode !== 'transparent') {
-          tapAction = { type: 'tap', keycode: existingKeycode as any };
+          tapAction = { action: 'tap', keycode: existingKeycode as any };
         }
-        newAction = { type: 'mt', modifiers: existingModifiers, tapAction };
-        break;
-      }
-      case 'mod': {
-        let keycodeVal = 'TRNS';
-        if (existingKeycode && existingKeycode !== 'transparent' && existingKeycode !== 'none') {
-          keycodeVal = existingKeycode;
-        }
-        newAction = { type: 'mod', modifiers: existingModifiers, keycode: keycodeVal as any };
+        newAction = { action: 'mt', modifiers: existingModifiers, tapAction };
         break;
       }
       case 'tap':
       default: {
         if (existingKeycode === 'none') {
-          newAction = { type: 'none' };
+          newAction = { action: 'none' };
         } else if (existingKeycode && existingKeycode !== 'transparent') {
-          newAction = { type: 'tap', keycode: existingKeycode as any };
+          newAction = { action: 'tap', keycode: existingKeycode as any };
+          if (existingModifiers && existingModifiers.length > 0) {
+            newAction.mods = existingModifiers;
+          }
         } else {
-          newAction = { type: 'trans' };
+          newAction = { action: 'trans' };
         }
         break;
       }
@@ -186,17 +184,17 @@ export const KeycodeConfigPanel = () => {
 
   const handleLayerChange = (layerId: number) => {
     if (
-      action.type === 'mo' ||
-      action.type === 'tg' ||
-      action.type === 'to' ||
-      action.type === 'lt'
+      action.action === 'mo' ||
+      action.action === 'tg' ||
+      action.action === 'to' ||
+      action.action === 'lt'
     ) {
       updateSelectedAction({ ...action, layerId });
     }
   };
 
   const handleModifierToggle = (mod: Modifier) => {
-    if (action.type === 'mt' || action.type === 'mod') {
+    if (action.action === 'mt') {
       const isSelected = action.modifiers.includes(mod);
       let nextModifiers = isSelected
         ? action.modifiers.filter(m => m !== mod)
@@ -218,42 +216,79 @@ export const KeycodeConfigPanel = () => {
       }
 
       updateSelectedAction({ ...action, modifiers: nextModifiers });
-    }
-  };
-
-  const handleBasicKeycodeChange = (code: string) => {
-    let newAction: UniversalAction;
-    if (code === 'transparent') {
-      newAction = { type: 'trans' };
-    } else if (code === 'none') {
-      newAction = { type: 'none' };
     } else {
-      newAction = { type: 'tap', keycode: code as UniversalKey };
+      // action is 'tap', 'trans', 'none'
+      const currentMods = (action.action === 'tap' && action.mods) ? action.mods : [];
+      const isSelected = currentMods.includes(mod);
+      let nextModifiers = isSelected
+        ? currentMods.filter(m => m !== mod)
+        : [...currentMods, mod];
+      
+      if (!isSelected) {
+        const isNewModRight = mod.startsWith('R');
+        const mapping: Record<Modifier, Modifier> = isNewModRight
+          ? {
+              "LCTL": "RCTL", "LSFT": "RSFT", "LALT": "RALT", "LGUI": "RGUI",
+              "RCTL": "RCTL", "RSFT": "RSFT", "RALT": "RALT", "RGUI": "RGUI"
+            }
+          : {
+              "RCTL": "LCTL", "RSFT": "LSFT", "RALT": "LALT", "RGUI": "LGUI",
+              "LCTL": "LCTL", "LSFT": "LSFT", "LALT": "LALT", "LGUI": "LGUI"
+            };
+        nextModifiers = nextModifiers.map(m => mapping[m]);
+      }
+
+      let baseKeycode: UniversalKey = 'TRNS';
+      if (action.action === 'tap') {
+        baseKeycode = action.keycode;
+      } else if (action.action === 'none') {
+        baseKeycode = 'NO';
+      }
+
+      const nextAction: UniversalAction = {
+        action: 'tap',
+        keycode: baseKeycode
+      };
+
+      if (nextModifiers.length > 0) {
+        nextAction.mods = nextModifiers;
+      }
+      updateSelectedAction(nextAction);
     }
-    updateSelectedAction(newAction);
   };
 
-  const handleTapKeycodeChange = (code: string) => {
-    if (action.type === 'lt' || action.type === 'mt') {
+  const handleKeycodeSelection = (code: string) => {
+    if (action.action === 'lt' || action.action === 'mt') {
       let tapAction: UniversalAction;
       if (code === 'transparent') {
-        tapAction = { type: 'trans' };
+        tapAction = { action: 'trans' };
       } else if (code === 'none') {
-        tapAction = { type: 'none' };
+        tapAction = { action: 'none' };
       } else {
-        tapAction = { type: 'tap', keycode: code as UniversalKey };
+        tapAction = { action: 'tap', keycode: code as UniversalKey };
       }
       updateSelectedAction({ ...action, tapAction });
-    } else if (action.type === 'mod') {
-      updateSelectedAction({ ...action, keycode: code as UniversalKey });
+    } else {
+      let newAction: UniversalAction;
+      if (code === 'transparent') {
+        newAction = { action: 'trans' };
+      } else if (code === 'none') {
+        newAction = { action: 'none' };
+      } else {
+        newAction = { action: 'tap', keycode: code as UniversalKey };
+        if (action.action === 'tap' && action.mods && action.mods.length > 0) {
+          newAction.mods = action.mods;
+        }
+      }
+      updateSelectedAction(newAction);
     }
   };
 
   // Determine current active config type string
   let currentType = 'tap';
-  if (['mo', 'tg', 'to', 'lt', 'mt', 'mod'].includes(action.type)) {
-    currentType = action.type;
-  } else if (action.type === 'trans' || action.type === 'none' || action.type === 'tap') {
+  if (['mo', 'tg', 'to', 'lt', 'mt'].includes(action.action)) {
+    currentType = action.action;
+  } else {
     currentType = 'tap';
   }
 
@@ -271,12 +306,12 @@ export const KeycodeConfigPanel = () => {
 
   // Get current active keycode code
   let currentActiveCode = 'transparent';
-  if (currentType === 'tap') {
-    currentActiveCode = action.type === 'tap' ? action.keycode : action.type;
-  } else if (action.type === 'lt' || action.type === 'mt') {
-    currentActiveCode = action.tapAction.type === 'tap' ? action.tapAction.keycode : action.tapAction.type;
-  } else if (action.type === 'mod') {
+  if (action.action === 'tap') {
     currentActiveCode = action.keycode;
+  } else if (action.action === 'lt' || action.action === 'mt') {
+    currentActiveCode = action.tapAction.action === 'tap' ? action.tapAction.keycode : action.tapAction.action;
+  } else if (action.action === 'trans' || action.action === 'none') {
+    currentActiveCode = action.action;
   }
 
   return (
@@ -319,8 +354,7 @@ export const KeycodeConfigPanel = () => {
             onChange={(e) => handleActionTypeChange(e.target.value)}
             className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg px-3 py-2 text-xs font-bold text-[var(--text-highlight)] focus:outline-none focus:border-amber-500 cursor-pointer transition-colors"
           >
-            <option value="tap">{t('keycodeConfig.typeBasic') || 'Basic Key / Transparent'}</option>
-            <option value="mod">{t('keycodeConfig.typeModifier') || 'Modifiers (Combo)'}</option>
+            <option value="tap">{t('keycodeConfig.typeBasic') || 'Tap Key'}</option>
             <option value="mt">{t('keycodeConfig.typeModTap') || 'Modifier Tap (MT)'}</option>
             <option value="mo">{t('keycodeConfig.typeMomentary') || 'Momentary Layer (MO)'}</option>
             <option value="tg">{t('keycodeConfig.typeToggle') || 'Toggle Layer (TG)'}</option>
@@ -332,10 +366,10 @@ export const KeycodeConfigPanel = () => {
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
         {/* Layer Selector Grid */}
-        {(action.type === 'mo' ||
-          action.type === 'tg' ||
-          action.type === 'to' ||
-          action.type === 'lt') && (
+        {(action.action === 'mo' ||
+          action.action === 'tg' ||
+          action.action === 'to' ||
+          action.action === 'lt') && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
               {t('keycodeConfig.targetLayer') || 'Target Layer'}
@@ -363,27 +397,31 @@ export const KeycodeConfigPanel = () => {
         )}
 
         {/* Modifiers Checklist */}
-        {(action.type === 'mt' || action.type === 'mod') && (
+        {(action.action === 'mt' || action.action === 'tap' || action.action === 'trans' || action.action === 'none') && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {t('keycodeConfig.modifiers') || 'Modifiers'}
+              {action.action === 'mt'
+                ? (t('keycodeConfig.modifiers') || 'Hold Modifiers')
+                : (t('keycodeConfig.modifiers') || 'Modifiers')}
             </label>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-4 gap-1">
               {MODIFIERS.map(mod => {
-                const isSelected = (action.type === 'mt' || action.type === 'mod') && action.modifiers.includes(mod);
+                const isSelected = action.action === 'mt'
+                  ? action.modifiers.includes(mod)
+                  : (action.action === 'tap' && action.mods ? action.mods.includes(mod) : false);
                 return (
                   <button
                     key={mod}
                     onClick={() => handleModifierToggle(mod)}
                     className={cn(
-                      "px-2.5 py-1.5 text-[9px] font-black tracking-wide rounded transition-all flex items-center justify-between border",
+                      "px-1 py-1.5 text-[9px] font-black tracking-wide rounded transition-all flex items-center justify-center gap-0.5 border",
                       isSelected
                         ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
                         : "bg-[var(--bg-app)]/30 border-[var(--border-main)]/50 text-[var(--text-dim)] hover:bg-[var(--bg-hover)]"
                     )}
                   >
                     <span>{mod}</span>
-                    {isSelected && <Check size={10} className="text-amber-500" />}
+                    {isSelected && <Check size={10} className="text-amber-500 shrink-0" />}
                   </button>
                 );
               })}
@@ -391,98 +429,14 @@ export const KeycodeConfigPanel = () => {
           </div>
         )}
 
-        {/* Basic Keycode Search & Selection */}
-        {currentType === 'tap' && (
+        {/* Keycode Search & Selection */}
+        {(action.action === 'tap' || action.action === 'trans' || action.action === 'none' || action.action === 'lt' || action.action === 'mt') && (
           <div className="flex flex-col gap-2 flex-1 min-h-[220px]">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {t('keymap.currentKeycode') || 'Keycode'}
-            </label>
-            
-            {/* Search Input */}
-            <div className="relative shrink-0">
-              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('keycodeConfig.searchKeycode') || 'Search keycode...'}
-                className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg pl-9 pr-4 py-2 text-xs text-[var(--text-highlight)] focus:outline-none focus:border-amber-500 transition-colors"
-              />
-            </div>
-
-            {/* Current Value Pill */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-app)]/20 border border-[var(--border-main)] text-[10px] shrink-0 font-medium">
-              <div className="flex items-center gap-2">
-                <span className="text-[var(--text-muted)] font-bold">{t('keycodeConfig.currentValue') || 'Current Value'}:</span>
-                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 font-bold border border-amber-500/30 uppercase tracking-wide">
-                  {currentActiveCode}
-                </span>
-              </div>
-              <button
-                onClick={() => setIsCapturingParam(!isCapturingParam)}
-                className={cn(
-                  "h-[22px] px-2 rounded text-[9px] font-bold transition-all flex items-center gap-1 border cursor-pointer",
-                  isCapturingParam
-                    ? "bg-red-500/20 text-red-500 border-red-500/30"
-                    : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500 hover:text-zinc-950"
-                )}
-              >
-                <Keyboard className={cn("w-3 h-3 shrink-0", isCapturingParam ? "animate-bounce" : "")} />
-                <span>
-                  {isCapturingParam
-                    ? (t('keymap.capturingDesc') || 'Selecting...')
-                    : (t('keymap.captureTapKey') || 'Select')}
-                </span>
-              </button>
-            </div>
-
-            {/* Scrollable Keycode Grid */}
-            <div className="flex-1 min-h-0 border border-[var(--border-main)] rounded-lg overflow-hidden bg-[var(--bg-app)]/10 flex flex-col">
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 flex flex-col gap-0.5">
-                {filteredKeycodes.length === 0 ? (
-                  <div className="p-6 text-center text-[10px] italic text-[var(--text-muted)]">
-                    {t('keycodeConfig.noResults') || 'No keycodes found'}
-                  </div>
-                ) : (
-                  filteredKeycodes.map(k => {
-                    const isSelected = k.code === currentActiveCode;
-                    return (
-                      <button
-                        key={k.code}
-                        onClick={() => handleBasicKeycodeChange(k.code)}
-                        className={cn(
-                          "w-full text-left px-2.5 py-2 rounded text-[10px] font-bold transition-all flex items-center justify-between group",
-                          isSelected
-                            ? "bg-amber-500 text-zinc-950 shadow-sm"
-                            : "hover:bg-[var(--bg-hover)] text-[var(--text-main)]"
-                        )}
-                        title={k.description || k.code}
-                      >
-                        <div className="flex flex-col gap-0.5 max-w-[85%] truncate">
-                          <span className="truncate">{k.label}</span>
-                          <span className={cn(
-                            "text-[8px] truncate leading-none font-medium",
-                            isSelected ? "text-zinc-800" : "text-[var(--text-muted)] group-hover:text-[var(--text-dim)]"
-                          )}>
-                            {k.code}
-                          </span>
-                        </div>
-                        {isSelected && <Check size={12} className="text-zinc-950 stroke-[3]" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tap Action Keycode Search & Selection */}
-        {(action.type === 'lt' || action.type === 'mt' || action.type === 'mod') && (
-          <div className="flex flex-col gap-2 flex-1 min-h-[220px]">
-            <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {action.type === 'mod'
-                ? (t('keycodeConfig.baseKeycode') || 'Base Keycode')
+              {action.action === 'tap' || action.action === 'trans' || action.action === 'none'
+                ? (t('keymap.currentKeycode') || 'Keycode')
+                : action.action === 'lt'
+                ? (t('keycodeConfig.tapKeycode') || 'Tap Keycode')
                 : (t('keycodeConfig.tapKeycode') || 'Tap Keycode')}
             </label>
             
@@ -537,7 +491,7 @@ export const KeycodeConfigPanel = () => {
                     return (
                       <button
                         key={k.code}
-                        onClick={() => handleTapKeycodeChange(k.code)}
+                        onClick={() => handleKeycodeSelection(k.code)}
                         className={cn(
                           "w-full text-left px-2.5 py-2 rounded text-[10px] font-bold transition-all flex items-center justify-between group",
                           isSelected

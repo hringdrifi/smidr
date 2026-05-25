@@ -143,7 +143,7 @@ export function parseZmkModifiedKey(str: string): { modifiers: Modifier[], keyco
 
 // Helper to convert UniversalAction AST to ZMK DTS string notation (e.g. for dynamic keymap compilation)
 export function actionToZmkString(action: UniversalAction): string {
-  switch (action.type) {
+  switch (action.action) {
     case 'trans':
       return '&trans';
     case 'none':
@@ -156,20 +156,19 @@ export function actionToZmkString(action: UniversalAction): string {
       if (action.keycode.startsWith('MOUSE_') && (action.keycode as string) !== 'MOUSE_BTN') {
         return `&mmv ${zKey}`;
       }
+      if (action.mods && action.mods.length > 0) {
+        let result = zKey;
+        const shortcutMap: Record<Modifier, string> = {
+          'LCTL': 'LC', 'LSFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
+          'RCTL': 'RC', 'RSFT': 'RS', 'RALT': 'RA', 'RGUI': 'RG'
+        };
+        action.mods.forEach(mod => {
+          const sh = shortcutMap[mod] || mod;
+          result = `${sh}(${result})`;
+        });
+        return `&kp ${result}`;
+      }
       return `&kp ${zKey}`;
-    }
-    case 'mod': {
-      const zKey = ZMK_KEY_MAP[action.keycode] || action.keycode;
-      let result = zKey;
-      const shortcutMap: Record<Modifier, string> = {
-        'LCTL': 'LC', 'LSFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
-        'RCTL': 'RC', 'RSFT': 'RS', 'RALT': 'RA', 'RGUI': 'RG'
-      };
-      action.modifiers.forEach(mod => {
-        const sh = shortcutMap[mod] || mod;
-        result = `${sh}(${result})`;
-      });
-      return `&kp ${result}`;
     }
     case 'mo':
       return `&mo ${action.layerId}`;
@@ -209,27 +208,27 @@ export function actionToZmkString(action: UniversalAction): string {
 export function zmkStringToAction(zmkStr: string): UniversalAction {
   const trimmed = zmkStr.trim();
 
-  if (trimmed === '&trans') return { type: 'trans' };
-  if (trimmed === '&none') return { type: 'none' };
+  if (trimmed === '&trans') return { action: 'trans' };
+  if (trimmed === '&none') return { action: 'none' };
 
   // momentary layer (&mo 1)
   let match = trimmed.match(/^&mo\s+(\d+)$/);
-  if (match) return { type: 'mo', layerId: parseInt(match[1]) };
+  if (match) return { action: 'mo', layerId: parseInt(match[1]) };
 
   // layer toggle (&tog 1)
   match = trimmed.match(/^&tog\s+(\d+)$/);
-  if (match) return { type: 'tg', layerId: parseInt(match[1]) };
+  if (match) return { action: 'tg', layerId: parseInt(match[1]) };
 
   // layer to (&to 1)
   match = trimmed.match(/^&to\s+(\d+)$/);
-  if (match) return { type: 'to', layerId: parseInt(match[1]) };
+  if (match) return { action: 'to', layerId: parseInt(match[1]) };
 
   // layer tap (&lt 1 SPACE)
   match = trimmed.match(/^&lt\s+(\d+)\s+([^\s]+)$/);
   if (match) {
     const layerId = parseInt(match[1]);
     const tapAction = zmkStringToAction(`&kp ${match[2]}`);
-    return { type: 'lt', layerId, tapAction };
+    return { action: 'lt', layerId, tapAction };
   }
 
   // mod tap (&mt LCTRL SPACE or &mt LCTRL LSHIFT SPACE)
@@ -241,19 +240,19 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
       const clean = m.trim();
       return ZMK_TO_UNIVERSAL[clean] || clean;
     }) as Modifier[];
-    return { type: 'mt', modifiers, tapAction };
+    return { action: 'mt', modifiers, tapAction };
   }
 
   // macro (&macro_0)
   match = trimmed.match(/^&macro_(\d+)$/);
-  if (match) return { type: 'macro', macroId: parseInt(match[1]) };
+  if (match) return { action: 'macro', macroId: parseInt(match[1]) };
 
   // mouse keys (&mkp LCLK / &mmv MOVE_UP)
   match = trimmed.match(/^&(mkp|mmv)\s+([^\s]+)$/);
   if (match) {
     const inner = match[2];
     if (ZMK_TO_UNIVERSAL[inner]) {
-      return { type: 'tap', keycode: ZMK_TO_UNIVERSAL[inner] };
+      return { action: 'tap', keycode: ZMK_TO_UNIVERSAL[inner] };
     }
   }
 
@@ -263,20 +262,20 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
     const inner = match[1];
     const parsedMod = parseZmkModifiedKey(inner);
     if (parsedMod) {
-      return { type: 'mod', modifiers: parsedMod.modifiers, keycode: parsedMod.keycode };
+      return { action: 'tap', keycode: parsedMod.keycode, mods: parsedMod.modifiers };
     }
     if (ZMK_TO_UNIVERSAL[inner]) {
-      return { type: 'tap', keycode: ZMK_TO_UNIVERSAL[inner] };
+      return { action: 'tap', keycode: ZMK_TO_UNIVERSAL[inner] };
     }
   }
 
-  return { type: 'custom', protocol: 'zmk', rawCode: trimmed };
+  return { action: 'custom', protocol: 'zmk', rawCode: trimmed };
 }
 
 // Maps UniversalAction to ZMK Studio RPC Protobuf dynamic behavior request objects (stub for Phase 4)
 export function actionToZmkRpc(action: UniversalAction): any {
   return {
-    behaviorId: action.type,
-    param: action.type === 'tap' ? ZMK_KEY_MAP[action.keycode] : null
+    behaviorId: action.action,
+    param: action.action === 'tap' ? ZMK_KEY_MAP[action.keycode] : null
   };
 }
