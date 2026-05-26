@@ -14,7 +14,7 @@ import { hidTransport } from '@/lib/transport/hid';
 
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, currentLayer, setCurrentLayer, settings, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities } = useKeyboardStore();
+  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
   const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
@@ -72,7 +72,7 @@ export const RemapView: React.FC = () => {
                       </div>
                     </button>
 
-                    {(settings.features?.vial || !!deviceCapabilities) && (
+                    {(connectedDevice?.protocolType === 'vial' || !!deviceCapabilities) && (
                       <>
                         <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
                         <button 

@@ -27,7 +27,8 @@ export const DeviceConnector: React.FC = () => {
             vid: device.vendorId,
             pid: device.productId,
             productName: device.productName,
-            manufacturerName: device.manufacturerName
+            manufacturerName: device.manufacturerName,
+            protocolType: 'via'
           });
 
           // Check for Vial compatibility & fetch UID
@@ -45,6 +46,12 @@ export const DeviceConnector: React.FC = () => {
             if (version > 0) {
               isVial = true;
               console.log(`Vial detected (v${version}). Fetching Keyboard UID & definition...`);
+              
+              // Upgrade the protocol type now that Vial is confirmed
+              const current = useKeyboardStore.getState().connectedDevice;
+              if (current) {
+                useKeyboardStore.getState().setConnectedDevice({ ...current, protocolType: 'vial' });
+              }
               
               try {
                 keyboardId = await vial.getKeyboardId();

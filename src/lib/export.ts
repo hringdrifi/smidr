@@ -80,7 +80,6 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
     layouts: {
       labels: labels.length > 0 ? labels : undefined,
       keymap: kleData,
-      optionKeys: settings.optionKeys,
     },
     keymaps: keymaps
   };

@@ -53,6 +53,5 @@ export interface KeyboardDefinition {
   layouts: {
     keymap: string | any[][];
     labels?: (string | string[])[];
-    optionKeys?: Record<string, Record<string, any>>;
   };
 }

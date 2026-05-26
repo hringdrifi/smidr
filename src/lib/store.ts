@@ -93,7 +93,7 @@ export interface KeyboardState {
   setKeycode: (keyId: string, layer: number, action: UniversalAction) => void;
 
   // Remap Mode Specific
-  connectedDevice: { vid: number; pid: number; productName?: string; manufacturerName?: string } | null;
+  connectedDevice: { vid: number; pid: number; productName?: string; manufacturerName?: string; protocolType?: 'via' | 'vial' | 'zmk' } | null;
   setConnectedDevice: (device: KeyboardState['connectedDevice']) => void;
   deviceCapabilities: DeviceCapability | null;
   setDeviceCapabilities: (caps: DeviceCapability | null) => void;
@@ -408,7 +408,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           if (!s.connectedDevice) return;
           
           try {
-            const isVial = !!s.settings.features?.vial;
+            const isVial = s.connectedDevice?.protocolType === 'vial';
             const protocol = isVial ? new VialProtocol() : new ViaProtocol();
 
             await protocol.initialize(hidTransport);
@@ -517,7 +517,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         syncMacrosAndCombos: async (existingProtocol?: VialProtocol) => {
           const s = get();
-          if (!s.connectedDevice || !s.settings.features?.vial) return;
+          if (!s.connectedDevice || s.connectedDevice.protocolType !== 'vial') return;
           
           try {
             console.log('Syncing macros and combos from device...');
@@ -556,7 +556,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         updateRemoteMacro: async (id: number, actions: MacroAction[]) => {
           const s = get();
-          if (!s.connectedDevice || !s.settings.features?.vial) return;
+          if (!s.connectedDevice || s.connectedDevice.protocolType !== 'vial') return;
           
           try {
             const protocol = new VialProtocol();
@@ -593,7 +593,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         updateRemoteCombo: async (index: number, combo: ComboEntry) => {
           const s = get();
-          if (!s.connectedDevice || !s.settings.features?.vial) return;
+          if (!s.connectedDevice || s.connectedDevice.protocolType !== 'vial') return;
           
           try {
             const protocol = new VialProtocol();
@@ -626,7 +626,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           
           console.log('[Offline Sync] Checking for keymap sync disparities (UI-priority)...');
           try {
-            const isVial = !!s.settings.features?.vial;
+            const isVial = s.connectedDevice?.protocolType === 'vial';
             const protocol = isVial ? new VialProtocol() : new ViaProtocol();
 
             await protocol.initialize(hidTransport);
@@ -659,12 +659,11 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setActiveOption: (g: string, i: number) => set((s) => {
           const newActiveOptions = { ...s.settings.activeOptions, [g]: i };
-          const { optionKeys } = s.settings;
           
           let newKeys = [...(s.baseKeys && s.baseKeys.length > 0 ? s.baseKeys : s.keys)];
           
           // 1. If it's a Vial keyboard, sync layout options to physical device if connected
-          if (s.settings.features?.vial) {
+          if (s.connectedDevice?.protocolType === 'vial') {
             // Update physical device if connected
             if (s.connectedDevice) {
               const labels = Object.keys(s.settings.layoutOptions || {})
@@ -688,19 +687,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                 });
             }
           } 
-          // 2. Fallback to classic VIA style property overrides
-          else if (optionKeys) {
-            Object.entries(newActiveOptions).forEach(([groupId, choiceId]) => {
-              const choiceOverrides = optionKeys[groupId]?.[choiceId.toString()];
-              if (choiceOverrides) {
-                newKeys = newKeys.map((k, idx) => {
-                  const overrides = choiceOverrides[idx.toString()];
-                  if (overrides) return { ...k, ...overrides };
-                  return k;
-                });
-              }
-            });
-          }
           // 3. Auto-align to (0,0) if not in Design-Layout mode
           const isDesignLayout = s.appMode === 'design' && s.editorMode === 'layout';
           if (!isDesignLayout && newKeys.length > 0) {
@@ -884,7 +870,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const { connectedDevice, updateRemoteKeycode, settings } = get();
           if (!connectedDevice) return;
           try {
-            const isVial = !!settings.features?.vial;
+            const isVial = connectedDevice?.protocolType === 'vial';
             const protocol = isVial ? new VialProtocol() : new ViaProtocol();
 
             await protocol.initialize(hidTransport);
@@ -1013,7 +999,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             if (appMode === 'remap' && s.connectedDevice) {
               const runDeviceUpdates = async () => {
                 try {
-                  const isVial = !!s.settings.features?.vial;
+                  const isVial = s.connectedDevice?.protocolType === 'vial';
                   const protocol = isVial ? new VialProtocol() : new ViaProtocol();
                   await protocol.initialize(hidTransport);
 
@@ -1096,7 +1082,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           // 2. If connected to a device in remap mode, sync to device sequentially
           if (appMode === 'remap' && connectedDevice) {
             try {
-              const isVial = !!settings.features?.vial;
+              const isVial = connectedDevice?.protocolType === 'vial';
               const protocol = isVial ? new VialProtocol() : new ViaProtocol();
               await protocol.initialize(hidTransport);
 
@@ -1155,7 +1141,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           // 2. If connected to a device in remap mode, sync to device sequentially
           if (appMode === 'remap' && connectedDevice) {
             try {
-              const isVial = !!settings.features?.vial;
+              const isVial = connectedDevice?.protocolType === 'vial';
               const protocol = isVial ? new VialProtocol() : new ViaProtocol();
               await protocol.initialize(hidTransport);
 
@@ -1426,7 +1412,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
 
             const result = parseKeyboardDefinition(input);
-            const { keys, name, vendorProductId, layoutOptions, optionKeys } = result;
+            const { keys, name, vendorProductId, layoutOptions } = result;
             
             // Update again with parsed info if successful
             if (typeof window !== 'undefined' && (window as any).setAppDebug) {
@@ -1455,19 +1441,6 @@ export const useKeyboardStore = create<KeyboardState>()(
               const baseKeys = [...keys];
               let appliedKeys = [...keys];
               
-              // Apply choice 0 overrides by default for all groups
-              if (optionKeys) {
-                Object.keys(layoutOptions || {}).forEach(groupId => {
-                  const choiceOverrides = optionKeys[groupId]?.["0"];
-                  if (choiceOverrides) {
-                    appliedKeys = appliedKeys.map((k, idx) => {
-                      const overrides = choiceOverrides[idx.toString()];
-                      if (overrides) return { ...k, ...overrides };
-                      return k;
-                    });
-                  }
-                });
-              }
               // 3. Auto-align to (0,0) if not in Design-Layout mode
               const isDesignLayout = s.appMode === 'design'; // Since editorMode is being set to 'layout' below
               if (!isDesignLayout && appliedKeys.length > 0) {
@@ -1498,7 +1471,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                   vendorProductId: vendorProductId || s.settings.vendorProductId,
                   layoutOptions: layoutOptions || {},
                   activeOptions: {},
-                  optionKeys: optionKeys || {},
                   matrix: {
                     rows: hasMatrix ? maxRow + 1 : s.settings.matrix.rows,
                     cols: hasMatrix ? maxCol + 1 : s.settings.matrix.cols,

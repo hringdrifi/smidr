@@ -77,7 +77,6 @@ export interface ProjectSettings {
     }
   };
   activeOptions: Record<string, number>; // index: 0 for Off, 1 for On in toggle; choice index for list
-  optionKeys?: Record<string, Record<string, any>>; // Vial/VIA style geometry overrides
   vialUid?: string; // 64-bit Vial UID (hex string, e.g. "0x123456789ABCDEF0")
   vid?: string; // Legacy optional vid string
   pid?: string; // Legacy optional pid string

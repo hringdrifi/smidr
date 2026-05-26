@@ -32,8 +32,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   keys: PhysicalKey[], 
   name?: string,
   vendorProductId?: number,
-  layoutOptions?: ProjectSettings['layoutOptions'],
-  optionKeys?: any
+  layoutOptions?: ProjectSettings['layoutOptions']
 } {
   const isDebug = options?.debug;
   if (isDebug) console.log('[Parser] Starting unified parse...');
@@ -174,7 +173,6 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
     keys, 
     name, 
     vendorProductId, 
-    layoutOptions, 
-    optionKeys: input.layouts?.optionKeys 
+    layoutOptions
   };
 }
