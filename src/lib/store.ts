@@ -496,7 +496,15 @@ export const useKeyboardStore = create<KeyboardState>()(
               return { ...k, keymap };
             });
 
-            set({ remoteKeymap: newRemoteKeymap, keys: updatedKeys, baseKeys: updatedKeys });
+            set((state) => ({
+              remoteKeymap: newRemoteKeymap,
+              keys: updatedKeys,
+              baseKeys: updatedKeys,
+              settings: {
+                ...state.settings,
+                matrix: { rows: matrixRows, cols: matrixCols }
+              }
+            }));
             
             // Auto-sync macros and combos if it is a Vial device
             if (isVial) {
@@ -1471,9 +1479,11 @@ export const useKeyboardStore = create<KeyboardState>()(
                 }
               }
 
+              const finalKeys = appliedKeys.filter(k => !k.decal);
+
               return {
-                keys: appliedKeys,
-                baseKeys: appliedKeys,
+                keys: finalKeys,
+                baseKeys: finalKeys,
                 settings: {
                   ...s.settings,
                   name: name || s.settings.name,
@@ -1493,7 +1503,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 focusedKeyId: null,
                 editorMode: 'layout',
                 currentLayer: 0,
-                transform: getCenteredTransform(appliedKeys, {}),
+                transform: getCenteredTransform(finalKeys, {}),
               };
             });
           } catch (err: any) {
