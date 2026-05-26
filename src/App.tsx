@@ -44,7 +44,6 @@ export default function App() {
   const { undo, redo, pastStates, futureStates } = useStore((useKeyboardStore as any).temporal, (state: any) => state);
   const { t, language, setLanguage } = useTranslation();
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
-  const [isReadMenuOpen, setIsReadMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
   const [isLangMenuOpen, setIsLangMenuOpen] = React.useState(false);
   const [isEditorModeMenuOpen, setIsEditorModeMenuOpen] = React.useState(false);
@@ -58,8 +57,7 @@ export default function App() {
   const isDirty = pastStates.length !== lastSavedHistoryLength;
   const [isRestoring, setIsRestoring] = React.useState(false);
   const remapFileInputRef = React.useRef<HTMLInputElement>(null);
-  const qmkFileInputRef = React.useRef<HTMLInputElement>(null);
-  const viaFileInputRef = React.useRef<HTMLInputElement>(null);
+  const keyboardFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const hasDeletableSelection = React.useMemo(() => {
     if (selectedKeyIds.length === 0) return false;
@@ -160,31 +158,21 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
-  const handleImportQmkInfo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportKeyboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      storeState.importKeyboardDefinition(json);
-      setIsReadMenuOpen(false);
-    } catch (err) {
-      console.error('Import QMK INFO failed:', err);
-      alert(t('common.parseFailed'));
-    }
-    e.target.value = '';
-  };
 
-  const handleImportViaVial = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    if (keys.length > 0 && !confirm(t('tools.confirmReplace'))) {
+      e.target.value = '';
+      return;
+    }
+
     try {
       const text = await file.text();
       const json = JSON.parse(text);
       storeState.importKeyboardDefinition(json);
-      setIsReadMenuOpen(false);
     } catch (err) {
-      console.error('Import VIA/Vial failed:', err);
+      console.error('Import keyboard failed:', err);
       alert(t('common.parseFailed'));
     }
     e.target.value = '';
@@ -483,65 +471,24 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsReadMenuOpen(!isReadMenuOpen)}
-                    disabled={!storeState.isProjectOpen}
-                    className={cn(
-                      "h-8 w-10 flex items-center justify-center rounded-md bg-[var(--bg-app)]/50 border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-highlight)] transition-all disabled:pointer-events-none group",
-                      isReadMenuOpen && "bg-[var(--bg-hover)] border-amber-500/50 text-amber-500"
-                    )}
-                    title={t('header.readTooltip')}
-                  >
-                    <FileUp size={16} className={cn(
-                      storeState.isProjectOpen ? "group-hover:scale-110 transition-transform" : "opacity-20"
-                    )} />
-                  </button>
-
-                  {isReadMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsReadMenuOpen(false)} />
-                      <div className="absolute top-full left-0 w-64 mt-2 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[150] overflow-hidden animate-in fade-in slide-in-from-top-1">
-                        <div className="p-2 border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">{t('header.readTitle')}</span>
-                          <button onClick={() => setIsReadMenuOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">
-                            <X size={14} />
-                          </button>
-                        </div>
-                        <div className="p-1 flex flex-col gap-0.5">
-                          <button 
-                            onClick={() => qmkFileInputRef.current?.click()}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
-                          >
-                            <FileUp size={14} className="text-amber-500" />
-                            <span>{t('header.readQmkInfo')}</span>
-                          </button>
-
-                          <button 
-                            onClick={() => viaFileInputRef.current?.click()}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
-                          >
-                            <FileUp size={14} className="text-amber-500" />
-                            <span>{t('header.readViaVial')}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </>
+                <button 
+                  onClick={() => keyboardFileInputRef.current?.click()}
+                  disabled={!storeState.isProjectOpen}
+                  className={cn(
+                    "flex items-center justify-center w-10 h-8 rounded-md bg-[var(--bg-app)]/50 border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-highlight)] transition-all disabled:pointer-events-none group"
                   )}
-                </div>
+                  title={t('header.readTooltip')}
+                >
+                  <FileUp size={16} className={cn(
+                    storeState.isProjectOpen ? "group-hover:scale-110 transition-transform" : "opacity-20"
+                  )} />
+                </button>
 
                 <input 
                   type="file" 
-                  ref={qmkFileInputRef} 
+                  ref={keyboardFileInputRef} 
                   accept=".json" 
-                  onChange={handleImportQmkInfo} 
-                  className="hidden" 
-                />
-                <input 
-                  type="file" 
-                  ref={viaFileInputRef} 
-                  accept=".json" 
-                  onChange={handleImportViaVial} 
+                  onChange={handleImportKeyboard} 
                   className="hidden" 
                 />
 
