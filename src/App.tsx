@@ -492,7 +492,7 @@ export default function App() {
                         ? "bg-[var(--bg-hover)] border-amber-500/50 text-amber-500" 
                         : "bg-[var(--bg-app)]/50 border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-highlight)]"
                     )}
-                    title={t('common.export')}
+                    title={`${t('common.export')}...`}
                   >
                     <Download size={16} className={cn(
                       storeState.isProjectOpen ? "group-hover:scale-110 transition-transform" : "opacity-20"
