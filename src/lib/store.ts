@@ -843,12 +843,19 @@ export const useKeyboardStore = create<KeyboardState>()(
             hidTransport.disconnect().catch(err => {
               console.error('Failed to disconnect keyboard on design mode switch:', err);
             });
-            set({
+            set((s) => ({
               appMode: m,
               selectedKeyIds: [],
               connectedDevice: null,
-              deviceCapabilities: null
-            });
+              deviceCapabilities: null,
+              settings: {
+                ...s.settings,
+                matrix: {
+                  rows: s.settings.pins.rows.length,
+                  cols: s.settings.pins.cols.length,
+                }
+              }
+            }));
           } else {
             set({ appMode: m, selectedKeyIds: [] });
           }
