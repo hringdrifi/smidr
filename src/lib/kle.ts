@@ -76,6 +76,7 @@ export const exportKLE = (keys: PhysicalKey[]): any[] => {
     if (key.x2 !== undefined && key.x2 !== 0) { props.x2 = key.x2; propsChanged = true; }
     if (key.y2 !== undefined && key.y2 !== 0) { props.y2 = key.y2; propsChanged = true; }
     if (key.stepped) { props.l = true; propsChanged = true; }
+    if (key.decal) { props.d = true; propsChanged = true; }
 
     if (propsChanged) currentRow.push(props);
     currentRow.push(key.label || '');

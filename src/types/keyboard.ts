@@ -55,6 +55,7 @@ export interface ProjectSettings {
     scl?: string;
     encoderA?: string;
     encoderB?: string;
+    splitSerial?: string; // Serial transport pin (e.g. GP1 for RP2040)
   };
   hardware: {
     mcu: 'rp2040' | 'atmega32u4' | 'other';
@@ -66,6 +67,7 @@ export interface ProjectSettings {
     encoder: boolean;
     oled: boolean;
     via: boolean;
+    split: boolean;
   };
   layers: number;
   layoutOptions: {

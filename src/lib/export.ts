@@ -21,10 +21,106 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
     }
   });
 
+  // Group active keys by their option group
+  const keysByGroup: Record<string, PhysicalKey[]> = {};
+  keys.forEach(k => {
+    if (k.group !== undefined && k.option !== undefined) {
+      if (!keysByGroup[k.group]) keysByGroup[k.group] = [];
+      keysByGroup[k.group].push(k);
+    }
+  });
+
+  const generatedBlockers: PhysicalKey[] = [];
+
+  // For each option group, find all unique choices defined in settings or active keys
+  Object.entries(keysByGroup).forEach(([g, gKeys]) => {
+    const optSettings = settings.layoutOptions?.[g];
+    const optionsInGroup = new Set<number>();
+    
+    // Always include option 0
+    optionsInGroup.add(0);
+    
+    if (optSettings) {
+      if (optSettings.type === 'list' && optSettings.choices) {
+        optSettings.choices.forEach((_, choiceIdx) => {
+          optionsInGroup.add(choiceIdx);
+        });
+      } else if (optSettings.type === 'toggle') {
+        optionsInGroup.add(0);
+        optionsInGroup.add(1);
+      }
+    }
+    
+    gKeys.forEach(k => {
+      if (k.option !== undefined) {
+        optionsInGroup.add(k.option);
+      }
+    });
+
+    const uniqueOptions = Array.from(optionsInGroup);
+
+    // Bidirectional scan:
+    // If choice 'a' has a key at a position where choice 'b' has no overlapping key,
+    // we generate a blocker decal key for choice 'b' at choice 'a's key position.
+    uniqueOptions.forEach(b => {
+      const bKeys = gKeys.filter(k => k.option === b);
+
+      uniqueOptions.forEach(a => {
+        if (a === b) return;
+        
+        const aKeys = gKeys.filter(k => k.option === a);
+
+        aKeys.forEach(aKey => {
+          const hasOverlap = bKeys.some(bKey => {
+            const x1_a = aKey.x;
+            const x2_a = aKey.x + aKey.w;
+            const x1_b = bKey.x;
+            const x2_b = bKey.x + bKey.w;
+            
+            const overlapX = Math.max(0, Math.min(x2_a, x2_b) - Math.max(x1_a, x1_b));
+            return overlapX > 0.1;
+          }) || generatedBlockers.some(blocker => {
+            if (blocker.group !== g || blocker.option !== b) return false;
+            const x1_a = aKey.x;
+            const x2_a = aKey.x + aKey.w;
+            const x1_b = blocker.x;
+            const x2_b = blocker.x + blocker.w;
+            
+            const overlapX = Math.max(0, Math.min(x2_a, x2_b) - Math.max(x1_a, x1_b));
+            return overlapX > 0.1;
+          });
+
+          if (!hasOverlap) {
+            generatedBlockers.push({
+              x: aKey.x,
+              y: aKey.y,
+              w: aKey.w,
+              h: aKey.h,
+              r: aKey.r,
+              rx: aKey.rx,
+              ry: aKey.ry,
+              w2: aKey.w2,
+              h2: aKey.h2,
+              x2: aKey.x2,
+              y2: aKey.y2,
+              stepped: aKey.stepped,
+              group: g,
+              option: b,
+              decal: true,
+              label: ''
+            });
+          }
+        });
+      });
+    });
+  });
+
+  const allKeysToExport = [...keys, ...generatedBlockers];
+
   // Prepare keys with correct matrix and layout option labels for KLE export
-  const viaKeys = keys.map(key => {
+  const viaKeys = allKeysToExport.map(key => {
     let label = '';
-    if (key.row !== undefined && key.col !== undefined) {
+    if (!key.decal && key.row !== undefined && key.col !== undefined) {
       label = `${key.row},${key.col}`;
     }
     if (key.group !== undefined && key.option !== undefined) {

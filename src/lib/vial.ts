@@ -63,7 +63,21 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
           };
         })
       }
-    }
+    },
+    ...(settings.features.split ? {
+      split: {
+        enabled: true,
+        matrix_pins: {
+          right: {
+            cols: settings.pins.cols,
+            rows: settings.pins.rows
+          }
+        },
+        transport: {
+          serial: { pin: settings.pins.splitSerial || 'GP1' }
+        }
+      }
+    } : {})
   };
   kbFolder.file('keyboard.json', JSON.stringify(infoJson, null, 2));
 
@@ -74,7 +88,10 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
 /* Matrix scanning */
 #define MATRIX_ROWS ${settings.matrix.rows}
 #define MATRIX_COLS ${settings.matrix.cols}
-
+${settings.features.split ? `
+/* Split keyboard */
+#define SPLIT_KEYBOARD
+` : ''}
 /* Encoder pins */
 ${settings.features.encoder ? `
 #define ENCODERS_PAD_A { ${settings.pins.encoderA || 'B0'} }

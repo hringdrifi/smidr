@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKLE } from '@/lib/kle';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Undo2, Redo2, Layout, ChevronDown, FileUp, Trash2, Grid2X2
+  Plus, Undo2, Redo2, Layout, ChevronDown, Trash2, Grid2X2
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
@@ -149,9 +149,6 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                 </>
               )}
             </div>
-
-            {/* Import KLE */}
-            <FloatingButton icon={FileUp} label={t('tools.importKle')} onClick={handleImportKLE} />
 
             <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
 

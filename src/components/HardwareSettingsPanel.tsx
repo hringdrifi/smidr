@@ -245,6 +245,7 @@ export const HardwareSettingsPanel = () => {
     if (settings.pins.scl) pins.add(settings.pins.scl);
     if (settings.pins.encoderA) pins.add(settings.pins.encoderA);
     if (settings.pins.encoderB) pins.add(settings.pins.encoderB);
+    if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
     return pins;
   };
 
@@ -288,7 +289,8 @@ export const HardwareSettingsPanel = () => {
         sda: '',
         scl: '',
         encoderA: '',
-        encoderB: ''
+        encoderB: '',
+        splitSerial: ''
       }
     });
     setActiveBox(null);
@@ -386,6 +388,7 @@ export const HardwareSettingsPanel = () => {
             { id: 'encoder', label: t('hardware.encoder'), icon: Gauge },
             { id: 'oled', label: t('hardware.oled'), icon: Monitor },
             { id: 'via', label: t('hardware.via'), icon: Database },
+            { id: 'split', label: t('hardware.split'), icon: HardDrive },
           ].map(feat => (
             <React.Fragment key={feat.id}>
               <button
@@ -500,7 +503,7 @@ export const HardwareSettingsPanel = () => {
           </div>
 
           {/* Special Pin Slots */}
-          {(settings.features.rgb || settings.features.encoder || settings.features.oled) && (
+          {(settings.features.rgb || settings.features.encoder || settings.features.oled || settings.features.split) && (
             <div className="space-y-3 border-t border-[var(--border-main)] pt-4">
               <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -563,6 +566,18 @@ export const HardwareSettingsPanel = () => {
                       onClear={() => setPin('feature', 'encoderB', '')}
                     />
                   </>
+                )}
+                {settings.features.split && (
+                  <InteractivePinSlot 
+                    label={t('hardware.splitSerial')} 
+                    value={settings.pins.splitSerial || ''} 
+                    isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
+                    onFocus={() => {
+                      setActiveBox('feature');
+                      setFocusedFeature('splitSerial');
+                    }}
+                    onClear={() => setPin('feature', 'splitSerial', '')}
+                  />
                 )}
               </div>
             </div>
