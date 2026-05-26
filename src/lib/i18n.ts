@@ -834,7 +834,7 @@ export const TRANSLATIONS = {
       add: '追加',
       new: '新規',
       import: 'インポート',
-      export: 'エクスポート',
+      export: '出力',
       search: '検索',
       saved: '保存済み!',
       noProjects: '保存されたプロジェクトはありません',

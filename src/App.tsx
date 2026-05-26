@@ -433,12 +433,12 @@ export default function App() {
                             ))
                           )}
                         </div>
-                        <div className="p-2 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 flex flex-col gap-2">
+                        <div className="p-1 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50">
                           <button 
-                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded bg-[var(--bg-button)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all relative overflow-hidden"
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left relative overflow-hidden"
                           >
-                            <FileUp size={12} className="text-amber-500" />
-                            {t('header.importProject')}
+                            <FileUp size={14} className="text-amber-500" />
+                            <span>{t('header.importProject')}</span>
                             <input 
                               type="file" 
                               accept=".smidr"
