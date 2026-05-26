@@ -55,7 +55,7 @@ export type UniversalAction =
   | { action: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
   | { action: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
   | { action: "macro"; macroId: number }                                   // マクロ
-  | { action: "lighting"; command: "TOGGLE" | "MODE_UP" | "MODE_DOWN" | "BRIGHTNESS_UP" | "BRIGHTNESS_DOWN" } // 統一ライティング操作
+  | { action: "lighting"; command: "TOGGLE" | "MODE_UP" | "MODE_DOWN" | "BRIGHTNESS_UP" | "BRIGHTNESS_DOWN" | "HUE_UP" | "HUE_DOWN" | "SAT_UP" | "SAT_DOWN" | "SPEED_UP" | "SPEED_DOWN" } // 統一ライティング操作
   | { action: "custom"; protocol: "qmk" | "zmk"; rawCode: string };        // エスケープハッチ
 
 export interface MacroAction {

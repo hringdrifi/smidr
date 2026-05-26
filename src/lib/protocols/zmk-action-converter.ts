@@ -193,7 +193,13 @@ export function actionToZmkString(action: UniversalAction): string {
         'MODE_UP': 'RGB_EFF',
         'MODE_DOWN': 'RGB_EFR',
         'BRIGHTNESS_UP': 'RGB_BRI',
-        'BRIGHTNESS_DOWN': 'RGB_BRD'
+        'BRIGHTNESS_DOWN': 'RGB_BRD',
+        'HUE_UP': 'RGB_HUI',
+        'HUE_DOWN': 'RGB_HUD',
+        'SAT_UP': 'RGB_SAI',
+        'SAT_DOWN': 'RGB_SAD',
+        'SPEED_UP': 'RGB_SPI',
+        'SPEED_DOWN': 'RGB_SPD'
       };
       return `&rgb_ug ${cmdMap[action.command] || 'RGB_TOG'}`;
     }
@@ -246,6 +252,28 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
   // macro (&macro_0)
   match = trimmed.match(/^&macro_(\d+)$/);
   if (match) return { action: 'macro', macroId: parseInt(match[1]) };
+
+  // rgb_ug (&rgb_ug RGB_TOG)
+  match = trimmed.match(/^&rgb_ug\s+([^\s]+)$/);
+  if (match) {
+    const cmd = match[1];
+    const cmdMap: Record<string, string> = {
+      'RGB_TOG': 'TOGGLE',
+      'RGB_EFF': 'MODE_UP',
+      'RGB_EFR': 'MODE_DOWN',
+      'RGB_BRI': 'BRIGHTNESS_UP',
+      'RGB_BRD': 'BRIGHTNESS_DOWN',
+      'RGB_HUI': 'HUE_UP',
+      'RGB_HUD': 'HUE_DOWN',
+      'RGB_SAI': 'SAT_UP',
+      'RGB_SAD': 'SAT_DOWN',
+      'RGB_SPI': 'SPEED_UP',
+      'RGB_SPD': 'SPEED_DOWN'
+    };
+    if (cmdMap[cmd]) {
+      return { action: 'lighting', command: cmdMap[cmd] as any };
+    }
+  }
 
   // mouse keys (&mkp LCLK / &mmv MOVE_UP)
   match = trimmed.match(/^&(mkp|mmv)\s+([^\s]+)$/);
