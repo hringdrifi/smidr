@@ -438,7 +438,7 @@ export default function App() {
                             className="w-full flex items-center justify-center gap-1.5 py-2 rounded bg-[var(--bg-button)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all relative overflow-hidden"
                           >
                             <FileUp size={12} className="text-amber-500" />
-                            {t('header.importProject')} (.smidr)
+                            {t('header.importProject')}
                             <input 
                               type="file" 
                               accept=".smidr"
@@ -515,7 +515,7 @@ export default function App() {
                             className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
                           >
                             <FileDown size={14} className="text-amber-500" />
-                            <span>{t('header.exportProject')} (.smidr)</span>
+                            <span>{t('header.exportProject')}</span>
                           </button>
 
                           <button 
