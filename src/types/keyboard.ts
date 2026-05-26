@@ -65,7 +65,6 @@ export interface ProjectSettings {
     rgb: boolean;
     encoder: boolean;
     oled: boolean;
-    vial: boolean;
     via: boolean;
   };
   layers: number;
