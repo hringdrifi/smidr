@@ -1445,33 +1445,35 @@ export const useKeyboardStore = create<KeyboardState>()(
             const hasMatrix = keys.some(k => k.row !== undefined);
 
             set((s: KeyboardState) => {
-              const baseKeys = [...keys];
-              let appliedKeys = [...keys];
+              // Assign fresh runtime IDs first so keys and baseKeys share the exact same key list and references
+              let appliedKeys = keys.map(k => ({ ...k, id: crypto.randomUUID() }));
               
-              // 3. Auto-align to (0,0) if not in Design-Layout mode
-              const isDesignLayout = s.appMode === 'design'; // Since editorMode is being set to 'layout' below
-              if (!isDesignLayout && appliedKeys.length > 0) {
-                // For initial import, assume all keys are visible since activeOptions is empty
-                let minX = Math.min(...appliedKeys.map(k => k.x));
-                let minY = Math.min(...appliedKeys.map(k => k.y));
-                if (minX !== 0 || minY !== 0) {
-                  appliedKeys = appliedKeys.map(k => ({
-                    ...k,
-                    x: roundCoord(k.x - minX),
-                    y: roundCoord(k.y - minY),
-                    rx: roundCoord((k.rx ?? k.x) - minX),
-                    ry: roundCoord((k.ry ?? k.y) - minY),
-                  }));
+              // 3. Auto-align to (0,0) considering layout options
+              if (appliedKeys.length > 0) {
+                // Find visible keys under initial activeOptions (initially empty, so choice index is 0)
+                const visibleKeys = appliedKeys.filter(k => {
+                  if (!k.group) return true;
+                  return k.option === 0;
+                });
+
+                if (visibleKeys.length > 0) {
+                  let minX = Math.min(...visibleKeys.map(k => k.x));
+                  let minY = Math.min(...visibleKeys.map(k => k.y));
+                  if (minX !== 0 || minY !== 0) {
+                    appliedKeys = appliedKeys.map(k => ({
+                      ...k,
+                      x: roundCoord(k.x - minX),
+                      y: roundCoord(k.y - minY),
+                      rx: roundCoord((k.rx ?? k.x) - minX),
+                      ry: roundCoord((k.ry ?? k.y) - minY),
+                    }));
+                  }
                 }
               }
 
-              // Assign fresh runtime IDs
-              const keysWithIds = appliedKeys.map(k => ({ ...k, id: crypto.randomUUID() }));
-              const baseKeysWithIds = baseKeys.map(k => ({ ...k, id: crypto.randomUUID() }));
-
               return {
-                keys: keysWithIds,
-                baseKeys: baseKeysWithIds,
+                keys: appliedKeys,
+                baseKeys: appliedKeys,
                 settings: {
                   ...s.settings,
                   name: name || s.settings.name,
@@ -1491,7 +1493,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 focusedKeyId: null,
                 editorMode: 'layout',
                 currentLayer: 0,
-                transform: getCenteredTransform(keysWithIds, {}),
+                transform: getCenteredTransform(appliedKeys, {}),
               };
             });
           } catch (err: any) {

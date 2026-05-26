@@ -1,6 +1,8 @@
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { parseKLEData } from './kle-logic';
 
+const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
+
 const labelMap = [
   // 0  1  2  3  4  5  6  7  8  9 10 11   # align flags
   [ 0, 6, 2, 8, 9, 11, 3, 5, 1, 4, 7, 10], // 0 = no centering
@@ -270,6 +272,42 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
     if (pk.encoderIndex !== undefined) key.encoderIndex = pk.encoderIndex;
 
     return key;
+  });
+
+  // Align option choices to option 0 choice coordinates (VIA/Vial Style)
+  const groupMinX: Record<string, Record<number, number>> = {};
+  const groupMinY: Record<string, Record<number, number>> = {};
+
+  keys.forEach(k => {
+    if (k.group !== undefined && k.option !== undefined) {
+      const g = k.group;
+      const o = k.option;
+      if (!groupMinX[g]) groupMinX[g] = {};
+      if (!groupMinY[g]) groupMinY[g] = {};
+      
+      groupMinX[g][o] = Math.min(groupMinX[g][o] ?? Infinity, k.x);
+      groupMinY[g][o] = Math.min(groupMinY[g][o] ?? Infinity, k.y);
+    }
+  });
+
+  keys.forEach(k => {
+    if (k.group !== undefined && k.option !== undefined && k.option > 0) {
+      const g = k.group;
+      const o = k.option;
+      const minX0 = groupMinX[g]?.[0];
+      const minY0 = groupMinY[g]?.[0];
+      const minXo = groupMinX[g]?.[o];
+      const minYo = groupMinY[g]?.[o];
+
+      if (minX0 !== undefined && minXo !== undefined) {
+        const dx = minXo - minX0;
+        const dy = minYo - minY0;
+        k.x = roundCoord(k.x - dx);
+        k.y = roundCoord(k.y - dy);
+        if (k.rx !== undefined) k.rx = roundCoord(k.rx - dx);
+        if (k.ry !== undefined) k.ry = roundCoord(k.ry - dy);
+      }
+    }
   });
 
   // 4. Ensure all groups in keys exist in layoutOptions to prevent keys from being hidden
