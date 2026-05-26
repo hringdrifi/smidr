@@ -32,7 +32,10 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   keys: PhysicalKey[], 
   name?: string,
   vendorProductId?: number,
-  layoutOptions?: ProjectSettings['layoutOptions']
+  layoutOptions?: ProjectSettings['layoutOptions'],
+  pins?: Partial<ProjectSettings['pins']>,
+  hardware?: Partial<ProjectSettings['hardware']>,
+  features?: Partial<ProjectSettings['features']>
 } {
   const isDebug = options?.debug;
   if (isDebug) console.log('[Parser] Starting unified parse...');
@@ -64,9 +67,9 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       rawKLE = input;
     }
   } else if (typeof input === 'object') {
-    if (isDebug) console.log('[Parser] Detected Format: VIA/Vial Object');
-    // VIA/Vial Definition
+    // 1. VIA/Vial Definition
     if (input.layouts && input.layouts.keymap) {
+      if (isDebug) console.log('[Parser] Detected Format: VIA/Vial Object');
       if (typeof input.layouts.keymap === 'string') {
         try {
           rawKLE = JSON.parse(input.layouts.keymap);
@@ -98,8 +101,120 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           }
         });
       }
+    } else if (input.layouts && Object.values(input.layouts).some((l: any) => typeof l === 'object' && l !== null && Array.isArray(l.layout))) {
+      // 2. QMK info.json Format
+      if (isDebug) console.log('[Parser] Detected Format: QMK info.json');
+      name = input.keyboard_name || input.name;
+      if (input.usb && input.usb.vid !== undefined && input.usb.pid !== undefined) {
+        const parseHexOrDec = (val: any) => {
+          if (typeof val === 'number') return val;
+          const s = String(val).trim();
+          if (s.toLowerCase().startsWith('0x')) {
+            return parseInt(s.slice(2), 16);
+          }
+          return parseInt(s, 10);
+        };
+        const vid = parseHexOrDec(input.usb.vid);
+        const pid = parseHexOrDec(input.usb.pid);
+        if (!isNaN(vid) && !isNaN(pid)) {
+          vendorProductId = (vid << 16) | pid;
+        }
+      }
+
+      // Parse QMK hardware configuration
+      let pins: any = undefined;
+      if (input.matrix_pins) {
+        pins = {
+          rows: Array.isArray(input.matrix_pins.rows) ? input.matrix_pins.rows.map(String) : [],
+          cols: Array.isArray(input.matrix_pins.cols) ? input.matrix_pins.cols.map(String) : [],
+        };
+        
+        // Parse encoder pins if present
+        if (input.encoder && Array.isArray(input.encoder.rotary) && input.encoder.rotary[0]) {
+          pins.encoderA = input.encoder.rotary[0].pin_a ? String(input.encoder.rotary[0].pin_a) : undefined;
+          pins.encoderB = input.encoder.rotary[0].pin_b ? String(input.encoder.rotary[0].pin_b) : undefined;
+        }
+
+        // Parse RGB light pin if present
+        if (input.rgblight && input.rgblight.pin) {
+          pins.rgb = String(input.rgblight.pin);
+        } else if (input.ws2812 && input.ws2812.pin) {
+          pins.rgb = String(input.ws2812.pin);
+        }
+      }
+
+      let hardware: any = undefined;
+      if (input.processor || input.bootloader || input.diode_direction) {
+        let mcu = 'rp2040';
+        if (input.processor) {
+          const proc = String(input.processor).toLowerCase();
+          if (proc.includes('atmega32u4')) mcu = 'atmega32u4';
+          else if (proc.includes('rp2040')) mcu = 'rp2040';
+          else mcu = proc;
+        }
+        let board = 'promicro';
+        if (input.bootloader) {
+          const bl = String(input.bootloader).toLowerCase();
+          if (bl.includes('pro_micro') || bl.includes('promicro')) board = 'promicro';
+          else board = bl;
+        }
+        let diodeDirection: 'ROW2COL' | 'COL2ROW' = 'COL2ROW';
+        if (input.diode_direction) {
+          const dd = String(input.diode_direction).toUpperCase();
+          if (dd === 'ROW2COL' || dd === 'COL2ROW') {
+            diodeDirection = dd;
+          }
+        }
+        hardware = { mcu, board, diodeDirection };
+      }
+
+      let features: any = undefined;
+      if (input.features) {
+        features = {
+          rgb: !!(input.features.rgblight || input.features.rgb_matrix),
+          encoder: !!input.features.encoder,
+          oled: !!input.features.oled,
+          via: !!input.features.via,
+          vial: !!input.features.vial,
+        };
+      }
+
+      const layoutKey = Object.keys(input.layouts).find(k => Array.isArray(input.layouts[k]?.layout));
+      if (layoutKey) {
+        const qmkLayout = input.layouts[layoutKey].layout;
+        const keys: PhysicalKey[] = qmkLayout.map((k: any) => {
+          const id = crypto.randomUUID();
+          const row = Array.isArray(k.matrix) ? k.matrix[0] : undefined;
+          const col = Array.isArray(k.matrix) ? k.matrix[1] : undefined;
+          return {
+            id,
+            x: k.x ?? 0,
+            y: k.y ?? 0,
+            w: k.w ?? 1,
+            h: k.h ?? 1,
+            r: k.r ?? 0,
+            rx: k.rx ?? (k.x ?? 0),
+            ry: k.ry ?? (k.y ?? 0),
+            label: k.label || '',
+            row,
+            col,
+            keymap: {}
+          };
+        });
+        return {
+          keys,
+          name,
+          vendorProductId,
+          layoutOptions: {},
+          pins,
+          hardware,
+          features
+        };
+      } else {
+        throw new Error("Invalid QMK info.json: Layout definitions found but no layout array detected.");
+      }
     } else {
-      throw new Error("Invalid keyboard definition: 'layouts.keymap' property is missing.");
+      throw new Error("Invalid keyboard definition: unrecognized format (neither VIA/Vial nor QMK info.json).");
     }
   } else {
     throw new Error(`Unsupported input format: ${typeof input}. Expected Array or Object.`);

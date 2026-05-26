@@ -1419,7 +1419,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
 
             const result = parseKeyboardDefinition(input);
-            const { keys, name, vendorProductId, layoutOptions } = result;
+            const { keys, name, vendorProductId, layoutOptions, pins, hardware, features } = result;
             
             // Update again with parsed info if successful
             if (typeof window !== 'undefined' && (window as any).setAppDebug) {
@@ -1478,11 +1478,15 @@ export const useKeyboardStore = create<KeyboardState>()(
                   vendorProductId: vendorProductId || s.settings.vendorProductId,
                   layoutOptions: layoutOptions || {},
                   activeOptions: {},
+                  pins: pins ? { ...s.settings.pins, ...pins } : s.settings.pins,
+                  hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
+                  features: features ? { ...s.settings.features, ...features } : s.settings.features,
                   matrix: {
-                    rows: hasMatrix ? maxRow + 1 : s.settings.matrix.rows,
-                    cols: hasMatrix ? maxCol + 1 : s.settings.matrix.cols,
+                    rows: (pins && pins.rows && pins.rows.length > 0) ? pins.rows.length : (hasMatrix ? maxRow + 1 : s.settings.matrix.rows),
+                    cols: (pins && pins.cols && pins.cols.length > 0) ? pins.cols.length : (hasMatrix ? maxCol + 1 : s.settings.matrix.cols),
                   }
                 },
+                isProjectOpen: true,
                 selectedKeyIds: [],
                 focusedKeyId: null,
                 editorMode: 'layout',
