@@ -311,7 +311,6 @@ export const HardwareSettingsPanel = () => {
 
   const handleClearAllPins = () => {
     updateSettings({
-      matrix: { ...settings.matrix, rows: 0, cols: 0 },
       pins: {
         rows: [],
         cols: [],
@@ -481,10 +480,10 @@ export const HardwareSettingsPanel = () => {
               <div className="flex items-center gap-3">
                 {/* Dynamic Size Indicator - Borderless & Clean */}
                 <div className="flex gap-1 items-center text-xs text-[var(--text-highlight)] font-mono font-bold select-none animate-in fade-in zoom-in duration-200">
-                  <span>{settings.matrix.rows}</span>
+                  <span>{settings.pins.rows.length}</span>
                   <span className="text-[var(--text-dim)] font-sans font-normal mx-0.5">×</span>
-                  <span>{settings.matrix.cols}</span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-sans font-normal ml-1">({settings.matrix.rows * settings.matrix.cols} keys)</span>
+                  <span>{settings.pins.cols.length}</span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-sans font-normal ml-1">({settings.pins.rows.length * settings.pins.cols.length} keys)</span>
                 </div>
 
                 {/* Clear All Pins Button */}
@@ -511,7 +510,6 @@ export const HardwareSettingsPanel = () => {
                   }}
                   onUpdatePins={(newPins) => {
                     updateSettings({
-                      matrix: { ...settings.matrix, rows: newPins.length },
                       pins: { ...settings.pins, rows: newPins }
                     });
                   }}
@@ -527,7 +525,6 @@ export const HardwareSettingsPanel = () => {
                   }}
                   onUpdatePins={(newPins) => {
                     updateSettings({
-                      matrix: { ...settings.matrix, cols: newPins.length },
                       pins: { ...settings.pins, cols: newPins }
                     });
                   }}

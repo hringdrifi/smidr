@@ -856,13 +856,6 @@ export const useKeyboardStore = create<KeyboardState>()(
               selectedKeyIds: [],
               connectedDevice: null,
               deviceCapabilities: null,
-              settings: {
-                ...s.settings,
-                matrix: {
-                  rows: s.settings.pins.rows.length,
-                  cols: s.settings.pins.cols.length,
-                }
-              }
             }));
           } else {
             set({ appMode: m, selectedKeyIds: [] });
@@ -1371,6 +1364,13 @@ export const useKeyboardStore = create<KeyboardState>()(
         loadProject: (project: SmidrProject, preserveTransform = false) => set((s: KeyboardState) => {
           // Extract keys and id/updatedAt, rest is settings
           const { id, updatedAt, keys: rawKeys, ...settings } = project;
+          const settingsWithDefaultMatrix = {
+            ...settings,
+            matrix: settings.matrix || {
+              rows: settings.pins?.rows?.length || 0,
+              cols: settings.pins?.cols?.length || 0
+            }
+          };
 
           // Assign fresh runtime IDs to all keys (id is not persisted)
           let newKeys = rawKeys.map(k => ({
@@ -1406,7 +1406,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             : getCenteredTransform(newKeys, settings.activeOptions || {});
 
           return {
-            settings: settings as ProjectSettings,
+            settings: settingsWithDefaultMatrix as ProjectSettings,
             keys: newKeys,
             baseKeys: newKeys,
             currentProjectId: id || null,
@@ -1586,11 +1586,14 @@ export const useKeyboardStore = create<KeyboardState>()(
         },
       }),
       {
-        partialize: (state: KeyboardState) => ({
-          settings: state.settings,
-          keys: state.keys,
-          historyId: state.historyId,
-        }),
+        partialize: (state: KeyboardState) => {
+          const { matrix, ...settingsWithoutMatrix } = state.settings;
+          return {
+            settings: settingsWithoutMatrix,
+            keys: state.keys,
+            historyId: state.historyId,
+          };
+        },
         equality: (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b),
         limit: 50,
       }
