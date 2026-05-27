@@ -78,7 +78,11 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
           }
         },
         transport: {
-          serial: { pin: settings.pins.splitSerial || 'GP1' }
+          protocol: 'serial'
+        },
+        serial: {
+          driver: settings.hardware.mcu === 'rp2040' ? 'vendor' : 'bitbang',
+          pin: settings.pins.splitSerial || 'GP1'
         }
       }
     } : {})
@@ -89,10 +93,6 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   const configH = `/* Copyright 2026 Smidr User */
 #pragma once
 
-${settings.features.split ? `
-/* Split keyboard */
-#define SPLIT_KEYBOARD
-` : ''}
 /* Encoder pins */
 ${settings.features.encoder ? `
 #define ENCODERS_PAD_A { ${settings.pins.encoderA || 'B0'} }
