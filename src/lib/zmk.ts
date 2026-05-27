@@ -12,7 +12,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
   const validKeys = keys.filter((key, idx) => {
     if (key.row === undefined || key.col === undefined) return false;
-    if (key.row >= settings.matrix.rows || key.col >= settings.matrix.cols) return false;
+    if (key.row >= settings.pins.rows.length || key.col >= settings.pins.cols.length) return false;
     const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
     return firstIdx === idx;
   });
@@ -95,8 +95,8 @@ ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` 
 
     default_transform: keymap_transform_0 {
         compatible = "zmk,matrix-transform";
-        columns = <${settings.matrix.cols}>;
-        rows = <${settings.matrix.rows}>;
+        columns = <${settings.pins.cols.length}>;
+        rows = <${settings.pins.rows.length}>;
         map = <
             ${transformMapStr}
         >;

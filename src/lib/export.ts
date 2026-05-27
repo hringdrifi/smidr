@@ -138,14 +138,14 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
   // Generate Keymaps array for VIA (layers -> rows -> cols)
   const layersCount = settings.layers || 4;
   const keymaps: string[][][] = Array.from({ length: layersCount }, () => 
-    Array.from({ length: settings.matrix.rows }, () => 
-      Array.from({ length: settings.matrix.cols }, () => 'KC_TRNS')
+    Array.from({ length: settings.pins.rows.length }, () => 
+      Array.from({ length: settings.pins.cols.length }, () => 'KC_TRNS')
     )
   );
 
   keys.forEach(key => {
     if (key.row !== undefined && key.col !== undefined &&
-        key.row < settings.matrix.rows && key.col < settings.matrix.cols) {
+        key.row < settings.pins.rows.length && key.col < settings.pins.cols.length) {
       Object.entries(key.keymap || {}).forEach(([layer, action]) => {
         const l = parseInt(layer);
         if (l < layersCount) {
@@ -170,8 +170,8 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
       "qmk_lighting"
     ],
     matrix: {
-      rows: settings.matrix.rows,
-      cols: settings.matrix.cols,
+      rows: settings.pins.rows.length,
+      cols: settings.pins.cols.length,
     },
     layouts: {
       labels: labels.length > 0 ? labels : undefined,
@@ -186,13 +186,14 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
  */
 export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
   const { settings, keys } = state;
+  const { matrix, ...settingsWithoutMatrix } = settings;
   return {
     id: crypto.randomUUID(),
     updatedAt: Date.now(),
-    ...settings,
+    ...settingsWithoutMatrix,
     // Strip runtime-only 'id' field before persisting
     keys: keys.map(({ id, ...keyData }) => keyData as PhysicalKey)
-  };
+  } as unknown as SmidrProject;
 };
 
 export const downloadBlob = (filename: string, blob: Blob) => {

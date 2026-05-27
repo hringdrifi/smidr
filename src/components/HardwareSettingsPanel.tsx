@@ -238,12 +238,10 @@ export const HardwareSettingsPanel = () => {
     return genericPins;
   };
 
-  const getAssignedPins = () => {
+  const getLeftAssignedPins = () => {
     const pins = new Set<string>();
     settings.pins.rows.forEach(p => p && pins.add(p));
     settings.pins.cols.forEach(p => p && pins.add(p));
-    if (settings.pins.splitRows) settings.pins.splitRows.forEach(p => p && pins.add(p));
-    if (settings.pins.splitCols) settings.pins.splitCols.forEach(p => p && pins.add(p));
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
@@ -251,6 +249,20 @@ export const HardwareSettingsPanel = () => {
     if (settings.pins.encoderB) pins.add(settings.pins.encoderB);
     if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
     return pins;
+  };
+
+  const getRightAssignedPins = () => {
+    const pins = new Set<string>();
+    if (settings.pins.splitRows) settings.pins.splitRows.forEach(p => p && pins.add(p));
+    if (settings.pins.splitCols) settings.pins.splitCols.forEach(p => p && pins.add(p));
+    return pins;
+  };
+
+  const getAssignedPins = () => {
+    if (activeBox === 'splitRow' || activeBox === 'splitCol') {
+      return getRightAssignedPins();
+    }
+    return getLeftAssignedPins();
   };
 
   const assignedPins = getAssignedPins();
@@ -262,7 +274,6 @@ export const HardwareSettingsPanel = () => {
       }
       const newPins = [...settings.pins.rows, pinName];
       updateSettings({
-        matrix: { ...settings.matrix, rows: newPins.length },
         pins: { ...settings.pins, rows: newPins }
       });
     } else if (activeBox === 'col') {
@@ -271,7 +282,6 @@ export const HardwareSettingsPanel = () => {
       }
       const newPins = [...settings.pins.cols, pinName];
       updateSettings({
-        matrix: { ...settings.matrix, cols: newPins.length },
         pins: { ...settings.pins, cols: newPins }
       });
     } else if (activeBox === 'splitRow') {

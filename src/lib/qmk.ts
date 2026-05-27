@@ -12,7 +12,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
   const validKeys = keys.filter((key, idx) => {
     if (key.row === undefined || key.col === undefined) return false;
-    if (key.row >= settings.matrix.rows || key.col >= settings.matrix.cols) return false;
+    if (key.row >= settings.pins.rows.length || key.col >= settings.pins.cols.length) return false;
     const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
     return firstIdx === idx;
   });
@@ -89,9 +89,6 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   const configH = `/* Copyright 2026 Smidr User */
 #pragma once
 
-/* Matrix scanning */
-#define MATRIX_ROWS ${settings.matrix.rows}
-#define MATRIX_COLS ${settings.matrix.cols}
 ${settings.features.split ? `
 /* Split keyboard */
 #define SPLIT_KEYBOARD
