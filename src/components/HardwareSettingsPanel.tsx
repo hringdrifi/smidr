@@ -86,7 +86,7 @@ const PinTagInput = ({
   onFocus,
   onUpdatePins
 }: {
-  type: 'row' | 'col';
+  type: 'row' | 'col' | 'splitRow' | 'splitCol';
   pins: string[];
   isActive: boolean;
   onFocus: () => void;
@@ -148,7 +148,9 @@ const PinTagInput = ({
   return (
     <div className="space-y-1 w-full">
       <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase font-bold tracking-wider">
-        {type === 'row' ? 'Row Pins (行)' : 'Col Pins (列)'}
+        {type === 'row' ? 'Left Row Pins (左・行)' : 
+         type === 'col' ? 'Left Col Pins (左・列)' : 
+         type === 'splitRow' ? 'Right Row Pins (右・行)' : 'Right Col Pins (右・列)'}
       </label>
       <div 
         onClick={onFocus}
@@ -208,7 +210,7 @@ export const HardwareSettingsPanel = () => {
   const { settings, updateSettings, setPin } = useKeyboardStore();
   const { t } = useTranslation();
 
-  const [activeBox, setActiveBox] = React.useState<'row' | 'col' | 'feature' | null>(null);
+  const [activeBox, setActiveBox] = React.useState<'row' | 'col' | 'splitRow' | 'splitCol' | 'feature' | null>(null);
   const [focusedFeature, setFocusedFeature] = React.useState<string | null>(null);
   const [preventDuplicates, setPreventDuplicates] = React.useState<boolean>(true);
   const [customPinText, setCustomPinText] = React.useState<string>('');
@@ -240,6 +242,8 @@ export const HardwareSettingsPanel = () => {
     const pins = new Set<string>();
     settings.pins.rows.forEach(p => p && pins.add(p));
     settings.pins.cols.forEach(p => p && pins.add(p));
+    if (settings.pins.splitRows) settings.pins.splitRows.forEach(p => p && pins.add(p));
+    if (settings.pins.splitCols) settings.pins.splitCols.forEach(p => p && pins.add(p));
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
@@ -270,6 +274,22 @@ export const HardwareSettingsPanel = () => {
         matrix: { ...settings.matrix, cols: newPins.length },
         pins: { ...settings.pins, cols: newPins }
       });
+    } else if (activeBox === 'splitRow') {
+      if (preventDuplicates && assignedPins.has(pinName)) {
+        if ((settings.pins.splitRows || []).includes(pinName)) return;
+      }
+      const newPins = [...(settings.pins.splitRows || []), pinName];
+      updateSettings({
+        pins: { ...settings.pins, splitRows: newPins }
+      });
+    } else if (activeBox === 'splitCol') {
+      if (preventDuplicates && assignedPins.has(pinName)) {
+        if ((settings.pins.splitCols || []).includes(pinName)) return;
+      }
+      const newPins = [...(settings.pins.splitCols || []), pinName];
+      updateSettings({
+        pins: { ...settings.pins, splitCols: newPins }
+      });
     } else if (activeBox === 'feature' && focusedFeature) {
       if (preventDuplicates && assignedPins.has(pinName)) {
         const currentVal = (settings.pins as any)[focusedFeature];
@@ -285,6 +305,8 @@ export const HardwareSettingsPanel = () => {
       pins: {
         rows: [],
         cols: [],
+        splitRows: [],
+        splitCols: [],
         rgb: '',
         sda: '',
         scl: '',
@@ -467,39 +489,75 @@ export const HardwareSettingsPanel = () => {
               </div>
             </div>
             
-            {/* Rows Tag Input Box */}
-            <PinTagInput
-              type="row"
-              pins={settings.pins.rows}
-              isActive={activeBox === 'row'}
-              onFocus={() => {
-                setActiveBox('row');
-                setFocusedFeature(null);
-              }}
-              onUpdatePins={(newPins) => {
-                updateSettings({
-                  matrix: { ...settings.matrix, rows: newPins.length },
-                  pins: { ...settings.pins, rows: newPins }
-                });
-              }}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <PinTagInput
+                  type="row"
+                  pins={settings.pins.rows}
+                  isActive={activeBox === 'row'}
+                  onFocus={() => {
+                    setActiveBox('row');
+                    setFocusedFeature(null);
+                  }}
+                  onUpdatePins={(newPins) => {
+                    updateSettings({
+                      matrix: { ...settings.matrix, rows: newPins.length },
+                      pins: { ...settings.pins, rows: newPins }
+                    });
+                  }}
+                />
 
-            {/* Cols Tag Input Box */}
-            <PinTagInput
-              type="col"
-              pins={settings.pins.cols}
-              isActive={activeBox === 'col'}
-              onFocus={() => {
-                setActiveBox('col');
-                setFocusedFeature(null);
-              }}
-              onUpdatePins={(newPins) => {
-                updateSettings({
-                  matrix: { ...settings.matrix, cols: newPins.length },
-                  pins: { ...settings.pins, cols: newPins }
-                });
-              }}
-            />
+                <PinTagInput
+                  type="col"
+                  pins={settings.pins.cols}
+                  isActive={activeBox === 'col'}
+                  onFocus={() => {
+                    setActiveBox('col');
+                    setFocusedFeature(null);
+                  }}
+                  onUpdatePins={(newPins) => {
+                    updateSettings({
+                      matrix: { ...settings.matrix, cols: newPins.length },
+                      pins: { ...settings.pins, cols: newPins }
+                    });
+                  }}
+                />
+              </div>
+
+              {settings.features.split && (
+                <div className="space-y-4 border-l border-[var(--border-main)] pl-4">
+                  <PinTagInput
+                    type="splitRow"
+                    pins={settings.pins.splitRows || []}
+                    isActive={activeBox === 'splitRow'}
+                    onFocus={() => {
+                      setActiveBox('splitRow');
+                      setFocusedFeature(null);
+                    }}
+                    onUpdatePins={(newPins) => {
+                      updateSettings({
+                        pins: { ...settings.pins, splitRows: newPins }
+                      });
+                    }}
+                  />
+
+                  <PinTagInput
+                    type="splitCol"
+                    pins={settings.pins.splitCols || []}
+                    isActive={activeBox === 'splitCol'}
+                    onFocus={() => {
+                      setActiveBox('splitCol');
+                      setFocusedFeature(null);
+                    }}
+                    onUpdatePins={(newPins) => {
+                      updateSettings({
+                        pins: { ...settings.pins, splitCols: newPins }
+                      });
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Special Pin Slots */}
@@ -592,7 +650,17 @@ export const HardwareSettingsPanel = () => {
                 </span>
                 {activeBox && (
                   <span className="text-[9px] text-[var(--text-muted)] mt-0.5">
-                    Appending to <span className="font-mono text-amber-500 font-bold uppercase">{activeBox === 'row' ? 'Rows (行)' : activeBox === 'col' ? 'Cols (列)' : focusedFeature}</span>. Click a pin below to set it.
+                    Setting <span className="font-mono text-amber-500 font-bold uppercase">
+                      {activeBox === 'row' 
+                        ? 'Left Rows (左・行)' 
+                        : activeBox === 'col' 
+                        ? 'Left Cols (左・列)' 
+                        : activeBox === 'splitRow'
+                        ? 'Right Rows (右・行)'
+                        : activeBox === 'splitCol'
+                        ? 'Right Cols (右・列)'
+                        : focusedFeature}
+                    </span>. Click a pin below to set it.
                   </span>
                 )}
               </div>
@@ -626,6 +694,10 @@ export const HardwareSettingsPanel = () => {
                   isCurrentSlotPin = settings.pins.rows.includes(pinName);
                 } else if (activeBox === 'col') {
                   isCurrentSlotPin = settings.pins.cols.includes(pinName);
+                } else if (activeBox === 'splitRow') {
+                  isCurrentSlotPin = (settings.pins.splitRows || []).includes(pinName);
+                } else if (activeBox === 'splitCol') {
+                  isCurrentSlotPin = (settings.pins.splitCols || []).includes(pinName);
                 } else if (activeBox === 'feature' && focusedFeature) {
                   isCurrentSlotPin = (settings.pins as any)[focusedFeature] === pinName;
                 }

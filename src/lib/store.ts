@@ -122,7 +122,7 @@ export interface KeyboardState {
   setMatrixSubMode: (mode: 'paint' | 'manual') => void;
   
   // Hardware/Pins
-  setPin: (type: 'row' | 'col' | 'feature', index: number | string, pin: string) => void;
+  setPin: (type: 'row' | 'col' | 'splitRow' | 'splitCol' | 'feature', index: number | string, pin: string) => void;
   
   // Layout Tools
   alignSelectedKeys: (type: 'left' | 'right' | 'top' | 'bottom' | 'center-x' | 'center-y') => void;
@@ -199,7 +199,7 @@ const initialState: Partial<KeyboardState> = {
     vendorProductId: 0xFEED0001,
     vialUid: generateRandomVialUid(),
     matrix: { rows: 0, cols: 0 },
-    pins: { rows: [], cols: [] },
+    pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
     hardware: { mcu: 'rp2040', board: 'promicro', diodeDirection: 'COL2ROW' },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
@@ -1204,10 +1204,18 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setMatrixSubMode: (m: 'paint' | 'manual') => set({ matrixSubMode: m, selectedKeyIds: [] }),
 
-        setPin: (type: 'row' | 'col' | 'feature', idx: number | string, pin: string) => set((s) => {
+        setPin: (type: 'row' | 'col' | 'splitRow' | 'splitCol' | 'feature', idx: number | string, pin: string) => set((s) => {
           const p = { ...s.settings.pins };
           if (type === 'row') { p.rows = [...p.rows]; (p.rows as any)[idx as number] = pin; }
           if (type === 'col') { p.cols = [...p.cols]; (p.cols as any)[idx as number] = pin; }
+          if (type === 'splitRow') {
+            p.splitRows = p.splitRows ? [...p.splitRows] : [];
+            (p.splitRows as any)[idx as number] = pin;
+          }
+          if (type === 'splitCol') {
+            p.splitCols = p.splitCols ? [...p.splitCols] : [];
+            (p.splitCols as any)[idx as number] = pin;
+          }
           if (type === 'feature') (p as any)[idx as string] = pin;
           return {
             settings: { ...s.settings, pins: p }

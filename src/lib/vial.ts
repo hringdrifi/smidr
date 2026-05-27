@@ -69,8 +69,12 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
         enabled: true,
         matrix_pins: {
           right: {
-            cols: settings.pins.cols,
-            rows: settings.pins.rows
+            cols: settings.pins.splitCols && settings.pins.splitCols.length === settings.pins.cols.length 
+              ? settings.pins.splitCols 
+              : settings.pins.cols,
+            rows: settings.pins.splitRows && settings.pins.splitRows.length === settings.pins.rows.length 
+              ? settings.pins.splitRows 
+              : settings.pins.rows
           }
         },
         transport: {

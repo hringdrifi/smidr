@@ -56,6 +56,8 @@ export interface ProjectSettings {
     encoderA?: string;
     encoderB?: string;
     splitSerial?: string; // Serial transport pin (e.g. GP1 for RP2040)
+    splitRows?: string[]; // Right side row pins for split keyboards
+    splitCols?: string[]; // Right side col pins for split keyboards
   };
   hardware: {
     mcu: 'rp2040' | 'atmega32u4' | 'other';
