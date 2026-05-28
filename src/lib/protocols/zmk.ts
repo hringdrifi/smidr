@@ -87,15 +87,16 @@ export class ZmkBleTransport implements ITransport {
       } else {
         this.device = await (navigator as any).bluetooth.requestDevice({
           filters: [{ namePrefix: 'ZMK Studio' }],
-          optionalServices: ['00000001-0000-1000-8000-00805f9b34fb'] // ZMK Studio GATT Service UUID
+          optionalServices: ['00000000-0196-6107-c967-c5cfb1c2482a'] // ZMK Studio GATT Service UUID
         });
       }
       if (!this.device || !this.device.gatt) return false;
 
       const server = await this.device.gatt.connect();
-      const service = await server.getPrimaryService('00000001-0000-1000-8000-00805f9b34fb');
-      this.txCharacteristic = await service.getCharacteristic('00000002-0000-1000-8000-00805f9b34fb');
-      this.rxCharacteristic = await service.getCharacteristic('00000003-0000-1000-8000-00805f9b34fb');
+      const service = await server.getPrimaryService('00000000-0196-6107-c967-c5cfb1c2482a');
+      const characteristic = await service.getCharacteristic('00000001-0196-6107-c967-c5cfb1c2482a');
+      this.txCharacteristic = characteristic;
+      this.rxCharacteristic = characteristic;
       
       this.isConnected = true;
       console.log('ZMK WebBLE Transport Connected');
