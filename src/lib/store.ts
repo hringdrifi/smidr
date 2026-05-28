@@ -515,6 +515,26 @@ export const useKeyboardStore = create<KeyboardState>()(
                   keys: updatedKeys,
                   baseKeys: updatedKeys
                 });
+
+                // Background lock probe for ZMK
+                setTimeout(async () => {
+                  try {
+                    console.log('[ZmkProtocol] Running background keymap lock probe on Layer 0, Position 0...');
+                    const succeeded = await zmkProto.testReadBinding(0, 0);
+                    if (succeeded) {
+                      console.log('[ZmkProtocol] Background probe succeeded! Device is unlocked.');
+                      set({ zmkLocked: false });
+                    } else {
+                      console.warn('[ZmkProtocol] Background probe failed or unsupported.');
+                    }
+                  } catch (probeErr: any) {
+                    console.warn('[ZmkProtocol] Background probe failed:', probeErr);
+                    if (probeErr.message && (probeErr.message.includes('locked') || probeErr.message.includes('Unlock'))) {
+                      set({ zmkLocked: true });
+                    }
+                  }
+                }, 50);
+
                 return;
               }
             } else {
@@ -611,36 +631,62 @@ export const useKeyboardStore = create<KeyboardState>()(
               if (hasPhysicalLayout && !hasKeymap) {
                 console.log('[syncKeymap:ZMK] Physical layout loaded, but keymap unavailable. Generating layout-only runtime keys.');
               } else {
-                console.log('[syncKeymap:ZMK] No project open. Generating temporary runtime keys from physical positions.');
+                console.log('[syncKeymap:ZMK] No project open. Generating runtime keys from physical layout and fetched keymap.');
               }
-              updatedKeys = positions.map((p) => {
-                const col = p.col;
-                const row = p.row;
-                const x = col * 1.25;
-                const y = row * 1.25;
-                
-                const keymap: Record<number, UniversalAction> = {};
-                Object.keys(newRemoteKeymap).forEach(lStr => {
-                  const l = Number(lStr);
-                  const flatIndex = row * 32 + col;
-                  const action = newRemoteKeymap[l]?.[flatIndex];
-                  if (action) {
-                    keymap[l] = action;
-                  }
-                });
+              if (zmkProto.physicalKeys && zmkProto.physicalKeys.length > 0) {
+                updatedKeys = zmkProto.physicalKeys.map((pk) => {
+                  const keymap: Record<number, UniversalAction> = {};
+                  Object.keys(newRemoteKeymap).forEach(lStr => {
+                    const l = Number(lStr);
+                    const flatIndex = pk.row * 32 + pk.col;
+                    const action = newRemoteKeymap[l]?.[flatIndex];
+                    if (action) {
+                      keymap[l] = action;
+                    }
+                  });
 
-                return {
-                  id: crypto.randomUUID(),
-                  label: `R${row}C${col}`,
-                  x,
-                  y,
-                  w: 1,
-                  h: 1,
-                  row,
-                  col,
-                  keymap
-                } as RuntimeKey;
-              });
+                  return {
+                    id: crypto.randomUUID(),
+                    label: `R${pk.row}C${pk.col}`,
+                    x: pk.x,
+                    y: pk.y,
+                    w: pk.w,
+                    h: pk.h,
+                    row: pk.row,
+                    col: pk.col,
+                    keymap
+                  } as RuntimeKey;
+                });
+              } else {
+                updatedKeys = positions.map((p) => {
+                  const col = p.col;
+                  const row = p.row;
+                  const x = col * 1.25;
+                  const y = row * 1.25;
+                  
+                  const keymap: Record<number, UniversalAction> = {};
+                  Object.keys(newRemoteKeymap).forEach(lStr => {
+                    const l = Number(lStr);
+                    const flatIndex = row * 32 + col;
+                    const action = newRemoteKeymap[l]?.[flatIndex];
+                    if (action) {
+                      keymap[l] = action;
+                    }
+                  });
+
+                  return {
+                    id: crypto.randomUUID(),
+                    label: `R${row}C${col}`,
+                    x,
+                    y,
+                    w: 1,
+                    h: 1,
+                    row,
+                    col,
+                    keymap
+                  } as RuntimeKey;
+                });
+              }
             } else {
               // Standard merge: merge fetched physical keymap directly into editor keys
               updatedKeys = s.keys.map(k => {

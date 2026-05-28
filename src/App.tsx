@@ -15,6 +15,7 @@ import { HardwareSettingsPanel } from '@/components/HardwareSettingsPanel';
 import { MatrixPropertyPanel } from '@/components/MatrixPropertyPanel';
 import { KeycodeConfigPanel } from '@/components/KeycodeConfigPanel';
 import { UnlockModal } from '@/components/UnlockModal';
+import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { useKeyboardStore } from '@/lib/store';
 import { zmkProtocol } from '@/lib/protocols/zmk';
 import { clsx, type ClassValue } from 'clsx';
@@ -976,6 +977,7 @@ export default function App() {
         </div>
       )}
       <UnlockModal />
+      <ZmkUnlockModal />
       {editorSettings.debugMode && <DebugOverlay />}
     </div>
   );

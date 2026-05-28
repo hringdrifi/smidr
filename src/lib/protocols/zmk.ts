@@ -530,6 +530,7 @@ interface DecodedRequestResponse {
 
 interface DecodedCoreResponse {
   getDeviceInfo?: { name: string; serialNumber: Uint8Array };
+  getLockState?: number;
 }
 
 interface DecodedBehaviorsResponse {
@@ -634,13 +635,16 @@ function decodeMetaResponse(buffer: Uint8Array): DecodedMetaResponse {
 function decodeCoreResponse(buffer: Uint8Array): DecodedCoreResponse {
   const decoder = new ProtoDecoder(buffer);
   let getDeviceInfo: { name: string; serialNumber: Uint8Array } | undefined;
+  let getLockState: number | undefined;
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 2) {
       getDeviceInfo = decodeGetDeviceInfoResponse(field.value);
+    } else if (field.fieldNumber === 2 && field.wireType === 0) {
+      getLockState = field.value;
     }
   }
-  return { getDeviceInfo };
+  return { getDeviceInfo, getLockState };
 }
 
 function decodeGetDeviceInfoResponse(buffer: Uint8Array): { name: string; serialNumber: Uint8Array } {
@@ -820,7 +824,8 @@ function decodeBehaviorBinding(buffer: Uint8Array): DecodedBehaviorBinding {
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 0) {
-      behaviorId = field.value;
+      const val = field.value;
+      behaviorId = (val >>> 1) ^ -(val & 1);
     } else if (field.fieldNumber === 2 && field.wireType === 0) {
       param1 = field.value;
     } else if (field.fieldNumber === 3 && field.wireType === 0) {
@@ -903,19 +908,10 @@ function encodeSetLayerBindingRequest(
   return encodeRequest(requestId, { keymap: keymapEncoder.getUint8Array() });
 }
 
-function encodeGetLayerBindingRequest(
-  requestId: number,
-  layerId: number,
-  keyPosition: number
-): Uint8Array {
-  const getLayerBindingEncoder = new ProtoEncoder();
-  getLayerBindingEncoder.writeUint32(1, layerId);
-  getLayerBindingEncoder.writeInt32(2, keyPosition);
-
-  const keymapEncoder = new ProtoEncoder();
-  keymapEncoder.writeBytes(3, getLayerBindingEncoder.getUint8Array()); // getLayerBinding
-
-  return encodeRequest(requestId, { keymap: keymapEncoder.getUint8Array() });
+function encodeGetLockStateRequest(requestId: number): Uint8Array {
+  const coreEncoder = new ProtoEncoder();
+  coreEncoder.writeBool(2, true); // getLockState (field 2 in core Request)
+  return encodeRequest(requestId, { core: coreEncoder.getUint8Array() });
 }
 
 function encodeSaveChangesRequest(requestId: number): Uint8Array {
@@ -946,6 +942,90 @@ function zmkKeyNameToHid(name: string): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+function decodeZmkUsageToZmkKeyName(encodedUsage: number): string {
+  const usagePage = (encodedUsage >>> 16) & 0xff;
+  const usageId = encodedUsage & 0xffff;
+
+  if (usagePage === 0x07) {
+    return hidToZmkKeyName(usageId);
+  } else if (usagePage === 0x0C) {
+    const consumerMap: Record<number, string> = {
+      0x00B5: "C_NEXT",
+      0x00B6: "C_PREV",
+      0x00B9: "C_VOL_UP",
+      0x00BA: "C_VOL_DN",
+      0x00CD: "C_PP",   // Play/Pause
+      0x00CC: "C_STOP",
+      0x00E2: "C_MUTE",
+      0x006F: "C_BRI_UP",
+      0x0070: "C_BRI_DN",
+      0x00E9: "C_VOL_UP", // Consumer Volume Up
+      0x00EA: "C_VOL_DN", // Consumer Volume Down
+    };
+    return consumerMap[usageId] || `C_0x${usageId.toString(16).toUpperCase()}`;
+  } else if (usagePage === 0x00) {
+    return hidToZmkKeyName(usageId);
+  }
+  return `0x${encodedUsage.toString(16).toUpperCase()}`;
+}
+
+function encodeZmkKeyNameToUsage(name: string): number {
+  const uKey = ZMK_TO_UNIVERSAL[name] || name;
+
+  const consumerKeys: Record<string, number> = {
+    "C_NEXT": 0x00B5,
+    "C_PREV": 0x00B6,
+    "C_VOL_UP": 0x00B9,
+    "C_VOL_DN": 0x00BA,
+    "C_PP": 0x00CD,
+    "C_STOP": 0x00CC,
+    "C_MUTE": 0x00E2,
+    "C_BRI_UP": 0x006F,
+    "C_BRI_DN": 0x0070
+  };
+
+  if (consumerKeys[uKey]) {
+    return (0x0C << 16) | consumerKeys[uKey];
+  }
+
+  const entry = KEY_MAP[uKey as UniversalKey];
+  if (entry) {
+    if (entry.hid >= 0x00 && entry.hid <= 0xFF) {
+      return (0x07 << 16) | entry.hid;
+    }
+    return entry.hid;
+  }
+
+  if (name.startsWith("0x")) {
+    const parsed = parseInt(name.slice(2), 16);
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  const parsed = parseInt(name);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function resolveBehaviorId(behaviorIds: Record<string, number>, shortName: string): number {
+  const normShort = shortName.toLowerCase().replace(/[\s_-]+/g, '');
+
+  if (behaviorIds[shortName] !== undefined) return behaviorIds[shortName];
+  if (behaviorIds[normShort] !== undefined) return behaviorIds[normShort];
+
+  for (const [key, value] of Object.entries(behaviorIds)) {
+    const normKey = key.toLowerCase().replace(/[\s_-]+/g, '');
+    if (normKey === normShort) return value;
+
+    if (normShort === "kp" && (normKey === "keypress" || normKey === "key")) return value;
+    if (normShort === "mo" && (normKey === "momentary" || normKey === "momentarylayer")) return value;
+    if (normShort === "tog" && (normKey === "toggle" || normKey === "toglayer" || normKey === "togglelayer")) return value;
+    if (normShort === "to" && normKey === "tolayer") return value;
+    if (normShort === "lt" && normKey === "layertap") return value;
+    if (normShort === "mt" && (normKey === "modtap" || normKey === "holdtap")) return value;
+  }
+
+  return 0;
+}
+
 function parseZmkModifiers(mask: number): string[] {
   const mods: string[] = [];
   if (mask & 0x01) mods.push("LCTRL");
@@ -963,49 +1043,76 @@ function bindingToZmkString(
   binding: { behaviorId: number; param1: number; param2: number },
   behaviorNames: Record<number, string>
 ): string {
-  const name = behaviorNames[binding.behaviorId] || `behavior_${binding.behaviorId}`;
+  const rawName = behaviorNames[binding.behaviorId] || `behavior_${binding.behaviorId}`;
+  const name = rawName.toLowerCase().replace(/[\s_-]+/g, '');
   
   if (name === "none") {
     return "&none";
   }
-  if (name === "trans") {
+  if (name === "trans" || name === "transparent") {
     return "&trans";
   }
-  if (name === "kp") {
-    const modFlags = (binding.param1 >>> 8) & 0xff;
-    const baseHid = binding.param1 & 0xff;
-    const baseKeyName = hidToZmkKeyName(baseHid);
-    if (modFlags > 0) {
-      let result = baseKeyName;
-      const mods = parseZmkModifiers(modFlags);
-      const shortcutMap: Record<string, string> = {
-        'LCTRL': 'LC', 'LSHIFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
-        'RCTRL': 'RC', 'RSHIFT': 'RS', 'RALT': 'RA', 'RGUI': 'RG'
-      };
-      mods.forEach(mod => {
-        const sh = shortcutMap[mod] || mod;
-        result = `${sh}(${result})`;
-      });
-      return `&kp ${result}`;
+  if (name === "kp" || name === "keypress" || name === "key") {
+    const usagePage = (binding.param1 >>> 16) & 0xffff;
+    if (usagePage > 0) {
+      const baseKeyName = decodeZmkUsageToZmkKeyName(binding.param1);
+      return `&kp ${baseKeyName}`;
+    } else {
+      const modFlags = (binding.param1 >>> 8) & 0xff;
+      const baseHid = binding.param1 & 0xff;
+      const baseKeyName = hidToZmkKeyName(baseHid);
+      if (modFlags > 0) {
+        let result = baseKeyName;
+        const mods = parseZmkModifiers(modFlags);
+        const shortcutMap: Record<string, string> = {
+          'LCTRL': 'LC', 'LSHIFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
+          'RCTRL': 'RC', 'RSHIFT': 'RS', 'RALT': 'RA', 'RGUI': 'RG'
+        };
+        mods.forEach(mod => {
+          const sh = shortcutMap[mod] || mod;
+          result = `${sh}(${result})`;
+        });
+        return `&kp ${result}`;
+      }
+      return `&kp ${baseKeyName}`;
     }
-    return `&kp ${baseKeyName}`;
   }
-  if (name === "mo") {
+  if (name === "mo" || name === "momentary" || name === "momentarylayer") {
     return `&mo ${binding.param1}`;
   }
-  if (name === "tog" || name === "tog_layer" || name === "toggle") {
+  if (name === "tog" || name === "toglayer" || name === "toggle" || name === "togglelayer") {
     return `&tog ${binding.param1}`;
   }
-  if (name === "to") {
+  if (name === "to" || name === "tolayer") {
     return `&to ${binding.param1}`;
   }
-  if (name === "lt") {
-    return `&lt ${binding.param1} ${hidToZmkKeyName(binding.param2)}`;
+  if (name === "lt" || name === "layertap") {
+    const tapKey = decodeZmkUsageToZmkKeyName(binding.param2);
+    return `&lt ${binding.param1} ${tapKey}`;
   }
-  if (name === "mt") {
-    return `&mt ${parseZmkModifiers(binding.param1).join(" ")} ${hidToZmkKeyName(binding.param2)}`;
+  if (name === "mt" || name === "modtap" || name === "holdtap") {
+    const tapKey = decodeZmkUsageToZmkKeyName(binding.param2);
+    const usagePage = (binding.param1 >>> 16) & 0xff;
+    const usageId = binding.param1 & 0xffff;
+    
+    if (usagePage === 0x07 && usageId >= 0xE0 && usageId <= 0xE7) {
+      const directMods: Record<number, string> = {
+        0xE0: "LCTRL",
+        0xE1: "LSHIFT",
+        0xE2: "LALT",
+        0xE3: "LGUI",
+        0xE4: "RCTRL",
+        0xE5: "RSHIFT",
+        0xE6: "RALT",
+        0xE7: "RGUI"
+      };
+      const resolvedMod = directMods[usageId];
+      return `&mt ${resolvedMod} ${tapKey}`;
+    }
+    
+    return `&mt ${parseZmkModifiers(binding.param1).join(" ")} ${tapKey}`;
   }
-  if (name === "rgb_ug") {
+  if (name === "rgbug") {
     const cmdMap: Record<number, string> = {
       0: "RGB_TOG",
       1: "RGB_ON",
@@ -1024,7 +1131,8 @@ function bindingToZmkString(
     return `&rgb_ug ${cmdMap[binding.param1] || "RGB_TOG"}`;
   }
   
-  return `&${name} ${binding.param1} ${binding.param2}`.trim();
+  const dtsName = rawName.replace(/[\s_]+/g, '_');
+  return `&${dtsName} ${binding.param1} ${binding.param2}`.trim();
 }
 
 function zmkStringToBinding(
@@ -1034,10 +1142,10 @@ function zmkStringToBinding(
   const trimmed = zmkStr.trim();
   
   if (trimmed === "&trans") {
-    return { behaviorId: behaviorIds["trans"] || 0, param1: 0, param2: 0 };
+    return { behaviorId: resolveBehaviorId(behaviorIds, "trans"), param1: 0, param2: 0 };
   }
   if (trimmed === "&none") {
-    return { behaviorId: behaviorIds["none"] || 0, param1: 0, param2: 0 };
+    return { behaviorId: resolveBehaviorId(behaviorIds, "none"), param1: 0, param2: 0 };
   }
   
   let match = trimmed.match(/^&kp\s+([^\s]+)$/);
@@ -1058,15 +1166,15 @@ function zmkStringToBinding(
       }
       const hid = zmkKeyNameToHid(parsedMod.keycode);
       return {
-        behaviorId: behaviorIds["kp"] || 0,
+        behaviorId: resolveBehaviorId(behaviorIds, "kp"),
         param1: (modFlags << 8) | hid,
         param2: 0
       };
     } else {
-      const hid = zmkKeyNameToHid(keyName);
+      const usage = encodeZmkKeyNameToUsage(keyName);
       return {
-        behaviorId: behaviorIds["kp"] || 0,
-        param1: hid,
+        behaviorId: resolveBehaviorId(behaviorIds, "kp"),
+        param1: usage,
         param2: 0
       };
     }
@@ -1075,7 +1183,7 @@ function zmkStringToBinding(
   match = trimmed.match(/^&mo\s+(\d+)$/);
   if (match) {
     return {
-      behaviorId: behaviorIds["mo"] || 0,
+      behaviorId: resolveBehaviorId(behaviorIds, "mo"),
       param1: parseInt(match[1]),
       param2: 0
     };
@@ -1084,7 +1192,7 @@ function zmkStringToBinding(
   match = trimmed.match(/^&(tog|toggle|tog_layer)\s+(\d+)$/);
   if (match) {
     return {
-      behaviorId: behaviorIds["tog"] || behaviorIds["tog_layer"] || behaviorIds["toggle"] || 0,
+      behaviorId: resolveBehaviorId(behaviorIds, "tog"),
       param1: parseInt(match[2]),
       param2: 0
     };
@@ -1093,7 +1201,7 @@ function zmkStringToBinding(
   match = trimmed.match(/^&to\s+(\d+)$/);
   if (match) {
     return {
-      behaviorId: behaviorIds["to"] || 0,
+      behaviorId: resolveBehaviorId(behaviorIds, "to"),
       param1: parseInt(match[1]),
       param2: 0
     };
@@ -1102,9 +1210,9 @@ function zmkStringToBinding(
   match = trimmed.match(/^&lt\s+(\d+)\s+([^\s]+)$/);
   if (match) {
     return {
-      behaviorId: behaviorIds["lt"] || 0,
+      behaviorId: resolveBehaviorId(behaviorIds, "lt"),
       param1: parseInt(match[1]),
-      param2: zmkKeyNameToHid(match[2])
+      param2: encodeZmkKeyNameToUsage(match[2])
     };
   }
   
@@ -1112,23 +1220,43 @@ function zmkStringToBinding(
   if (match) {
     const modsStr = match[1];
     const keyName = match[2];
-    let modFlags = 0;
-    for (const mod of modsStr.split(/\s+/)) {
-      const clean = mod.trim();
-      const uKey = ZMK_TO_UNIVERSAL[clean] || clean;
-      if (uKey === "LCTL") modFlags |= 0x01;
-      if (uKey === "LSFT") modFlags |= 0x02;
-      if (uKey === "LALT") modFlags |= 0x04;
-      if (uKey === "LGUI") modFlags |= 0x08;
-      if (uKey === "RCTL") modFlags |= 0x10;
-      if (uKey === "RSFT") modFlags |= 0x20;
-      if (uKey === "RALT") modFlags |= 0x40;
-      if (uKey === "RGUI") modFlags |= 0x80;
+    
+    const singleCleanMod = modsStr.trim().toUpperCase();
+    const directModsToUsage: Record<string, number> = {
+      "LCTRL": 0x700e0, "LCTL": 0x700e0,
+      "LSHIFT": 0x700e1, "LSFT": 0x700e1,
+      "LALT": 0x700e2,
+      "LGUI": 0x700e3,
+      "RCTRL": 0x700e4, "RCTL": 0x700e4,
+      "RSHIFT": 0x700e5, "RSFT": 0x700e5,
+      "RALT": 0x700e6,
+      "RGUI": 0x700e7
+    };
+    
+    let param1Val = 0;
+    if (directModsToUsage[singleCleanMod] !== undefined) {
+      param1Val = directModsToUsage[singleCleanMod];
+    } else {
+      let modFlags = 0;
+      for (const mod of modsStr.split(/\s+/)) {
+        const clean = mod.trim();
+        const uKey = ZMK_TO_UNIVERSAL[clean] || clean;
+        if (uKey === "LCTL") modFlags |= 0x01;
+        if (uKey === "LSFT") modFlags |= 0x02;
+        if (uKey === "LALT") modFlags |= 0x04;
+        if (uKey === "LGUI") modFlags |= 0x08;
+        if (uKey === "RCTL") modFlags |= 0x10;
+        if (uKey === "RSFT") modFlags |= 0x20;
+        if (uKey === "RALT") modFlags |= 0x40;
+        if (uKey === "RGUI") modFlags |= 0x80;
+      }
+      param1Val = modFlags;
     }
+    
     return {
-      behaviorId: behaviorIds["mt"] || 0,
-      param1: modFlags,
-      param2: zmkKeyNameToHid(keyName)
+      behaviorId: resolveBehaviorId(behaviorIds, "mt"),
+      param1: param1Val,
+      param2: encodeZmkKeyNameToUsage(keyName)
     };
   }
   
@@ -1317,6 +1445,8 @@ export class ZmkProtocol implements IProtocolDriver {
     this.keymapAvailable = false;
     this.isLayoutAvailable = false;
 
+    const isLockError = (err: any) => err && err.message && (err.message.includes('locked') || err.message.includes('Unlock'));
+
     // 1. Send GetKeyboardInfoRequest
     try {
       const getInfoMsg = encodeGetDeviceInfoRequest(1);
@@ -1327,7 +1457,8 @@ export class ZmkProtocol implements IProtocolDriver {
         this.keyboardName = infoMsg.name || this.keyboardName;
       }
       this.keyboardInfoAvailable = true;
-    } catch (err) {
+    } catch (err: any) {
+      if (isLockError(err)) throw err;
       console.error('[ZmkProtocol] Failed to retrieve mandatory keyboard info from physical device:', err);
       return false;
     }
@@ -1340,7 +1471,8 @@ export class ZmkProtocol implements IProtocolDriver {
       // Attempt 1: 10000ms timeout!
       const layoutsResponse = await this.sendRequest('GetPhysicalLayouts', getLayoutsMsg, 10000);
       layoutSuccess = this.parseLayoutsResponse(layoutsResponse);
-    } catch (layoutErr) {
+    } catch (layoutErr: any) {
+      if (isLockError(layoutErr)) throw layoutErr;
       console.warn('[ZmkProtocol] GetPhysicalLayouts attempt 1 timed out or failed:', layoutErr);
       // Retry 1: Delay 100ms then retry with 10000ms timeout!
       await sleep(100);
@@ -1349,7 +1481,8 @@ export class ZmkProtocol implements IProtocolDriver {
         const getLayoutsMsg = encodeGetPhysicalLayoutsRequest(1);
         const layoutsResponse = await this.sendRequest('GetPhysicalLayouts', getLayoutsMsg, 10000);
         layoutSuccess = this.parseLayoutsResponse(layoutsResponse);
-      } catch (retryErr) {
+      } catch (retryErr: any) {
+        if (isLockError(retryErr)) throw retryErr;
         console.warn('[ZmkProtocol] GetPhysicalLayouts attempt 2 (retry) timed out or failed:', retryErr);
       }
     }
@@ -1384,7 +1517,8 @@ export class ZmkProtocol implements IProtocolDriver {
         }
       }
       this.behaviorsAvailable = true;
-    } catch (err) {
+    } catch (err: any) {
+      if (isLockError(err)) throw err;
       console.warn('[ZmkProtocol] Discovering behaviors failed dynamically:', err);
     }
 
@@ -1396,12 +1530,34 @@ export class ZmkProtocol implements IProtocolDriver {
         const getLayoutsMsg = encodeGetPhysicalLayoutsRequest(1);
         const layoutsResponse = await this.sendRequest('GetPhysicalLayouts', getLayoutsMsg, 10000);
         this.parseLayoutsResponse(layoutsResponse);
-      } catch (finalErr) {
+      } catch (finalErr: any) {
+        if (isLockError(finalErr)) throw finalErr;
         console.error('[ZmkProtocol] Final fallback GetPhysicalLayouts retry failed:', finalErr);
       }
     }
 
-    this.keymapAvailable = false;
+    // 6. Fetch Keymap dynamically via GetKeymapRequest
+    try {
+      console.log('[ZmkProtocol] Fetching full keymap via GetKeymapRequest...');
+      const getKeymapMsg = encodeGetKeymapRequest(1);
+      const keymapResponse = await this.sendRequest('GetKeymap', getKeymapMsg, 10000);
+      const decodedKeymapRes = decodeResponse(keymapResponse);
+      const keymapMsg = decodedKeymapRes.requestResponse?.keymap?.getKeymap;
+      if (keymapMsg && keymapMsg.layers && keymapMsg.layers.length > 0) {
+        this.fetchedKeymap = keymapMsg;
+        this.layerCount = keymapMsg.layers.length;
+        this.keymapAvailable = true;
+        console.log(`[ZmkProtocol] Successfully fetched keymap with ${this.layerCount} layers.`);
+      } else {
+        console.warn('[ZmkProtocol] Keymap response was empty or invalid.');
+        this.keymapAvailable = false;
+      }
+    } catch (err: any) {
+      if (isLockError(err)) throw err;
+      console.warn('[ZmkProtocol] Failed to retrieve keymap from physical device (device may be locked or unsupported):', err.message || err);
+      this.keymapAvailable = false;
+    }
+
     return true;
   }
 
@@ -1447,23 +1603,34 @@ export class ZmkProtocol implements IProtocolDriver {
     return this.physicalPositions;
   }
 
-  async testReadBinding(layer: number, position: number): Promise<void> {
+  async testReadBinding(layer: number, position: number): Promise<boolean> {
     if (!this.transport) {
       throw new Error('Device not connected');
     }
 
-    const testMsg = encodeGetLayerBindingRequest(1, layer, position);
-    const hex = (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    console.log(`[ZMK Test Probe TX] Layer:${layer} Position:${position}`);
+    const testMsg = encodeGetLockStateRequest(1);
+    console.log('[ZMK Test Probe TX]: Querying Lock State...');
 
     try {
-      const response = await this.sendRequest('GetLayerBinding', testMsg);
-      console.log('[ZMK Test Probe RX Raw]:', hex(response));
+      const response = await this.sendRequest('GetLockState', testMsg);
+      const decoded = decodeResponse(response);
+      const lockState = decoded.requestResponse?.core?.getLockState;
+      
+      if (lockState !== undefined) {
+        const isLocked = lockState === 0;
+        console.log(`[ZMK Test Probe RX]: Lock State is ${isLocked ? 'LOCKED' : 'UNLOCKED'} (${lockState})`);
+        if (isLocked) {
+          throw new Error('Device is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
+        }
+        return true;
+      }
+      return false;
     } catch (err: any) {
-      console.warn('[ZMK Test Probe RX Error]: Request timed out or failed:', err);
+      console.warn('[ZMK Test Probe RX Error]: Lock check timed out or failed:', err);
       if (err.message && (err.message.includes('locked') || err.message.includes('Unlock'))) {
         throw err;
       }
+      return false;
     }
   }
 
@@ -1514,6 +1681,30 @@ export class ZmkProtocol implements IProtocolDriver {
 
     console.log('[ZMK read] raw:', hex(bindingBytes));
     console.log('[ZMK read] decoded:', action);
+
+    const behaviorName = this.behaviorNames[binding.behaviorId] || `behavior_${binding.behaviorId}`;
+    console.log(`[ZMK Decoded Log]`, {
+      behaviorId: binding.behaviorId,
+      behaviorName,
+      rawParams: [binding.param1, binding.param2],
+      paramsHex: [
+        `0x${binding.param1.toString(16).toUpperCase()}`,
+        `0x${binding.param2.toString(16).toUpperCase()}`
+      ],
+      param1: {
+        paramHex: `0x${binding.param1.toString(16).toUpperCase()}`,
+        usagePage: binding.param1 >>> 16,
+        usageId: binding.param1 & 0xffff,
+        maybeMaskedUsagePage: (binding.param1 >>> 16) & 0xff
+      },
+      param2: {
+        paramHex: `0x${binding.param2.toString(16).toUpperCase()}`,
+        usagePage: binding.param2 >>> 16,
+        usageId: binding.param2 & 0xffff,
+        maybeMaskedUsagePage: (binding.param2 >>> 16) & 0xff
+      },
+      convertedAction: action
+    });
 
     return action;
   }
