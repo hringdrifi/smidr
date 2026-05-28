@@ -1040,16 +1040,6 @@ function hidToZmkKeyName(hid: number): string {
   return `0x${hid.toString(16)}`;
 }
 
-function zmkKeyNameToHid(name: string): number {
-  const uKey = ZMK_TO_UNIVERSAL[name] || name;
-  const entry = KEY_MAP[uKey as UniversalKey];
-  if (entry) {
-    return entry.hid;
-  }
-  const parsed = parseInt(name);
-  return isNaN(parsed) ? 0 : parsed;
-}
-
 function decodeZmkUsageToZmkKeyName(encodedUsage: number): string {
   const usagePage = (encodedUsage >>> 16) & 0xff;
   const usageId = encodedUsage & 0xffff;
@@ -1113,6 +1103,49 @@ function encodeZmkKeyNameToUsage(name: string): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+function zmkModifierToFlag(mod: string): number {
+  const clean = (ZMK_TO_UNIVERSAL[mod] || mod).toUpperCase();
+  if (clean === "LCTL" || clean === "LCTRL") return 0x01;
+  if (clean === "LSFT" || clean === "LSHIFT") return 0x02;
+  if (clean === "LALT") return 0x04;
+  if (clean === "LGUI") return 0x08;
+  if (clean === "RCTL" || clean === "RCTRL") return 0x10;
+  if (clean === "RSFT" || clean === "RSHIFT") return 0x20;
+  if (clean === "RALT") return 0x40;
+  if (clean === "RGUI") return 0x80;
+  return 0;
+}
+
+function encodeZmkModifiedUsage(modifiers: string[], keyName: string): number {
+  const modFlags = modifiers.reduce((flags, mod) => flags | zmkModifierToFlag(mod), 0);
+  const usage = encodeZmkKeyNameToUsage(keyName);
+  return ((modFlags * 0x01000000) + usage) >>> 0;
+}
+
+function decodeZmkModifiedUsage(encodedUsage: number): { modFlags: number; usage: number } {
+  return {
+    modFlags: Math.floor(encodedUsage / 0x01000000) & 0xff,
+    usage: encodedUsage & 0x00ffffff
+  };
+}
+
+function zmkModifiedUsageToString(encodedUsage: number): string {
+  const { modFlags, usage } = decodeZmkModifiedUsage(encodedUsage);
+  const baseKeyName = decodeZmkUsageToZmkKeyName(usage);
+  if (modFlags === 0) return baseKeyName;
+
+  let result = baseKeyName;
+  const shortcutMap: Record<string, string> = {
+    'LCTRL': 'LC', 'LSHIFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
+    'RCTRL': 'RC', 'RSHIFT': 'RS', 'RALT': 'RA', 'RGUI': 'RG'
+  };
+  for (const mod of parseZmkModifiers(modFlags)) {
+    const sh = shortcutMap[mod] || mod;
+    result = `${sh}(${result})`;
+  }
+  return result;
+}
+
 function resolveBehaviorId(behaviorIds: Record<string, number>, shortName: string): number {
   const normShort = shortName.toLowerCase().replace(/[\s_-]+/g, '');
 
@@ -1168,29 +1201,7 @@ function bindingToZmkString(
     return "&trans";
   }
   if (name === "kp" || name === "keypress" || name === "key") {
-    const usagePage = (binding.param1 >>> 16) & 0xffff;
-    if (usagePage > 0) {
-      const baseKeyName = decodeZmkUsageToZmkKeyName(binding.param1);
-      return `&kp ${baseKeyName}`;
-    } else {
-      const modFlags = (binding.param1 >>> 8) & 0xff;
-      const baseHid = binding.param1 & 0xff;
-      const baseKeyName = hidToZmkKeyName(baseHid);
-      if (modFlags > 0) {
-        let result = baseKeyName;
-        const mods = parseZmkModifiers(modFlags);
-        const shortcutMap: Record<string, string> = {
-          'LCTRL': 'LC', 'LSHIFT': 'LS', 'LALT': 'LA', 'LGUI': 'LG',
-          'RCTRL': 'RC', 'RSHIFT': 'RS', 'RALT': 'RA', 'RGUI': 'RG'
-        };
-        mods.forEach(mod => {
-          const sh = shortcutMap[mod] || mod;
-          result = `${sh}(${result})`;
-        });
-        return `&kp ${result}`;
-      }
-      return `&kp ${baseKeyName}`;
-    }
+    return `&kp ${zmkModifiedUsageToString(binding.param1)}`;
   }
   if (name === "mo" || name === "momentary" || name === "momentarylayer") {
     return `&mo ${binding.param1}`;
@@ -1207,10 +1218,12 @@ function bindingToZmkString(
   }
   if (name === "mt" || name === "modtap" || name === "holdtap") {
     const tapKey = decodeZmkUsageToZmkKeyName(binding.param2);
-    const usagePage = (binding.param1 >>> 16) & 0xff;
-    const usageId = binding.param1 & 0xffff;
+    const holdKey = zmkModifiedUsageToString(binding.param1);
+    const { modFlags, usage } = decodeZmkModifiedUsage(binding.param1);
+    const usagePage = (usage >>> 16) & 0xff;
+    const usageId = usage & 0xffff;
     
-    if (usagePage === 0x07 && usageId >= 0xE0 && usageId <= 0xE7) {
+    if (modFlags === 0 && usagePage === 0x07 && usageId >= 0xE0 && usageId <= 0xE7) {
       const directMods: Record<number, string> = {
         0xE0: "LCTRL",
         0xE1: "LSHIFT",
@@ -1225,7 +1238,7 @@ function bindingToZmkString(
       return `&mt ${resolvedMod} ${tapKey}`;
     }
     
-    return `&mt ${parseZmkModifiers(binding.param1).join(" ")} ${tapKey}`;
+    return `&mt ${holdKey} ${tapKey}`;
   }
   if (name === "rgbug") {
     const cmdMap: Record<number, string> = {
@@ -1268,21 +1281,9 @@ function zmkStringToBinding(
     const keyName = match[1];
     const parsedMod = parseZmkModifiedKey(keyName);
     if (parsedMod) {
-      let modFlags = 0;
-      for (const mod of parsedMod.modifiers) {
-        if (mod === "LCTL") modFlags |= 0x01;
-        if (mod === "LSFT") modFlags |= 0x02;
-        if (mod === "LALT") modFlags |= 0x04;
-        if (mod === "LGUI") modFlags |= 0x08;
-        if (mod === "RCTL") modFlags |= 0x10;
-        if (mod === "RSFT") modFlags |= 0x20;
-        if (mod === "RALT") modFlags |= 0x40;
-        if (mod === "RGUI") modFlags |= 0x80;
-      }
-      const hid = zmkKeyNameToHid(parsedMod.keycode);
       return {
         behaviorId: resolveBehaviorId(behaviorIds, "kp"),
-        param1: (modFlags << 8) | hid,
+        param1: encodeZmkModifiedUsage(parsedMod.modifiers, parsedMod.keycode),
         param2: 0
       };
     } else {
@@ -1330,47 +1331,34 @@ function zmkStringToBinding(
       param2: encodeZmkKeyNameToUsage(match[2])
     };
   }
+
+  match = trimmed.match(/^&mt\s+([^\s]+)$/);
+  if (match) {
+    return {
+      behaviorId: resolveBehaviorId(behaviorIds, "kp"),
+      param1: encodeZmkKeyNameToUsage(match[1]),
+      param2: 0
+    };
+  }
   
   match = trimmed.match(/^&mt\s+(.+)\s+([^\s]+)$/);
   if (match) {
     const modsStr = match[1];
     const keyName = match[2];
     
-    const singleCleanMod = modsStr.trim().toUpperCase();
-    const directModsToUsage: Record<string, number> = {
-      "LCTRL": 0x700e0, "LCTL": 0x700e0,
-      "LSHIFT": 0x700e1, "LSFT": 0x700e1,
-      "LALT": 0x700e2,
-      "LGUI": 0x700e3,
-      "RCTRL": 0x700e4, "RCTL": 0x700e4,
-      "RSHIFT": 0x700e5, "RSFT": 0x700e5,
-      "RALT": 0x700e6,
-      "RGUI": 0x700e7
-    };
-    
-    let param1Val = 0;
-    if (directModsToUsage[singleCleanMod] !== undefined) {
-      param1Val = directModsToUsage[singleCleanMod];
-    } else {
-      let modFlags = 0;
-      for (const mod of modsStr.split(/\s+/)) {
-        const clean = mod.trim();
-        const uKey = ZMK_TO_UNIVERSAL[clean] || clean;
-        if (uKey === "LCTL") modFlags |= 0x01;
-        if (uKey === "LSFT") modFlags |= 0x02;
-        if (uKey === "LALT") modFlags |= 0x04;
-        if (uKey === "LGUI") modFlags |= 0x08;
-        if (uKey === "RCTL") modFlags |= 0x10;
-        if (uKey === "RSFT") modFlags |= 0x20;
-        if (uKey === "RALT") modFlags |= 0x40;
-        if (uKey === "RGUI") modFlags |= 0x80;
-      }
-      param1Val = modFlags;
+    const mods = modsStr.split(/\s+/).map(mod => mod.trim()).filter(Boolean);
+    const holdKey = mods.pop();
+    if (!holdKey) {
+      return {
+        behaviorId: resolveBehaviorId(behaviorIds, "kp"),
+        param1: encodeZmkKeyNameToUsage(keyName),
+        param2: 0
+      };
     }
     
     return {
       behaviorId: resolveBehaviorId(behaviorIds, "mt"),
-      param1: param1Val,
+      param1: encodeZmkModifiedUsage(mods, holdKey),
       param2: encodeZmkKeyNameToUsage(keyName)
     };
   }

@@ -225,6 +225,9 @@ describe('protocols conversion tests', () => {
       const requestResponse = [0x08, requestId, 0x1a, core.length, ...core];
       return new Uint8Array([0x0a, requestResponse.length, ...requestResponse]);
     };
+    const containsSubsequence = (bytes: number[], sequence: number[]) => {
+      return bytes.some((_, start) => sequence.every((value, offset) => bytes[start + offset] === value));
+    };
 
     it('should throw an error indicating lock state when metadata meta error is returned', async () => {
       const zmk = new ZmkProtocol();
@@ -315,6 +318,131 @@ describe('protocols conversion tests', () => {
       ));
 
       expect(bindingStart).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should encode ZMK modifier functions in the high modifier byte', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]),
+        new Uint8Array([0x0a, 0x12, 0x08, 0x04, 0x2a, 0x0e, 0x0a, 0x0c, 0x0a, 0x0a, 0x08, 0x00, 0x12, 0x00, 0x1a, 0x04, 0x08, 0x06, 0x10, 0x04])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 3, param1: 4, param2: 0 }] }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { 'key press': 3 };
+
+      await zmk.setKey(0, 0, 0, { action: 'tap', keycode: 'DOWN', mods: ['RGUI'] });
+
+      expect(containsSubsequence(Array.from(sent[1]), [
+        0x08, 0x06,
+        0x10, 0xd1, 0x80, 0x9c, 0x80, 0x08,
+        0x18, 0x00
+      ])).toBe(true);
+    });
+
+    it('should encode multi-mod mod-tap hold parameters as modified ZMK usages', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]),
+        new Uint8Array([0x0a, 0x12, 0x08, 0x04, 0x2a, 0x0e, 0x0a, 0x0c, 0x0a, 0x0a, 0x08, 0x00, 0x12, 0x00, 0x1a, 0x04, 0x08, 0x1e, 0x10, 0x04])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 15, param1: 0x000700e6, param2: 0x00070051 }] }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { 'key press': 3, 'mod-tap': 15 };
+
+      await zmk.setKey(0, 0, 0, {
+        action: 'mt',
+        modifiers: ['RGUI', 'RALT'],
+        tapAction: { action: 'tap', keycode: 'DOWN' }
+      });
+
+      expect(containsSubsequence(Array.from(sent[1]), [
+        0x08, 0x1e,
+        0x10, 0xe6, 0x81, 0x9c, 0x80, 0x08,
+        0x18, 0xd1, 0x80, 0x1c
+      ])).toBe(true);
+    });
+
+    it('should avoid sending an invalid mod-tap when no hold modifiers are selected', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]),
+        new Uint8Array([0x0a, 0x12, 0x08, 0x04, 0x2a, 0x0e, 0x0a, 0x0c, 0x0a, 0x0a, 0x08, 0x00, 0x12, 0x00, 0x1a, 0x04, 0x08, 0x06, 0x10, 0x04])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 3, param1: 4, param2: 0 }] }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { 'key press': 3, 'mod-tap': 15 };
+
+      await zmk.setKey(0, 0, 0, {
+        action: 'mt',
+        modifiers: [],
+        tapAction: { action: 'tap', keycode: 'DOWN' }
+      });
+
+      expect(containsSubsequence(Array.from(sent[1]), [
+        0x08, 0x06,
+        0x10, 0xd1, 0x80, 0x1c,
+        0x18, 0x00
+      ])).toBe(true);
     });
   });
 });
