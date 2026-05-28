@@ -12,7 +12,7 @@ import { parseKeyboardDefinition } from './parser';
 import { convertVialToSmidr, packLayoutOptions } from './protocols/vial-converter';
 import { VialProtocol } from './protocols/vial';
 import { DeviceCapability, ITransport } from './transport/types';
-import { ZmkProtocol } from './protocols/zmk';
+import { ZmkProtocol, zmkProtocol } from './protocols/zmk';
 import { qmkStringToAction, actionToQmkString } from './protocols/via-action-converter';
 import { getStoredTheme, setStoredTheme, getStoredLanguage, setStoredLanguage } from './storage';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
@@ -421,7 +421,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             const isZmk = s.connectedDevice?.protocolType === 'zmk';
             const isVial = s.connectedDevice?.protocolType === 'vial';
             const protocol = isZmk
-              ? new ZmkProtocol()
+              ? zmkProtocol
               : (isVial ? new VialProtocol() : new ViaProtocol());
 
             await protocol.initialize(s.activeTransport || hidTransport);
@@ -848,7 +848,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             const isZmk = s.connectedDevice?.protocolType === 'zmk';
             const isVial = s.connectedDevice?.protocolType === 'vial';
             const protocol = isZmk
-              ? new ZmkProtocol()
+              ? zmkProtocol
               : (isVial ? new VialProtocol() : new ViaProtocol());
 
             await protocol.initialize(s.activeTransport || hidTransport);
@@ -1098,7 +1098,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             const isZmk = connectedDevice?.protocolType === 'zmk';
             const isVial = connectedDevice?.protocolType === 'vial';
             const protocol = isZmk
-              ? new ZmkProtocol()
+              ? zmkProtocol
               : (isVial ? new VialProtocol() : new ViaProtocol());
 
             await protocol.initialize(get().activeTransport || hidTransport);
@@ -1114,20 +1114,46 @@ export const useKeyboardStore = create<KeyboardState>()(
               }
             }
             
-            console.log(`[VIA/Vial Write via AST] Layer:${layer} Row:${row} Col:${col}`, action);
+            console.log(`[ZMK/VIA/Vial Write via AST] Layer:${layer} Row:${row} Col:${col}`, action);
             await protocol.setKey(layer, row, col, action);
-            updateRemoteKeycode(layer, row * 32 + col, action);
 
-            // ALSO update corresponding key in editor keys state
-            set((s) => {
-              const updatedKeys = s.keys.map(k => {
-                if (k.row === row && k.col === col) {
-                  return { ...k, keymap: { ...k.keymap, [layer]: action } };
+            if (isZmk) {
+              const zmkProto = protocol as ZmkProtocol;
+              console.log('[ZMK Sync] Syncing local UI store state with re-fetched ZMK keymap data...');
+              const newRemoteKeymap = { ...get().remoteKeymap };
+              const updatedKeys = await Promise.all(get().keys.map(async (k) => {
+                if (k.row === undefined || k.col === undefined) return k;
+                
+                const keymap = { ...k.keymap };
+                for (let l = 0; l < zmkProto.layerCount; l++) {
+                  const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                  keymap[l] = actionVal;
+                  if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
+                  newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
                 }
-                return k;
+                return { ...k, keymap };
+              }));
+
+              set({
+                remoteKeymap: newRemoteKeymap,
+                keys: updatedKeys,
+                baseKeys: updatedKeys
               });
-              return { keys: updatedKeys, baseKeys: updatedKeys };
-            });
+              console.log('[ZMK Sync SUCCESS] Local UI store state synchronized.');
+            } else {
+              updateRemoteKeycode(layer, row * 32 + col, action);
+
+              // ALSO update corresponding key in editor keys state
+              set((s) => {
+                const updatedKeys = s.keys.map(k => {
+                  if (k.row === row && k.col === col) {
+                    return { ...k, keymap: { ...k.keymap, [layer]: action } };
+                  }
+                  return k;
+                });
+                return { keys: updatedKeys, baseKeys: updatedKeys };
+              });
+            }
           } catch (err) {
             console.error('Failed to update device keycode:', err);
           }
@@ -1230,7 +1256,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   const isZmk = s.connectedDevice?.protocolType === 'zmk';
                   const isVial = s.connectedDevice?.protocolType === 'vial';
                   const protocol = isZmk
-                    ? new ZmkProtocol()
+                    ? zmkProtocol
                     : (isVial ? new VialProtocol() : new ViaProtocol());
                   await protocol.initialize(s.activeTransport || hidTransport);
 
@@ -1248,10 +1274,33 @@ export const useKeyboardStore = create<KeyboardState>()(
                     if (tk.row !== undefined && tk.col !== undefined) {
                       const action = actionClipboard.length === 1 ? actionClipboard[0] : actionClipboard[i];
                       if (action) {
-                        console.log(`[VIA/Vial Paste Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
+                        console.log(`[ZMK/VIA/Vial Paste Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
                         await protocol.setKey(currentLayer, tk.row, tk.col, action);
                       }
                     }
+                  }
+
+                  if (isZmk) {
+                    const zmkProto = protocol as ZmkProtocol;
+                    console.log('[ZMK Sync] Syncing local UI store state after paste...');
+                    const newRemoteKeymap = { ...get().remoteKeymap };
+                    const updatedKeys = await Promise.all(get().keys.map(async (k) => {
+                      if (k.row === undefined || k.col === undefined) return k;
+                      const keymap = { ...k.keymap };
+                      for (let l = 0; l < zmkProto.layerCount; l++) {
+                        const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                        keymap[l] = actionVal;
+                        if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
+                        newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
+                      }
+                      return { ...k, keymap };
+                    }));
+                    set({
+                      remoteKeymap: newRemoteKeymap,
+                      keys: updatedKeys,
+                      baseKeys: updatedKeys
+                    });
+                    console.log('[ZMK Sync SUCCESS] Local UI store state synchronized after paste.');
                   }
                 } catch (err) {
                   console.error('Failed to paste to device:', err);
@@ -1316,7 +1365,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               const isZmk = connectedDevice?.protocolType === 'zmk';
               const isVial = connectedDevice?.protocolType === 'vial';
               const protocol = isZmk
-                ? new ZmkProtocol()
+                ? zmkProtocol
                 : (isVial ? new VialProtocol() : new ViaProtocol());
               await protocol.initialize(s.activeTransport || hidTransport);
 
@@ -1331,9 +1380,32 @@ export const useKeyboardStore = create<KeyboardState>()(
               // Set each key sequentially
               for (const tk of targetKeys) {
                 if (tk.row !== undefined && tk.col !== undefined) {
-                  console.log(`[VIA/Vial Delete Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, newAction);
+                  console.log(`[ZMK/VIA/Vial Delete Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, newAction);
                   await protocol.setKey(currentLayer, tk.row, tk.col, newAction);
                 }
+              }
+
+              if (isZmk) {
+                const zmkProto = protocol as ZmkProtocol;
+                console.log('[ZMK Sync] Syncing local UI store state after delete...');
+                const newRemoteKeymap = { ...get().remoteKeymap };
+                const updatedKeys = await Promise.all(get().keys.map(async (k) => {
+                  if (k.row === undefined || k.col === undefined) return k;
+                  const keymap = { ...k.keymap };
+                  for (let l = 0; l < zmkProto.layerCount; l++) {
+                    const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                    keymap[l] = actionVal;
+                    if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
+                    newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
+                  }
+                  return { ...k, keymap };
+                }));
+                set({
+                  remoteKeymap: newRemoteKeymap,
+                  keys: updatedKeys,
+                  baseKeys: updatedKeys
+                });
+                console.log('[ZMK Sync SUCCESS] Local UI store state synchronized after delete.');
               }
             } catch (err) {
               console.error('Failed to delete keycodes on device:', err);
@@ -1378,7 +1450,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               const isZmk = connectedDevice?.protocolType === 'zmk';
               const isVial = connectedDevice?.protocolType === 'vial';
               const protocol = isZmk
-                ? new ZmkProtocol()
+                ? zmkProtocol
                 : (isVial ? new VialProtocol() : new ViaProtocol());
               await protocol.initialize(s.activeTransport || hidTransport);
 
@@ -1393,9 +1465,32 @@ export const useKeyboardStore = create<KeyboardState>()(
               // Set each key sequentially
               for (const tk of targetKeys) {
                 if (tk.row !== undefined && tk.col !== undefined) {
-                  console.log(`[VIA/Vial Bulk Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
+                  console.log(`[ZMK/VIA/Vial Bulk Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
                   await protocol.setKey(currentLayer, tk.row, tk.col, action);
                 }
+              }
+
+              if (isZmk) {
+                const zmkProto = protocol as ZmkProtocol;
+                console.log('[ZMK Sync] Syncing local UI store state after bulk write...');
+                const newRemoteKeymap = { ...get().remoteKeymap };
+                const updatedKeys = await Promise.all(get().keys.map(async (k) => {
+                  if (k.row === undefined || k.col === undefined) return k;
+                  const keymap = { ...k.keymap };
+                  for (let l = 0; l < zmkProto.layerCount; l++) {
+                    const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                    keymap[l] = actionVal;
+                    if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
+                    newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
+                  }
+                  return { ...k, keymap };
+                }));
+                set({
+                  remoteKeymap: newRemoteKeymap,
+                  keys: updatedKeys,
+                  baseKeys: updatedKeys
+                });
+                console.log('[ZMK Sync SUCCESS] Local UI store state synchronized after bulk write.');
               }
             } catch (err) {
               console.error('Failed to update keycodes on device:', err);
@@ -1830,3 +1925,6 @@ export const useKeyboardStore = create<KeyboardState>()(
     )
   )
 );
+
+// Register UI Keys Provider for ZMK Protocol to avoid circular dependencies
+zmkProtocol.registerUiKeysProvider(() => useKeyboardStore.getState().keys);
