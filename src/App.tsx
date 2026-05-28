@@ -570,13 +570,32 @@ export default function App() {
                             <span>{t('header.exportVialZip')}</span>
                           </button>
 
-                          <button 
-                            onClick={handleExportZmkZip}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
-                          >
-                            <Download size={14} className="text-amber-500" />
-                            <span>{t('header.exportZmkZip')}</span>
-                          </button>
+                          {(() => {
+                            const isAvrMcu = settings.hardware?.mcu === 'atmega32u4';
+                            return (
+                              <button 
+                                onClick={handleExportZmkZip}
+                                disabled={isAvrMcu}
+                                className={cn(
+                                  "w-full flex items-center justify-between px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
+                                  isAvrMcu 
+                                    ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]" 
+                                    : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
+                                )}
+                                title={isAvrMcu ? "ZMK does not support AVR microcontrollers (Zephyr RTOS is 32-bit only)" : undefined}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Download size={14} className={isAvrMcu ? "text-[var(--text-muted)]" : "text-amber-500"} />
+                                  <span>{t('header.exportZmkZip')}</span>
+                                </div>
+                                {isAvrMcu && (
+                                  <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-bold tracking-tighter">
+                                    AVR非対応
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     </>
