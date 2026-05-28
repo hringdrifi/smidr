@@ -16,7 +16,7 @@ export interface ITransport {
   connect(device?: any): Promise<boolean>;
   disconnect(): Promise<void>;
   send(data: Uint8Array): Promise<void>;
-  receive(filter?: (data: Uint8Array) => boolean): Promise<Uint8Array>;
+  receive(filter?: (data: Uint8Array) => boolean, timeoutMs?: number): Promise<Uint8Array>;
 }
 
 // 通信プロトコル（VIA, Vial, ZMK RPC）を統一するインターフェース
@@ -27,5 +27,6 @@ export interface IProtocolDriver {
   getKey(layer: number, row: number, col: number): Promise<UniversalAction>;
   setKey(layer: number, row: number, col: number, action: UniversalAction): Promise<void>;
   getKeymapBuffer?(offset: number, length: number): Promise<Uint8Array>; // Vial等の高速一括フェッチ用 (オプション)
+  getKeyPositions?(): Promise<Array<{ row: number; col: number; index: number }>>;
   disconnect(): Promise<void>;
 }

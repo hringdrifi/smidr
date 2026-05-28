@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { viaCodeToAction, actionToViaCode, actionToQmkString, qmkStringToAction } from '../protocols/via-action-converter';
 import { zmkStringToAction, actionToZmkString } from '../protocols/zmk-action-converter';
 import { UniversalAction } from '@/types/actions';
+import { ZmkProtocol } from '../protocols/zmk';
+import { ITransport } from '../transport/types';
 
 describe('protocols conversion tests', () => {
   describe('QMK/VIA Dynamic Keycode Converter', () => {
@@ -214,6 +216,31 @@ describe('protocols conversion tests', () => {
         mods: ['LCTL', 'LSFT'],
         keycode: 'A'
       })).toBe('&kp LS(LC(A))');
+    });
+  });
+
+  describe('ZmkProtocol Lock State Detection', () => {
+    it('should throw an error indicating lock state when metadata meta error is returned', async () => {
+      const zmk = new ZmkProtocol();
+      const mockTransport: ITransport = {
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {},
+        receive: async (predicate?: (data: Uint8Array) => boolean) => {
+          // Construct Response containing RequestResponse with requestId: 1, and meta simpleError: 1 (UNLOCK_REQUIRED)
+          // 0a 06 08 01 12 02 10 01
+          const payload = new Uint8Array([0x0a, 0x06, 0x08, 0x01, 0x12, 0x02, 0x10, 0x01]);
+          return payload;
+        }
+      };
+
+      await zmk.initialize(mockTransport);
+
+      // We expect sendRequest to throw the locked error when it encounters meta simpleError = 1
+      await expect(async () => {
+        await zmk['sendRequest'](new Uint8Array([0x08, 0x01]));
+      }).rejects.toThrow('Device is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
     });
   });
 });

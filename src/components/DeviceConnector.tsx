@@ -162,10 +162,30 @@ export const DeviceConnector: React.FC = () => {
           protocolType: 'zmk'
         });
 
-        // Initialize ZmkProtocol to load capabilities
-        const zmk = new ZmkProtocol();
-        await zmk.initialize(transport);
-        useKeyboardStore.getState().setDeviceCapabilities(zmk.capabilities);
+        // Match connected device against local storage projects
+        const deviceVendorProductId = (0x1D50 << 16) | 0x615E;
+        const projects = listProjects();
+        const match = projects.find(p => {
+          let projectVpid = p.vendorProductId;
+          if (!projectVpid && p.vid && p.pid) {
+            const parsedVid = parseInt(String(p.vid).replace(/0[xX]/, ''), 16) || 0;
+            const parsedPid = parseInt(String(p.pid).replace(/0[xX]/, ''), 16) || 0;
+            projectVpid = (parsedVid << 16) | parsedPid;
+          }
+          return projectVpid === deviceVendorProductId;
+        });
+
+        if (match) {
+          console.log(`Auto-loading ZMK project: ${match.name}`);
+          loadProject({
+            ...match,
+            name: match.name || 'ZMK Keyboard',
+            manufacturer: match.manufacturer || 'ZMK',
+          });
+        }
+
+        console.log('Fetching initial keymap...');
+        await useKeyboardStore.getState().syncKeymap();
       }
     } catch (err) {
       console.error('ZMK Serial Connection failed:', err);
@@ -192,10 +212,8 @@ export const DeviceConnector: React.FC = () => {
           protocolType: 'zmk'
         });
 
-        // Initialize ZmkProtocol to load capabilities
-        const zmk = new ZmkProtocol();
-        await zmk.initialize(transport);
-        useKeyboardStore.getState().setDeviceCapabilities(zmk.capabilities);
+        console.log('Fetching initial keymap...');
+        await useKeyboardStore.getState().syncKeymap();
       }
     } catch (err) {
       console.error('ZMK BLE Connection failed:', err);

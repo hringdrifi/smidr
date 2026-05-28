@@ -7,7 +7,7 @@ import { PhysicalKey } from '@/types/keyboard';
 import { sortKeys } from '@/lib/sorting';
 import { keysIntersect } from '@/lib/collision';
 import { useTranslation } from '@/hooks/useTranslation';
-import { LayoutGrid, FolderOpen, Plus } from 'lucide-react';
+import { LayoutGrid, FolderOpen, Plus, Lock, RefreshCw } from 'lucide-react';
 import { KeyComponent } from './canvas/KeyComponent';
 import { GridComponent } from './canvas/GridComponent';
 import { UNIT, num, round, roundCoord, roundRot, getVisualCenter, getKeyVertices, getKeyLabel, isLayoutMode, PADDING_X, PADDING_Y } from '@/lib/canvas-utils';
@@ -23,7 +23,8 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     setPreviewKeys, commitPreviewKeys, copyKeys, pasteKeys,
     isProjectOpen, setIsHardwareModalOpen, resetProject,
     setCanvasDimensions,
-    connectedDevice, currentProjectId
+    connectedDevice, currentProjectId,
+    zmkLocked, syncKeymap
   } = useKeyboardStore();
   
   const { t } = useTranslation();
@@ -774,6 +775,51 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           <p className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-widest opacity-50">
             Canvas is empty. Add your first key!
           </p>
+        </div>
+      )}
+
+      {/* Empty State Overlay (Remap Mode with no keys / layout metadata unavailable) */}
+      {appMode === 'remap' && visKeys.length === 0 && !zmkLocked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/90 backdrop-blur-[4px] z-[200]">
+          <div className="w-20 h-20 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-dim)] mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in zoom-in duration-500">
+            <LayoutGrid size={40} className="text-amber-500" />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-[var(--text-highlight)] mb-3 tracking-tight">
+            Layout Metadata Unavailable
+          </h2>
+          <p className="text-sm text-[var(--text-muted)] max-w-md leading-relaxed mb-6">
+            The physical layout and key positions could not be retrieved from the device.
+          </p>
+          {connectedDevice?.protocolType === 'zmk' && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-semibold max-w-sm leading-relaxed animate-pulse">
+              If your device is locked, please physically press the &ldquo;Studio Unlock&rdquo; key combination on your keyboard to unlock it, then reconnect.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ZMK Locked State Overlay */}
+      {appMode === 'remap' && zmkLocked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/90 backdrop-blur-[4px] z-[201]">
+          <div className="w-20 h-20 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-dim)] mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in zoom-in duration-500">
+            <Lock size={40} className="text-amber-500 animate-pulse" />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-[var(--text-highlight)] mb-3 tracking-tight">
+            ZMK Studio is locked
+          </h2>
+          <p className="text-sm text-[var(--text-muted)] max-w-md leading-relaxed mb-8">
+            Press the physical &ldquo;Studio Unlock&rdquo; key combination on your keyboard to unlock it, then click below to retry synchronization.
+          </p>
+
+          <button
+            onClick={() => syncKeymap()}
+            className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-black font-semibold rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer"
+          >
+            <RefreshCw size={16} />
+            Retry Sync
+          </button>
         </div>
       )}
     </div>

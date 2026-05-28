@@ -103,6 +103,8 @@ export interface KeyboardState {
   remoteKeymap: Record<number, UniversalAction[]>; // layer -> array of actions
   setRemoteKeymap: (keymap: Record<number, UniversalAction[]>) => void;
   syncKeymap: () => Promise<void>;
+  zmkLocked: boolean;
+  setZmkLocked: (locked: boolean) => void;
   syncOfflineState: () => Promise<void>;
   updateRemoteKeycode: (layer: number, index: number, action: UniversalAction) => void;
   updateDeviceKeycode: (layer: number, row: number, col: number, action: UniversalAction) => Promise<void>;
@@ -247,6 +249,7 @@ const initialState: Partial<KeyboardState> = {
   matrixClipboard: [],
   actionClipboard: [],
   isCapturingParam: false,
+  zmkLocked: false,
   unlockState: {
     showModal: false,
     progress: 0,
@@ -307,6 +310,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         })),
 
         setIsCapturingParam: (capturing: boolean) => set({ isCapturingParam: capturing }),
+        setZmkLocked: (locked: boolean) => set({ zmkLocked: locked }),
 
         updateSettings: (sets: Partial<ProjectSettings>) => set((s) => ({ 
           settings: { ...s.settings, ...sets } 
@@ -411,6 +415,8 @@ export const useKeyboardStore = create<KeyboardState>()(
           const s = get();
           if (!s.connectedDevice) return;
           
+          set({ zmkLocked: false });
+
           try {
             const isZmk = s.connectedDevice?.protocolType === 'zmk';
             const isVial = s.connectedDevice?.protocolType === 'vial';
@@ -421,93 +427,239 @@ export const useKeyboardStore = create<KeyboardState>()(
             await protocol.initialize(s.activeTransport || hidTransport);
             set({ deviceCapabilities: protocol.capabilities });
 
-            const layerCount = await protocol.getLayerCount();
-            set((state) => ({
-              settings: {
-                ...state.settings,
-                layers: layerCount
-              }
-            }));
+            let positions: Array<{ row: number; col: number; index: number }> = [];
+            let layerCount = 3;
 
             if (isZmk) {
-              console.log('Skipping bulk keymap scan for ZMK protocol to preserve local designed baseline layout.');
-              return;
+              try {
+                const success = await (protocol as ZmkProtocol).fetchMetadata();
+                if (!success) {
+                  console.error('[syncKeymap:ZMK] ZMK Metadata Failure: Could not read keyboard layout from device. Aborting keymap sync.');
+                  throw new Error('ZMK Metadata Failure: Could not read keyboard layout from device.');
+                }
+              } catch (err: any) {
+                if (err.message && (err.message.includes('locked') || err.message.includes('Unlock'))) {
+                  console.warn('[syncKeymap:ZMK] ZMK lock state detected. Aborting keymap sync.');
+                  set({ zmkLocked: true });
+                  return;
+                }
+                throw err;
+              }
+              
+              const zmkProto = protocol as ZmkProtocol;
+              const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalPositions.length > 0;
+              const hasKeymap = zmkProto.keymapAvailable === true;
+
+              if (!hasPhysicalLayout) {
+                console.warn('[syncKeymap:ZMK] Layout metadata is unavailable. Skipping keymap sync completely.');
+                return;
+              }
+
+              positions = await zmkProto.getKeyPositions();
+              layerCount = zmkProto.layerCount;
+              const selectedLayoutName = zmkProto.selectedLayoutName;
+
+              console.log('[ZMK sync]', {
+                layerCount,
+                physicalLayout: selectedLayoutName,
+                positionCount: positions.length,
+              });
+
+              set((state) => ({
+                settings: {
+                  ...state.settings,
+                  layers: layerCount,
+                  name: state.keys.length === 0 ? (zmkProto.keyboardName || state.settings.name) : state.settings.name
+                }
+              }));
+
+              if (!hasKeymap) {
+                console.warn('[syncKeymap:ZMK] Physical layout loaded, but keymap unavailable. Generating layout-only runtime keys.');
+                let updatedKeys = [...s.keys];
+                if (s.keys.length === 0) {
+                  if (zmkProto.physicalKeys && zmkProto.physicalKeys.length > 0) {
+                    updatedKeys = zmkProto.physicalKeys.map((pk) => {
+                      return {
+                        id: crypto.randomUUID(),
+                        label: `R${pk.row}C${pk.col}`,
+                        x: pk.x,
+                        y: pk.y,
+                        w: pk.w,
+                        h: pk.h,
+                        row: pk.row,
+                        col: pk.col,
+                        keymap: {}
+                      } as RuntimeKey;
+                    });
+                  } else if (positions.length > 0) {
+                    updatedKeys = positions.map((p) => {
+                      const col = p.col;
+                      const row = p.row;
+                      const x = col * 1.25;
+                      const y = row * 1.25;
+                      return {
+                        id: crypto.randomUUID(),
+                        label: `R${row}C${col}`,
+                        x,
+                        y,
+                        w: 1,
+                        h: 1,
+                        row,
+                        col,
+                        keymap: {}
+                      } as RuntimeKey;
+                    });
+                  }
+                }
+                set({
+                  keys: updatedKeys,
+                  baseKeys: updatedKeys
+                });
+                return;
+              }
+            } else {
+              layerCount = await protocol.getLayerCount();
+            }
+
+            if (!isZmk) {
+              set((state) => ({
+                settings: {
+                  ...state.settings,
+                  layers: layerCount,
+                  name: state.settings.name
+                }
+              }));
             }
 
             const matrixRows = s.settings.matrix?.rows || 6;
             const matrixCols = s.settings.matrix?.cols || 16;
             
             const newRemoteKeymap: Record<number, UniversalAction[]> = {};
+              for (let l = 0; l < Math.min(layerCount, 16); l++) {
+                const layerActions: UniversalAction[] = [];
+                const keysToFetch = matrixRows * matrixCols; 
+                const keysPerPacket = 14;
 
-            for (let l = 0; l < Math.min(layerCount, 16); l++) {
-              const layerActions: UniversalAction[] = [];
-              const keysToFetch = matrixRows * matrixCols; 
-              const keysPerPacket = 14;
-
-              if (isVial) {
-                // High-speed batch fetch for Vial
-                const layerOffset = l * matrixRows * matrixCols * 2;
-                console.log(`Layer ${l}: Syncing ${keysToFetch} keys (Matrix: ${matrixRows}x${matrixCols}) at offset ${layerOffset}`);
-                for (let k = 0; k < keysToFetch; k += keysPerPacket) {
-                  try {
-                    const offset = layerOffset + k * 2;
-                    const buffer = await (protocol as VialProtocol).getKeymapBuffer(offset, keysPerPacket * 2);
-                    
-                    if (!buffer || buffer.length === 0) {
-                      throw new Error(`Empty buffer returned for offset ${offset}`);
-                    }
-
-                    for (let i = 0; i < keysPerPacket; i++) {
-                      const keyIdx = k + i;
-                      if (keyIdx >= keysToFetch) break;
+                if (isVial) {
+                  // High-speed batch fetch for Vial
+                  const layerOffset = l * matrixRows * matrixCols * 2;
+                  console.log(`Layer ${l}: Syncing ${keysToFetch} keys (Matrix: ${matrixRows}x${matrixCols}) at offset ${layerOffset}`);
+                  for (let k = 0; k < keysToFetch; k += keysPerPacket) {
+                    try {
+                      const offset = layerOffset + k * 2;
+                      const buffer = await (protocol as VialProtocol).getKeymapBuffer(offset, keysPerPacket * 2);
                       
-                      const bIdx = i * 2;
-                      if (bIdx + 1 >= buffer.length) break;
+                      if (!buffer || buffer.length === 0) {
+                        throw new Error(`Empty buffer returned for offset ${offset}`);
+                      }
 
-                      const val = (buffer[bIdx] << 8) | buffer[bIdx + 1];
-                      const row = Math.floor(keyIdx / matrixCols);
-                      const col = keyIdx % matrixCols;
-                      
-                      // Safety check for matrix bounds
-                      const targetIdx = row * 32 + col;
-                      layerActions[targetIdx] = vialCodeToAction(val);
+                      for (let i = 0; i < keysPerPacket; i++) {
+                        const keyIdx = k + i;
+                        if (keyIdx >= keysToFetch) break;
+                        
+                        const bIdx = i * 2;
+                        if (bIdx + 1 >= buffer.length) break;
+
+                        const val = (buffer[bIdx] << 8) | buffer[bIdx + 1];
+                        const row = Math.floor(keyIdx / matrixCols);
+                        const col = keyIdx % matrixCols;
+                        
+                        // Safety check for matrix bounds
+                        const targetIdx = row * 32 + col;
+                        layerActions[targetIdx] = vialCodeToAction(val);
+                      }
+                    } catch (e) {
+                      console.error(`Layer ${l} Error: Failed at key offset ${k}. Error:`, e);
+                      break;
                     }
-                  } catch (e) {
-                    console.error(`Layer ${l} Error: Failed at key offset ${k}. Error:`, e);
-                    break;
+                  }
+                } else {
+                  // Fallback for VIA or ZMK: fetch one by one
+                  const coords = new Set<string>();
+                  if (isZmk) {
+                    positions.forEach(p => {
+                      coords.add(`${p.row},${p.col}`);
+                    });
+                  } else {
+                    s.keys.forEach(k => {
+                      if (k.row !== undefined && k.col !== undefined) {
+                        coords.add(`${k.row},${k.col}`);
+                      }
+                    });
+                  }
+
+                  for (const coord of Array.from(coords)) {
+                    try {
+                      const [row, col] = coord.split(',').map(Number);
+                      const action = await protocol.getKey(l, row, col);
+                      layerActions[row * 32 + col] = action;
+                    } catch (e) {
+                      console.warn(`[syncKeymap] Failed to fetch Layer:${l} Row:${coord.split(',')[0]} Col:${coord.split(',')[1]}:`, e);
+                    }
                   }
                 }
+                newRemoteKeymap[l] = layerActions;
+              }
+
+            // If no project is loaded for ZMK, dynamically generate runtime layout keys from positions
+            let updatedKeys = [...s.keys];
+            if (isZmk && s.keys.length === 0 && positions.length > 0) {
+              const zmkProto = protocol as ZmkProtocol;
+              const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalPositions.length > 0;
+              const hasKeymap = zmkProto.keymapAvailable === true;
+
+              if (hasPhysicalLayout && !hasKeymap) {
+                console.log('[syncKeymap:ZMK] Physical layout loaded, but keymap unavailable. Generating layout-only runtime keys.');
               } else {
-                // Fallback for VIA: fetch one by one
-                const coords = new Set<string>();
-                s.keys.forEach(k => {
-                  if (k.row !== undefined && k.col !== undefined) {
-                    coords.add(`${k.row},${k.col}`);
+                console.log('[syncKeymap:ZMK] No project open. Generating temporary runtime keys from physical positions.');
+              }
+              updatedKeys = positions.map((p) => {
+                const col = p.col;
+                const row = p.row;
+                const x = col * 1.25;
+                const y = row * 1.25;
+                
+                const keymap: Record<number, UniversalAction> = {};
+                Object.keys(newRemoteKeymap).forEach(lStr => {
+                  const l = Number(lStr);
+                  const flatIndex = row * 32 + col;
+                  const action = newRemoteKeymap[l]?.[flatIndex];
+                  if (action) {
+                    keymap[l] = action;
                   }
                 });
-                for (const coord of Array.from(coords)) {
-                  const [row, col] = coord.split(',').map(Number);
-                  const action = await protocol.getKey(l, row, col);
-                  layerActions[row * 32 + col] = action;
-                }
-              }
-              newRemoteKeymap[l] = layerActions;
+
+                return {
+                  id: crypto.randomUUID(),
+                  label: `R${row}C${col}`,
+                  x,
+                  y,
+                  w: 1,
+                  h: 1,
+                  row,
+                  col,
+                  keymap
+                } as RuntimeKey;
+              });
+            } else {
+              // Standard merge: merge fetched physical keymap directly into editor keys
+              updatedKeys = s.keys.map(k => {
+                if (k.row === undefined || k.col === undefined) return k;
+                const flatIndex = k.row * 32 + k.col;
+                const keymap = { ...k.keymap };
+                Object.keys(newRemoteKeymap).forEach(lStr => {
+                  const l = Number(lStr);
+                  const action = newRemoteKeymap[l]?.[flatIndex];
+                  if (action) {
+                    keymap[l] = action;
+                  }
+                });
+                return { ...k, keymap };
+              });
             }
 
-            // Also merge the fetched physical keymap directly into editor keys
-            const updatedKeys = s.keys.map(k => {
-              if (k.row === undefined || k.col === undefined) return k;
-              const flatIndex = k.row * 32 + k.col;
-              const keymap = { ...k.keymap };
-              Object.keys(newRemoteKeymap).forEach(lStr => {
-                const l = Number(lStr);
-                const action = newRemoteKeymap[l]?.[flatIndex];
-                if (action) {
-                  keymap[l] = action;
-                }
-              });
-              return { ...k, keymap };
-            });
+            const finalMatrixRows = isZmk && s.keys.length === 0 ? 6 : matrixRows;
+            const finalMatrixCols = isZmk && s.keys.length === 0 ? 16 : matrixCols;
 
             set((state) => ({
               remoteKeymap: newRemoteKeymap,
@@ -515,7 +667,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               baseKeys: updatedKeys,
               settings: {
                 ...state.settings,
-                matrix: { rows: matrixRows, cols: matrixCols }
+                matrix: { rows: finalMatrixRows, cols: finalMatrixCols }
               }
             }));
             

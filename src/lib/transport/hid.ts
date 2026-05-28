@@ -65,14 +65,14 @@ export class HidTransport implements ITransport {
    * that arrives — no filtering. The filter parameter is accepted for interface
    * compatibility but is intentionally ignored.
    */
-  async receive(_filter?: (data: Uint8Array) => boolean): Promise<Uint8Array> {
+  async receive(_filter?: (data: Uint8Array) => boolean, timeoutMs?: number): Promise<Uint8Array> {
     if (!this.device) throw new Error('Device not connected');
     
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         if (this.device) this.device.oninputreport = null;
         reject(new Error('HID Timeout'));
-      }, HID_TIMEOUT_MS);
+      }, timeoutMs || HID_TIMEOUT_MS);
 
       this.device.oninputreport = (event: any) => {
         clearTimeout(timeout);
