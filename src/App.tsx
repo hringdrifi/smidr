@@ -17,7 +17,6 @@ import { KeycodeConfigPanel } from '@/components/KeycodeConfigPanel';
 import { UnlockModal } from '@/components/UnlockModal';
 import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { useKeyboardStore } from '@/lib/store';
-import { zmkProtocol } from '@/lib/protocols/zmk';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson } from '@/lib/export';
@@ -343,37 +342,6 @@ export default function App() {
                       {connectedDevice.protocolType === 'zmk' ? `ZMK connected: ${settings.name || 'Segl'}` : (connectedDevice.productName || 'Keyboard')}
                     </span>
                   </div>
-
-                  {connectedDevice.protocolType === 'zmk' && (
-                    <>
-                      <div className="w-px h-4 bg-[var(--border-main)] shrink-0" />
-                      {!zmkProtocol.physicalLayoutsAvailable ? (
-                        <div className="flex items-center gap-1.5 px-2.5 h-8 bg-red-500/10 border border-red-500/20 rounded-md shrink-0 select-none animate-in fade-in duration-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                          <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider">
-                            layout metadata unavailable
-                          </span>
-                        </div>
-                      ) : !zmkProtocol.keymapAvailable ? (
-                        <div className="flex items-center gap-1.5 px-2.5 h-8 bg-amber-500/10 border border-amber-500/20 rounded-md shrink-0 select-none animate-in fade-in duration-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">
-                            keymap unavailable
-                          </span>
-                          <span className="text-[8px] text-zinc-400 uppercase tracking-widest font-black border border-amber-500/20 px-1.5 rounded shrink-0">
-                            keymap sync skipped
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 px-2.5 h-8 bg-green-500/10 border border-green-500/20 rounded-md shrink-0 select-none animate-in fade-in duration-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                          <span className="text-[9px] font-bold text-green-400 uppercase tracking-wider">
-                            layout & keymap synced
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
 
                   <div className="w-px h-4 bg-[var(--border-main)] shrink-0" />
 

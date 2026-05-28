@@ -220,6 +220,12 @@ describe('protocols conversion tests', () => {
   });
 
   describe('ZmkProtocol Lock State Detection', () => {
+    const lockStateResponse = (requestId: number, lockState: number) => {
+      const core = [0x10, lockState];
+      const requestResponse = [0x08, requestId, 0x1a, core.length, ...core];
+      return new Uint8Array([0x0a, requestResponse.length, ...requestResponse]);
+    };
+
     it('should throw an error indicating lock state when metadata meta error is returned', async () => {
       const zmk = new ZmkProtocol();
       const mockTransport: ITransport = {
@@ -241,6 +247,74 @@ describe('protocols conversion tests', () => {
       await expect(async () => {
         await zmk['sendRequest'](new Uint8Array([0x08, 0x01]));
       }).rejects.toThrow('Device is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
+    });
+
+    it('should treat lock state 0 as locked and 1 as unlocked', async () => {
+      const unlocked = new ZmkProtocol();
+      await unlocked.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async () => {},
+        receive: async () => lockStateResponse(1, 1)
+      });
+
+      await expect(unlocked.testReadBinding(0, 0)).resolves.toBe(true);
+
+      const locked = new ZmkProtocol();
+      await locked.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async () => {},
+        receive: async () => lockStateResponse(1, 0)
+      });
+
+      await expect(locked.testReadBinding(0, 0)).rejects.toThrow('ZMK Studio is locked');
+    });
+
+    it('should zig-zag encode behavior IDs when writing a layer binding', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]), // setLayerBinding = OK
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]), // saveChanges ok
+        new Uint8Array([0x0a, 0x12, 0x08, 0x04, 0x2a, 0x0e, 0x0a, 0x0c, 0x0a, 0x0a, 0x08, 0x00, 0x12, 0x00, 0x1a, 0x04, 0x08, 0x06, 0x10, 0x04])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 3, param1: 4, param2: 0 }] }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { kp: 3 };
+
+      await zmk.setKey(0, 0, 0, { action: 'tap', keycode: 'A' });
+
+      const setLayerBindingRequest = sent[1];
+      const bytes = Array.from(setLayerBindingRequest);
+      const bindingStart = bytes.findIndex((byte, index) => (
+        byte === 0x1a &&
+        bytes[index + 1] !== undefined &&
+        bytes[index + 2] === 0x08 &&
+        bytes[index + 3] === 0x06
+      ));
+
+      expect(bindingStart).toBeGreaterThanOrEqual(0);
     });
   });
 });

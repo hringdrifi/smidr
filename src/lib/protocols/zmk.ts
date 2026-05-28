@@ -70,6 +70,13 @@ export function encodeVarint(value: number): number[] {
   return result;
 }
 
+const ZMK_STUDIO_LOCK_STATE_UNLOCKED = 1;
+const ZMK_BLE_WRITE_CHUNK_SIZE = 20;
+
+const isZmkStudioLocked = (lockState: number) => lockState !== ZMK_STUDIO_LOCK_STATE_UNLOCKED;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 /**
  * ZmkSerialTransport handles physical Web Serial communication (CDC ACM) for ZMK Studio.
  */
@@ -82,6 +89,25 @@ export class ZmkSerialTransport implements ITransport {
   private keepReading: boolean = false;
   private readerPromise: Promise<void> | null = null;
   private activeReader: any = null;
+  private disconnectCallback: (() => void) | null = null;
+  private disconnectNotified = false;
+
+  private handleSerialDisconnect = (event: any) => {
+    if (event.target && this.port && event.target !== this.port) return;
+    this.handleUnexpectedDisconnect();
+  };
+
+  private handleUnexpectedDisconnect() {
+    if (this.disconnectNotified) return;
+    this.disconnectNotified = true;
+    this.keepReading = false;
+    this.port = null;
+    this.rxBuffer = [];
+    this.receiveQueue = [];
+    this.pendingResolvers = [];
+    this.isConnected = false;
+    this.disconnectCallback?.();
+  }
 
   async connect(port?: any): Promise<boolean> {
     try {
@@ -100,6 +126,9 @@ export class ZmkSerialTransport implements ITransport {
       this.receiveQueue = [];
       this.pendingResolvers = [];
       this.keepReading = true;
+      this.disconnectNotified = false;
+      (navigator as any).serial?.removeEventListener?.('disconnect', this.handleSerialDisconnect);
+      (navigator as any).serial?.addEventListener?.('disconnect', this.handleSerialDisconnect);
       this.readerPromise = this.startReadLoop();
       console.log('ZMK Serial Transport Connected');
       return true;
@@ -136,6 +165,9 @@ export class ZmkSerialTransport implements ITransport {
         break;
       }
     }
+    if (this.keepReading) {
+      this.handleUnexpectedDisconnect();
+    }
   }
 
   private processAccumulatedFrames() {
@@ -159,6 +191,8 @@ export class ZmkSerialTransport implements ITransport {
 
   async disconnect(): Promise<void> {
     this.keepReading = false;
+    this.disconnectNotified = true;
+    (navigator as any).serial?.removeEventListener?.('disconnect', this.handleSerialDisconnect);
     
     if (this.activeReader) {
       try {
@@ -183,12 +217,19 @@ export class ZmkSerialTransport implements ITransport {
     console.log('ZMK Serial Transport Disconnected');
   }
 
+  onDisconnect(callback: () => void): void {
+    this.disconnectCallback = callback;
+  }
+
   async send(data: Uint8Array): Promise<void> {
     if (!this.port || !this.port.writable) throw new Error('Device not connected');
     const framed = framePayload(data);
     const writer = this.port.writable.getWriter();
-    await writer.write(framed);
-    writer.releaseLock();
+    try {
+      await writer.write(framed);
+    } finally {
+      writer.releaseLock();
+    }
   }
 
   async receive(filter?: (data: Uint8Array) => boolean, timeoutMs?: number): Promise<Uint8Array> {
@@ -238,6 +279,8 @@ export class ZmkBleTransport implements ITransport {
   private rxBuffer: number[] = [];
   private receiveQueue: Uint8Array[] = [];
   private pendingResolvers: { resolve: (data: Uint8Array) => void; filter?: (data: Uint8Array) => boolean }[] = [];
+  private disconnectCallback: (() => void) | null = null;
+  private disconnectNotified = false;
 
   private handleNotification = (event: any) => {
     const value = event.target.value;
@@ -251,6 +294,29 @@ export class ZmkBleTransport implements ITransport {
     // Process accumulated buffer and extract complete frames
     this.processAccumulatedFrames();
   };
+
+  private handleGattDisconnect = () => {
+    this.handleUnexpectedDisconnect();
+  };
+
+  private handleUnexpectedDisconnect() {
+    if (this.disconnectNotified) return;
+    this.disconnectNotified = true;
+    if (this.rxCharacteristic) {
+      this.rxCharacteristic.removeEventListener?.('characteristicvaluechanged', this.handleNotification);
+    }
+    if (this.device) {
+      this.device.removeEventListener?.('gattserverdisconnected', this.handleGattDisconnect);
+    }
+    this.device = null;
+    this.rxCharacteristic = null;
+    this.txCharacteristic = null;
+    this.rxBuffer = [];
+    this.receiveQueue = [];
+    this.pendingResolvers = [];
+    this.isConnected = false;
+    this.disconnectCallback?.();
+  }
 
   private processAccumulatedFrames() {
     while (true) {
@@ -291,8 +357,11 @@ export class ZmkBleTransport implements ITransport {
       // Subscribe to GATT indications/notifications
       await this.rxCharacteristic.startNotifications();
       this.rxCharacteristic.addEventListener('characteristicvaluechanged', this.handleNotification);
+      this.device.removeEventListener?.('gattserverdisconnected', this.handleGattDisconnect);
+      this.device.addEventListener?.('gattserverdisconnected', this.handleGattDisconnect);
       
       this.isConnected = true;
+      this.disconnectNotified = false;
       this.rxBuffer = [];
       this.receiveQueue = [];
       console.log('ZMK WebBLE Transport Connected');
@@ -305,6 +374,7 @@ export class ZmkBleTransport implements ITransport {
   }
 
   async disconnect(): Promise<void> {
+    this.disconnectNotified = true;
     if (this.rxCharacteristic) {
       try {
         this.rxCharacteristic.removeEventListener('characteristicvaluechanged', this.handleNotification);
@@ -314,6 +384,9 @@ export class ZmkBleTransport implements ITransport {
       } catch (e) {
         console.warn('Error stopping BLE notifications:', e);
       }
+    }
+    if (this.device) {
+      this.device.removeEventListener?.('gattserverdisconnected', this.handleGattDisconnect);
     }
     if (this.device && this.device.gatt?.connected) {
       this.device.gatt.disconnect();
@@ -328,10 +401,17 @@ export class ZmkBleTransport implements ITransport {
     console.log('ZMK WebBLE Transport Disconnected');
   }
 
+  onDisconnect(callback: () => void): void {
+    this.disconnectCallback = callback;
+  }
+
   async send(data: Uint8Array): Promise<void> {
     if (!this.txCharacteristic) throw new Error('Device not connected');
     const framed = framePayload(data);
-    await this.txCharacteristic.writeValueWithoutResponse(framed);
+    for (let offset = 0; offset < framed.length; offset += ZMK_BLE_WRITE_CHUNK_SIZE) {
+      const chunk = framed.slice(offset, offset + ZMK_BLE_WRITE_CHUNK_SIZE);
+      await this.txCharacteristic.writeValueWithoutResponse(chunk);
+    }
   }
 
   async receive(filter?: (data: Uint8Array) => boolean, timeoutMs?: number): Promise<Uint8Array> {
@@ -497,6 +577,11 @@ class ProtoEncoder {
     }
   }
 
+  writeSint32(fieldNumber: number, value: number) {
+    this.writeTag(fieldNumber, 0);
+    this.writeVarint((value << 1) ^ (value >> 31));
+  }
+
   writeBytes(fieldNumber: number, value: Uint8Array) {
     this.writeTag(fieldNumber, 2);
     this.writeVarint(value.length);
@@ -541,6 +626,8 @@ interface DecodedBehaviorsResponse {
 interface DecodedKeymapResponse {
   getKeymap?: DecodedKeymap;
   getPhysicalLayouts?: DecodedPhysicalLayouts;
+  setLayerBinding?: number;
+  saveChanges?: { ok?: boolean; err?: number };
 }
 
 interface DecodedKeymap {
@@ -711,19 +798,40 @@ function decodeGetBehaviorDetailsResponse(buffer: Uint8Array): { id: number; dis
   return { id, displayName };
 }
 
+function decodeSaveChangesResponse(buffer: Uint8Array): { ok?: boolean; err?: number } {
+  const decoder = new ProtoDecoder(buffer);
+  let ok: boolean | undefined;
+  let err: number | undefined;
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 0) {
+      ok = !!field.value;
+    } else if (field.fieldNumber === 2 && field.wireType === 0) {
+      err = field.value;
+    }
+  }
+  return { ok, err };
+}
+
 function decodeKeymapResponse(buffer: Uint8Array): DecodedKeymapResponse {
   const decoder = new ProtoDecoder(buffer);
   let getKeymap: DecodedKeymap | undefined;
   let getPhysicalLayouts: DecodedPhysicalLayouts | undefined;
+  let setLayerBinding: number | undefined;
+  let saveChanges: { ok?: boolean; err?: number } | undefined;
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 2) {
       getKeymap = decodeKeymap(field.value);
+    } else if (field.fieldNumber === 2 && field.wireType === 0) {
+      setLayerBinding = field.value;
+    } else if (field.fieldNumber === 4 && field.wireType === 2) {
+      saveChanges = decodeSaveChangesResponse(field.value);
     } else if (field.fieldNumber === 6 && field.wireType === 2) {
       getPhysicalLayouts = decodePhysicalLayouts(field.value);
     }
   }
-  return { getKeymap, getPhysicalLayouts };
+  return { getKeymap, getPhysicalLayouts, setLayerBinding, saveChanges };
 }
 
 function decodePhysicalLayouts(buffer: Uint8Array): DecodedPhysicalLayouts {
@@ -893,7 +1001,7 @@ function encodeSetLayerBindingRequest(
   param2: number
 ): Uint8Array {
   const bindingEncoder = new ProtoEncoder();
-  bindingEncoder.writeUint32(1, behaviorId);
+  bindingEncoder.writeSint32(1, behaviorId);
   bindingEncoder.writeUint32(2, param1);
   bindingEncoder.writeUint32(3, param2);
 
@@ -1022,6 +1130,13 @@ function resolveBehaviorId(behaviorIds: Record<string, number>, shortName: strin
     if (normShort === "lt" && normKey === "layertap") return value;
     if (normShort === "mt" && (normKey === "modtap" || normKey === "holdtap")) return value;
   }
+
+  // Fallback defaults if not found dynamically from device
+  if (normShort === "kp") return 3;
+  if (normShort === "none") return 16;
+  if (normShort === "trans" || normShort === "transparent") return 19;
+  if (normShort === "lt" || normShort === "layertap") return 14;
+  if (normShort === "mt" || normShort === "modtap" || normShort === "holdtap") return 15;
 
   return 0;
 }
@@ -1317,6 +1432,75 @@ export class ZmkProtocol implements IProtocolDriver {
   private behaviorNames: Record<number, string> = {};
   private behaviorIds: Record<string, number> = {};
   private fetchedKeymap: DecodedKeymap | null = null;
+  private requestQueue: Promise<void> = Promise.resolve();
+
+  private uiKeysProvider: (() => any[]) | null = null;
+
+  registerUiKeysProvider(provider: () => any[]) {
+    this.uiKeysProvider = provider;
+  }
+
+  resolveZmkPosition(row: number, col: number): number {
+    let resolvedIndex = -1;
+    let method = '';
+
+    // 1. Try to find the matching key from the active project keys in the store
+    if (this.uiKeysProvider) {
+      try {
+        const uiKeys = this.uiKeysProvider();
+        if (uiKeys && uiKeys.length > 0) {
+          const uiKey = uiKeys.find((k: any) => k.row === row && k.col === col);
+          if (uiKey) {
+            // Find the physical key with the closest coordinates (x, y)
+            let closestIndex = -1;
+            let minDistance = Infinity;
+            
+            for (let i = 0; i < this.physicalKeys.length; i++) {
+              const pk = this.physicalKeys[i];
+              const dx = pk.x - uiKey.x;
+              const dy = pk.y - uiKey.y;
+              const dist = dx * dx + dy * dy;
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestIndex = i;
+              }
+            }
+            
+            if (closestIndex !== -1 && minDistance < 1.0) { // Keep safety threshold of 1.0 unit (key width)
+              resolvedIndex = closestIndex;
+              method = `UI Coordinate Match (distance: ${Math.sqrt(minDistance).toFixed(3)})`;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[ZMK Position Resolve] Error during coordinate matching:', err);
+      }
+    }
+
+    // 2. Fallback to physicalPositions mapping (works when no project is loaded)
+    if (resolvedIndex === -1) {
+      const pos = this.physicalPositions.find(p => p.row === row && p.col === col);
+      if (pos) {
+        resolvedIndex = pos.index;
+        method = 'physicalPositions array fallback';
+      }
+    }
+
+    // 3. Ultimate fallback: default to 0
+    if (resolvedIndex === -1) {
+      resolvedIndex = 0;
+      method = 'Default ultimate fallback (0)';
+    }
+
+    // Spec Verification Logging for Row0 Col0
+    if (row === 0 && col === 0) {
+      console.log(`[ZMK Verify Specification] Row0 Col0 ZMK Position ID: ${resolvedIndex} (resolved via ${method})`);
+    } else {
+      console.log(`[ZMK Position Resolve] R${row}C${col} mapped to ZMK Position ID: ${resolvedIndex} (resolved via ${method})`);
+    }
+
+    return resolvedIndex;
+  }
 
   constructor() {}
 
@@ -1331,11 +1515,43 @@ export class ZmkProtocol implements IProtocolDriver {
   public physicalLayoutsAvailable: boolean = false;
   public keymapAvailable: boolean = false;
 
+  resetRuntimeState() {
+    this.currentRequestId = 1;
+    this.behaviorNames = {};
+    this.behaviorIds = {};
+    this.fetchedKeymap = null;
+    this.keyboardName = 'ZMK Keyboard';
+    this.layerCount = 3;
+    this.selectedLayoutName = 'Default Layout';
+    this.physicalPositions = [];
+    this.physicalKeys = [];
+    this.isLayoutAvailable = false;
+    this.keyboardInfoAvailable = false;
+    this.behaviorsAvailable = false;
+    this.physicalLayoutsAvailable = false;
+    this.keymapAvailable = false;
+  }
+
   private getNextRequestId(): number {
     return this.currentRequestId++;
   }
 
   private async sendRequest(requestNameOrData: string | Uint8Array, maybeData?: Uint8Array, timeoutMs?: number): Promise<Uint8Array> {
+    const previousRequest = this.requestQueue;
+    let releaseRequest!: () => void;
+    this.requestQueue = new Promise(resolve => {
+      releaseRequest = resolve;
+    });
+
+    await previousRequest;
+    try {
+      return await this.sendRequestUnlocked(requestNameOrData, maybeData, timeoutMs);
+    } finally {
+      releaseRequest();
+    }
+  }
+
+  private async sendRequestUnlocked(requestNameOrData: string | Uint8Array, maybeData?: Uint8Array, timeoutMs?: number): Promise<Uint8Array> {
     const hex = (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
 
     let requestName = 'UnknownRequest';
@@ -1426,7 +1642,6 @@ export class ZmkProtocol implements IProtocolDriver {
 
   async fetchMetadata(): Promise<boolean> {
     const hex = (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     if (!this.transport) {
       console.warn('[ZmkProtocol] Cannot fetch metadata: Transport is not connected.');
@@ -1434,16 +1649,7 @@ export class ZmkProtocol implements IProtocolDriver {
     }
 
     console.log('[ZmkProtocol] Querying device metadata...');
-    this.behaviorNames = {};
-    this.behaviorIds = {};
-    this.fetchedKeymap = null;
-    
-    // Reset flags
-    this.keyboardInfoAvailable = false;
-    this.behaviorsAvailable = false;
-    this.physicalLayoutsAvailable = false;
-    this.keymapAvailable = false;
-    this.isLayoutAvailable = false;
+    this.resetRuntimeState();
 
     const isLockError = (err: any) => err && err.message && (err.message.includes('locked') || err.message.includes('Unlock'));
 
@@ -1487,15 +1693,6 @@ export class ZmkProtocol implements IProtocolDriver {
       }
     }
 
-    if (!layoutSuccess) {
-      // Fallback: reuse cached layout information if available
-      if (this.physicalPositions && this.physicalPositions.length > 0) {
-        console.log('[ZmkProtocol] Using cached physical positions & layout parameters.');
-        this.physicalLayoutsAvailable = true;
-        this.isLayoutAvailable = true;
-        layoutSuccess = true;
-      }
-    }
     // 4. Discover Behaviors dynamically (POSTPONED!)
     await sleep(30);
     try {
@@ -1517,6 +1714,7 @@ export class ZmkProtocol implements IProtocolDriver {
         }
       }
       this.behaviorsAvailable = true;
+      console.log('[ZmkProtocol] Discovered behaviors dynamically:', JSON.stringify(this.behaviorIds));
     } catch (err: any) {
       if (isLockError(err)) throw err;
       console.warn('[ZmkProtocol] Discovering behaviors failed dynamically:', err);
@@ -1538,24 +1736,10 @@ export class ZmkProtocol implements IProtocolDriver {
 
     // 6. Fetch Keymap dynamically via GetKeymapRequest
     try {
-      console.log('[ZmkProtocol] Fetching full keymap via GetKeymapRequest...');
-      const getKeymapMsg = encodeGetKeymapRequest(1);
-      const keymapResponse = await this.sendRequest('GetKeymap', getKeymapMsg, 10000);
-      const decodedKeymapRes = decodeResponse(keymapResponse);
-      const keymapMsg = decodedKeymapRes.requestResponse?.keymap?.getKeymap;
-      if (keymapMsg && keymapMsg.layers && keymapMsg.layers.length > 0) {
-        this.fetchedKeymap = keymapMsg;
-        this.layerCount = keymapMsg.layers.length;
-        this.keymapAvailable = true;
-        console.log(`[ZmkProtocol] Successfully fetched keymap with ${this.layerCount} layers.`);
-      } else {
-        console.warn('[ZmkProtocol] Keymap response was empty or invalid.');
-        this.keymapAvailable = false;
-      }
+      await this.fetchKeymap();
     } catch (err: any) {
       if (isLockError(err)) throw err;
       console.warn('[ZmkProtocol] Failed to retrieve keymap from physical device (device may be locked or unsupported):', err.message || err);
-      this.keymapAvailable = false;
     }
 
     return true;
@@ -1617,10 +1801,10 @@ export class ZmkProtocol implements IProtocolDriver {
       const lockState = decoded.requestResponse?.core?.getLockState;
       
       if (lockState !== undefined) {
-        const isLocked = lockState === 0;
+        const isLocked = isZmkStudioLocked(lockState);
         console.log(`[ZMK Test Probe RX]: Lock State is ${isLocked ? 'LOCKED' : 'UNLOCKED'} (${lockState})`);
         if (isLocked) {
-          throw new Error('Device is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
+          throw new Error('ZMK Studio is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
         }
         return true;
       }
@@ -1652,12 +1836,7 @@ export class ZmkProtocol implements IProtocolDriver {
       throw new Error('Device keymap not fetched or cache empty');
     }
 
-    const pos = this.physicalPositions.find(p => p.row === row && p.col === col);
-    if (!pos) {
-      return { action: 'none' };
-    }
-
-    const keyIndex = pos.index;
+    const keyIndex = this.resolveZmkPosition(row, col);
     const lyr = this.fetchedKeymap.layers[layer];
     if (!lyr) {
       throw new Error(`Layer ${layer} not found in fetched keymap`);
@@ -1671,7 +1850,7 @@ export class ZmkProtocol implements IProtocolDriver {
     const hex = (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
     
     const bindingEncoder = new ProtoEncoder();
-    bindingEncoder.writeUint32(1, binding.behaviorId);
+    bindingEncoder.writeSint32(1, binding.behaviorId);
     bindingEncoder.writeUint32(2, binding.param1);
     bindingEncoder.writeUint32(3, binding.param2);
     const bindingBytes = bindingEncoder.getUint8Array();
@@ -1709,6 +1888,34 @@ export class ZmkProtocol implements IProtocolDriver {
     return action;
   }
 
+  async fetchKeymap(): Promise<boolean> {
+    if (!this.transport) {
+      throw new Error('Transport not connected');
+    }
+    try {
+      console.log('[ZmkProtocol] Fetching full keymap via GetKeymapRequest...');
+      const getKeymapMsg = encodeGetKeymapRequest(1);
+      const keymapResponse = await this.sendRequest('GetKeymap', getKeymapMsg, 10000);
+      const decodedKeymapRes = decodeResponse(keymapResponse);
+      const keymapMsg = decodedKeymapRes.requestResponse?.keymap?.getKeymap;
+      if (keymapMsg && keymapMsg.layers && keymapMsg.layers.length > 0) {
+        this.fetchedKeymap = keymapMsg;
+        this.layerCount = keymapMsg.layers.length;
+        this.keymapAvailable = true;
+        console.log(`[ZmkProtocol] Successfully fetched keymap with ${this.layerCount} layers.`);
+        return true;
+      } else {
+        console.warn('[ZmkProtocol] Keymap response was empty or invalid.');
+        this.keymapAvailable = false;
+        return false;
+      }
+    } catch (err: any) {
+      console.warn('[ZmkProtocol] Failed to retrieve keymap from physical device:', err.message || err);
+      this.keymapAvailable = false;
+      throw err;
+    }
+  }
+
   async setKey(layer: number, row: number, col: number, action: UniversalAction): Promise<void> {
     if (!this.keymapAvailable) {
       throw new Error('Operation not supported: Device keymap is not available.');
@@ -1720,15 +1927,56 @@ export class ZmkProtocol implements IProtocolDriver {
       throw new Error('Device keymap not cached');
     }
 
-    const pos = this.physicalPositions.find(p => p.row === row && p.col === col);
-    if (!pos) {
-      throw new Error(`Logical position R${row}C${col} not found in physical layout`);
-    }
-    const keyIndex = pos.index;
+    const keyIndex = this.resolveZmkPosition(row, col);
 
     const zmkDtsStr = actionToZmkString(action);
+    console.log(`[ZMK setKey] Mapping action "${zmkDtsStr}" using behaviorIds:`, JSON.stringify(this.behaviorIds));
     const binding = zmkStringToBinding(zmkDtsStr, this.behaviorIds);
+    console.log(`[ZMK setKey] Resolved binding: behaviorId=${binding.behaviorId}, param1=${binding.param1}, param2=${binding.param2}`);
 
+    const getSetLayerBindingResponseEnumName = (s: number): string => {
+      switch (s) {
+        case 0: return 'SET_LAYER_BINDING_RESP_OK';
+        case 1: return 'SET_LAYER_BINDING_RESP_INVALID_LOCATION';
+        case 2: return 'SET_LAYER_BINDING_RESP_INVALID_BEHAVIOR';
+        case 3: return 'SET_LAYER_BINDING_RESP_INVALID_PARAMETERS';
+        default: return `UNKNOWN_STATUS_CODE_${s}`;
+      }
+    };
+
+    const getSaveChangesErrorCodeName = (err: number): string => {
+      switch (err) {
+        case 0: return 'SAVE_CHANGES_ERR_OK';
+        case 1: return 'SAVE_CHANGES_ERR_GENERIC';
+        case 2: return 'SAVE_CHANGES_ERR_NOT_SUPPORTED';
+        case 3: return 'SAVE_CHANGES_ERR_NO_SPACE';
+        default: return `UNKNOWN_SAVE_ERR_${err}`;
+      }
+    };
+
+    // 1. Query lock state before writing
+    console.log('[ZMK Write Pre-check] Querying Lock State from device...');
+    try {
+      const lockRequestMsg = encodeGetLockStateRequest(1);
+      const lockResponse = await this.sendRequest('GetLockState', lockRequestMsg);
+      const decodedLock = decodeResponse(lockResponse);
+      const lockState = decodedLock.requestResponse?.core?.getLockState;
+      if (lockState !== undefined) {
+        const isLocked = isZmkStudioLocked(lockState);
+        console.log(`[ZMK Write Pre-check] Lock State: ${isLocked ? 'LOCKED' : 'UNLOCKED'} (value: ${lockState})`);
+        if (isLocked) {
+          throw new Error('ZMK Studio is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
+        }
+      }
+    } catch (err: any) {
+      if (err?.message && (err.message.includes('locked') || err.message.includes('Unlock'))) {
+        console.warn('[ZMK Write Pre-check] Device is locked:', err);
+        throw err;
+      }
+      console.warn('[ZMK Write Pre-check] Failed to query lock state:', err);
+    }
+
+    // 2. Send SetLayerBinding
     const setMsg = encodeSetLayerBindingRequest(
       1,
       layer,
@@ -1738,21 +1986,64 @@ export class ZmkProtocol implements IProtocolDriver {
       binding.param2
     );
 
-    console.log(`[ZMK Protobuf RPC Write] Layer:${layer} Row:${row} Col:${col} -> DTS:"${zmkDtsStr}"`);
-    const hex = (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
-
-    const setResponse = await this.sendRequest('SetLayerBinding', setMsg);
+    console.log(`[ZMK Protobuf RPC Write] Sending SetLayerBinding: Layer:${layer} Position:${keyIndex} behaviorId:${binding.behaviorId} param1:${binding.param1} param2:${binding.param2}`);
     
-    const saveMsg = encodeSaveChangesRequest(1);
-    await this.sendRequest('SaveChanges', saveMsg);
-
-    const lyr = this.fetchedKeymap.layers[layer];
-    if (lyr) {
-      lyr.bindings[keyIndex] = binding;
+    const setResponse = await this.sendRequest('SetLayerBinding', setMsg);
+    const decoded = decodeResponse(setResponse);
+    const status = decoded.requestResponse?.keymap?.setLayerBinding;
+    if (status !== undefined) {
+      const enumName = getSetLayerBindingResponseEnumName(status);
+      console.log(`[ZMK SetLayerBinding RX] Response Status: ${enumName} (${status})`);
+      if (status !== 0) { // 0: SET_LAYER_BINDING_RESP_OK
+        throw new Error(`SetLayerBinding failed: ${enumName} (status ${status})`);
+      }
+    } else {
+      throw new Error('SetLayerBinding response did not contain status field');
     }
 
-    console.log('[ZMK write] raw:', hex(setMsg));
-    console.log('[ZMK write] decoded:', action);
+    // 3. Send SaveChanges
+    console.log('[ZMK SaveChanges TX] Requesting SaveChanges...');
+    try {
+      const saveMsg = encodeSaveChangesRequest(1);
+      const saveResponse = await this.sendRequest('SaveChanges', saveMsg);
+      const decodedSave = decodeResponse(saveResponse);
+      const saveChangesResult = decodedSave.requestResponse?.keymap?.saveChanges;
+      if (saveChangesResult) {
+        if (saveChangesResult.ok) {
+          console.log('[ZMK SaveChanges RX] Status: SAVE_CHANGES_ERR_OK (ok=true)');
+        } else if (saveChangesResult.err !== undefined) {
+          const errName = getSaveChangesErrorCodeName(saveChangesResult.err);
+          console.log(`[ZMK SaveChanges RX] Status: ${errName} (err=${saveChangesResult.err})`);
+        }
+      }
+    } catch (err) {
+      console.warn('[ZMK SaveChanges ERROR] Request failed:', err);
+    }
+
+    // 4. Re-fetch full keymap and verify state
+    console.log('[ZMK Sync & Verify] Re-fetching keymap to verify change...');
+    await sleep(200);
+    await this.fetchKeymap();
+
+    const updatedLyr = this.fetchedKeymap?.layers[layer];
+    const updatedBinding = updatedLyr?.bindings[keyIndex];
+    if (updatedBinding) {
+      const match = updatedBinding.behaviorId === binding.behaviorId &&
+                    updatedBinding.param1 === binding.param1 &&
+                    updatedBinding.param2 === binding.param2;
+
+      if (match) {
+        console.log(`[ZMK Verification SUCCESS] Expected behaviorId:${binding.behaviorId}/param1:${binding.param1}/param2:${binding.param2} matches physical device keymap at index ${keyIndex}!`);
+      } else {
+        console.warn(
+          `[ZMK Verification FAILURE] Keymap mismatch at position ${keyIndex}:\n` +
+          `  Expected: behaviorId=${binding.behaviorId}, param1=${binding.param1}, param2=${binding.param2}\n` +
+          `  Actual on Device: behaviorId=${updatedBinding.behaviorId}, param1=${updatedBinding.param1}, param2=${updatedBinding.param2}`
+        );
+      }
+    } else {
+      console.warn(`[ZMK Verify WARNING] Could not verify the new binding on physical device.`);
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -1760,6 +2051,7 @@ export class ZmkProtocol implements IProtocolDriver {
       await this.transport.disconnect();
       this.transport = null;
     }
+    this.resetRuntimeState();
     console.log('ZMK Protocol Driver Disconnected');
   }
 }

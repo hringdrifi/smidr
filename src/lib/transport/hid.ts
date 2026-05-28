@@ -12,6 +12,20 @@ const HID_TIMEOUT_MS = 2000;
 
 export class HidTransport implements ITransport {
   private device: any = null;
+  private disconnectCallback: (() => void) | null = null;
+  private disconnectNotified = false;
+
+  private handleDeviceDisconnect = (event: any) => {
+    if (event.device && this.device && event.device !== this.device) return;
+    this.handleUnexpectedDisconnect();
+  };
+
+  private handleUnexpectedDisconnect() {
+    if (this.disconnectNotified) return;
+    this.disconnectNotified = true;
+    this.device = null;
+    this.disconnectCallback?.();
+  }
 
   async requestDevice(filters: any[]): Promise<any> {
     try {
@@ -38,6 +52,9 @@ export class HidTransport implements ITransport {
         await targetDevice.open();
       }
       this.device = targetDevice;
+      this.disconnectNotified = false;
+      (navigator as any).hid?.removeEventListener?.('disconnect', this.handleDeviceDisconnect);
+      (navigator as any).hid?.addEventListener?.('disconnect', this.handleDeviceDisconnect);
       return true;
     } catch (err) {
       console.error('HID Connect Error:', err);
@@ -46,10 +63,12 @@ export class HidTransport implements ITransport {
   }
 
   async disconnect(): Promise<void> {
+    (navigator as any).hid?.removeEventListener?.('disconnect', this.handleDeviceDisconnect);
     if (this.device) {
       await this.device.close();
       this.device = null;
     }
+    this.disconnectNotified = true;
   }
 
   // Agnostic send method supporting general raw arrays
@@ -100,6 +119,10 @@ export class HidTransport implements ITransport {
 
   get isConnected(): boolean {
     return !!this.device && this.device.opened;
+  }
+
+  onDisconnect(callback: () => void): void {
+    this.disconnectCallback = callback;
   }
 }
 

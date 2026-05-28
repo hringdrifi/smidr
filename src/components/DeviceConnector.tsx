@@ -2,7 +2,7 @@ import React from 'react';
 import { Power, Usb, Bluetooth, Loader2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { hidTransport } from '@/lib/transport/hid';
-import { ZmkSerialTransport, ZmkBleTransport, ZmkProtocol } from '@/lib/protocols/zmk';
+import { ZmkSerialTransport, zmkProtocol } from '@/lib/protocols/zmk';
 import { ViaProtocol } from '@/lib/protocols/via';
 import { VialProtocol } from '@/lib/protocols/vial';
 import { convertVialToSmidr } from '@/lib/protocols/vial-converter';
@@ -14,10 +14,43 @@ export const DeviceConnector: React.FC = () => {
   const { t } = useTranslation();
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
+  const [connectionError, setConnectionError] = React.useState<string | null>(null);
+
+  const clearDeviceLayoutState = React.useCallback(() => {
+    zmkProtocol.resetRuntimeState();
+    useKeyboardStore.setState({
+      keys: [],
+      baseKeys: [],
+      selectedKeyIds: [],
+      focusedKeyId: null,
+      selectionAnchorId: null,
+      currentLayer: 0,
+      currentProjectId: null,
+      isProjectOpen: false,
+      remoteKeymap: {},
+      remoteMacros: Array(16).fill(null).map(() => []),
+      remoteCombos: [],
+      zmkLocked: false,
+    });
+  }, []);
+
+  const clearConnectedDevice = React.useCallback(() => {
+    const { setActiveTransport } = useKeyboardStore.getState();
+    console.warn('Keyboard disconnected.');
+    clearDeviceLayoutState();
+    setConnectedDevice(null);
+    useKeyboardStore.getState().setDeviceCapabilities(null);
+    setActiveTransport(null);
+  }, [clearDeviceLayoutState, setConnectedDevice]);
+
+  const registerDisconnectHandler = React.useCallback((transport: { onDisconnect?: (callback: () => void) => void }) => {
+    transport.onDisconnect?.(clearConnectedDevice);
+  }, [clearConnectedDevice]);
 
   const connectHid = async () => {
     setIsConnecting(true);
     setShowMenu(false);
+    setConnectionError(null);
     try {
       const filters = [{ usagePage: 0xFF60, usage: 0x61 }];
       const device = await hidTransport.requestDevice(filters);
@@ -27,6 +60,8 @@ export const DeviceConnector: React.FC = () => {
         if (success) {
           // Store active transport
           useKeyboardStore.getState().setActiveTransport(hidTransport);
+          registerDisconnectHandler(hidTransport);
+          clearDeviceLayoutState();
 
           // Initialize connected device in store
           setConnectedDevice({
@@ -146,12 +181,15 @@ export const DeviceConnector: React.FC = () => {
 
   const connectZmkSerial = async () => {
     setIsConnecting(true);
-    setShowMenu(false);
+    setConnectionError(null);
     try {
       const transport = new ZmkSerialTransport();
       const success = await transport.connect();
       if (success) {
+        setShowMenu(false);
         useKeyboardStore.getState().setActiveTransport(transport);
+        registerDisconnectHandler(transport);
+        clearDeviceLayoutState();
 
         // Store ZMK connected device details
         setConnectedDevice({
@@ -186,37 +224,12 @@ export const DeviceConnector: React.FC = () => {
 
         console.log('Fetching initial keymap...');
         await useKeyboardStore.getState().syncKeymap();
+      } else {
+        setConnectionError('Could not open the serial port. Check that the keyboard is not already open in another app, then try again.');
       }
     } catch (err) {
       console.error('ZMK Serial Connection failed:', err);
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const connectZmkBle = async () => {
-    setIsConnecting(true);
-    setShowMenu(false);
-    try {
-      const transport = new ZmkBleTransport();
-      const success = await transport.connect();
-      if (success) {
-        useKeyboardStore.getState().setActiveTransport(transport);
-
-        // Store ZMK connected device details
-        setConnectedDevice({
-          vid: 0,
-          pid: 0,
-          productName: 'ZMK Studio (BLE)',
-          manufacturerName: 'ZMK',
-          protocolType: 'zmk'
-        });
-
-        console.log('Fetching initial keymap...');
-        await useKeyboardStore.getState().syncKeymap();
-      }
-    } catch (err) {
-      console.error('ZMK BLE Connection failed:', err);
+      setConnectionError(err instanceof Error ? err.message : 'Could not open the serial port.');
     } finally {
       setIsConnecting(false);
     }
@@ -226,6 +239,7 @@ export const DeviceConnector: React.FC = () => {
     const { activeTransport, setActiveTransport } = useKeyboardStore.getState();
     const transport = activeTransport || hidTransport;
     await transport.disconnect();
+    clearDeviceLayoutState();
     setConnectedDevice(null);
     useKeyboardStore.getState().setDeviceCapabilities(null);
     setActiveTransport(null);
@@ -246,7 +260,10 @@ export const DeviceConnector: React.FC = () => {
   return (
     <div className="relative">
       <button 
-        onClick={() => setShowMenu(!showMenu)}
+        onClick={() => {
+          setConnectionError(null);
+          setShowMenu(!showMenu);
+        }}
         disabled={isConnecting}
         className="flex items-center gap-2 px-3 h-8 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
       >
@@ -266,6 +283,12 @@ export const DeviceConnector: React.FC = () => {
               <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">Connection Mode</span>
             </div>
             <div className="p-1 flex flex-col gap-0.5">
+              {connectionError && (
+                <div className="mx-1 mb-1 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-semibold leading-snug text-red-300">
+                  {connectionError}
+                </div>
+              )}
+
               <button 
                 onClick={connectHid}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all text-left cursor-pointer"
@@ -289,13 +312,14 @@ export const DeviceConnector: React.FC = () => {
               </button>
 
               <button 
-                onClick={connectZmkBle}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all text-left cursor-pointer"
+                disabled
+                title="ZMK Studio BLE editing is not supported in Chrome on Windows. Use USB or the native ZMK Studio app."
+                className="w-full flex items-center gap-3 px-3 py-2 rounded text-[var(--text-muted)] opacity-45 text-left cursor-not-allowed"
               >
-                <Bluetooth size={14} className="text-amber-500 shrink-0" />
+                <Bluetooth size={14} className="text-[var(--text-muted)] shrink-0" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase tracking-wider">ZMK Studio (BLE)</span>
-                  <span className="text-[9px] text-[var(--text-muted)]">Connect via WebBLE / Bluetooth</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">Use USB or native app</span>
                 </div>
               </button>
             </div>

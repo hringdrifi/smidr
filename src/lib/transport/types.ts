@@ -17,6 +17,7 @@ export interface ITransport {
   disconnect(): Promise<void>;
   send(data: Uint8Array): Promise<void>;
   receive(filter?: (data: Uint8Array) => boolean, timeoutMs?: number): Promise<Uint8Array>;
+  onDisconnect?(callback: () => void): void;
 }
 
 // 通信プロトコル（VIA, Vial, ZMK RPC）を統一するインターフェース
