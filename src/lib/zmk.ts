@@ -3,6 +3,22 @@ import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { actionToZmkString } from './protocols/zmk-action-converter';
 import { sortKeys } from './sorting';
 
+const sanitizeIdentifier = (value: string, fallback: string) => {
+  const cleaned = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!cleaned) return fallback;
+  return /^[a-z]/.test(cleaned) ? cleaned : `${fallback}_${cleaned}`;
+};
+
+const parseGpioNumber = (pin: string, fallback: number): number => {
+  const match = pin.trim().match(/(?:GP|GPIO|P)?\s*(\d+)/i);
+  return match ? Number(match[1]) : fallback;
+};
+
 /**
  * Generates a full standard ZMK config source code ZIP as a custom Board definition (architecture-based).
  */
@@ -20,8 +36,8 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const sortedKeys = sortKeys(validKeys, 0.25);
 
   const zip = new JSZip();
-  const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
-  const vendorName = settings.manufacturer.replace(/\s+/g, '_').toLowerCase() || 'custom_vendor';
+  const kbName = sanitizeIdentifier(settings.name, 'smidr_keyboard');
+  const vendorName = sanitizeIdentifier(settings.manufacturer, 'custom_vendor');
   
   // Determine target architecture and SoC name based on selected MCU
   const mcu = settings.hardware.mcu || 'rp2040';
@@ -60,6 +76,10 @@ config BOARD
 config ZMK_KEYBOARD_NAME
     default "${settings.name}"
 
+${isAtmega ? '' : `config RP2_FLASH_W25Q080
+    default y
+`}
+
 endif
 `;
   boardFolder.file('Kconfig.defconfig', kconfigDefconfig);
@@ -69,7 +89,9 @@ endif
 CONFIG_ZMK=y
 CONFIG_USB=y
 CONFIG_FLASH=y
-${isAtmega ? 'CONFIG_BUILD_OUTPUT_HEX=y' : 'CONFIG_BUILD_OUTPUT_UF2=y\nCONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y'}
+CONFIG_SETTINGS=y
+CONFIG_SETTINGS_NVS=y
+${isAtmega ? 'CONFIG_BUILD_OUTPUT_HEX=y' : 'CONFIG_BUILD_OUTPUT_UF2=y\nCONFIG_PINCTRL=y\nCONFIG_CLOCK_CONTROL=y\nCONFIG_FLASH_PAGE_LAYOUT=y\nCONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y'}
 `;
   boardFolder.file(`${kbName}_defconfig`, boardDefconfig);
 
@@ -93,27 +115,62 @@ ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` 
   }
 
   const rowPins = settings.pins.rows || [];
-  const rowGpiosStr = rowPins.length > 0 
-    ? rowPins.map((pin, i) => `${isAtmega ? '&gpioa' : '&pro_micro'} ${i} (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN) /* Row ${i}: ${pin} */`).join('\n            , ')
-    : `${isAtmega ? '&gpioa' : '&pro_micro'} 0 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN) /* Please configure pins */`;
+  const gpioController = isAtmega ? '&gpioa' : '&gpio0';
+  const rowGpiosStr = rowPins.length > 0
+    ? rowPins.map((pin, i) => `${gpioController} ${parseGpioNumber(pin, i)} (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN) /* Row ${i}: ${pin} */`).join('\n            , ')
+    : `${gpioController} 0 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN) /* Please configure pins */`;
 
   const colPins = settings.pins.cols || [];
-  const colGpiosStr = colPins.length > 0 
-    ? colPins.map((pin, i) => `${isAtmega ? '&gpioa' : '&pro_micro'} ${i} GPIO_ACTIVE_HIGH /* Col ${i}: ${pin} */`).join('\n            , ')
-    : `${isAtmega ? '&gpioa' : '&pro_micro'} 0 GPIO_ACTIVE_HIGH /* Please configure pins */`;
+  const colGpiosStr = colPins.length > 0
+    ? colPins.map((pin, i) => `${gpioController} ${parseGpioNumber(pin, i)} GPIO_ACTIVE_HIGH /* Col ${i}: ${pin} */`).join('\n            , ')
+    : `${gpioController} 0 GPIO_ACTIVE_HIGH /* Please configure pins */`;
 
   const dtsInclude = isAtmega 
     ? '#include <atmel/atmega32u4.dtsi>'
-    : `#include <raspberrypi/rpi_pico/rp2040.dtsi>
-#include <arm/raspberrypi/rp2040-boot-mode-retention.dtsi>`;
+    : `#include <arm/rpi_pico/rp2040.dtsi>
+#include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>`;
 
   const dtsChosen = isAtmega
     ? `        zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;`
     : `        zephyr,sram = &sram0;
         zephyr,flash = &flash0;
+        zephyr,flash-controller = &ssi;
+        zephyr,code-partition = &code_partition;
         zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;`;
+
+  const rp2040Peripherals = isAtmega ? '' : `
+&gpio0 {
+    status = "okay";
+};
+
+&ssi {
+    status = "okay";
+};
+
+&flash0 {
+    status = "okay";
+    reg = <0x10000000 0x1000000>;
+
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        code_partition: partition@100 {
+            label = "code_partition";
+            reg = <0x100 0xf7f000>;
+            read-only;
+        };
+
+        storage_partition: partition@f80000 {
+            label = "storage";
+            reg = <0xf80000 0x80000>;
+        };
+    };
+};
+`;
 
   const keyboardDts = `/dts-v1/;
 ${dtsInclude}
@@ -149,13 +206,15 @@ ${dtsChosen}
             ;
     };
 };
+
+${rp2040Peripherals}
 `;
   boardFolder.file(`${kbName}.dts`, keyboardDts);
 
   // 6. [kbName].zmk.yml (Metadata for ZMK CLI / ZMK Studio)
   const zmkYml = `file_format: "1"
 id: ${kbName}
-name: ${settings.name}
+name: "${settings.name}"
 type: board
 features:
   - keys
@@ -209,10 +268,10 @@ features:
   // 8. README.md
   const readmeContent = `# ZMK Config for ${settings.name}
 
-This directory structure has been automatically generated by **Smiðr** to compile ZMK firmware for your custom keyboard.
+This directory structure has been automatically generated by **Smidr** to compile ZMK firmware for your custom keyboard.
 
 ## Directory Structure
-- \`config/${kbName}.keymap\`: Contains all keymap layers defined in Smiðr.
+- \`config/${kbName}.keymap\`: Contains all keymap layers defined in Smidr.
 - \`boards/${arch}/${kbName}/\`: Contains custom architecture-based board definition files (\`.dts\`, \`Kconfig\`, and \`_defconfig\`).
 
 ## Setup and Compilation
@@ -227,8 +286,9 @@ To build ZMK firmware using this configuration:
 4. Push the changes to GitHub and download the compiled firmware binary from the GitHub Actions tab!
 
 ## GPIO Matrix Pin Configuration
-The \`${kbName}.dts\` file has been populated with a standard \`gpio-matrix\` configuration. 
-Please verify the comments indicating which physical Smiðr pin corresponds to each entry and map them to your onboard MCU's actual GPIO pins as necessary.
+The \`${kbName}.dts\` file has been populated with a standard \`gpio-matrix\` configuration.
+For RP2040 boards, Smidr converts pin names like \`GP2\` or \`GPIO2\` to \`&gpio0 2\`.
+Please verify the generated GPIO numbers before flashing.
 `;
   zip.file('README.md', readmeContent);
 

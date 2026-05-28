@@ -9,9 +9,6 @@ import { KeycodePanel } from './KeycodePanel';
 import { LayoutOptionsPanel } from './LayoutOptionsPanel';
 import { KeycodeConfigPanel } from './KeycodeConfigPanel';
 import { MacrosCombosPanel } from './MacrosCombosPanel';
-
-import { hidTransport } from '@/lib/transport/hid';
-
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
   const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities } = useKeyboardStore();
