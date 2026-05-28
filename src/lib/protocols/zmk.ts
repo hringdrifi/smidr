@@ -79,6 +79,23 @@ export class ZmkBleTransport implements ITransport {
   private device: any = null;
   private rxCharacteristic: any = null;
   private txCharacteristic: any = null;
+  private receiveQueue: Uint8Array[] = [];
+  private pendingResolvers: { resolve: (data: Uint8Array) => void; filter?: (data: Uint8Array) => boolean }[] = [];
+
+  private handleNotification = (event: any) => {
+    const value = event.target.value;
+    const data = new Uint8Array(value.buffer);
+    
+    // Check if there is a pending resolver that matches the filter (if any)
+    const resolverIndex = this.pendingResolvers.findIndex(r => !r.filter || r.filter(data));
+    if (resolverIndex !== -1) {
+      const { resolve } = this.pendingResolvers[resolverIndex];
+      this.pendingResolvers.splice(resolverIndex, 1);
+      resolve(data);
+    } else {
+      this.receiveQueue.push(data);
+    }
+  };
 
   async connect(device?: any): Promise<boolean> {
     try {
@@ -86,8 +103,7 @@ export class ZmkBleTransport implements ITransport {
         this.device = device;
       } else {
         this.device = await (navigator as any).bluetooth.requestDevice({
-          filters: [{ namePrefix: 'ZMK Studio' }],
-          optionalServices: ['00000000-0196-6107-c967-c5cfb1c2482a'] // ZMK Studio GATT Service UUID
+          filters: [{ services: ['00000000-0196-6107-c967-c5cfb1c2482a'] }]
         });
       }
       if (!this.device || !this.device.gatt) return false;
@@ -97,6 +113,10 @@ export class ZmkBleTransport implements ITransport {
       const characteristic = await service.getCharacteristic('00000001-0196-6107-c967-c5cfb1c2482a');
       this.txCharacteristic = characteristic;
       this.rxCharacteristic = characteristic;
+
+      // Subscribe to GATT indications/notifications
+      await this.rxCharacteristic.startNotifications();
+      this.rxCharacteristic.addEventListener('characteristicvaluechanged', this.handleNotification);
       
       this.isConnected = true;
       console.log('ZMK WebBLE Transport Connected');
@@ -110,12 +130,24 @@ export class ZmkBleTransport implements ITransport {
   }
 
   async disconnect(): Promise<void> {
+    if (this.rxCharacteristic) {
+      try {
+        this.rxCharacteristic.removeEventListener('characteristicvaluechanged', this.handleNotification);
+        if (this.device && this.device.gatt?.connected) {
+          await this.rxCharacteristic.stopNotifications();
+        }
+      } catch (e) {
+        console.warn('Error stopping BLE notifications:', e);
+      }
+    }
     if (this.device && this.device.gatt?.connected) {
       this.device.gatt.disconnect();
     }
     this.device = null;
     this.rxCharacteristic = null;
     this.txCharacteristic = null;
+    this.receiveQueue = [];
+    this.pendingResolvers = [];
     this.isConnected = false;
     console.log('ZMK WebBLE Transport Disconnected');
   }
@@ -130,8 +162,22 @@ export class ZmkBleTransport implements ITransport {
 
   async receive(filter?: (data: Uint8Array) => boolean): Promise<Uint8Array> {
     if (this.rxCharacteristic) {
-      const val = await this.rxCharacteristic.readValue();
-      return new Uint8Array(val.buffer);
+      // First, check the queue for any matching message
+      if (filter) {
+        const index = this.receiveQueue.findIndex(filter);
+        if (index !== -1) {
+          const data = this.receiveQueue[index];
+          this.receiveQueue.splice(index, 1);
+          return data;
+        }
+      } else if (this.receiveQueue.length > 0) {
+        return this.receiveQueue.shift()!;
+      }
+
+      // If no matching message is in the queue, wait for a new one
+      return new Promise<Uint8Array>((resolve) => {
+        this.pendingResolvers.push({ resolve, filter });
+      });
     } else {
       // Mock basic ACK response
       return new Uint8Array([0x08, 0x01, 0x12, 0x02, 0x08, 0x00]);
