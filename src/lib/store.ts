@@ -11,7 +11,8 @@ import { vialCodeToAction } from './protocols/vial-action-converter';
 import { parseKeyboardDefinition } from './parser';
 import { convertVialToSmidr, packLayoutOptions } from './protocols/vial-converter';
 import { VialProtocol } from './protocols/vial';
-import { DeviceCapability } from './transport/types';
+import { DeviceCapability, ITransport } from './transport/types';
+import { ZmkProtocol } from './protocols/zmk';
 import { qmkStringToAction, actionToQmkString } from './protocols/via-action-converter';
 import { getStoredTheme, setStoredTheme, getStoredLanguage, setStoredLanguage } from './storage';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
@@ -97,6 +98,8 @@ export interface KeyboardState {
   setConnectedDevice: (device: KeyboardState['connectedDevice']) => void;
   deviceCapabilities: DeviceCapability | null;
   setDeviceCapabilities: (caps: DeviceCapability | null) => void;
+  activeTransport: ITransport | null;
+  setActiveTransport: (transport: ITransport | null) => void;
   remoteKeymap: Record<number, UniversalAction[]>; // layer -> array of actions
   setRemoteKeymap: (keymap: Record<number, UniversalAction[]>) => void;
   syncKeymap: () => Promise<void>;
@@ -227,6 +230,7 @@ const initialState: Partial<KeyboardState> = {
   currentLayer: 0,
   connectedDevice: null,
   deviceCapabilities: null,
+  activeTransport: null,
   remoteKeymap: {},
   remoteMacros: Array(16).fill(null).map(() => []),
   remoteCombos: [],
@@ -408,10 +412,13 @@ export const useKeyboardStore = create<KeyboardState>()(
           if (!s.connectedDevice) return;
           
           try {
+            const isZmk = s.connectedDevice?.protocolType === 'zmk';
             const isVial = s.connectedDevice?.protocolType === 'vial';
-            const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+            const protocol = isZmk
+              ? new ZmkProtocol()
+              : (isVial ? new VialProtocol() : new ViaProtocol());
 
-            await protocol.initialize(hidTransport);
+            await protocol.initialize(s.activeTransport || hidTransport);
             set({ deviceCapabilities: protocol.capabilities });
 
             const layerCount = await protocol.getLayerCount();
@@ -421,6 +428,12 @@ export const useKeyboardStore = create<KeyboardState>()(
                 layers: layerCount
               }
             }));
+
+            if (isZmk) {
+              console.log('Skipping bulk keymap scan for ZMK protocol to preserve local designed baseline layout.');
+              return;
+            }
+
             const matrixRows = s.settings.matrix?.rows || 6;
             const matrixCols = s.settings.matrix?.cols || 16;
             
@@ -534,7 +547,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               protocol = existingProtocol;
             } else {
               protocol = new VialProtocol();
-              await protocol.initialize(hidTransport);
+              await protocol.initialize(s.activeTransport || hidTransport);
             }
             
             // 1. Fetch Macros
@@ -568,7 +581,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           
           try {
             const protocol = new VialProtocol();
-            await protocol.initialize(hidTransport);
+            await protocol.initialize(s.activeTransport || hidTransport);
             
             const unlockStatus = await protocol.getUnlockStatus();
             if (unlockStatus === 0) {
@@ -605,7 +618,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           
           try {
             const protocol = new VialProtocol();
-            await protocol.initialize(hidTransport);
+            await protocol.initialize(s.activeTransport || hidTransport);
             
             const unlockStatus = await protocol.getUnlockStatus();
             if (unlockStatus === 0) {
@@ -634,10 +647,13 @@ export const useKeyboardStore = create<KeyboardState>()(
           
           console.log('[Offline Sync] Checking for keymap sync disparities (UI-priority)...');
           try {
+            const isZmk = s.connectedDevice?.protocolType === 'zmk';
             const isVial = s.connectedDevice?.protocolType === 'vial';
-            const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+            const protocol = isZmk
+              ? new ZmkProtocol()
+              : (isVial ? new VialProtocol() : new ViaProtocol());
 
-            await protocol.initialize(hidTransport);
+            await protocol.initialize(s.activeTransport || hidTransport);
             
             // Sync all matrix positions configured in the project keys
             for (const key of s.keys) {
@@ -686,7 +702,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 });
               const mask = packLayoutOptions(newActiveOptions, labels);
               const protocol = new VialProtocol();
-              protocol.initialize(hidTransport)
+              protocol.initialize(s.activeTransport || hidTransport)
                 .then(() => protocol.setLayoutOptions(mask))
                 .then(() => {
                   console.log('Successfully synced layout options to device.');
@@ -848,7 +864,8 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setAppMode: (m: 'design' | 'remap') => {
           if (m === 'design') {
-            hidTransport.disconnect().catch(err => {
+            const transport = get().activeTransport || hidTransport;
+            transport.disconnect().catch(err => {
               console.error('Failed to disconnect keyboard on design mode switch:', err);
             });
             set((s) => ({
@@ -856,6 +873,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               selectedKeyIds: [],
               connectedDevice: null,
               deviceCapabilities: null,
+              activeTransport: null,
             }));
           } else {
             set({ appMode: m, selectedKeyIds: [] });
@@ -865,6 +883,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setConnectedDevice: (d: KeyboardState['connectedDevice']) => set({ connectedDevice: d }),
         setDeviceCapabilities: (caps: DeviceCapability | null) => set({ deviceCapabilities: caps }),
+        setActiveTransport: (t: ITransport | null) => set({ activeTransport: t }),
         setRemoteKeymap: (km: Record<number, UniversalAction[]>) => set({ remoteKeymap: km }),
         updateRemoteKeycode: (l: number, i: number, action: UniversalAction) => set((s) => {
           const newKm = { ...s.remoteKeymap };
@@ -878,10 +897,13 @@ export const useKeyboardStore = create<KeyboardState>()(
           const { connectedDevice, updateRemoteKeycode, settings } = get();
           if (!connectedDevice) return;
           try {
+            const isZmk = connectedDevice?.protocolType === 'zmk';
             const isVial = connectedDevice?.protocolType === 'vial';
-            const protocol = isVial ? new VialProtocol() : new ViaProtocol();
+            const protocol = isZmk
+              ? new ZmkProtocol()
+              : (isVial ? new VialProtocol() : new ViaProtocol());
 
-            await protocol.initialize(hidTransport);
+            await protocol.initialize(get().activeTransport || hidTransport);
             
             if (isVial) {
               const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
@@ -1007,9 +1029,12 @@ export const useKeyboardStore = create<KeyboardState>()(
             if (appMode === 'remap' && s.connectedDevice) {
               const runDeviceUpdates = async () => {
                 try {
+                  const isZmk = s.connectedDevice?.protocolType === 'zmk';
                   const isVial = s.connectedDevice?.protocolType === 'vial';
-                  const protocol = isVial ? new VialProtocol() : new ViaProtocol();
-                  await protocol.initialize(hidTransport);
+                  const protocol = isZmk
+                    ? new ZmkProtocol()
+                    : (isVial ? new VialProtocol() : new ViaProtocol());
+                  await protocol.initialize(s.activeTransport || hidTransport);
 
                   if (isVial) {
                     const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
@@ -1090,9 +1115,12 @@ export const useKeyboardStore = create<KeyboardState>()(
           // 2. If connected to a device in remap mode, sync to device sequentially
           if (appMode === 'remap' && connectedDevice) {
             try {
+              const isZmk = connectedDevice?.protocolType === 'zmk';
               const isVial = connectedDevice?.protocolType === 'vial';
-              const protocol = isVial ? new VialProtocol() : new ViaProtocol();
-              await protocol.initialize(hidTransport);
+              const protocol = isZmk
+                ? new ZmkProtocol()
+                : (isVial ? new VialProtocol() : new ViaProtocol());
+              await protocol.initialize(s.activeTransport || hidTransport);
 
               if (isVial) {
                 const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
@@ -1149,9 +1177,12 @@ export const useKeyboardStore = create<KeyboardState>()(
           // 2. If connected to a device in remap mode, sync to device sequentially
           if (appMode === 'remap' && connectedDevice) {
             try {
+              const isZmk = connectedDevice?.protocolType === 'zmk';
               const isVial = connectedDevice?.protocolType === 'vial';
-              const protocol = isVial ? new VialProtocol() : new ViaProtocol();
-              await protocol.initialize(hidTransport);
+              const protocol = isZmk
+                ? new ZmkProtocol()
+                : (isVial ? new VialProtocol() : new ViaProtocol());
+              await protocol.initialize(s.activeTransport || hidTransport);
 
               if (isVial) {
                 const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
