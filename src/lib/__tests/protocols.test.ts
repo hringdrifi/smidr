@@ -74,12 +74,13 @@ describe('protocols conversion tests', () => {
       })).toBe(0x232C);
     });
 
-    it('should convert macro calls and lighting actions', () => {
+    it('should convert macro calls and keep bootloader distinct from lighting', () => {
       expect(viaCodeToAction(0x7701)).toEqual({ action: 'macro', macroId: 1 });
       expect(actionToViaCode({ action: 'macro', macroId: 1 })).toBe(0x7701);
 
-      expect(viaCodeToAction(0x7C00)).toEqual({ action: 'lighting', command: 'TOGGLE' });
-      expect(actionToViaCode({ action: 'lighting', command: 'TOGGLE' })).toBe(0x7C00);
+      expect(viaCodeToAction(0x7C00)).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
+      expect(actionToViaCode({ action: 'tap', keycode: 'BOOTLOADER' })).toBe(0x7C00);
+      expect(actionToViaCode({ action: 'lighting', command: 'TOGGLE' })).toBe(0x0000);
     });
   });
 
@@ -88,10 +89,13 @@ describe('protocols conversion tests', () => {
       expect(qmkStringToAction('KC_TRNS')).toEqual({ action: 'trans' });
       expect(qmkStringToAction('KC_NO')).toEqual({ action: 'none' });
       expect(qmkStringToAction('KC_A')).toEqual({ action: 'tap', keycode: 'A' });
+      expect(qmkStringToAction('QK_BOOT')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
+      expect(qmkStringToAction('RGB_TOG')).toEqual({ action: 'custom', protocol: 'qmk', rawCode: 'RGB_TOG' });
 
       expect(actionToQmkString({ action: 'trans' })).toBe('KC_TRNS');
       expect(actionToQmkString({ action: 'none' })).toBe('KC_NO');
       expect(actionToQmkString({ action: 'tap', keycode: 'A' })).toBe('KC_A');
+      expect(actionToQmkString({ action: 'lighting', command: 'TOGGLE' })).toBe('KC_NO');
     });
 
     it('should parse and format nested modifiers and shortcuts', () => {

@@ -16,7 +16,7 @@ export interface Keycode {
   y2?: number;
 }
 
-export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Lighting', 'Special'];
+export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Special'];
 
 export const KEYCODES: Keycode[] = [
   // ==========================================
@@ -249,18 +249,6 @@ export const KEYCODES: Keycode[] = [
   { code: 'MOUSE_BTN5', label: 'Btn 5', category: 'Media' },
 
   ...Array.from({ length: 16 }, (_, i) => ({ code: `MACRO_${i}`, label: `M${i}`, category: 'Macro' as const })),
-
-  { code: 'RGB_TOG', label: 'RGB Toggle', category: 'Lighting', description: 'Toggles RGB backlighting on/off' },
-  { code: 'RGB_MOD', label: 'RGB Mode +', category: 'Lighting', description: 'Cycles through RGB animation modes' },
-  { code: 'RGB_RMOD', label: 'RGB Mode -', category: 'Lighting', description: 'Cycles backward through RGB animation modes' },
-  { code: 'RGB_VAI', label: 'Val +', category: 'Lighting', description: 'Increases backlighting brightness' },
-  { code: 'RGB_VAD', label: 'Val -', category: 'Lighting', description: 'Decreases backlighting brightness' },
-  { code: 'RGB_HUI', label: 'Hue +', category: 'Lighting', description: 'Increases backlighting hue' },
-  { code: 'RGB_HUD', label: 'Hue -', category: 'Lighting', description: 'Decreases backlighting hue' },
-  { code: 'RGB_SAI', label: 'Sat +', category: 'Lighting', description: 'Increases backlighting saturation' },
-  { code: 'RGB_SAD', label: 'Sat -', category: 'Lighting', description: 'Decreases backlighting saturation' },
-  { code: 'RGB_SPI', label: 'Speed +', category: 'Lighting', description: 'Increases RGB effect speed' },
-  { code: 'RGB_SPD', label: 'Speed -', category: 'Lighting', description: 'Decreases RGB effect speed' },
 
   { code: 'transparent', label: '▽', category: 'Special', description: 'Passes through the keycode of the layer below (Transparent)' },
   { code: 'none', label: 'None', category: 'Special', description: 'Disables the key (No action)' },

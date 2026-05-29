@@ -163,12 +163,12 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
 
 // Reversing mappings for rapid lookup
 export const QMK_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(KEY_MAP).reduce((acc, [k, v]) => {
-  acc[v.qmk] = k as UniversalKey;
+  if (!acc[v.qmk]) acc[v.qmk] = k as UniversalKey;
   return acc;
 }, {} as Record<string, UniversalKey>);
 
 export const HID_TO_UNIVERSAL: Record<number, UniversalKey> = Object.entries(KEY_MAP).reduce((acc, [k, v]) => {
-  acc[v.hid] = k as UniversalKey;
+  if (!acc[v.hid]) acc[v.hid] = k as UniversalKey;
   return acc;
 }, {} as Record<number, UniversalKey>);
 
@@ -264,19 +264,6 @@ export function viaCodeToAction(value: number): UniversalAction {
     return { action: 'macro', macroId: value - 0x7700 };
   }
 
-  // Backlight / lighting commands -> 0x7C00 range
-  if (value === 0x7C00) return { action: 'lighting', command: 'TOGGLE' };
-  if (value === 0x7C01) return { action: 'lighting', command: 'MODE_UP' };
-  if (value === 0x7C02) return { action: 'lighting', command: 'MODE_DOWN' };
-  if (value === 0x7C03) return { action: 'lighting', command: 'BRIGHTNESS_UP' };
-  if (value === 0x7C04) return { action: 'lighting', command: 'BRIGHTNESS_DOWN' };
-  if (value === 0x7C05) return { action: 'lighting', command: 'HUE_UP' };
-  if (value === 0x7C06) return { action: 'lighting', command: 'HUE_DOWN' };
-  if (value === 0x7C07) return { action: 'lighting', command: 'SAT_UP' };
-  if (value === 0x7C08) return { action: 'lighting', command: 'SAT_DOWN' };
-  if (value === 0x7C09) return { action: 'lighting', command: 'SPEED_UP' };
-  if (value === 0x7C0A) return { action: 'lighting', command: 'SPEED_DOWN' };
-
   // Basic keys lookup
   if (HID_TO_UNIVERSAL[value]) {
     return { action: 'tap', keycode: HID_TO_UNIVERSAL[value] };
@@ -321,17 +308,6 @@ export function actionToViaCode(action: UniversalAction): number {
     case 'macro':
       return 0x7700 + (action.macroId & 0x1F);
     case 'lighting':
-      if (action.command === 'TOGGLE') return 0x7C00;
-      if (action.command === 'MODE_UP') return 0x7C01;
-      if (action.command === 'MODE_DOWN') return 0x7C02;
-      if (action.command === 'BRIGHTNESS_UP') return 0x7C03;
-      if (action.command === 'BRIGHTNESS_DOWN') return 0x7C04;
-      if (action.command === 'HUE_UP') return 0x7C05;
-      if (action.command === 'HUE_DOWN') return 0x7C06;
-      if (action.command === 'SAT_UP') return 0x7C07;
-      if (action.command === 'SAT_DOWN') return 0x7C08;
-      if (action.command === 'SPEED_UP') return 0x7C09;
-      if (action.command === 'SPEED_DOWN') return 0x7C0A;
       return 0x0000;
     case 'custom':
       if ((action.protocol === 'qmk' || action.protocol === 'via' || action.protocol === 'vial') && action.rawCode.startsWith('0x')) {
@@ -379,17 +355,6 @@ export function actionToQmkString(action: UniversalAction): string {
     case 'macro':
       return `MACRO(${action.macroId})`;
     case 'lighting':
-      if (action.command === 'TOGGLE') return 'RGB_TOG';
-      if (action.command === 'MODE_UP') return 'RGB_MOD';
-      if (action.command === 'MODE_DOWN') return 'RGB_RMOD';
-      if (action.command === 'BRIGHTNESS_UP') return 'RGB_VAI';
-      if (action.command === 'BRIGHTNESS_DOWN') return 'RGB_VAD';
-      if (action.command === 'HUE_UP') return 'RGB_HUI';
-      if (action.command === 'HUE_DOWN') return 'RGB_HUD';
-      if (action.command === 'SAT_UP') return 'RGB_SAI';
-      if (action.command === 'SAT_DOWN') return 'RGB_SAD';
-      if (action.command === 'SPEED_UP') return 'RGB_SPI';
-      if (action.command === 'SPEED_DOWN') return 'RGB_SPD';
       return 'KC_NO';
     case 'custom':
       return action.rawCode;
@@ -489,18 +454,11 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
   match = trimmed.match(/^MACRO\((\d+)\)$/);
   if (match) return { action: 'macro', macroId: parseInt(match[1]) };
 
-  // RGB / Light
-  if (trimmed === 'RGB_TOG') return { action: 'lighting', command: 'TOGGLE' };
-  if (trimmed === 'RGB_MOD') return { action: 'lighting', command: 'MODE_UP' };
-  if (trimmed === 'RGB_RMOD') return { action: 'lighting', command: 'MODE_DOWN' };
-  if (trimmed === 'RGB_VAI') return { action: 'lighting', command: 'BRIGHTNESS_UP' };
-  if (trimmed === 'RGB_VAD') return { action: 'lighting', command: 'BRIGHTNESS_DOWN' };
-  if (trimmed === 'RGB_HUI') return { action: 'lighting', command: 'HUE_UP' };
-  if (trimmed === 'RGB_HUD') return { action: 'lighting', command: 'HUE_DOWN' };
-  if (trimmed === 'RGB_SAI') return { action: 'lighting', command: 'SAT_UP' };
-  if (trimmed === 'RGB_SAD') return { action: 'lighting', command: 'SAT_DOWN' };
-  if (trimmed === 'RGB_SPI') return { action: 'lighting', command: 'SPEED_UP' };
-  if (trimmed === 'RGB_SPD') return { action: 'lighting', command: 'SPEED_DOWN' };
+  // RGB / Light keycodes are intentionally kept as raw strings until the exact
+  // QMK/VIA numeric ranges are verified.
+  if (/^(RGB|UG|RM)_/.test(trimmed)) {
+    return { action: 'custom', protocol: 'qmk', rawCode: trimmed };
+  }
 
   // Basic keys lookup
   if (QMK_TO_UNIVERSAL[trimmed]) {
