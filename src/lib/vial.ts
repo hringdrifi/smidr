@@ -137,6 +137,14 @@ const normalizeVialUid = (uid?: string) => {
   return generateRandomVialUid();
 };
 
+const formatVialUid = (uid: string) => {
+  const bytes: string[] = [];
+  for (let i = uid.length - 2; i >= 0; i -= 2) {
+    bytes.push(`0x${uid.substring(i, i + 2).padStart(2, '0')}`);
+  }
+  return `{ ${bytes.join(', ')} }`;
+};
+
 /**
  * Generates a full Vial-QMK firmware source code ZIP.
  * Tailored specifically for the forked vial-qmk repository rules and architecture.
@@ -169,8 +177,8 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     features: {
       command: false,
       console: false,
-      extrakey: true,
-      mousekey: true,
+      extrakey: false,
+      mousekey: false,
       nkro: true,
       encoder: settings.features.encoder,
       rgblight: settings.features.rgb,
@@ -230,6 +238,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
   // 2. config.h (Keyboard level) - config_common.h is deprecated in modern QMK
   const configH = `/* Copyright 2026 Smidr User */
 #pragma once
+${useMatrixMask ? '\n#define MATRIX_MASKED\n' : ''}
 
 /* Encoder pins */
 ${settings.features.encoder ? `
@@ -272,11 +281,7 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
 
     // keymaps/vial/config.h (vialUID definition)
     const rawUid = normalizeVialUid(settings.vialUid);
-    const bytes: string[] = [];
-    for (let i = 0; i < 16; i += 2) {
-      bytes.push(`0x${rawUid.substring(i, i + 2).padStart(2, '0')}`);
-    }
-    const vialUidFormatted = `{ ${bytes.join(', ')} }`;
+    const vialUidFormatted = formatVialUid(rawUid);
     const unlockCombo = getVialUnlockCombo(settings, validKeys);
     const r1 = unlockCombo.key1.row;
     const c1 = unlockCombo.key1.col;

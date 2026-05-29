@@ -228,11 +228,13 @@ describe('export generation', () => {
 
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const keyboardJson = JSON.parse(await zip.file('split_masked_board/keyboard.json')!.async('string'));
+    const configH = await zip.file('split_masked_board/config.h')!.async('string');
     const keyboardC = await zip.file('split_masked_board/split_masked_board.c')!.async('string');
 
     expect(keyboardJson.matrix_pins.masked).toBe(true);
     expect(keyboardJson.split.matrix_pins.right.rows).toEqual(['GP4', 'GP5']);
     expect(keyboardJson.split.matrix_pins.right.cols).toEqual(['GP5', 'GP6']);
+    expect(configH).toContain('#define MATRIX_MASKED');
     expect(keyboardC).toContain('(matrix_row_t)0x1ULL');
   });
 
@@ -271,12 +273,16 @@ describe('export generation', () => {
 
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const keyboardJson = JSON.parse(await zip.file('vial_masked_board/keyboard.json')!.async('string'));
+    const configH = await zip.file('vial_masked_board/config.h')!.async('string');
     const rulesMk = await zip.file('vial_masked_board/rules.mk')!.async('string');
     const keyboardC = await zip.file('vial_masked_board/vial_masked_board.c')!.async('string');
 
     expect(keyboardJson.matrix_pins.masked).toBeUndefined();
     expect(keyboardJson.features.bootmagic).toBeUndefined();
+    expect(keyboardJson.features.extrakey).toBe(false);
+    expect(keyboardJson.features.mousekey).toBe(false);
     expect(keyboardJson.bootmagic).toEqual({ enabled: true, matrix: [0, 0] });
+    expect(configH).toContain('#define MATRIX_MASKED');
     expect(rulesMk).toContain('MATRIX_MASKED = yes');
     expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
   });
@@ -298,6 +304,7 @@ describe('export generation', () => {
           key2: { row: 3, col: 4 },
         },
       },
+      vialUid: '43A8F8008844F971',
     };
     const keys: PhysicalKey[] = [
       {
@@ -334,5 +341,6 @@ describe('export generation', () => {
 
     expect(configH).toContain('#define VIAL_UNLOCK_COMBO_ROWS { 1, 3 }');
     expect(configH).toContain('#define VIAL_UNLOCK_COMBO_COLS { 2, 4 }');
+    expect(configH).toContain('#define VIAL_KEYBOARD_UID { 0x71, 0xF9, 0x44, 0x88, 0x00, 0xF8, 0xA8, 0x43 }');
   });
 });
