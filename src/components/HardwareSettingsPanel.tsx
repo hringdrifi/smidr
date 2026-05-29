@@ -914,14 +914,14 @@ export const HardwareSettingsPanel = () => {
                     className={cn(
                       "px-2 py-1 rounded text-[10px] font-mono font-bold transition-all relative",
                       !activeBox 
-                        ? "bg-zinc-800/40 border border-zinc-800 text-[var(--text-muted)] cursor-not-allowed opacity-50"
+                        ? "bg-[var(--bg-button)]/60 border border-[var(--border-main)] text-[var(--text-muted)] cursor-not-allowed opacity-50"
                         : isCurrentSlotPin
                         ? "bg-amber-500 text-zinc-950 border border-amber-500"
                         : isAssigned
                         ? preventDuplicates
-                          ? "bg-zinc-800/20 border border-zinc-800/40 text-zinc-600 cursor-not-allowed line-through"
-                          : "bg-zinc-800 text-[var(--text-main)] border border-zinc-700/60 pl-4.5"
-                        : "bg-zinc-800 hover:bg-zinc-700 hover:border-amber-500/50 text-[var(--text-highlight)] border border-zinc-700 active:scale-95 cursor-pointer"
+                          ? "bg-[var(--bg-button)]/50 border border-[var(--border-main)] text-[var(--text-dim)] cursor-not-allowed line-through"
+                          : "bg-[var(--bg-button)] text-[var(--text-main)] border border-[var(--border-main)] pl-4.5"
+                        : "bg-[var(--bg-button)] hover:bg-[var(--bg-hover)] hover:border-amber-500/50 text-[var(--text-highlight)] border border-[var(--border-main)] active:scale-95 cursor-pointer"
                     )}
                   >
                     {/* Small amber dot for duplicate pins when preventDuplicates is off */}
