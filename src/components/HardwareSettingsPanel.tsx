@@ -283,6 +283,7 @@ export const HardwareSettingsPanel = () => {
   const qmkMatrixMasked = settings.qmk?.matrixMasked === true;
   const qmkBootmagic = settings.qmk?.bootmagic || { enabled: true };
   const bootmagicEnabled = qmkBootmagic.enabled !== false;
+  const vialUnlockCombo = settings.vial?.unlockCombo || {};
   const updateQmkSettings = (qmkUpdates: NonNullable<typeof settings.qmk>) => {
     updateSettings({
       qmk: {
@@ -291,6 +292,23 @@ export const HardwareSettingsPanel = () => {
         bootmagic: {
           ...(settings.qmk?.bootmagic || {}),
           ...(qmkUpdates.bootmagic || {}),
+        },
+      },
+    });
+  };
+  const updateVialUnlockCombo = (
+    keyId: 'key1' | 'key2',
+    updates: { row?: number; col?: number }
+  ) => {
+    updateSettings({
+      vial: {
+        ...(settings.vial || {}),
+        unlockCombo: {
+          ...(settings.vial?.unlockCombo || {}),
+          [keyId]: {
+            ...(settings.vial?.unlockCombo?.[keyId] || {}),
+            ...updates,
+          },
         },
       },
     });
@@ -595,6 +613,54 @@ export const HardwareSettingsPanel = () => {
           <p className="text-[9px] text-[var(--text-muted)] leading-relaxed italic">
             {t('hardware.vialDesc')}
           </p>
+
+          <div className="space-y-3 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-[var(--text-main)] leading-none">Unlock Combo</span>
+              <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
+                Set the two matrix positions emitted as VIAL_UNLOCK_COMBO_ROWS/COLS.
+              </span>
+            </div>
+
+            {(['key1', 'key2'] as const).map((keyId, idx) => {
+              const comboKey = vialUnlockCombo[keyId] || {};
+              return (
+                <div key={keyId} className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-3 items-end">
+                  <div className="pb-2 text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                    Key {idx + 1}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Row</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={Number.isInteger(comboKey.row) ? comboKey.row : ''}
+                      onChange={(e) => updateVialUnlockCombo(keyId, {
+                        row: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                      })}
+                      placeholder={idx === 0 ? 'First key' : 'Last key'}
+                      className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Col</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={Number.isInteger(comboKey.col) ? comboKey.col : ''}
+                      onChange={(e) => updateVialUnlockCombo(keyId, {
+                        col: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                      })}
+                      placeholder={idx === 0 ? 'First key' : 'Last key'}
+                      className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </Section>
 

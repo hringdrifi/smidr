@@ -280,4 +280,59 @@ describe('export generation', () => {
     expect(rulesMk).toContain('MATRIX_MASKED = yes');
     expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
   });
+
+  it('emits configured Vial unlock combo positions', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Vial Unlock Board',
+      matrix: { rows: 4, cols: 5 },
+      pins: {
+        rows: ['GP0', 'GP1', 'GP2', 'GP3'],
+        cols: ['GP4', 'GP5', 'GP6', 'GP7', 'GP8'],
+        splitRows: [],
+        splitCols: [],
+      },
+      vial: {
+        unlockCombo: {
+          key1: { row: 1, col: 2 },
+          key2: { row: 3, col: 4 },
+        },
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 2,
+        col: 2,
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const configH = await zip.file('vial_unlock_board/keymaps/vial/config.h')!.async('string');
+
+    expect(configH).toContain('#define VIAL_UNLOCK_COMBO_ROWS { 1, 3 }');
+    expect(configH).toContain('#define VIAL_UNLOCK_COMBO_COLS { 2, 4 }');
+  });
 });

@@ -54,6 +54,24 @@ const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[])
   };
 };
 
+const getVialUnlockCombo = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
+  const firstKey = validKeys[0];
+  const lastKey = validKeys[validKeys.length - 1] || firstKey;
+  const configuredKey1 = settings.vial?.unlockCombo?.key1;
+  const configuredKey2 = settings.vial?.unlockCombo?.key2;
+
+  return {
+    key1: {
+      row: Number.isInteger(configuredKey1?.row) ? configuredKey1!.row! : firstKey?.row ?? 0,
+      col: Number.isInteger(configuredKey1?.col) ? configuredKey1!.col! : firstKey?.col ?? 0,
+    },
+    key2: {
+      row: Number.isInteger(configuredKey2?.row) ? configuredKey2!.row! : lastKey?.row ?? 0,
+      col: Number.isInteger(configuredKey2?.col) ? configuredKey2!.col! : lastKey?.col ?? 0,
+    },
+  };
+};
+
 const generateMatrixMaskC = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
   const matrix = getMatrixDimensions(settings, validKeys);
   const rowMasks = Array.from({ length: matrix.rows }, () => BigInt(0));
@@ -259,13 +277,11 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
       bytes.push(`0x${rawUid.substring(i, i + 2).padStart(2, '0')}`);
     }
     const vialUidFormatted = `{ ${bytes.join(', ')} }`;
-    
-    const firstKey = validKeys[0];
-    const lastKey = validKeys[validKeys.length - 1] || firstKey;
-    const r1 = firstKey?.row ?? 0;
-    const c1 = firstKey?.col ?? 0;
-    const r2 = lastKey?.row ?? 0;
-    const c2 = lastKey?.col ?? 0;
+    const unlockCombo = getVialUnlockCombo(settings, validKeys);
+    const r1 = unlockCombo.key1.row;
+    const c1 = unlockCombo.key1.col;
+    const r2 = unlockCombo.key2.row;
+    const c2 = unlockCombo.key2.col;
 
     const vialConfigH = `#pragma once
 
