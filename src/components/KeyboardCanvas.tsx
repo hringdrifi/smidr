@@ -31,6 +31,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const [isClient, setIsClient] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1000, height: 800 });
+  const dimensionsRef = useRef({ width: 0, height: 0 });
   const stageRef = useRef<any>(null);
   const [selBox, setSelBox] = useState<{ start: { x: number, y: number }, end: { x: number, y: number }, isRealDrag: boolean } | null>(null);
 
@@ -43,15 +44,33 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     setIsClient(true);
     const updateSize = () => {
       const container = containerRef.current;
+      let nextDimensions: { width: number, height: number };
+
       if (container) {
-        setDimensions({ width: container.clientWidth, height: container.clientHeight });
-        setCanvasDimensions({ width: container.clientWidth, height: container.clientHeight });
+        nextDimensions = { width: container.clientWidth, height: container.clientHeight };
       } else {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        setDimensions({ width: w, height: h });
-        setCanvasDimensions({ width: w, height: h });
+        nextDimensions = { width: window.innerWidth, height: window.innerHeight };
       }
+
+      const prevDimensions = dimensionsRef.current;
+      if (
+        prevDimensions.width > 0 &&
+        prevDimensions.height > 0 &&
+        nextDimensions.width > 0 &&
+        nextDimensions.height > 0 &&
+        prevDimensions.width !== nextDimensions.width
+      ) {
+        const currentTransform = useKeyboardStore.getState().transform;
+        setTransform({
+          ...currentTransform,
+          x: currentTransform.x + (nextDimensions.width - prevDimensions.width) / 2,
+          y: currentTransform.y
+        });
+      }
+
+      dimensionsRef.current = nextDimensions;
+      setDimensions(nextDimensions);
+      setCanvasDimensions(nextDimensions);
     };
     updateSize();
 
