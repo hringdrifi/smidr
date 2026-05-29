@@ -47,20 +47,27 @@ export const KeycodeConfigPanel = () => {
       action = selectedKey.keymap?.[currentLayer] || { action: 'trans' };
     }
   }
+  const actionSignature = JSON.stringify(action);
+  const [draftAction, setDraftAction] = useState<UniversalAction>(action);
+  const activeAction = draftAction;
 
   useEffect(() => {
     setIsCapturingParam(false);
   }, [selectedKeyId, setIsCapturingParam]);
 
   useEffect(() => {
-    if (action.action === 'custom') {
-      setRawDraft(action.rawCode);
-      setRawProtocolDraft(action.protocol);
+    setDraftAction(action);
+  }, [selectedKeyId, currentLayer, appMode, actionSignature]);
+
+  useEffect(() => {
+    if (activeAction.action === 'custom') {
+      setRawDraft(activeAction.rawCode);
+      setRawProtocolDraft(activeAction.protocol);
     } else {
       setRawDraft(defaultCustomProtocol === 'zmk' ? '&kp A' : '0x0004');
       setRawProtocolDraft(defaultCustomProtocol);
     }
-  }, [action, defaultCustomProtocol]);
+  }, [activeAction, defaultCustomProtocol]);
 
   if (selectedKeyIds.length !== 1 || !selectedKey) {
     return (
@@ -73,7 +80,20 @@ export const KeycodeConfigPanel = () => {
     );
   }
 
-  const updateSelectedAction = (newAction: UniversalAction) => {
+  const isCommitReady = (nextAction: UniversalAction) => {
+    if (nextAction.action === 'mt') {
+      return nextAction.modifiers.length > 0 && nextAction.tapAction.action === 'tap';
+    }
+    if (nextAction.action === 'lt') {
+      return nextAction.tapAction.action === 'tap';
+    }
+    if (nextAction.action === 'custom') {
+      return nextAction.rawCode.trim().length > 0;
+    }
+    return true;
+  };
+
+  const commitSelectedAction = (newAction: UniversalAction) => {
     if (appMode === 'remap') {
       if (hasMatrix) {
         updateDeviceKeycode(currentLayer, selectedKey.row!, selectedKey.col!, newAction);
@@ -83,27 +103,34 @@ export const KeycodeConfigPanel = () => {
     }
   };
 
+  const updateDraftAction = (newAction: UniversalAction) => {
+    setDraftAction(newAction);
+    if (isCommitReady(newAction)) {
+      commitSelectedAction(newAction);
+    }
+  };
+
   const handleActionTypeChange = (actVal: string) => {
-    const existingLayerId = ('layerId' in action) ? (action as any).layerId : 1;
-    let existingModifiers = ('modifiers' in action) ? (action as any).modifiers : [];
+    const existingLayerId = ('layerId' in activeAction) ? (activeAction as any).layerId : 1;
+    let existingModifiers = ('modifiers' in activeAction) ? (activeAction as any).modifiers : [];
 
     let existingKeycode: string | undefined = undefined;
-    if (action.action === 'tap') {
-      existingKeycode = action.keycode;
-      if (action.mods) {
-        existingModifiers = action.mods;
+    if (activeAction.action === 'tap') {
+      existingKeycode = activeAction.keycode;
+      if (activeAction.mods) {
+        existingModifiers = activeAction.mods;
       }
-    } else if (action.action === 'lt' || action.action === 'mt') {
-      if (action.tapAction.action === 'tap') {
-        existingKeycode = action.tapAction.keycode;
-      } else if (action.tapAction.action === 'trans') {
+    } else if (activeAction.action === 'lt' || activeAction.action === 'mt') {
+      if (activeAction.tapAction.action === 'tap') {
+        existingKeycode = activeAction.tapAction.keycode;
+      } else if (activeAction.tapAction.action === 'trans') {
         existingKeycode = 'TRNS';
-      } else if (action.tapAction.action === 'none') {
+      } else if (activeAction.tapAction.action === 'none') {
         existingKeycode = 'NO';
       }
-    } else if (action.action === 'trans') {
+    } else if (activeAction.action === 'trans') {
       existingKeycode = 'TRNS';
-    } else if (action.action === 'none') {
+    } else if (activeAction.action === 'none') {
       existingKeycode = 'NO';
     }
 
@@ -142,9 +169,9 @@ export const KeycodeConfigPanel = () => {
         break;
       }
       case 'custom': {
-        const protocol = action.action === 'custom' ? action.protocol : defaultCustomProtocol;
-        const rawCode = action.action === 'custom'
-          ? action.rawCode
+        const protocol = activeAction.action === 'custom' ? activeAction.protocol : defaultCustomProtocol;
+        const rawCode = activeAction.action === 'custom'
+          ? activeAction.rawCode
           : protocol === 'zmk'
           ? '&kp A'
           : '0x0004';
@@ -170,26 +197,26 @@ export const KeycodeConfigPanel = () => {
         break;
       }
     }
-    updateSelectedAction(newAction);
+    updateDraftAction(newAction);
   };
 
   const handleLayerChange = (layerId: number) => {
     if (
-      action.action === 'mo' ||
-      action.action === 'tg' ||
-      action.action === 'to' ||
-      action.action === 'lt'
+      activeAction.action === 'mo' ||
+      activeAction.action === 'tg' ||
+      activeAction.action === 'to' ||
+      activeAction.action === 'lt'
     ) {
-      updateSelectedAction({ ...action, layerId });
+      updateDraftAction({ ...activeAction, layerId });
     }
   };
 
   const handleModifierToggle = (mod: Modifier) => {
-    if (action.action === 'mt') {
-      const isSelected = action.modifiers.includes(mod);
+    if (activeAction.action === 'mt') {
+      const isSelected = activeAction.modifiers.includes(mod);
       let nextModifiers = isSelected
-        ? action.modifiers.filter(m => m !== mod)
-        : [...action.modifiers, mod];
+        ? activeAction.modifiers.filter(m => m !== mod)
+        : [...activeAction.modifiers, mod];
       
       // Automatically align other selected modifiers to the newly clicked modifier's handedness
       if (!isSelected) {
@@ -206,10 +233,10 @@ export const KeycodeConfigPanel = () => {
         nextModifiers = nextModifiers.map(m => mapping[m]);
       }
 
-      updateSelectedAction({ ...action, modifiers: nextModifiers });
+      updateDraftAction({ ...activeAction, modifiers: nextModifiers });
     } else {
       // action is 'tap', 'trans', 'none'
-      const currentMods = (action.action === 'tap' && action.mods) ? action.mods : [];
+      const currentMods = (activeAction.action === 'tap' && activeAction.mods) ? activeAction.mods : [];
       const isSelected = currentMods.includes(mod);
       let nextModifiers = isSelected
         ? currentMods.filter(m => m !== mod)
@@ -230,9 +257,9 @@ export const KeycodeConfigPanel = () => {
       }
 
       let baseKeycode: UniversalKey = 'TRNS';
-      if (action.action === 'tap') {
-        baseKeycode = action.keycode;
-      } else if (action.action === 'none') {
+      if (activeAction.action === 'tap') {
+        baseKeycode = activeAction.keycode;
+      } else if (activeAction.action === 'none') {
         baseKeycode = 'NO';
       }
 
@@ -255,12 +282,12 @@ export const KeycodeConfigPanel = () => {
           };
         }
       }
-      updateSelectedAction(nextAction);
+      updateDraftAction(nextAction);
     }
   };
 
   const handleKeycodeSelection = (code: string) => {
-    if (action.action === 'lt' || action.action === 'mt') {
+    if (activeAction.action === 'lt' || activeAction.action === 'mt') {
       let tapAction: UniversalAction;
       if (code === 'transparent') {
         tapAction = { action: 'trans' };
@@ -269,7 +296,7 @@ export const KeycodeConfigPanel = () => {
       } else {
         tapAction = { action: 'tap', keycode: code as UniversalKey };
       }
-      updateSelectedAction({ ...action, tapAction });
+      updateDraftAction({ ...activeAction, tapAction });
     } else {
       let newAction: UniversalAction;
       if (code === 'transparent') {
@@ -278,19 +305,19 @@ export const KeycodeConfigPanel = () => {
         newAction = { action: 'none' };
       } else {
         newAction = { action: 'tap', keycode: code as UniversalKey };
-        if (action.action === 'tap' && action.mods && action.mods.length > 0) {
-          newAction.mods = action.mods;
+        if (activeAction.action === 'tap' && activeAction.mods && activeAction.mods.length > 0) {
+          newAction.mods = activeAction.mods;
         }
       }
-      updateSelectedAction(newAction);
+      updateDraftAction(newAction);
     }
   };
 
   // Determine current active config type string
   let currentType = 'tap';
-  if (['mo', 'tg', 'to', 'lt', 'mt'].includes(action.action)) {
-    currentType = action.action;
-  } else if (action.action === 'custom') {
+  if (['mo', 'tg', 'to', 'lt', 'mt'].includes(activeAction.action)) {
+    currentType = activeAction.action;
+  } else if (activeAction.action === 'custom') {
     currentType = 'custom';
   } else {
     currentType = 'tap';
@@ -300,20 +327,20 @@ export const KeycodeConfigPanel = () => {
 
   // Get current active keycode code
   let currentActiveCode = 'transparent';
-  if (action.action === 'tap') {
-    currentActiveCode = action.keycode;
-  } else if (action.action === 'lt' || action.action === 'mt') {
-    currentActiveCode = action.tapAction.action === 'tap' ? action.tapAction.keycode : action.tapAction.action;
-  } else if (action.action === 'trans' || action.action === 'none') {
-    currentActiveCode = action.action;
-  } else if (action.action === 'custom') {
-    currentActiveCode = action.rawCode;
+  if (activeAction.action === 'tap') {
+    currentActiveCode = activeAction.keycode;
+  } else if (activeAction.action === 'lt' || activeAction.action === 'mt') {
+    currentActiveCode = activeAction.tapAction.action === 'tap' ? activeAction.tapAction.keycode : activeAction.tapAction.action;
+  } else if (activeAction.action === 'trans' || activeAction.action === 'none') {
+    currentActiveCode = activeAction.action;
+  } else if (activeAction.action === 'custom') {
+    currentActiveCode = activeAction.rawCode;
   }
 
   const handleApplyRawAction = () => {
     const rawCode = rawDraft.trim();
     if (!rawCode) return;
-    updateSelectedAction({
+    updateDraftAction({
       action: 'custom',
       protocol: rawProtocolDraft,
       rawCode,
@@ -375,7 +402,7 @@ export const KeycodeConfigPanel = () => {
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
         {/* Layer Selector Grid */}
-        {action.action === 'custom' && (
+        {activeAction.action === 'custom' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 text-amber-500">
               <Code2 size={14} className="shrink-0" />
@@ -416,17 +443,17 @@ export const KeycodeConfigPanel = () => {
           </div>
         )}
 
-        {(action.action === 'mo' ||
-          action.action === 'tg' ||
-          action.action === 'to' ||
-          action.action === 'lt') && (
+        {(activeAction.action === 'mo' ||
+          activeAction.action === 'tg' ||
+          activeAction.action === 'to' ||
+          activeAction.action === 'lt') && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
               {t('keycodeConfig.targetLayer') || 'Target Layer'}
             </label>
             <div className="grid grid-cols-4 gap-1">
               {Array.from({ length: settings.layers || 4 }).map((_, idx) => {
-                const isActive = (action as any).layerId === idx;
+                const isActive = (activeAction as any).layerId === idx;
                 return (
                   <button
                     key={idx}
@@ -447,18 +474,18 @@ export const KeycodeConfigPanel = () => {
         )}
 
         {/* Modifiers Checklist */}
-        {(action.action === 'mt' || action.action === 'tap' || action.action === 'trans' || action.action === 'none') && (
+        {(activeAction.action === 'mt' || activeAction.action === 'tap' || activeAction.action === 'trans' || activeAction.action === 'none') && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {action.action === 'mt'
+              {activeAction.action === 'mt'
                 ? (t('keycodeConfig.modifiers') || 'Hold Modifiers')
                 : (t('keycodeConfig.modifiers') || 'Modifiers')}
             </label>
             <div className="grid grid-cols-4 gap-1">
               {MODIFIERS.map(mod => {
-                const isSelected = action.action === 'mt'
-                  ? action.modifiers.includes(mod)
-                  : (action.action === 'tap' && action.mods ? action.mods.includes(mod) : false);
+                const isSelected = activeAction.action === 'mt'
+                  ? activeAction.modifiers.includes(mod)
+                  : (activeAction.action === 'tap' && activeAction.mods ? activeAction.mods.includes(mod) : false);
                 return (
                   <button
                     key={mod}
@@ -480,12 +507,12 @@ export const KeycodeConfigPanel = () => {
         )}
 
         {/* Keycode Selection */}
-        {(action.action === 'tap' || action.action === 'trans' || action.action === 'none' || action.action === 'lt' || action.action === 'mt') && (
+        {(activeAction.action === 'tap' || activeAction.action === 'trans' || activeAction.action === 'none' || activeAction.action === 'lt' || activeAction.action === 'mt') && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {action.action === 'tap' || action.action === 'trans' || action.action === 'none'
+              {activeAction.action === 'tap' || activeAction.action === 'trans' || activeAction.action === 'none'
                 ? (t('keymap.currentKeycode') || 'Keycode')
-                : action.action === 'lt'
+                : activeAction.action === 'lt'
                 ? (t('keycodeConfig.tapKeycode') || 'Tap Keycode')
                 : (t('keycodeConfig.tapKeycode') || 'Tap Keycode')}
             </label>

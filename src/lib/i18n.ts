@@ -34,6 +34,7 @@ export const TRANSLATIONS = {
       selectKeysDesc: 'Select keys on the canvas to edit properties.',
       emptyProjectTitle: 'Please open a project',
       emptyProjectDesc: 'Create a new project or open an existing one from the top-left header menu to start designing.',
+      layer: 'Layer',
     },
     languages: {
       en: 'English',
@@ -310,6 +311,7 @@ export const TRANSLATIONS = {
       selectKeysDesc: '在画布上选择按键以编辑属性。',
       emptyProjectTitle: '请打开项目',
       emptyProjectDesc: '从左上方页眉菜单创建新项目或打开现有项目以开始设计。',
+      layer: '层',
     },
     languages: {
       en: '英文',
@@ -586,6 +588,7 @@ export const TRANSLATIONS = {
       selectKeysDesc: '캔버스에서 키를 선택하여 속성을 편집하세요.',
       emptyProjectTitle: '프로젝트를 열어주세요',
       emptyProjectDesc: '좌측 상단 헤더 메뉴에서 새 프로젝트를 만들거나 기존 프로젝트를 열어 디자인을 시작하세요.',
+      layer: '레이어',
     },
     languages: {
       en: '영어',
@@ -862,6 +865,7 @@ export const TRANSLATIONS = {
       selectKeysDesc: 'キャンバス上のキーを選択してプロパティを編集します。',
       emptyProjectTitle: 'プロジェクトを開いてください',
       emptyProjectDesc: '画面左上のヘッダーメニューから新しいプロジェクトを作成するか、既存のプロジェクトを開いて設計を開始してください。',
+      layer: 'レイヤー',
     },
     languages: {
       en: '英語',
@@ -1138,6 +1142,7 @@ export const TRANSLATIONS = {
       selectKeysDesc: 'Seleccione teclas en el lienzo para editar propiedades.',
       emptyProjectTitle: 'Por favor, abra un proyecto',
       emptyProjectDesc: 'Cree un nuevo proyecto o abra uno existente desde el menú superior izquierdo en la cabecera para comenzar a diseñar.',
+      layer: 'Capa',
     },
     languages: {
       en: 'Inglés',
@@ -1414,6 +1419,7 @@ export const TRANSLATIONS = {
       selectKeysDesc: 'Wählen Sie Tasten auf der Leinwand aus, um Eigenschaften zu bearbeiten.',
       emptyProjectTitle: 'Bitte öffnen Sie ein Projekt',
       emptyProjectDesc: 'Erstellen Sie ein neues Projekt oder öffnen Sie ein vorhandenes im Menü oben links in der Kopfzeile, um mit der Gestaltung zu beginnen.',
+      layer: 'Ebene',
     },
     languages: {
       en: 'Englisch',

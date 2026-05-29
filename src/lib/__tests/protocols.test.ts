@@ -402,7 +402,7 @@ describe('protocols conversion tests', () => {
       ])).toBe(true);
     });
 
-    it('should avoid sending an invalid mod-tap when no hold modifiers are selected', async () => {
+    it('should reject an invalid mod-tap when no hold modifiers are selected', async () => {
       const zmk = new ZmkProtocol();
       const sent: Uint8Array[] = [];
       let responseIndex = 0;
@@ -432,17 +432,147 @@ describe('protocols conversion tests', () => {
       zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
       zmk['behaviorIds'] = { 'key press': 3, 'mod-tap': 15 };
 
-      await zmk.setKey(0, 0, 0, {
+      await expect(zmk.setKey(0, 0, 0, {
         action: 'mt',
         modifiers: [],
         tapAction: { action: 'tap', keycode: 'DOWN' }
+      })).rejects.toThrow('Mod-tap requires at least one hold modifier.');
+      expect(sent.length).toBe(0);
+    });
+
+    it('should rename ZMK layers with setLayerProps without re-fetching the keymap', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x60, 0x00]), // setLayerProps = OK
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]) // saveChanges ok
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
       });
 
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 7, name: 'Base', bindings: [] }],
+        availableLayers: 3,
+        maxLayerNameLength: 20
+      };
+
+      await zmk.renameLayer(0, 'Fn');
+
       expect(containsSubsequence(Array.from(sent[1]), [
-        0x08, 0x06,
-        0x10, 0xd1, 0x80, 0x1c,
-        0x18, 0x00
+        0x62, 0x06,
+        0x08, 0x07,
+        0x12, 0x02, 0x46, 0x6e
       ])).toBe(true);
+      expect(sent).toHaveLength(3);
+      expect(zmk.getLayerMetadata()).toEqual({
+        layers: [{ id: 7, name: 'Fn' }],
+        availableLayers: 3,
+        maxLayerNameLength: 20
+      });
+    });
+
+    it('should add a ZMK layer without re-fetching the keymap', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([
+          0x0a, 0x12, 0x08, 0x02, 0x2a, 0x0e, 0x4a, 0x0c,
+          0x0a, 0x0a, 0x08, 0x01, 0x12, 0x06, 0x08, 0x04,
+          0x12, 0x02, 0x4c, 0x31
+        ]), // addLayer ok: index 1, layer id 4, name "L1"
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [] }],
+        availableLayers: 2,
+        maxLayerNameLength: 20
+      };
+
+      await expect(zmk.addLayer()).resolves.toBe(1);
+
+      expect(containsSubsequence(Array.from(sent[1]), [0x4a, 0x00])).toBe(true);
+      expect(sent).toHaveLength(3);
+      expect(zmk.getLayerMetadata()).toEqual({
+        layers: [{ id: 0, name: 'Base' }, { id: 4, name: 'L1' }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      });
+    });
+
+    it('should treat empty ZMK binding slots as no-op keys', () => {
+      const zmk = new ZmkProtocol();
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 0, param1: 0, param2: 0 }] }],
+        availableLayers: 0,
+        maxLayerNameLength: 20
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+
+      expect(zmk.getCachedKeymapActions()[0][0]).toEqual({ action: 'none' });
+    });
+
+    it('should remove the last ZMK layer without re-fetching the keymap', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x02, 0x2a, 0x04, 0x52, 0x02, 0x0a, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [] }, { id: 4, name: 'L1', bindings: [] }],
+        availableLayers: 0,
+        maxLayerNameLength: 20
+      };
+
+      await expect(zmk.removeLastLayer()).resolves.toBe(1);
+
+      expect(containsSubsequence(Array.from(sent[1]), [0x52, 0x02, 0x08, 0x01])).toBe(true);
+      expect(sent).toHaveLength(3);
+      expect(zmk.getLayerMetadata()).toEqual({
+        layers: [{ id: 0, name: 'Base' }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      });
     });
 
     it('should pass through raw ZMK behavior strings by resolving behavior names', async () => {

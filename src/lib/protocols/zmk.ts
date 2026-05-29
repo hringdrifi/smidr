@@ -72,6 +72,20 @@ export function encodeVarint(value: number): number[] {
 
 const ZMK_STUDIO_LOCK_STATE_UNLOCKED = 1;
 const ZMK_BLE_WRITE_CHUNK_SIZE = 20;
+const ZMK_DEFAULT_BEHAVIOR_NAMES: Record<number, string> = {
+  3: 'kp',
+  14: 'lt',
+  15: 'mt',
+  16: 'none',
+  19: 'trans',
+};
+const ZMK_DEFAULT_BEHAVIOR_IDS: Record<string, number> = {
+  kp: 3,
+  lt: 14,
+  mt: 15,
+  none: 16,
+  trans: 19,
+};
 
 const isZmkStudioLocked = (lockState: number) => lockState !== ZMK_STUDIO_LOCK_STATE_UNLOCKED;
 
@@ -680,6 +694,9 @@ interface DecodedKeymapResponse {
   getPhysicalLayouts?: DecodedPhysicalLayouts;
   setLayerBinding?: number;
   saveChanges?: { ok?: boolean; err?: number };
+  addLayer?: DecodedAddLayerResponse;
+  removeLayer?: DecodedRemoveLayerResponse;
+  setLayerProps?: number;
 }
 
 interface DecodedKeymap {
@@ -692,6 +709,22 @@ interface DecodedLayer {
   id: number;
   name: string;
   bindings: DecodedBehaviorBinding[];
+}
+
+interface DecodedAddLayerResponse {
+  ok?: { index: number; layer: DecodedLayer };
+  err?: number;
+}
+
+interface DecodedRemoveLayerResponse {
+  ok?: boolean;
+  err?: number;
+}
+
+export interface ZmkLayerMetadata {
+  layers: Array<{ id: number; name: string }>;
+  availableLayers: number;
+  maxLayerNameLength: number;
 }
 
 interface DecodedBehaviorBinding {
@@ -969,12 +1002,61 @@ function decodeSaveChangesResponse(buffer: Uint8Array): { ok?: boolean; err?: nu
   return { ok, err };
 }
 
+function decodeAddLayerResponseDetails(buffer: Uint8Array): { index: number; layer: DecodedLayer } {
+  const decoder = new ProtoDecoder(buffer);
+  let index = 0;
+  let layer: DecodedLayer = { id: 0, name: "", bindings: [] };
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 0) {
+      index = field.value;
+    } else if (field.fieldNumber === 2 && field.wireType === 2) {
+      layer = decodeLayer(field.value);
+    }
+  }
+
+  return { index, layer };
+}
+
+function decodeAddLayerResponse(buffer: Uint8Array): DecodedAddLayerResponse {
+  const decoder = new ProtoDecoder(buffer);
+  const response: DecodedAddLayerResponse = {};
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 2) {
+      response.ok = decodeAddLayerResponseDetails(field.value);
+    } else if (field.fieldNumber === 2 && field.wireType === 0) {
+      response.err = field.value;
+    }
+  }
+
+  return response;
+}
+
+function decodeRemoveLayerResponse(buffer: Uint8Array): DecodedRemoveLayerResponse {
+  const decoder = new ProtoDecoder(buffer);
+  const response: DecodedRemoveLayerResponse = {};
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 2) {
+      response.ok = true;
+    } else if (field.fieldNumber === 2 && field.wireType === 0) {
+      response.err = field.value;
+    }
+  }
+
+  return response;
+}
+
 function decodeKeymapResponse(buffer: Uint8Array): DecodedKeymapResponse {
   const decoder = new ProtoDecoder(buffer);
   let getKeymap: DecodedKeymap | undefined;
   let getPhysicalLayouts: DecodedPhysicalLayouts | undefined;
   let setLayerBinding: number | undefined;
   let saveChanges: { ok?: boolean; err?: number } | undefined;
+  let addLayer: DecodedAddLayerResponse | undefined;
+  let removeLayer: DecodedRemoveLayerResponse | undefined;
+  let setLayerProps: number | undefined;
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 2) {
@@ -985,9 +1067,15 @@ function decodeKeymapResponse(buffer: Uint8Array): DecodedKeymapResponse {
       saveChanges = decodeSaveChangesResponse(field.value);
     } else if (field.fieldNumber === 6 && field.wireType === 2) {
       getPhysicalLayouts = decodePhysicalLayouts(field.value);
+    } else if (field.fieldNumber === 9 && field.wireType === 2) {
+      addLayer = decodeAddLayerResponse(field.value);
+    } else if (field.fieldNumber === 10 && field.wireType === 2) {
+      removeLayer = decodeRemoveLayerResponse(field.value);
+    } else if (field.fieldNumber === 12 && field.wireType === 0) {
+      setLayerProps = field.value;
     }
   }
-  return { getKeymap, getPhysicalLayouts, setLayerBinding, saveChanges };
+  return { getKeymap, getPhysicalLayouts, setLayerBinding, saveChanges, addLayer, removeLayer, setLayerProps };
 }
 
 function decodePhysicalLayouts(buffer: Uint8Array): DecodedPhysicalLayouts {
@@ -1172,6 +1260,32 @@ function encodeSetLayerBindingRequest(
   return encodeRequest(requestId, { keymap: keymapEncoder.getUint8Array() });
 }
 
+function encodeSetLayerPropsRequest(requestId: number, layerId: number, name: string): Uint8Array {
+  const propsEncoder = new ProtoEncoder();
+  propsEncoder.writeUint32(1, layerId);
+  propsEncoder.writeString(2, name);
+
+  const keymapEncoder = new ProtoEncoder();
+  keymapEncoder.writeBytes(12, propsEncoder.getUint8Array()); // setLayerProps
+
+  return encodeRequest(requestId, { keymap: keymapEncoder.getUint8Array() });
+}
+
+function encodeAddLayerRequest(requestId: number): Uint8Array {
+  const keymapEncoder = new ProtoEncoder();
+  keymapEncoder.writeBytes(9, new Uint8Array()); // addLayer
+  return encodeRequest(requestId, { keymap: keymapEncoder.getUint8Array() });
+}
+
+function encodeRemoveLayerRequest(requestId: number, layerIndex: number): Uint8Array {
+  const removeLayerEncoder = new ProtoEncoder();
+  removeLayerEncoder.writeUint32(1, layerIndex);
+
+  const keymapEncoder = new ProtoEncoder();
+  keymapEncoder.writeBytes(10, removeLayerEncoder.getUint8Array()); // removeLayer
+  return encodeRequest(requestId, { keymap: keymapEncoder.getUint8Array() });
+}
+
 function encodeGetLockStateRequest(requestId: number): Uint8Array {
   const coreEncoder = new ProtoEncoder();
   coreEncoder.writeBool(2, true); // getLockState (field 2 in core Request)
@@ -1330,6 +1444,22 @@ function resolveBehaviorId(behaviorIds: Record<string, number>, shortName: strin
   return 0;
 }
 
+function getBehaviorAliases(displayName: string): string[] {
+  const normalized = displayName.toLowerCase().replace(/_behavior$/, '').replace(/[\s_-]+/g, '');
+  const aliases: string[] = [];
+
+  if (normalized === "keypress" || normalized === "key") aliases.push("kp");
+  if (normalized === "momentary" || normalized === "momentarylayer") aliases.push("mo");
+  if (normalized === "toggle" || normalized === "toglayer" || normalized === "togglelayer" || normalized === "keytoggle") aliases.push("tog");
+  if (normalized === "tolayer") aliases.push("to");
+  if (normalized === "layertap") aliases.push("lt");
+  if (normalized === "modtap" || normalized === "holdtap") aliases.push("mt");
+  if (normalized === "transparent") aliases.push("trans");
+  if (normalized === "none" || normalized === "nooperation" || normalized === "noop") aliases.push("none");
+
+  return aliases;
+}
+
 function parseZmkModifiers(mask: number): string[] {
   const mods: string[] = [];
   if (mask & 0x01) mods.push("LCTRL");
@@ -1347,6 +1477,10 @@ function bindingToZmkString(
   binding: { behaviorId: number; param1: number; param2: number },
   behaviorNames: Record<number, string>
 ): string {
+  if (binding.behaviorId === 0 && binding.param1 === 0 && binding.param2 === 0) {
+    return "&none";
+  }
+
   const rawName = behaviorNames[binding.behaviorId] || `behavior_${binding.behaviorId}`;
   const name = rawName.toLowerCase().replace(/[\s_-]+/g, '');
   
@@ -1684,17 +1818,21 @@ export class ZmkProtocol implements IProtocolDriver {
       method = 'Default ultimate fallback (0)';
     }
 
-    // Spec Verification Logging for Row0 Col0
-    if (row === 0 && col === 0) {
-      console.log(`[ZMK Verify Specification] Row0 Col0 ZMK Position ID: ${resolvedIndex} (resolved via ${method})`);
-    } else {
-      console.log(`[ZMK Position Resolve] R${row}C${col} mapped to ZMK Position ID: ${resolvedIndex} (resolved via ${method})`);
+    if (this.isDebugLoggingEnabled()) {
+      if (row === 0 && col === 0) {
+        console.log(`[ZMK Verify Specification] Row0 Col0 ZMK Position ID: ${resolvedIndex} (resolved via ${method})`);
+      } else {
+        console.log(`[ZMK Position Resolve] R${row}C${col} mapped to ZMK Position ID: ${resolvedIndex} (resolved via ${method})`);
+      }
     }
 
     return resolvedIndex;
   }
 
-  constructor() {}
+  constructor() {
+    this.behaviorNames = { ...ZMK_DEFAULT_BEHAVIOR_NAMES };
+    this.behaviorIds = { ...ZMK_DEFAULT_BEHAVIOR_IDS };
+  }
 
   setNotificationHandler(handler: ((notification: ZmkStudioNotification) => void) | null): void {
     this.notificationHandler = handler;
@@ -1711,7 +1849,9 @@ export class ZmkProtocol implements IProtocolDriver {
     }
 
     if (simplified.lockStateChanged !== undefined || simplified.unsavedChangesStatusChanged !== undefined) {
-      console.log('[ZMK notification]', simplified);
+      if (this.isDebugLoggingEnabled()) {
+        console.log('[ZMK notification]', simplified);
+      }
       this.notificationHandler?.(simplified);
     }
   }
@@ -1729,8 +1869,8 @@ export class ZmkProtocol implements IProtocolDriver {
 
   resetRuntimeState() {
     this.currentRequestId = 1;
-    this.behaviorNames = {};
-    this.behaviorIds = {};
+    this.behaviorNames = { ...ZMK_DEFAULT_BEHAVIOR_NAMES };
+    this.behaviorIds = { ...ZMK_DEFAULT_BEHAVIOR_IDS };
     this.behaviorMetadata = {};
     this.fetchedKeymap = null;
     this.keyboardName = 'ZMK Keyboard';
@@ -1747,6 +1887,10 @@ export class ZmkProtocol implements IProtocolDriver {
 
   private getNextRequestId(): number {
     return this.currentRequestId++;
+  }
+
+  private isDebugLoggingEnabled(): boolean {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('smidr:zmk-debug') === '1';
   }
 
   private async sendRequest(requestNameOrData: string | Uint8Array, maybeData?: Uint8Array, timeoutMs?: number): Promise<Uint8Array> {
@@ -1790,11 +1934,13 @@ export class ZmkProtocol implements IProtocolDriver {
     }
     const correctlyPagedMsg = encodeRequest(expectedId, originalSubmsg);
     
-    console.log('[ZMK tx]', {
-      requestName,
-      requestId: expectedId,
-      raw: hex(correctlyPagedMsg)
-    });
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK tx]', {
+        requestName,
+        requestId: expectedId,
+        raw: hex(correctlyPagedMsg)
+      });
+    }
 
     await this.transport.send(correctlyPagedMsg);
     
@@ -1822,11 +1968,13 @@ export class ZmkProtocol implements IProtocolDriver {
       throw err;
     }
 
-    console.log('[ZMK rx]', {
-      requestName,
-      requestId: expectedId,
-      raw: hex(responseData)
-    });
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK rx]', {
+        requestName,
+        requestId: expectedId,
+        raw: hex(responseData)
+      });
+    }
 
     const decoded = decodeResponse(responseData);
     if (decoded.requestResponse?.meta) {
@@ -1906,37 +2054,8 @@ export class ZmkProtocol implements IProtocolDriver {
       }
     }
 
-    // 4. Discover Behaviors dynamically (POSTPONED!)
-    await sleep(30);
-    try {
-      const listBehaviorsMsg = encodeListAllBehaviorsRequest(1);
-      const listBehaviorsRes = await this.sendRequest('ListAllBehaviors', listBehaviorsMsg);
-      const decodedList = decodeResponse(listBehaviorsRes);
-      const behaviorList = decodedList.requestResponse?.behaviors?.listAllBehaviors?.behaviors || [];
-      
-      for (const bId of behaviorList) {
-        await sleep(30);
-        const getDetailsMsg = encodeGetBehaviorDetailsRequest(1, bId);
-        const detailsRes = await this.sendRequest('GetBehaviorDetails', getDetailsMsg);
-        const decodedDetails = decodeResponse(detailsRes);
-        const details = decodedDetails.requestResponse?.behaviors?.getBehaviorDetails;
-        if (details) {
-          const cleanName = details.displayName.toLowerCase().replace(/_behavior$/, '');
-          this.behaviorNames[details.id] = cleanName;
-          this.behaviorIds[cleanName] = details.id;
-          this.behaviorMetadata[details.id] = details;
-        }
-      }
-      this.behaviorsAvailable = true;
-      console.log('[ZmkProtocol] Discovered behaviors dynamically:', JSON.stringify(this.behaviorIds));
-    } catch (err: any) {
-      if (isLockError(err)) throw err;
-      console.warn('[ZmkProtocol] Discovering behaviors failed dynamically:', err);
-    }
-
-    // 5. Final fallback retry if layout is still missing (at the very end of metadata sequence!)
     if (!this.physicalLayoutsAvailable) {
-      console.log('[ZmkProtocol] Dynamic behaviors query completed. Executing final fallback GetPhysicalLayouts retry...');
+      console.log('[ZmkProtocol] Executing final fallback GetPhysicalLayouts retry before keymap fetch...');
       await sleep(100);
       try {
         const getLayoutsMsg = encodeGetPhysicalLayoutsRequest(1);
@@ -1948,7 +2067,8 @@ export class ZmkProtocol implements IProtocolDriver {
       }
     }
 
-    // 6. Fetch Keymap dynamically via GetKeymapRequest
+    // 4. Fetch Keymap dynamically via GetKeymapRequest. This is enough to paint
+    // the UI; detailed behavior metadata is filled in afterwards.
     try {
       await this.fetchKeymap();
     } catch (err: any) {
@@ -1956,7 +2076,85 @@ export class ZmkProtocol implements IProtocolDriver {
       console.warn('[ZmkProtocol] Failed to retrieve keymap from physical device (device may be locked or unsupported):', err.message || err);
     }
 
+    await this.fetchKeymapBehaviorDetails();
+    void this.fetchBehaviorMetadata();
+
     return true;
+  }
+
+  private getBehaviorIdsUsedByKeymap(): number[] {
+    if (!this.fetchedKeymap) return [];
+
+    const ids = new Set<number>();
+    for (const layer of this.fetchedKeymap.layers) {
+      for (const binding of layer.bindings) {
+        ids.add(binding.behaviorId);
+      }
+    }
+    return Array.from(ids);
+  }
+
+  private async fetchBehaviorDetailsById(behaviorId: number): Promise<boolean> {
+    if (this.behaviorNames[behaviorId] && !this.behaviorNames[behaviorId].startsWith('behavior_')) {
+      return true;
+    }
+
+    const getDetailsMsg = encodeGetBehaviorDetailsRequest(1, behaviorId);
+    const detailsRes = await this.sendRequest('GetBehaviorDetails', getDetailsMsg);
+    const decodedDetails = decodeResponse(detailsRes);
+    const details = decodedDetails.requestResponse?.behaviors?.getBehaviorDetails;
+    if (!details) return false;
+
+    const cleanName = details.displayName.toLowerCase().replace(/_behavior$/, '');
+    this.behaviorNames[details.id] = cleanName;
+    this.behaviorIds[cleanName] = details.id;
+    for (const alias of getBehaviorAliases(details.displayName)) {
+      this.behaviorIds[alias] = details.id;
+      this.behaviorNames[details.id] = alias;
+    }
+    this.behaviorMetadata[details.id] = details;
+    return true;
+  }
+
+  async fetchKeymapBehaviorDetails(): Promise<boolean> {
+    const isLockError = (err: any) => err && err.message && (err.message.includes('locked') || err.message.includes('Unlock'));
+    const behaviorIds = this.getBehaviorIdsUsedByKeymap();
+    let success = true;
+
+    for (const behaviorId of behaviorIds) {
+      try {
+        const detailSuccess = await this.fetchBehaviorDetailsById(behaviorId);
+        success = success && detailSuccess;
+      } catch (err: any) {
+        if (isLockError(err)) throw err;
+        success = false;
+        console.warn(`[ZmkProtocol] Failed to retrieve keymap behavior detail for ID ${behaviorId}:`, err.message || err);
+      }
+    }
+
+    return success;
+  }
+
+  async fetchBehaviorMetadata(): Promise<boolean> {
+    const isLockError = (err: any) => err && err.message && (err.message.includes('locked') || err.message.includes('Unlock'));
+
+    try {
+      const listBehaviorsMsg = encodeListAllBehaviorsRequest(1);
+      const listBehaviorsRes = await this.sendRequest('ListAllBehaviors', listBehaviorsMsg);
+      const decodedList = decodeResponse(listBehaviorsRes);
+      const behaviorList = decodedList.requestResponse?.behaviors?.listAllBehaviors?.behaviors || [];
+      
+      for (const bId of behaviorList) {
+        await this.fetchBehaviorDetailsById(bId);
+      }
+      this.behaviorsAvailable = true;
+      console.log('[ZmkProtocol] Discovered behaviors dynamically:', JSON.stringify(this.behaviorIds));
+      return true;
+    } catch (err: any) {
+      if (isLockError(err)) throw err;
+      console.warn('[ZmkProtocol] Discovering behaviors failed dynamically:', err);
+      return false;
+    }
   }
 
   parseLayoutsResponse(layoutsResponse: Uint8Array): boolean {
@@ -2072,45 +2270,280 @@ export class ZmkProtocol implements IProtocolDriver {
       return { action: 'none' };
     }
 
-    const hex = (data: Uint8Array) => Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    
-    const bindingEncoder = new ProtoEncoder();
-    bindingEncoder.writeSint32(1, binding.behaviorId);
-    bindingEncoder.writeUint32(2, binding.param1);
-    bindingEncoder.writeUint32(3, binding.param2);
-    const bindingBytes = bindingEncoder.getUint8Array();
-
     const dtsStr = bindingToZmkString(binding, this.behaviorNames);
     const action = zmkStringToAction(dtsStr);
 
-    console.log('[ZMK read] raw:', hex(bindingBytes));
-    console.log('[ZMK read] decoded:', action);
-
-    const behaviorName = this.behaviorNames[binding.behaviorId] || `behavior_${binding.behaviorId}`;
-    console.log(`[ZMK Decoded Log]`, {
-      behaviorId: binding.behaviorId,
-      behaviorName,
-      rawParams: [binding.param1, binding.param2],
-      paramsHex: [
-        `0x${binding.param1.toString(16).toUpperCase()}`,
-        `0x${binding.param2.toString(16).toUpperCase()}`
-      ],
-      param1: {
-        paramHex: `0x${binding.param1.toString(16).toUpperCase()}`,
-        usagePage: binding.param1 >>> 16,
-        usageId: binding.param1 & 0xffff,
-        maybeMaskedUsagePage: (binding.param1 >>> 16) & 0xff
-      },
-      param2: {
-        paramHex: `0x${binding.param2.toString(16).toUpperCase()}`,
-        usagePage: binding.param2 >>> 16,
-        usageId: binding.param2 & 0xffff,
-        maybeMaskedUsagePage: (binding.param2 >>> 16) & 0xff
-      },
-      convertedAction: action
-    });
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK read] decoded:', action);
+    }
 
     return action;
+  }
+
+  getCachedKeymapActions(): Record<number, UniversalAction[]> {
+    if (!this.keymapAvailable || !this.fetchedKeymap) {
+      throw new Error('Device keymap not fetched or cache empty');
+    }
+
+    const keymap: Record<number, UniversalAction[]> = {};
+    const positions = this.physicalPositions.length > 0
+      ? this.physicalPositions
+      : this.physicalKeys.map((pk, index) => ({ row: pk.row, col: pk.col, index }));
+
+    for (let layer = 0; layer < Math.min(this.fetchedKeymap.layers.length, 16); layer++) {
+      const actions: UniversalAction[] = [];
+      const layerBindings = this.fetchedKeymap.layers[layer]?.bindings || [];
+      for (const pos of positions) {
+        const binding = layerBindings[pos.index];
+        actions[pos.row * 32 + pos.col] = binding
+          ? zmkStringToAction(bindingToZmkString(binding, this.behaviorNames))
+          : { action: 'none' };
+      }
+      keymap[layer] = actions;
+    }
+
+    return keymap;
+  }
+
+  getLayerMetadata(): ZmkLayerMetadata | null {
+    if (!this.fetchedKeymap) return null;
+
+    return {
+      layers: this.fetchedKeymap.layers.map((layer, index) => ({
+        id: layer.id ?? index,
+        name: layer.name
+      })),
+      availableLayers: this.fetchedKeymap.availableLayers,
+      maxLayerNameLength: this.fetchedKeymap.maxLayerNameLength
+    };
+  }
+
+  private getSaveChangesErrorCodeName(err: number): string {
+    switch (err) {
+      case 0: return 'SAVE_CHANGES_ERR_OK';
+      case 1: return 'SAVE_CHANGES_ERR_GENERIC';
+      case 2: return 'SAVE_CHANGES_ERR_NOT_SUPPORTED';
+      case 3: return 'SAVE_CHANGES_ERR_NO_SPACE';
+      default: return `UNKNOWN_SAVE_ERR_${err}`;
+    }
+  }
+
+  private async assertStudioUnlocked(): Promise<void> {
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK Write Pre-check] Querying Lock State from device...');
+    }
+    try {
+      const lockRequestMsg = encodeGetLockStateRequest(1);
+      const lockResponse = await this.sendRequest('GetLockState', lockRequestMsg);
+      const decodedLock = decodeResponse(lockResponse);
+      const lockState = decodedLock.requestResponse?.core?.getLockState;
+      if (lockState !== undefined) {
+        const isLocked = isZmkStudioLocked(lockState);
+        this.notificationHandler?.({ lockStateChanged: lockState });
+        if (this.isDebugLoggingEnabled()) {
+          console.log(`[ZMK Write Pre-check] Lock State: ${isLocked ? 'LOCKED' : 'UNLOCKED'} (value: ${lockState})`);
+        }
+        if (isLocked) {
+          throw new Error('ZMK Studio is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
+        }
+      }
+    } catch (err: any) {
+      if (err?.message && (err.message.includes('locked') || err.message.includes('Unlock'))) {
+        console.warn('[ZMK Write Pre-check] Device is locked:', err);
+        throw err;
+      }
+      console.warn('[ZMK Write Pre-check] Failed to query lock state:', err);
+    }
+  }
+
+  private async saveChanges(): Promise<void> {
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK SaveChanges TX] Requesting SaveChanges...');
+    }
+    const saveMsg = encodeSaveChangesRequest(1);
+    const saveResponse = await this.sendRequest('SaveChanges', saveMsg);
+    const decodedSave = decodeResponse(saveResponse);
+    const saveChangesResult = decodedSave.requestResponse?.keymap?.saveChanges;
+    if (!saveChangesResult) return;
+
+    if (saveChangesResult.ok) {
+      if (this.isDebugLoggingEnabled()) {
+        console.log('[ZMK SaveChanges RX] Status: SAVE_CHANGES_ERR_OK (ok=true)');
+      }
+      this.notificationHandler?.({ unsavedChangesStatusChanged: false });
+    } else if (saveChangesResult.err !== undefined) {
+      const errName = this.getSaveChangesErrorCodeName(saveChangesResult.err);
+      if (this.isDebugLoggingEnabled()) {
+        console.log(`[ZMK SaveChanges RX] Status: ${errName} (err=${saveChangesResult.err})`);
+      }
+      if (saveChangesResult.err !== 0) {
+        throw new Error(`SaveChanges failed: ${errName} (err=${saveChangesResult.err})`);
+      }
+    }
+  }
+
+  async renameLayer(layerIndex: number, name: string): Promise<void> {
+    if (!this.keymapAvailable) {
+      throw new Error('Operation not supported: Device keymap is not available.');
+    }
+    if (!this.transport) {
+      throw new Error('Device not connected');
+    }
+    if (!this.fetchedKeymap) {
+      throw new Error('Device keymap not cached');
+    }
+
+    const layer = this.fetchedKeymap.layers[layerIndex];
+    if (!layer) {
+      throw new Error(`Layer ${layerIndex} not found in fetched keymap`);
+    }
+
+    await this.assertStudioUnlocked();
+
+    const setMsg = encodeSetLayerPropsRequest(1, layer.id, name);
+    if (this.isDebugLoggingEnabled()) {
+      console.log(`[ZMK SetLayerProps TX] Renaming Layer:${layerIndex} ID:${layer.id} to "${name}"`);
+    }
+    const setResponse = await this.sendRequest('SetLayerProps', setMsg);
+    const decoded = decodeResponse(setResponse);
+    const status = decoded.requestResponse?.keymap?.setLayerProps;
+    const statusName = (() => {
+      switch (status) {
+        case 0: return 'SET_LAYER_PROPS_RESP_OK';
+        case 1: return 'SET_LAYER_PROPS_RESP_ERR_GENERIC';
+        case 2: return 'SET_LAYER_PROPS_RESP_ERR_INVALID_ID';
+        default: return `UNKNOWN_SET_LAYER_PROPS_STATUS_${status}`;
+      }
+    })();
+
+    if (status === undefined) {
+      throw new Error('SetLayerProps response did not contain status field');
+    }
+    if (this.isDebugLoggingEnabled()) {
+      console.log(`[ZMK SetLayerProps RX] Response Status: ${statusName} (${status})`);
+    }
+    if (status !== 0) {
+      throw new Error(`SetLayerProps failed: ${statusName} (status ${status})`);
+    }
+
+    try {
+      await this.saveChanges();
+    } catch (err) {
+      console.warn('[ZMK SaveChanges ERROR] Request failed:', err);
+      throw err;
+    }
+
+    this.fetchedKeymap.layers[layerIndex] = {
+      ...layer,
+      name
+    };
+  }
+
+  async addLayer(): Promise<number> {
+    if (!this.keymapAvailable) {
+      throw new Error('Operation not supported: Device keymap is not available.');
+    }
+    if (!this.transport) {
+      throw new Error('Device not connected');
+    }
+    if (!this.fetchedKeymap) {
+      throw new Error('Device keymap not cached');
+    }
+    if (this.fetchedKeymap.availableLayers <= 0) {
+      throw new Error('No available ZMK layers remain.');
+    }
+
+    await this.assertStudioUnlocked();
+
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK AddLayer TX] Requesting addLayer');
+    }
+    const addResponse = await this.sendRequest('AddLayer', encodeAddLayerRequest(1));
+    const decoded = decodeResponse(addResponse);
+    const result = decoded.requestResponse?.keymap?.addLayer;
+    if (!result) {
+      throw new Error('AddLayer response did not contain result field');
+    }
+    if (result.err !== undefined) {
+      const errName = (() => {
+        switch (result.err) {
+          case 0: return 'ADD_LAYER_ERR_OK';
+          case 1: return 'ADD_LAYER_ERR_GENERIC';
+          case 2: return 'ADD_LAYER_ERR_NO_SPACE';
+          default: return `UNKNOWN_ADD_LAYER_ERR_${result.err}`;
+        }
+      })();
+      throw new Error(`AddLayer failed: ${errName} (err=${result.err})`);
+    }
+    if (!result.ok) {
+      throw new Error('AddLayer response did not contain layer details');
+    }
+
+    try {
+      await this.saveChanges();
+    } catch (err) {
+      console.warn('[ZMK SaveChanges ERROR] Request failed:', err);
+      throw err;
+    }
+
+    this.fetchedKeymap.layers.splice(result.ok.index, 0, result.ok.layer);
+    this.fetchedKeymap.availableLayers = Math.max(0, this.fetchedKeymap.availableLayers - 1);
+    this.layerCount = this.fetchedKeymap.layers.length;
+    return result.ok.index;
+  }
+
+  async removeLastLayer(): Promise<number> {
+    if (!this.keymapAvailable) {
+      throw new Error('Operation not supported: Device keymap is not available.');
+    }
+    if (!this.transport) {
+      throw new Error('Device not connected');
+    }
+    if (!this.fetchedKeymap) {
+      throw new Error('Device keymap not cached');
+    }
+    if (this.fetchedKeymap.layers.length <= 1) {
+      throw new Error('Cannot remove the last remaining layer.');
+    }
+
+    const layerIndex = this.fetchedKeymap.layers.length - 1;
+    await this.assertStudioUnlocked();
+
+    if (this.isDebugLoggingEnabled()) {
+      console.log(`[ZMK RemoveLayer TX] Removing last layer index:${layerIndex}`);
+    }
+    const removeResponse = await this.sendRequest('RemoveLayer', encodeRemoveLayerRequest(1, layerIndex));
+    const decoded = decodeResponse(removeResponse);
+    const result = decoded.requestResponse?.keymap?.removeLayer;
+    if (!result) {
+      throw new Error('RemoveLayer response did not contain result field');
+    }
+    if (result.err !== undefined) {
+      const errName = (() => {
+        switch (result.err) {
+          case 0: return 'REMOVE_LAYER_ERR_OK';
+          case 1: return 'REMOVE_LAYER_ERR_GENERIC';
+          case 2: return 'REMOVE_LAYER_ERR_INVALID_INDEX';
+          default: return `UNKNOWN_REMOVE_LAYER_ERR_${result.err}`;
+        }
+      })();
+      throw new Error(`RemoveLayer failed: ${errName} (err=${result.err})`);
+    }
+    if (!result.ok) {
+      throw new Error('RemoveLayer response did not contain ok field');
+    }
+
+    try {
+      await this.saveChanges();
+    } catch (err) {
+      console.warn('[ZMK SaveChanges ERROR] Request failed:', err);
+      throw err;
+    }
+
+    this.fetchedKeymap.layers.splice(layerIndex, 1);
+    this.fetchedKeymap.availableLayers += 1;
+    this.layerCount = this.fetchedKeymap.layers.length;
+    return layerIndex;
   }
 
   async fetchKeymap(): Promise<boolean> {
@@ -2118,7 +2551,9 @@ export class ZmkProtocol implements IProtocolDriver {
       throw new Error('Transport not connected');
     }
     try {
-      console.log('[ZmkProtocol] Fetching full keymap via GetKeymapRequest...');
+      if (this.isDebugLoggingEnabled()) {
+        console.log('[ZmkProtocol] Fetching full keymap via GetKeymapRequest...');
+      }
       const getKeymapMsg = encodeGetKeymapRequest(1);
       const keymapResponse = await this.sendRequest('GetKeymap', getKeymapMsg, 10000);
       const decodedKeymapRes = decodeResponse(keymapResponse);
@@ -2127,7 +2562,9 @@ export class ZmkProtocol implements IProtocolDriver {
         this.fetchedKeymap = keymapMsg;
         this.layerCount = keymapMsg.layers.length;
         this.keymapAvailable = true;
-        console.log(`[ZmkProtocol] Successfully fetched keymap with ${this.layerCount} layers.`);
+        if (this.isDebugLoggingEnabled()) {
+          console.log(`[ZmkProtocol] Successfully fetched keymap with ${this.layerCount} layers.`);
+        }
         return true;
       } else {
         console.warn('[ZmkProtocol] Keymap response was empty or invalid.');
@@ -2155,9 +2592,13 @@ export class ZmkProtocol implements IProtocolDriver {
     const keyIndex = this.resolveZmkPosition(row, col);
 
     const zmkDtsStr = actionToZmkString(action);
-    console.log(`[ZMK setKey] Mapping action "${zmkDtsStr}" using behaviorIds:`, JSON.stringify(this.behaviorIds));
+    if (this.isDebugLoggingEnabled()) {
+      console.log(`[ZMK setKey] Mapping action "${zmkDtsStr}" using behaviorIds:`, JSON.stringify(this.behaviorIds));
+    }
     const binding = zmkStringToBinding(zmkDtsStr, this.behaviorIds, this.behaviorMetadata);
-    console.log(`[ZMK setKey] Resolved binding: behaviorId=${binding.behaviorId}, param1=${binding.param1}, param2=${binding.param2}`);
+    if (this.isDebugLoggingEnabled()) {
+      console.log(`[ZMK setKey] Resolved binding: behaviorId=${binding.behaviorId}, param1=${binding.param1}, param2=${binding.param2}`);
+    }
 
     const getSetLayerBindingResponseEnumName = (s: number): string => {
       switch (s) {
@@ -2180,7 +2621,9 @@ export class ZmkProtocol implements IProtocolDriver {
     };
 
     // 1. Query lock state before writing
-    console.log('[ZMK Write Pre-check] Querying Lock State from device...');
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK Write Pre-check] Querying Lock State from device...');
+    }
     try {
       const lockRequestMsg = encodeGetLockStateRequest(1);
       const lockResponse = await this.sendRequest('GetLockState', lockRequestMsg);
@@ -2189,7 +2632,9 @@ export class ZmkProtocol implements IProtocolDriver {
       if (lockState !== undefined) {
         const isLocked = isZmkStudioLocked(lockState);
         this.notificationHandler?.({ lockStateChanged: lockState });
-        console.log(`[ZMK Write Pre-check] Lock State: ${isLocked ? 'LOCKED' : 'UNLOCKED'} (value: ${lockState})`);
+        if (this.isDebugLoggingEnabled()) {
+          console.log(`[ZMK Write Pre-check] Lock State: ${isLocked ? 'LOCKED' : 'UNLOCKED'} (value: ${lockState})`);
+        }
         if (isLocked) {
           throw new Error('ZMK Studio is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
         }
@@ -2212,14 +2657,18 @@ export class ZmkProtocol implements IProtocolDriver {
       binding.param2
     );
 
-    console.log(`[ZMK Protobuf RPC Write] Sending SetLayerBinding: Layer:${layer} Position:${keyIndex} behaviorId:${binding.behaviorId} param1:${binding.param1} param2:${binding.param2}`);
+    if (this.isDebugLoggingEnabled()) {
+      console.log(`[ZMK Protobuf RPC Write] Sending SetLayerBinding: Layer:${layer} Position:${keyIndex} behaviorId:${binding.behaviorId} param1:${binding.param1} param2:${binding.param2}`);
+    }
     
     const setResponse = await this.sendRequest('SetLayerBinding', setMsg);
     const decoded = decodeResponse(setResponse);
     const status = decoded.requestResponse?.keymap?.setLayerBinding;
     if (status !== undefined) {
       const enumName = getSetLayerBindingResponseEnumName(status);
-      console.log(`[ZMK SetLayerBinding RX] Response Status: ${enumName} (${status})`);
+      if (this.isDebugLoggingEnabled()) {
+        console.log(`[ZMK SetLayerBinding RX] Response Status: ${enumName} (${status})`);
+      }
       if (status !== 0) { // 0: SET_LAYER_BINDING_RESP_OK
         throw new Error(`SetLayerBinding failed: ${enumName} (status ${status})`);
       }
@@ -2228,7 +2677,9 @@ export class ZmkProtocol implements IProtocolDriver {
     }
 
     // 3. Send SaveChanges
-    console.log('[ZMK SaveChanges TX] Requesting SaveChanges...');
+    if (this.isDebugLoggingEnabled()) {
+      console.log('[ZMK SaveChanges TX] Requesting SaveChanges...');
+    }
     try {
       const saveMsg = encodeSaveChangesRequest(1);
       const saveResponse = await this.sendRequest('SaveChanges', saveMsg);
@@ -2236,40 +2687,24 @@ export class ZmkProtocol implements IProtocolDriver {
       const saveChangesResult = decodedSave.requestResponse?.keymap?.saveChanges;
       if (saveChangesResult) {
         if (saveChangesResult.ok) {
-          console.log('[ZMK SaveChanges RX] Status: SAVE_CHANGES_ERR_OK (ok=true)');
+          if (this.isDebugLoggingEnabled()) {
+            console.log('[ZMK SaveChanges RX] Status: SAVE_CHANGES_ERR_OK (ok=true)');
+          }
           this.notificationHandler?.({ unsavedChangesStatusChanged: false });
         } else if (saveChangesResult.err !== undefined) {
           const errName = getSaveChangesErrorCodeName(saveChangesResult.err);
-          console.log(`[ZMK SaveChanges RX] Status: ${errName} (err=${saveChangesResult.err})`);
+          if (this.isDebugLoggingEnabled()) {
+            console.log(`[ZMK SaveChanges RX] Status: ${errName} (err=${saveChangesResult.err})`);
+          }
         }
       }
     } catch (err) {
       console.warn('[ZMK SaveChanges ERROR] Request failed:', err);
     }
 
-    // 4. Re-fetch full keymap and verify state
-    console.log('[ZMK Sync & Verify] Re-fetching keymap to verify change...');
-    await sleep(200);
-    await this.fetchKeymap();
-
-    const updatedLyr = this.fetchedKeymap?.layers[layer];
-    const updatedBinding = updatedLyr?.bindings[keyIndex];
-    if (updatedBinding) {
-      const match = updatedBinding.behaviorId === binding.behaviorId &&
-                    updatedBinding.param1 === binding.param1 &&
-                    updatedBinding.param2 === binding.param2;
-
-      if (match) {
-        console.log(`[ZMK Verification SUCCESS] Expected behaviorId:${binding.behaviorId}/param1:${binding.param1}/param2:${binding.param2} matches physical device keymap at index ${keyIndex}!`);
-      } else {
-        console.warn(
-          `[ZMK Verification FAILURE] Keymap mismatch at position ${keyIndex}:\n` +
-          `  Expected: behaviorId=${binding.behaviorId}, param1=${binding.param1}, param2=${binding.param2}\n` +
-          `  Actual on Device: behaviorId=${updatedBinding.behaviorId}, param1=${updatedBinding.param1}, param2=${updatedBinding.param2}`
-        );
-      }
-    } else {
-      console.warn(`[ZMK Verify WARNING] Could not verify the new binding on physical device.`);
+    const updatedLayer = this.fetchedKeymap.layers[layer];
+    if (updatedLayer) {
+      updatedLayer.bindings[keyIndex] = binding;
     }
   }
 

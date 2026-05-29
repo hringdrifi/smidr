@@ -791,11 +791,6 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           <p className="text-sm text-[var(--text-muted)] max-w-md leading-relaxed mb-6">
             The physical layout and key positions could not be retrieved from the device.
           </p>
-          {connectedDevice?.protocolType === 'zmk' && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-semibold max-w-sm leading-relaxed animate-pulse">
-              If your device is locked, please physically press the &ldquo;Studio Unlock&rdquo; key combination on your keyboard to unlock it, then reconnect.
-            </div>
-          )}
         </div>
       )}
 

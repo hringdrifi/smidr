@@ -244,6 +244,47 @@ describe('useKeyboardStore', () => {
     expect(state.remoteKeymap[0][33]).toEqual({ action: 'tap', keycode: 'Y' });
   });
 
+  it('should remove the last layer keymap data and retarget references to layer 0', () => {
+    const store = useKeyboardStore.getState();
+    useKeyboardStore.setState({
+      settings: {
+        ...useKeyboardStore.getState().settings,
+        layers: 3
+      },
+      currentLayer: 2,
+      remoteKeymap: {
+        0: [],
+        1: [],
+        2: [{ action: 'tap', keycode: 'Z' }]
+      }
+    });
+
+    store.addKeys([
+      {
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        keymap: {
+          0: { action: 'mo', layerId: 2 },
+          1: { action: 'lt', layerId: 2, tapAction: { action: 'tap', keycode: 'A' } },
+          2: { action: 'tap', keycode: 'B' }
+        }
+      }
+    ], { skipCollision: true });
+
+    store.removeLastLayer();
+    const state = useKeyboardStore.getState();
+    const keymap = state.keys[0].keymap;
+
+    expect(state.settings.layers).toBe(2);
+    expect(state.currentLayer).toBe(1);
+    expect(keymap?.[2]).toBeUndefined();
+    expect(keymap?.[0]).toEqual({ action: 'mo', layerId: 0 });
+    expect(keymap?.[1]).toEqual({ action: 'lt', layerId: 0, tapAction: { action: 'tap', keycode: 'A' } });
+    expect(state.remoteKeymap[2]).toBeUndefined();
+  });
+
   it('should align keys correctly', () => {
     const store = useKeyboardStore.getState();
     // Add two keys at different locations

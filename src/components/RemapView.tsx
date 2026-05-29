@@ -11,7 +11,7 @@ import { KeycodeConfigPanel } from './KeycodeConfigPanel';
 import { MacrosCombosPanel } from './MacrosCombosPanel';
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities } = useKeyboardStore();
+  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
   const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
@@ -29,6 +29,8 @@ export const RemapView: React.FC = () => {
     });
   }, [selectedKeyIds, keys, currentLayer, remoteKeymap]);
 
+  const shouldShowZoomControls = !(keys.length === 0 && !zmkLocked);
+
   return (
     <div className="flex-1 relative flex flex-col overflow-hidden bg-[var(--bg-app)]">
       {/* Workspace Area */}
@@ -42,9 +44,11 @@ export const RemapView: React.FC = () => {
               </div>
               
               {/* Position ZoomControls relative to the top of the KeycodePanel */}
-              <div className="absolute inset-x-0 bottom-[400px] h-0 z-[160]">
-                <ZoomControls />
-              </div>
+              {shouldShowZoomControls && (
+                <div className="absolute inset-x-0 bottom-[400px] h-0 z-[160]">
+                  <ZoomControls />
+                </div>
+              )}
                 
                 {/* Right Side Floating Widgets (Swapped from Left Side) */}
                 <div className="absolute top-4 right-4 z-[100] flex flex-col gap-4 items-end">

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Plus, Minus, Scan, Grid, MousePointer2, Hash, RefreshCcw } from 'lucide-react';
+import { Check, Pencil, Plus, Minus, Scan, Grid, MousePointer2, Hash, RefreshCcw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -21,13 +21,29 @@ export const ZoomControls = () => {
     appMode,
     currentLayer,
     setCurrentLayer,
-    updateSettings,
+    addLayer,
+    removeLastLayer,
     connectedDevice,
-    syncKeymap
+    zmkLayerMetadata,
+    syncKeymap,
+    renameZmkLayer,
+    addZmkLayer,
+    removeLastZmkLayer
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeMenu, setActiveMenu] = React.useState<'grid' | 'mouse' | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [editingLayer, setEditingLayer] = React.useState<number | null>(null);
+  const [layerNameDraft, setLayerNameDraft] = React.useState('');
+  const [layerNameError, setLayerNameError] = React.useState<string | null>(null);
+  const [isRenamingLayer, setIsRenamingLayer] = React.useState(false);
+  const [isChangingLayers, setIsChangingLayers] = React.useState(false);
+  const isZmkDevice = connectedDevice?.protocolType === 'zmk';
+  const layerCount = settings.layers || 4;
+  const zmkAvailableLayers = zmkLayerMetadata?.availableLayers || 0;
+  const zmkMaxLayerNameLength = zmkLayerMetadata?.maxLayerNameLength || 0;
+  const canAddZmkLayer = isZmkDevice && zmkLayerMetadata && zmkAvailableLayers > 0;
+  const canRemoveZmkLayer = isZmkDevice && zmkLayerMetadata && layerCount > 1;
 
   const handleRefresh = async () => {
     if (!connectedDevice) return;
@@ -38,6 +54,59 @@ export const ZoomControls = () => {
       console.error('Refresh failed:', err);
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const openLayerRename = () => {
+    const layer = zmkLayerMetadata?.layers[currentLayer];
+    setEditingLayer(currentLayer);
+    setLayerNameDraft(layer?.name || `Layer ${currentLayer}`);
+    setLayerNameError(null);
+  };
+
+  const closeLayerRename = () => {
+    if (isRenamingLayer) return;
+    setEditingLayer(null);
+    setLayerNameDraft('');
+    setLayerNameError(null);
+  };
+
+  const handleLayerRename = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (editingLayer === null) return;
+
+    setIsRenamingLayer(true);
+    setLayerNameError(null);
+    try {
+      await renameZmkLayer(editingLayer, layerNameDraft);
+      setEditingLayer(null);
+      setLayerNameDraft('');
+    } catch (err: any) {
+      setLayerNameError(err?.message || 'Failed to rename layer.');
+    } finally {
+      setIsRenamingLayer(false);
+    }
+  };
+
+  const handleAddZmkLayer = async () => {
+    setIsChangingLayers(true);
+    try {
+      await addZmkLayer();
+    } catch (err) {
+      console.error('Failed to add ZMK layer:', err);
+    } finally {
+      setIsChangingLayers(false);
+    }
+  };
+
+  const handleRemoveLastZmkLayer = async () => {
+    setIsChangingLayers(true);
+    try {
+      await removeLastZmkLayer();
+    } catch (err) {
+      console.error('Failed to remove ZMK layer:', err);
+    } finally {
+      setIsChangingLayers(false);
     }
   };
 
@@ -91,29 +160,82 @@ export const ZoomControls = () => {
         {(appMode === 'remap' || editorMode === 'keymap') && (
           <>
             <div className="flex items-center gap-1 bg-[var(--bg-app)] border border-[var(--border-main)] rounded p-0.5">
-              {Array.from({ length: settings.layers || 4 }).map((_, layer) => (
-                <button
-                  key={layer}
-                  onClick={() => setCurrentLayer(layer)}
-                  className={cn(
-                    "w-7 h-7 flex items-center justify-center rounded text-[11px] font-bold transition-all relative group",
-                    currentLayer === layer 
-                      ? "bg-amber-500 text-zinc-950 font-black shadow-sm" 
-                      : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
-                  )}
-                >
-                  {layer}
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
-                    {t('common.layer')} {layer}
-                  </div>
-                </button>
-              ))}
+              {Array.from({ length: layerCount }).map((_, layer) => {
+                const zmkLayer = zmkLayerMetadata?.layers[layer];
+                const layerName = zmkLayer?.name?.trim();
+                const tooltipLabel = layerName
+                  ? `${t('common.layer')} ${layer}: ${layerName}`
+                  : `${t('common.layer')} ${layer}`;
+
+                return (
+                  <button
+                    key={layer}
+                    onClick={() => setCurrentLayer(layer)}
+                    className={cn(
+                      "w-7 h-7 flex items-center justify-center rounded text-[11px] font-bold transition-all relative group",
+                      currentLayer === layer 
+                        ? "bg-amber-500 text-zinc-950 font-black shadow-sm" 
+                        : "text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+                    )}
+                  >
+                    {layer}
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      {tooltipLabel}
+                    </div>
+                  </button>
+                );
+              })}
+
+              {isZmkDevice && zmkLayerMetadata && (
+                <>
+                  <div className="w-px h-4 bg-[var(--border-main)] mx-0.5" />
+                  <button
+                    onClick={openLayerRename}
+                    className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
+                  >
+                    <Pencil size={12} />
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      Rename layer
+                    </div>
+                  </button>
+                  <button
+                    onClick={handleAddZmkLayer}
+                    disabled={!canAddZmkLayer || isChangingLayers}
+                    className={cn(
+                      "w-7 h-7 flex items-center justify-center rounded transition-all relative group",
+                      canAddZmkLayer && !isChangingLayers
+                        ? "text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)]"
+                        : "text-[var(--text-muted)] opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    <Plus size={12} />
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      Add ZMK layer
+                    </div>
+                  </button>
+                  <button
+                    onClick={handleRemoveLastZmkLayer}
+                    disabled={!canRemoveZmkLayer || isChangingLayers}
+                    className={cn(
+                      "w-7 h-7 flex items-center justify-center rounded transition-all relative group",
+                      canRemoveZmkLayer && !isChangingLayers
+                        ? "text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)]"
+                        : "text-[var(--text-muted)] opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    <Minus size={12} />
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
+                      Remove last ZMK layer
+                    </div>
+                  </button>
+                </>
+              )}
 
               {appMode === 'design' && (
                 <>
                   <div className="w-px h-4 bg-[var(--border-main)] mx-0.5" />
                   <button 
-                    onClick={() => updateSettings({ layers: Math.min(32, settings.layers + 1) })}
+                    onClick={addLayer}
                     className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
                   >
                     <Plus size={12} />
@@ -122,7 +244,7 @@ export const ZoomControls = () => {
                     </div>
                   </button>
                   <button 
-                    onClick={() => updateSettings({ layers: Math.max(1, settings.layers - 1) })}
+                    onClick={removeLastLayer}
                     className="w-7 h-7 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-amber-500 hover:bg-[var(--bg-hover)] transition-all relative group"
                   >
                     <span className="text-sm font-bold leading-none -translate-y-px">-</span>
@@ -152,6 +274,44 @@ export const ZoomControls = () => {
                 </>
               )}
             </div>
+
+            {isZmkDevice && zmkLayerMetadata && editingLayer !== null && (
+              <>
+                <div className="fixed inset-0" onClick={closeLayerRename} />
+                <form
+                  onSubmit={handleLayerRename}
+                  className="absolute bottom-full right-0 mb-2 w-64 rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)]/95 p-2 shadow-2xl backdrop-blur-xl"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={layerNameDraft}
+                      maxLength={zmkMaxLayerNameLength || undefined}
+                      onChange={(event) => setLayerNameDraft(event.target.value)}
+                      className="h-8 min-w-0 flex-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-2 text-xs font-semibold text-[var(--text-main)] outline-none focus:border-amber-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isRenamingLayer}
+                      className="h-8 w-8 flex items-center justify-center rounded bg-amber-500 text-zinc-950 hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeLayerRename}
+                      disabled={isRenamingLayer}
+                      className="h-8 w-8 flex items-center justify-center rounded text-[var(--text-dim)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {layerNameError && (
+                    <div className="mt-1.5 text-[10px] font-semibold text-red-400">{layerNameError}</div>
+                  )}
+                </form>
+              </>
+            )}
             
             <div className="w-px h-4 bg-[var(--border-main)] mx-1" />
           </>

@@ -181,6 +181,9 @@ export function actionToZmkString(action: UniversalAction): string {
       return `&lt ${action.layerId} ${inner}`;
     }
     case 'mt': {
+      if (action.modifiers.length === 0) {
+        throw new Error('Mod-tap requires at least one hold modifier.');
+      }
       const inner = actionToZmkString(action.tapAction).replace(/^&kp\s+/, '');
       const mods = action.modifiers.map(m => ZMK_KEY_MAP[m] || m).join(' ');
       return `&mt ${mods} ${inner}`;
