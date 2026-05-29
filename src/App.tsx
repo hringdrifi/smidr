@@ -140,6 +140,7 @@ export default function App() {
   };
 
   const handleExportViaZip = async () => {
+    if (!isQmkSourceExportSupported(settings.hardware)) return;
     warnIfQmkPinsMissing();
     const zipBlob = await generateQmkZip({ settings, keys });
     if (zipBlob) {
@@ -150,6 +151,7 @@ export default function App() {
   };
 
   const handleExportVialZip = async () => {
+    if (!isQmkSourceExportSupported(settings.hardware)) return;
     warnIfQmkPinsMissing();
     const zipBlob = await generateVialZip({ settings, keys });
     if (zipBlob) {
@@ -160,6 +162,7 @@ export default function App() {
   };
 
   const handleExportZmkZip = async () => {
+    if (!isZmkSourceExportSupported(settings.hardware)) return;
     const zipBlob = await generateZmkZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_zmk.zip`, zipBlob);
@@ -568,6 +571,14 @@ export default function App() {
                         <div className="p-1 flex flex-col gap-0.5">
                           <button 
                             onClick={handleExportJson}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                          >
+                            <FileDown size={14} className="text-amber-500" />
+                            <span>{t('header.exportProject')}</span>
+                          </button>
+
+                          <button 
+                            onClick={handleExportViaZip}
                             disabled={qmkSourceUnsupported}
                             className={cn(
                               "w-full flex items-center gap-2 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
@@ -576,14 +587,6 @@ export default function App() {
                                 : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
                             )}
                             title={qmkSourceUnsupported ? "QMK export is not supported for the selected MCU or development board." : undefined}
-                          >
-                            <FileDown size={14} className="text-amber-500" />
-                            <span>{t('header.exportProject')}</span>
-                          </button>
-
-                          <button 
-                            onClick={handleExportViaZip}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
                           >
                             <Download size={14} className={qmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
                             <span>{t('header.exportViaZip')}</span>

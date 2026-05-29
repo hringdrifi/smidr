@@ -60,5 +60,7 @@ describe('MCU pin presets', () => {
     expect(isZmkSourceExportSupported({ controllerType: 'development_board', board: 'kb2040' })).toBe(true);
     expect(isQmkSourceExportSupported({ controllerType: 'development_board', board: 'nice_nano' })).toBe(false);
     expect(isZmkSourceExportSupported({ controllerType: 'development_board', board: 'nice_nano' })).toBe(true);
+    expect(isQmkSourceExportSupported({ board: 'nice_nano', mcu: 'RP2040' })).toBe(false);
+    expect(isZmkSourceExportSupported({ board: 'nice_nano', mcu: 'RP2040' })).toBe(true);
   });
 });

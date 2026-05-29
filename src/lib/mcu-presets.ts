@@ -163,15 +163,15 @@ export const isQmkMcuSupported = (mcu: string | undefined) => {
 };
 
 export const isQmkSourceExportSupported = (hardware: { controllerType?: 'mcu' | 'development_board'; mcu?: string; board?: string } | undefined) => {
-  if (hardware?.controllerType === 'development_board') {
-    return isQmkDevelopmentBoardSupported(hardware.board);
+  if ((hardware?.controllerType || 'development_board') === 'development_board') {
+    return isQmkDevelopmentBoardSupported(hardware?.board);
   }
   return isQmkMcuSupported(hardware?.mcu);
 };
 
 export const isZmkSourceExportSupported = (hardware: { controllerType?: 'mcu' | 'development_board'; mcu?: string; board?: string } | undefined) => {
-  if (hardware?.controllerType === 'development_board') {
-    return isZmkDevelopmentBoardSupported(hardware.board);
+  if ((hardware?.controllerType || 'development_board') === 'development_board') {
+    return isZmkDevelopmentBoardSupported(hardware?.board);
   }
   return isZmkExportSupported(hardware?.mcu);
 };
