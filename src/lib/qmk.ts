@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
+import { getDefaultBootloader, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const matrixKeys = keys.filter(key => (
@@ -111,6 +112,8 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
+  const processor = getQmkProcessor(settings.hardware.mcu);
+  const bootloader = settings.hardware.bootloader || getDefaultBootloader(processor);
   
   const kbFolder = zip.folder(kbName);
   if (!kbFolder) return null;
@@ -120,8 +123,8 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     manufacturer: settings.manufacturer,
     keyboard_name: settings.name,
     maintainer: 'Smidr User',
-    processor: settings.hardware.mcu === 'rp2040' ? 'RP2040' : 'atmega32u4',
-    bootloader: settings.hardware.mcu === 'rp2040' ? 'rp2040' : 'pro_micro',
+    processor,
+    bootloader,
     diode_direction: settings.hardware.diodeDirection,
     features: {
       command: false,
@@ -173,7 +176,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
           protocol: 'serial'
         },
         serial: {
-          driver: settings.hardware.mcu === 'rp2040' ? 'vendor' : 'bitbang',
+          driver: getSplitSerialDriver(processor),
           pin: settings.pins.splitSerial || 'GP1'
         }
       }

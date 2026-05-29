@@ -6,6 +6,7 @@ import { Settings, Cpu, HardDrive, Hash, Lightbulb, Gauge, Monitor, ShieldCheck,
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getDefaultBootloader, getMcuPins, getQmkProcessor, QMK_MCU_PRESETS } from '@/lib/mcu-presets';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -215,27 +216,8 @@ export const HardwareSettingsPanel = () => {
   const [preventDuplicates, setPreventDuplicates] = React.useState<boolean>(true);
   const [customPinText, setCustomPinText] = React.useState<string>('');
 
-  const rp2040Pins = [
-    'GP0', 'GP1', 'GP2', 'GP3', 'GP4', 'GP5', 'GP6', 'GP7',
-    'GP8', 'GP9', 'GP10', 'GP11', 'GP12', 'GP13', 'GP14', 'GP15',
-    'GP16', 'GP17', 'GP18', 'GP19', 'GP20', 'GP21', 'GP22',
-    'GP23', 'GP24', 'GP25', 'GP26', 'GP27', 'GP28', 'GP29'
-  ];
-
-  const atmega32u4Pins = [
-    'B0', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7',
-    'C6', 'C7',
-    'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D7',
-    'E6',
-    'F0', 'F1', 'F4', 'F5', 'F6', 'F7'
-  ];
-
-  const genericPins = Array.from({ length: 20 }, (_, i) => `P${i}`);
-
   const getPinPool = () => {
-    if (settings.hardware.mcu === 'rp2040') return rp2040Pins;
-    if (settings.hardware.mcu === 'atmega32u4') return atmega32u4Pins;
-    return genericPins;
+    return getMcuPins(settings.hardware.mcu);
   };
 
   const getLeftAssignedPins = () => {
@@ -281,6 +263,7 @@ export const HardwareSettingsPanel = () => {
     hasRowColPinOverlap(settings.pins.rows, settings.pins.cols) ||
     (settings.features.split && hasRowColPinOverlap(rightRows, rightCols));
   const qmkMatrixMasked = settings.qmk?.matrixMasked === true;
+  const selectedMcu = getQmkProcessor(settings.hardware.mcu);
   const qmkBootmagic = settings.qmk?.bootmagic || { enabled: true };
   const bootmagicEnabled = qmkBootmagic.enabled !== false;
   const vialUnlockCombo = settings.vial?.unlockCombo || {};
@@ -379,6 +362,13 @@ export const HardwareSettingsPanel = () => {
     updateSettings({ hardware: { ...settings.hardware, ...updates } });
   };
 
+  const updateMcu = (mcu: string) => {
+    updateHardware({
+      mcu,
+      bootloader: getDefaultBootloader(mcu),
+    });
+  };
+
   const toggleFeature = (key: keyof typeof settings.features) => {
     updateSettings({ features: { ...settings.features, [key]: !settings.features[key] } });
   };
@@ -429,15 +419,21 @@ export const HardwareSettingsPanel = () => {
           <div className="space-y-1">
             <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.controller')}</label>
             <select 
-              value={settings.hardware.mcu}
-              onChange={(e) => updateHardware({ mcu: e.target.value as any })}
+              value={selectedMcu}
+              onChange={(e) => updateMcu(e.target.value)}
               className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]"
             >
-              <option value="rp2040">Raspberry Pi RP2040</option>
-              <option value="atmega32u4">ATmega32U4 (Pro Micro)</option>
-              <option value="other">{t('hardware.otherMcu')}</option>
+              {QMK_MCU_PRESETS.map(preset => (
+                <option key={preset.value} value={preset.value}>{preset.label}</option>
+              ))}
             </select>
           </div>
+          <PinInput
+            label="QMK bootloader"
+            value={settings.hardware.bootloader || getDefaultBootloader(selectedMcu)}
+            onChange={(v) => updateHardware({ bootloader: v.trim() })}
+            placeholder="e.g. stm32-dfu"
+          />
           <div className="space-y-1">
             <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.diodeDir')}</label>
             <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
@@ -847,7 +843,10 @@ export const HardwareSettingsPanel = () => {
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                  Available Pins Pool ({settings.hardware.mcu.toUpperCase()})
+                  Available Pins Pool ({selectedMcu.toUpperCase()})
+                </span>
+                <span className="text-[9px] text-[var(--text-dim)] mt-0.5">
+                  QMK pin symbols are shown as candidates. Verify exposed pins against your board/package pinout.
                 </span>
                 {activeBox && (
                   <span className="text-[9px] text-[var(--text-muted)] mt-0.5">

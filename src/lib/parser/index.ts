@@ -1,5 +1,6 @@
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { parseKLEData } from './kle-logic';
+import { getDefaultBootloader, getQmkProcessor } from '../mcu-presets';
 
 const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
 
@@ -148,14 +149,12 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
 
       let hardware: any = undefined;
       if (input.processor || input.bootloader || input.diode_direction) {
-        let mcu = 'rp2040';
+        let mcu = 'RP2040';
         if (input.processor) {
-          const proc = String(input.processor).toLowerCase();
-          if (proc.includes('atmega32u4')) mcu = 'atmega32u4';
-          else if (proc.includes('rp2040')) mcu = 'rp2040';
-          else mcu = proc;
+          mcu = getQmkProcessor(String(input.processor));
         }
         let board = 'promicro';
+        let bootloader = input.bootloader ? String(input.bootloader) : getDefaultBootloader(mcu);
         if (input.bootloader) {
           const bl = String(input.bootloader).toLowerCase();
           if (bl.includes('pro_micro') || bl.includes('promicro')) board = 'promicro';
@@ -168,7 +167,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
             diodeDirection = dd;
           }
         }
-        hardware = { mcu, board, diodeDirection };
+        hardware = { mcu, bootloader, board, diodeDirection };
       }
 
       const bootmagicMatrix = Array.isArray(input.bootmagic?.matrix) ? input.bootmagic.matrix : undefined;

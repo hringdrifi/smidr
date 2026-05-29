@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { actionToZmkString } from './protocols/zmk-action-converter';
 import { sortKeys } from './sorting';
+import { getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
@@ -17,6 +18,28 @@ const sanitizeIdentifier = (value: string, fallback: string) => {
 const parseGpioNumber = (pin: string, fallback: number): number => {
   const match = pin.trim().match(/(?:GP|GPIO|P)?\s*(\d+)/i);
   return match ? Number(match[1]) : fallback;
+};
+
+const parseZmkGpio = (pin: string, fallback: number, target: ZmkTarget) => {
+  if (target === 'nrf52840') {
+    const match = pin.trim().match(/^P([01])\.(\d{1,2})$/i);
+    if (match) {
+      return { controller: `&gpio${match[1]}`, number: Number(match[2]) };
+    }
+  }
+
+  return { controller: '&gpio0', number: parseGpioNumber(pin, fallback) };
+};
+
+const formatGpios = (pins: string[], target: ZmkTarget, flags: string, label: string) => {
+  if (pins.length === 0) {
+    return `&gpio0 0 ${flags} /* Please configure pins */`;
+  }
+
+  return pins.map((pin, index) => {
+    const parsed = parseZmkGpio(pin, index, target);
+    return `${parsed.controller} ${parsed.number} ${flags} /* ${label} ${index}: ${pin} */`;
+  }).join('\n            , ');
 };
 
 /**
@@ -39,10 +62,12 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const kbName = sanitizeIdentifier(settings.name, 'smidr_keyboard');
   const vendorName = sanitizeIdentifier(settings.manufacturer, 'custom_vendor');
   
-  // Determine target architecture and SoC name based on selected MCU
-  const mcu = settings.hardware.mcu || 'rp2040';
-  const isAtmega = mcu === 'atmega32u4';
-  const arch = isAtmega ? 'avr' : 'arm';
+  if (!isZmkExportSupported(settings.hardware.mcu)) {
+    throw new Error('ZMK export is currently implemented for RP2040 and nRF52840 projects only.');
+  }
+
+  const zmkTarget = getZmkTarget(settings.hardware.mcu) || 'rp2040';
+  const arch = 'arm';
   
   // ZMK configs are typically inside a config/ folder
   const configFolder = zip.folder('config');
@@ -60,7 +85,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
 
 config BOARD_${kbName.toUpperCase()}
     bool "${settings.name}"
-    select SOC_${isAtmega ? 'ATMEGA32U4' : 'RP2040'}
+    select SOC_${zmkTarget === 'nrf52840' ? 'NRF52840_QIAA' : 'RP2040'}
 `;
   boardFolder.file('Kconfig.board', kconfigBoard);
 
@@ -76,10 +101,14 @@ config BOARD
 config ZMK_KEYBOARD_NAME
     default "${settings.name}"
 
-${isAtmega ? '' : `config RP2_FLASH_W25Q080
+${zmkTarget === 'nrf52840' ? `config ZMK_BLE
+    default y
+
+config ZMK_USB
+    default y
+` : `config RP2_FLASH_W25Q080
     default y
 `}
-
 endif
 `;
   boardFolder.file('Kconfig.defconfig', kconfigDefconfig);
@@ -88,10 +117,18 @@ endif
   const boardDefconfig = `CONFIG_GPIO=y
 CONFIG_ZMK=y
 CONFIG_USB=y
+${zmkTarget === 'nrf52840' ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}
 CONFIG_FLASH=y
 CONFIG_SETTINGS=y
 CONFIG_SETTINGS_NVS=y
-${isAtmega ? 'CONFIG_BUILD_OUTPUT_HEX=y' : 'CONFIG_BUILD_OUTPUT_UF2=y\nCONFIG_PINCTRL=y\nCONFIG_CLOCK_CONTROL=y\nCONFIG_FLASH_PAGE_LAYOUT=y\nCONFIG_RETAINED_MEM=y\nCONFIG_RETENTION=y\nCONFIG_RETENTION_BOOT_MODE=y'}
+CONFIG_BUILD_OUTPUT_UF2=y
+CONFIG_PINCTRL=y
+CONFIG_CLOCK_CONTROL=y
+CONFIG_FLASH_PAGE_LAYOUT=y
+${zmkTarget === 'nrf52840' ? 'CONFIG_NVS=y\nCONFIG_MPU_ALLOW_FLASH_WRITE=y\n' : ''}
+CONFIG_RETAINED_MEM=y
+CONFIG_RETENTION=y
+CONFIG_RETENTION_BOOT_MODE=y
 `;
   boardFolder.file(`${kbName}_defconfig`, boardDefconfig);
 
@@ -115,23 +152,21 @@ ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` 
   }
 
   const rowPins = settings.pins.rows || [];
-  const gpioController = isAtmega ? '&gpioa' : '&gpio0';
-  const rowGpiosStr = rowPins.length > 0
-    ? rowPins.map((pin, i) => `${gpioController} ${parseGpioNumber(pin, i)} (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN) /* Row ${i}: ${pin} */`).join('\n            , ')
-    : `${gpioController} 0 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN) /* Please configure pins */`;
+  const rowGpiosStr = formatGpios(rowPins, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Row');
 
   const colPins = settings.pins.cols || [];
-  const colGpiosStr = colPins.length > 0
-    ? colPins.map((pin, i) => `${gpioController} ${parseGpioNumber(pin, i)} GPIO_ACTIVE_HIGH /* Col ${i}: ${pin} */`).join('\n            , ')
-    : `${gpioController} 0 GPIO_ACTIVE_HIGH /* Please configure pins */`;
+  const colGpiosStr = formatGpios(colPins, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Col');
 
-  const dtsInclude = isAtmega 
-    ? '#include <atmel/atmega32u4.dtsi>'
+  const dtsInclude = zmkTarget === 'nrf52840'
+    ? '#include <nordic/nrf52840_qiaa.dtsi>'
     : `#include <arm/rpi_pico/rp2040.dtsi>
 #include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>`;
 
-  const dtsChosen = isAtmega
-    ? `        zmk,kscan = &kscan0;
+  const dtsChosen = zmkTarget === 'nrf52840'
+    ? `        zephyr,sram = &sram0;
+        zephyr,flash = &flash0;
+        zephyr,code-partition = &code_partition;
+        zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;`
     : `        zephyr,sram = &sram0;
         zephyr,flash = &flash0;
@@ -140,7 +175,33 @@ ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` 
         zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;`;
 
-  const rp2040Peripherals = isAtmega ? '' : `
+  const peripheralDts = zmkTarget === 'nrf52840' ? `
+&gpio0 {
+    status = "okay";
+};
+
+&gpio1 {
+    status = "okay";
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        code_partition: partition@26000 {
+            label = "code_partition";
+            reg = <0x00026000 0x000d2000>;
+        };
+
+        storage_partition: partition@f8000 {
+            label = "storage";
+            reg = <0x000f8000 0x00008000>;
+        };
+    };
+};
+` : `
 &gpio0 {
     status = "okay";
 };
@@ -207,7 +268,7 @@ ${dtsChosen}
     };
 };
 
-${rp2040Peripherals}
+${peripheralDts}
 `;
   boardFolder.file(`${kbName}.dts`, keyboardDts);
 
@@ -288,6 +349,7 @@ To build ZMK firmware using this configuration:
 ## GPIO Matrix Pin Configuration
 The \`${kbName}.dts\` file has been populated with a standard \`gpio-matrix\` configuration.
 For RP2040 boards, Smidr converts pin names like \`GP2\` or \`GPIO2\` to \`&gpio0 2\`.
+For nRF52840 boards, Smidr converts pin names like \`P0.06\` and \`P1.02\` to \`&gpio0 6\` and \`&gpio1 2\`.
 Please verify the generated GPIO numbers before flashing.
 `;
   zip.file('README.md', readmeContent);

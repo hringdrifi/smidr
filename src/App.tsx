@@ -23,6 +23,7 @@ import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson }
 import { generateQmkZip } from '@/lib/qmk';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
+import { isZmkExportSupported } from '@/lib/mcu-presets';
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
 import { UniversalAction } from '@/types/actions';
 import { SmidrProject, PhysicalKey } from '@/types/keyboard';
@@ -586,26 +587,26 @@ export default function App() {
                           </button>
 
                           {(() => {
-                            const isAvrMcu = settings.hardware?.mcu === 'atmega32u4';
+                            const zmkUnsupported = !isZmkExportSupported(settings.hardware?.mcu);
                             return (
                               <button 
                                 onClick={handleExportZmkZip}
-                                disabled={isAvrMcu}
+                                disabled={zmkUnsupported}
                                 className={cn(
                                   "w-full flex items-center justify-between px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
-                                  isAvrMcu 
+                                  zmkUnsupported 
                                     ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]" 
                                     : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
                                 )}
-                                title={isAvrMcu ? "ZMK does not support AVR microcontrollers (Zephyr RTOS is 32-bit only)" : undefined}
+                                title={zmkUnsupported ? "ZMK export is currently implemented for RP2040 and nRF52840 projects only." : undefined}
                               >
                                 <div className="flex items-center gap-2">
-                                  <Download size={14} className={isAvrMcu ? "text-[var(--text-muted)]" : "text-amber-500"} />
+                                  <Download size={14} className={zmkUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
                                   <span>{t('header.exportZmkZip')}</span>
                                 </div>
-                                {isAvrMcu && (
+                                {zmkUnsupported && (
                                   <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-bold tracking-tighter">
-                                    AVR非対応
+                                    RP2040/nRF52840のみ
                                   </span>
                                 )}
                               </button>

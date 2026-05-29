@@ -1,5 +1,6 @@
 // src/types/keyboard.ts
 import { UniversalAction } from './actions';
+import type { QmkMcu } from '@/lib/mcu-presets';
 
 export interface Point { x: number; y: number; }
 
@@ -61,7 +62,8 @@ export interface ProjectSettings {
     splitCols?: string[]; // Right side col pins for split keyboards
   };
   hardware: {
-    mcu: 'rp2040' | 'atmega32u4' | 'other';
+    mcu: QmkMcu | string;
+    bootloader?: string;
     board: string; // e.g. "promicro", "elite_c"
     diodeDirection: 'ROW2COL' | 'COL2ROW';
   };

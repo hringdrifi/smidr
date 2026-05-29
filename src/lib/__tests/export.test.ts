@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { generateViaJson } from '../export';
 import { generateQmkZip } from '../qmk';
 import { generateVialZip } from '../vial';
+import { generateZmkZip } from '../zmk';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
 const baseSettings: ProjectSettings = {
@@ -103,6 +104,47 @@ describe('export generation', () => {
     expect(keyboardJson.matrix_pins.masked).toBeUndefined();
     expect(keyboardJson.features.via).toBeUndefined();
     expect(zip.file('unmasked_board/unmasked_board.c')).toBeNull();
+  });
+
+  it('emits QMK new-keyboard style processor and bootloader defaults', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'STM Board',
+      hardware: {
+        ...baseSettings.hardware,
+        mcu: 'STM32F103',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['A0'],
+        cols: ['B0'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('stm_board/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.processor).toBe('STM32F103');
+    expect(keyboardJson.bootloader).toBe('stm32duino');
   });
 
   it('emits explicit QMK bootmagic settings', async () => {
@@ -341,5 +383,49 @@ describe('export generation', () => {
     expect(configH).toContain('#define VIAL_UNLOCK_COMBO_ROWS { 1, 3 }');
     expect(configH).toContain('#define VIAL_UNLOCK_COMBO_COLS { 2, 4 }');
     expect(configH).toContain('#define VIAL_KEYBOARD_UID { 0x71, 0xF9, 0x44, 0x88, 0x00, 0xF8, 0xA8, 0x43 }');
+  });
+
+  it('emits nRF52840 ZMK custom board GPIO ports', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Nordic Board',
+      hardware: {
+        ...baseSettings.hardware,
+        mcu: 'nRF52840',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P1.02'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const boardDts = await zip.file('boards/arm/nordic_board/nordic_board.dts')!.async('string');
+    const kconfigBoard = await zip.file('boards/arm/nordic_board/Kconfig.board')!.async('string');
+
+    expect(kconfigBoard).toContain('select SOC_NRF52840_QIAA');
+    expect(boardDts).toContain('#include <nordic/nrf52840_qiaa.dtsi>');
+    expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
+    expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
   });
 });
