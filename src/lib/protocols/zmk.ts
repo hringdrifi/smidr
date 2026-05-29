@@ -2289,13 +2289,16 @@ export class ZmkProtocol implements IProtocolDriver {
     }
 
     const keymap: Record<number, UniversalAction[]> = {};
+    const zmkPositions = this.physicalKeys.length > 0
+      ? this.physicalKeys.map(pk => pk.zmkPosition)
+      : this.physicalPositions.map(pos => pos.index);
 
     for (let layer = 0; layer < Math.min(this.fetchedKeymap.layers.length, 16); layer++) {
       const actions: UniversalAction[] = [];
       const layerBindings = this.fetchedKeymap.layers[layer]?.bindings || [];
-      for (const pk of this.physicalKeys) {
-        const binding = layerBindings[pk.zmkPosition];
-        actions[pk.zmkPosition] = binding
+      for (const zmkPosition of zmkPositions) {
+        const binding = layerBindings[zmkPosition];
+        actions[zmkPosition] = binding
           ? zmkStringToAction(bindingToZmkString(binding, this.behaviorNames))
           : { action: 'none' };
       }

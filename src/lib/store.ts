@@ -156,8 +156,10 @@ export interface KeyboardState {
     status: 'idle' | 'holding' | 'success' | 'failed';
     statusText: string;
     unlockKeys: { row: number; col: number }[];
+    cancelRequested: boolean;
   };
   setUnlockState: (state: Partial<KeyboardState['unlockState']>) => void;
+  cancelDeviceUnlock: () => void;
   performDeviceUnlock: (protocol: VialProtocol) => Promise<boolean>;
 
   // Project Management
@@ -267,6 +269,7 @@ const initialState: Partial<KeyboardState> = {
     status: 'idle',
     statusText: '',
     unlockKeys: [],
+    cancelRequested: false,
   },
 };
 
@@ -424,8 +427,35 @@ export const useKeyboardStore = create<KeyboardState>()(
           unlockState: { ...s.unlockState, ...state }
         })),
 
+        cancelDeviceUnlock: () => set((s: KeyboardState) => ({
+          unlockState: {
+            ...s.unlockState,
+            showModal: false,
+            progress: 0,
+            status: 'idle',
+            statusText: '',
+            unlockKeys: [],
+            cancelRequested: true,
+          }
+        })),
+
         performDeviceUnlock: async (protocol: VialProtocol): Promise<boolean> => {
           const { setUnlockState } = get();
+          const finishCancelledUnlock = async () => {
+            try {
+              await protocol.lock();
+            } catch (lockErr) {
+              console.warn('Failed to lock device after unlock cancellation:', lockErr);
+            }
+            setUnlockState({
+              showModal: false,
+              progress: 0,
+              status: 'idle',
+              statusText: '',
+              unlockKeys: [],
+              cancelRequested: false,
+            });
+          };
 
           let unlockKeys: { row: number; col: number }[] = [];
           try {
@@ -440,7 +470,8 @@ export const useKeyboardStore = create<KeyboardState>()(
             progress: 0,
             status: 'holding',
             statusText: 'Press and hold the unlock key combination on your keyboard.',
-            unlockKeys
+            unlockKeys,
+            cancelRequested: false,
           });
 
           try {
@@ -450,7 +481,17 @@ export const useKeyboardStore = create<KeyboardState>()(
             let maxCounter = 1;
             
             while (Date.now() - startTime < timeoutMs) {
+              if (get().unlockState.cancelRequested) {
+                await finishCancelledUnlock();
+                return false;
+              }
+
               const poll = await protocol.unlockPoll();
+              if (get().unlockState.cancelRequested) {
+                await finishCancelledUnlock();
+                return false;
+              }
+
               if (poll.unlocked === 1) {
                 setUnlockState({
                   progress: 100,
@@ -473,8 +514,12 @@ export const useKeyboardStore = create<KeyboardState>()(
                 status: 'holding',
                 statusText: `Holding... ${progressPercent}%`
               });
-              
+
               await new Promise(resolve => setTimeout(resolve, 200));
+              if (get().unlockState.cancelRequested) {
+                await finishCancelledUnlock();
+                return false;
+              }
             }
             
             setUnlockState({

@@ -1,7 +1,55 @@
-import { KeyboardState } from './store';
 import { PhysicalKey, SmidrProject, ProjectSettings } from '@/types/keyboard';
 import { exportKLE } from './kle';
 import { actionToQmkString } from './protocols/via-action-converter';
+
+const sortLayoutGroupIds = (ids: string[]) => {
+  return [...ids].sort((a, b) => {
+    const an = Number(a);
+    const bn = Number(b);
+    const aIsNumeric = Number.isFinite(an);
+    const bIsNumeric = Number.isFinite(bn);
+
+    if (aIsNumeric && bIsNumeric) return an - bn;
+    if (aIsNumeric) return -1;
+    if (bIsNumeric) return 1;
+    return a.localeCompare(b);
+  });
+};
+
+const getKeyBounds = (key: PhysicalKey) => {
+  const rects = [
+    { x: key.x, y: key.y, w: key.w, h: key.h }
+  ];
+
+  if (key.w2 !== undefined || key.h2 !== undefined || key.x2 !== undefined || key.y2 !== undefined) {
+    rects.push({
+      x: key.x + (key.x2 ?? 0),
+      y: key.y + (key.y2 ?? 0),
+      w: key.w2 ?? key.w,
+      h: key.h2 ?? key.h
+    });
+  }
+
+  return rects.reduce((bounds, rect) => ({
+    minX: Math.min(bounds.minX, rect.x),
+    minY: Math.min(bounds.minY, rect.y),
+    maxX: Math.max(bounds.maxX, rect.x + rect.w),
+    maxY: Math.max(bounds.maxY, rect.y + rect.h),
+  }), {
+    minX: Infinity,
+    minY: Infinity,
+    maxX: -Infinity,
+    maxY: -Infinity,
+  });
+};
+
+const keysOverlap = (a: PhysicalKey, b: PhysicalKey) => {
+  const ab = getKeyBounds(a);
+  const bb = getKeyBounds(b);
+  const overlapX = Math.max(0, Math.min(ab.maxX, bb.maxX) - Math.max(ab.minX, bb.minX));
+  const overlapY = Math.max(0, Math.min(ab.maxY, bb.maxY) - Math.max(ab.minY, bb.minY));
+  return overlapX > 0.1 && overlapY > 0.1;
+};
 
 /**
  * Generates a VIA/Vial compatible JSON definition.
@@ -11,9 +59,11 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
 
   // Format labels from layoutOptions
   const labels: any[] = [];
-  const groupIds = Object.keys(settings.layoutOptions || {}).map(Number).sort((a, b) => a - b);
+  const groupIds = sortLayoutGroupIds(Object.keys(settings.layoutOptions || {}));
+  const exportGroupByInternalId = new Map<string, number>();
   groupIds.forEach(groupId => {
-    const opt = settings.layoutOptions[groupId.toString()];
+    const opt = settings.layoutOptions[groupId];
+    exportGroupByInternalId.set(groupId, labels.length);
     if (opt.type === 'list' && opt.choices) {
       labels.push([opt.name, ...opt.choices]);
     } else {
@@ -71,23 +121,9 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
         const aKeys = gKeys.filter(k => k.option === a);
 
         aKeys.forEach(aKey => {
-          const hasOverlap = bKeys.some(bKey => {
-            const x1_a = aKey.x;
-            const x2_a = aKey.x + aKey.w;
-            const x1_b = bKey.x;
-            const x2_b = bKey.x + bKey.w;
-            
-            const overlapX = Math.max(0, Math.min(x2_a, x2_b) - Math.max(x1_a, x1_b));
-            return overlapX > 0.1;
-          }) || generatedBlockers.some(blocker => {
+          const hasOverlap = bKeys.some(bKey => keysOverlap(aKey, bKey)) || generatedBlockers.some(blocker => {
             if (blocker.group !== g || blocker.option !== b) return false;
-            const x1_a = aKey.x;
-            const x2_a = aKey.x + aKey.w;
-            const x1_b = blocker.x;
-            const x2_b = blocker.x + blocker.w;
-            
-            const overlapX = Math.max(0, Math.min(x2_a, x2_b) - Math.max(x1_a, x1_b));
-            return overlapX > 0.1;
+            return keysOverlap(aKey, blocker);
           });
 
           if (!hasOverlap) {
@@ -124,7 +160,10 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
       label = `${key.row},${key.col}`;
     }
     if (key.group !== undefined && key.option !== undefined) {
-      label += `\n\n\n${key.group},${key.option}`;
+      const exportGroup = exportGroupByInternalId.get(key.group);
+      if (exportGroup !== undefined) {
+        label += `\n\n\n${exportGroup},${key.option}`;
+      }
     }
     return {
       ...key,
@@ -145,6 +184,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
 
   keys.forEach(key => {
     if (key.row !== undefined && key.col !== undefined &&
+        key.row >= 0 && key.col >= 0 &&
         key.row < settings.pins.rows.length && key.col < settings.pins.cols.length) {
       Object.entries(key.keymap || {}).forEach(([layer, action]) => {
         const l = parseInt(layer);

@@ -2,10 +2,11 @@
 
 import React, { useMemo } from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Lock, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Lock, ShieldAlert, ShieldCheck, X } from 'lucide-react';
+import { generatePath, getKeyVertices, UNIT } from '@/lib/canvas-utils';
 
 export const UnlockModal = () => {
-  const { unlockState, keys, settings } = useKeyboardStore();
+  const { unlockState, keys, settings, cancelDeviceUnlock } = useKeyboardStore();
   const { progress, status, statusText, unlockKeys } = unlockState;
 
   // 1. Filter active layout keys for preview mapping
@@ -21,24 +22,13 @@ export const UnlockModal = () => {
     }
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     visKeys.forEach(k => {
-      const x = k.x !== undefined ? Number(k.x) : 0;
-      const y = k.y !== undefined ? Number(k.y) : 0;
-      const w = k.w !== undefined ? Number(k.w) : 1;
-      const h = k.h !== undefined ? Number(k.h) : 1;
-      const x2 = k.x2 !== undefined ? Number(k.x2) : x;
-      const y2 = k.y2 !== undefined ? Number(k.y2) : y;
-      const w2 = k.w2 !== undefined ? Number(k.w2) : w;
-      const h2 = k.h !== undefined ? Number(k.h) : h;
-
-      const kMinX = Math.min(x, x2);
-      const kMaxX = Math.max(x + w, x2 + w2);
-      const kMinY = Math.min(y, y2);
-      const kMaxY = Math.max(y + h, y2 + h2);
-
-      if (kMinX < minX) minX = kMinX;
-      if (kMaxX > maxX) maxX = kMaxX;
-      if (kMinY < minY) minY = kMinY;
-      if (kMaxY > maxY) maxY = kMaxY;
+      const vertices = getKeyVertices(k).map(p => ({ x: p.x / UNIT, y: p.y / UNIT }));
+      vertices.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
     });
 
     const padding = 0.4;
@@ -64,6 +54,18 @@ export const UnlockModal = () => {
         {/* Glow effect backdrops */}
         <div className="absolute -top-10 -left-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl animate-pulse" />
+
+        {status === 'holding' && (
+          <button
+            type="button"
+            onClick={cancelDeviceUnlock}
+            className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/70 bg-slate-950/60 text-slate-400 transition-colors hover:border-slate-500 hover:bg-slate-900 hover:text-slate-100"
+            aria-label="Cancel unlock"
+            title="Cancel unlock"
+          >
+            <X size={16} />
+          </button>
+        )}
 
         {/* Pulsing Status Icon */}
         <div className="relative flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-6 shadow-inner animate-pulse">
@@ -105,44 +107,20 @@ export const UnlockModal = () => {
               className="w-full h-auto max-h-48 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
             >
               {visKeys.map(k => {
-                const x = k.x !== undefined ? Number(k.x) : 0;
-                const y = k.y !== undefined ? Number(k.y) : 0;
-                const w = k.w !== undefined ? Number(k.w) : 1;
-                const h = k.h !== undefined ? Number(k.h) : 1;
-                const x2 = k.x2 !== undefined ? Number(k.x2) : x;
-                const y2 = k.y2 !== undefined ? Number(k.y2) : y;
-                const w2 = k.w2 !== undefined ? Number(k.w2) : w;
-                const h2 = k.h !== undefined ? Number(k.h) : h;
-
                 const unlockActive = isUnlockKey(k);
-                const gap = 0.05; // Gap between keys in coordinate units
-
-                const hasSecondary = (k.x2 !== undefined || k.y2 !== undefined || k.w2 !== undefined || k.h2 !== undefined);
+                const vertices = getKeyVertices(k).map(p => ({ x: p.x / UNIT, y: p.y / UNIT }));
+                const pathData = generatePath(vertices, 0.08);
                 
                 const keyProps = {
                   key: k.id,
-                  rx: 0.08, // Rounded corners in SVG coordinates
-                  ry: 0.08,
                   className: unlockActive
                     ? "fill-amber-500 stroke-amber-300 stroke-[0.04px] animate-pulse drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] cursor-default"
                     : "fill-slate-800/40 stroke-slate-700/50 stroke-[0.02px] cursor-default"
                 };
 
-                if (hasSecondary) {
-                  return (
-                    <g key={k.id}>
-                      <rect x={x + gap} y={y + gap} width={w - gap * 2} height={h - gap * 2} {...keyProps} />
-                      <rect x={x2 + gap} y={y2 + gap} width={w2 - gap * 2} height={h2 - gap * 2} {...keyProps} />
-                    </g>
-                  );
-                }
-
                 return (
-                  <rect
-                    x={x + gap}
-                    y={y + gap}
-                    width={w - gap * 2}
-                    height={h - gap * 2}
+                  <path
+                    d={pathData}
                     {...keyProps}
                   />
                 );
@@ -164,6 +142,14 @@ export const UnlockModal = () => {
               <span>Progress</span>
               <span className="text-amber-400">{progress}%</span>
             </div>
+            <button
+              type="button"
+              onClick={cancelDeviceUnlock}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700/70 bg-slate-950/50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-colors hover:border-slate-500 hover:bg-slate-900 hover:text-slate-100"
+            >
+              <X size={13} />
+              Cancel Unlock
+            </button>
           </div>
         )}
 

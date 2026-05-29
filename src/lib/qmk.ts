@@ -2,6 +2,37 @@ import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
 
+const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  return keys.filter((key, idx) => {
+    if (key.row === undefined || key.col === undefined) return false;
+    if (key.row < 0 || key.col < 0) return false;
+    if (key.row >= settings.pins.rows.length || key.col >= settings.pins.cols.length) return false;
+    const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
+    return firstIdx === idx;
+  });
+};
+
+const generateKeymapC = (validKeys: PhysicalKey[], keymapsArray: string[][][]) => {
+  let keymapC = `#include QMK_KEYBOARD_H
+
+const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
+`;
+
+  keymapsArray.forEach((layer, i) => {
+    keymapC += `  [${i}] = LAYOUT(\n    `;
+    keymapC += validKeys.map(key => {
+      if (key.row !== undefined && key.col !== undefined) {
+        return layer[key.row][key.col] || 'KC_TRNS';
+      }
+      return 'KC_TRNS';
+    }).join(', ');
+    keymapC += `\n  ),\n`;
+  });
+  keymapC += `};\n`;
+
+  return keymapC;
+};
+
 /**
  * Generates a full standard QMK Firmware source code ZIP with VIA support.
  * Complies strictly with modern mainline QMK rules.
@@ -10,12 +41,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   const { settings, keys } = state;
 
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
-  const validKeys = keys.filter((key, idx) => {
-    if (key.row === undefined || key.col === undefined) return false;
-    if (key.row >= settings.pins.rows.length || key.col >= settings.pins.cols.length) return false;
-    const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
-    return firstIdx === idx;
-  });
+  const validKeys = getValidMatrixKeys(settings, keys);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -115,30 +141,21 @@ ${settings.features.rgb ? `
   // Note: No [kbName].h or [kbName].c files are generated here, enabling QMK to automatically
   // auto-generate the keyboard header with the LAYOUT macro from keyboard.json.
 
-  // 4. keymaps/via/
+  const firmwareViaJson = generateViaJson({ settings, keys: validKeys });
+  const keymapC = generateKeymapC(validKeys, firmwareViaJson.keymaps);
+
+  // 4. keymaps/default/
+  const defaultFolder = kbFolder.folder('keymaps')?.folder('default');
+  if (defaultFolder) {
+    defaultFolder.file('keymap.c', keymapC);
+    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n`);
+  }
+
+  // 5. keymaps/via/
   const viaFolder = kbFolder.folder('keymaps')?.folder('via');
   if (viaFolder) {
-    const viaJson = generateViaJson({ settings, keys: validKeys });
+    const viaJson = generateViaJson({ settings, keys });
     viaFolder.file('via.json', JSON.stringify(viaJson, null, 2));
-
-    // keymap.c
-    const keymapsArray = viaJson.keymaps;
-    let keymapC = `#include QMK_KEYBOARD_H
-
-const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-`;
-
-    keymapsArray.forEach((layer, i) => {
-      keymapC += `  [${i}] = LAYOUT(\n    `;
-      keymapC += validKeys.map(key => {
-        if (key.row !== undefined && key.col !== undefined) {
-          return layer[key.row][key.col] || 'KC_TRNS';
-        }
-        return 'KC_TRNS';
-      }).join(', ');
-      keymapC += `\n  ),\n`;
-    });
-    keymapC += `};\n`;
     viaFolder.file('keymap.c', keymapC);
 
     // keymaps/via/rules.mk
