@@ -148,14 +148,14 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       }
 
       let hardware: any = undefined;
-      if (input.processor || input.bootloader || input.diode_direction) {
+      if (input.development_board || input.processor || input.bootloader || input.diode_direction) {
         let mcu = 'RP2040';
         if (input.processor) {
           mcu = getQmkProcessor(String(input.processor));
         }
-        let board = 'promicro';
+        let board = input.development_board ? String(input.development_board) : 'promicro';
         let bootloader = input.bootloader ? String(input.bootloader) : getDefaultBootloader(mcu);
-        if (input.bootloader) {
+        if (!input.development_board && input.bootloader) {
           const bl = String(input.bootloader).toLowerCase();
           if (bl.includes('pro_micro') || bl.includes('promicro')) board = 'promicro';
           else board = bl;
@@ -167,7 +167,13 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
             diodeDirection = dd;
           }
         }
-        hardware = { mcu, bootloader, board, diodeDirection };
+        hardware = {
+          controllerType: input.development_board ? 'development_board' : 'mcu',
+          mcu,
+          bootloader,
+          board,
+          diodeDirection,
+        };
       }
 
       const bootmagicMatrix = Array.isArray(input.bootmagic?.matrix) ? input.bootmagic.matrix : undefined;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMcuPins } from '../mcu-presets';
+import { getMcuPins, isQmkSourceExportSupported, isZmkSourceExportSupported } from '../mcu-presets';
 
 describe('MCU pin presets', () => {
   it('limits RP2040 to the GPIOs exposed by the MCU spec', () => {
@@ -48,5 +48,17 @@ describe('MCU pin presets', () => {
     const pins = getMcuPins('STM32H723');
 
     expect(pins).toContain('K15');
+  });
+
+  it('gates source exports by selected controller type', () => {
+    expect(isQmkSourceExportSupported({ controllerType: 'mcu', mcu: 'STM32F103' })).toBe(true);
+    expect(isZmkSourceExportSupported({ controllerType: 'mcu', mcu: 'STM32F103' })).toBe(false);
+    expect(isQmkSourceExportSupported({ controllerType: 'mcu', mcu: 'nRF52840' })).toBe(false);
+    expect(isZmkSourceExportSupported({ controllerType: 'mcu', mcu: 'nRF52840' })).toBe(true);
+
+    expect(isQmkSourceExportSupported({ controllerType: 'development_board', board: 'kb2040' })).toBe(true);
+    expect(isZmkSourceExportSupported({ controllerType: 'development_board', board: 'kb2040' })).toBe(true);
+    expect(isQmkSourceExportSupported({ controllerType: 'development_board', board: 'nice_nano' })).toBe(false);
+    expect(isZmkSourceExportSupported({ controllerType: 'development_board', board: 'nice_nano' })).toBe(true);
   });
 });

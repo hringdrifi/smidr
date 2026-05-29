@@ -62,9 +62,10 @@ export interface ProjectSettings {
     splitCols?: string[]; // Right side col pins for split keyboards
   };
   hardware: {
+    controllerType?: 'mcu' | 'development_board';
     mcu: QmkMcu | string;
     bootloader?: string;
-    board: string; // e.g. "promicro", "elite_c"
+    board: string; // QMK development_board, e.g. "promicro", "elite_c"
     diodeDirection: 'ROW2COL' | 'COL2ROW';
   };
   qmk?: {

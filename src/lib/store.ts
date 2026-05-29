@@ -15,6 +15,7 @@ import { DeviceCapability, ITransport } from './transport/types';
 import { ZmkLayerMetadata, ZmkProtocol, zmkProtocol } from './protocols/zmk';
 import { qmkStringToAction, actionToQmkString } from './protocols/via-action-converter';
 import { getStoredTheme, setStoredTheme, getStoredLanguage, setStoredLanguage } from './storage';
+import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
 
 export type RuntimeKey = PhysicalKey & { id: string };
@@ -216,7 +217,13 @@ const initialState: Partial<KeyboardState> = {
     vialUid: generateRandomVialUid(),
     matrix: { rows: 0, cols: 0 },
     pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
-    hardware: { mcu: 'RP2040', bootloader: 'rp2040', board: 'promicro', diodeDirection: 'COL2ROW' },
+    hardware: {
+      controllerType: 'development_board',
+      mcu: 'RP2040',
+      bootloader: 'rp2040',
+      board: getDefaultDevelopmentBoard('RP2040'),
+      diodeDirection: 'COL2ROW',
+    },
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,

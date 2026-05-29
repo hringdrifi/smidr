@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
-import { getDefaultBootloader, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
+import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const matrixKeys = keys.filter(key => (
@@ -114,6 +114,10 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
   const processor = getQmkProcessor(settings.hardware.mcu);
   const bootloader = settings.hardware.bootloader || getDefaultBootloader(processor);
+  const developmentBoard = getQmkDevelopmentBoard(settings.hardware.board || getDefaultDevelopmentBoard(settings.hardware.mcu));
+  const controllerJson = settings.hardware.controllerType === 'mcu'
+    ? { processor, bootloader }
+    : { development_board: developmentBoard };
   
   const kbFolder = zip.folder(kbName);
   if (!kbFolder) return null;
@@ -123,8 +127,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     manufacturer: settings.manufacturer,
     keyboard_name: settings.name,
     maintainer: 'Smidr User',
-    processor,
-    bootloader,
+    ...controllerJson,
     diode_direction: settings.hardware.diodeDirection,
     features: {
       command: false,

@@ -6,7 +6,7 @@ import { Settings, Cpu, HardDrive, Hash, Lightbulb, Gauge, Monitor, ShieldCheck,
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTranslation } from '@/hooks/useTranslation';
-import { getDefaultBootloader, getMcuPins, getQmkProcessor, QMK_MCU_PRESETS } from '@/lib/mcu-presets';
+import { DEVELOPMENT_BOARD_OPTIONS, getDefaultBootloader, getDefaultDevelopmentBoard, getMcuPins, QMK_MCU_PRESETS } from '@/lib/mcu-presets';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -263,7 +263,12 @@ export const HardwareSettingsPanel = () => {
     hasRowColPinOverlap(settings.pins.rows, settings.pins.cols) ||
     (settings.features.split && hasRowColPinOverlap(rightRows, rightCols));
   const qmkMatrixMasked = settings.qmk?.matrixMasked === true;
-  const selectedMcu = getQmkProcessor(settings.hardware.mcu);
+  const selectedMcu = settings.hardware.mcu || 'RP2040';
+  const controllerType = settings.hardware.controllerType || 'development_board';
+  const selectedDevelopmentBoard = settings.hardware.board || getDefaultDevelopmentBoard(selectedMcu);
+  const developmentBoardOptions = DEVELOPMENT_BOARD_OPTIONS.some(option => option.value === selectedDevelopmentBoard)
+    ? DEVELOPMENT_BOARD_OPTIONS
+    : [...DEVELOPMENT_BOARD_OPTIONS, { value: selectedDevelopmentBoard, label: selectedDevelopmentBoard }];
   const qmkBootmagic = settings.qmk?.bootmagic || { enabled: true };
   const bootmagicEnabled = qmkBootmagic.enabled !== false;
   const vialUnlockCombo = settings.vial?.unlockCombo || {};
@@ -369,6 +374,15 @@ export const HardwareSettingsPanel = () => {
     });
   };
 
+  const updateControllerType = (nextType: 'mcu' | 'development_board') => {
+    updateHardware({
+      controllerType: nextType,
+      ...(nextType === 'development_board' && !settings.hardware.board
+        ? { board: getDefaultDevelopmentBoard(selectedMcu) }
+        : {}),
+    });
+  };
+
   const toggleFeature = (key: keyof typeof settings.features) => {
     updateSettings({ features: { ...settings.features, [key]: !settings.features[key] } });
   };
@@ -417,6 +431,29 @@ export const HardwareSettingsPanel = () => {
       <Section title={t('hardware.mcu')} icon={Cpu}>
         <div className="space-y-4">
           <div className="space-y-1">
+            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">Controller source</label>
+            <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
+              {([
+                ['development_board', 'Development Board'],
+                ['mcu', 'MCU'],
+              ] as const).map(([type, label]) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => updateControllerType(type)}
+                  className={cn(
+                    "flex-1 py-1 text-[10px] font-bold rounded transition-all",
+                    controllerType === type ? "bg-amber-500 text-[var(--bg-button)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {controllerType === 'mcu' ? (
+          <div className="space-y-1">
             <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.controller')}</label>
             <select 
               value={selectedMcu}
@@ -427,13 +464,27 @@ export const HardwareSettingsPanel = () => {
                 <option key={preset.value} value={preset.value}>{preset.label}</option>
               ))}
             </select>
+            <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
+              QMK/Vial exports write processor and bootloader when MCU is selected.
+            </p>
           </div>
-          <PinInput
-            label="QMK bootloader"
-            value={settings.hardware.bootloader || getDefaultBootloader(selectedMcu)}
-            onChange={(v) => updateHardware({ bootloader: v.trim() })}
-            placeholder="e.g. stm32-dfu"
-          />
+          ) : (
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">Development board</label>
+            <select
+              value={selectedDevelopmentBoard}
+              onChange={(e) => updateHardware({ board: e.target.value.trim() })}
+              className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)] font-mono"
+            >
+              {developmentBoardOptions.map(board => (
+                <option key={board.value} value={board.value}>{board.label}</option>
+              ))}
+            </select>
+            <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
+              QMK/Vial exports write this as keyboard.json development_board. ZMK exports build this board with the generated shield.
+            </p>
+          </div>
+          )}
           <div className="space-y-1">
             <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.diodeDir')}</label>
             <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">

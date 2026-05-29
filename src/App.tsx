@@ -23,7 +23,7 @@ import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson }
 import { generateQmkZip } from '@/lib/qmk';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
-import { isZmkExportSupported } from '@/lib/mcu-presets';
+import { isQmkSourceExportSupported, isZmkSourceExportSupported } from '@/lib/mcu-presets';
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
 import { UniversalAction } from '@/types/actions';
 import { SmidrProject, PhysicalKey } from '@/types/keyboard';
@@ -167,6 +167,9 @@ export default function App() {
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
   };
+
+  const qmkSourceUnsupported = !isQmkSourceExportSupported(settings.hardware);
+  const zmkSourceUnsupported = !isZmkSourceExportSupported(settings.hardware);
 
   const handleImportKeyboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -565,7 +568,14 @@ export default function App() {
                         <div className="p-1 flex flex-col gap-0.5">
                           <button 
                             onClick={handleExportJson}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                            disabled={qmkSourceUnsupported}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
+                              qmkSourceUnsupported
+                                ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]"
+                                : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
+                            )}
+                            title={qmkSourceUnsupported ? "QMK export is not supported for the selected MCU or development board." : undefined}
                           >
                             <FileDown size={14} className="text-amber-500" />
                             <span>{t('header.exportProject')}</span>
@@ -575,38 +585,44 @@ export default function App() {
                             onClick={handleExportViaZip}
                             className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
                           >
-                            <Download size={14} className="text-amber-500" />
+                            <Download size={14} className={qmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
                             <span>{t('header.exportViaZip')}</span>
                           </button>
                           <button 
                             onClick={handleExportVialZip}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                            disabled={qmkSourceUnsupported}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
+                              qmkSourceUnsupported
+                                ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]"
+                                : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
+                            )}
+                            title={qmkSourceUnsupported ? "Vial export is not supported for the selected MCU or development board." : undefined}
                           >
-                            <Download size={14} className="text-amber-500" />
+                            <Download size={14} className={qmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
                             <span>{t('header.exportVialZip')}</span>
                           </button>
 
                           {(() => {
-                            const zmkUnsupported = !isZmkExportSupported(settings.hardware?.mcu);
                             return (
                               <button 
                                 onClick={handleExportZmkZip}
-                                disabled={zmkUnsupported}
+                                disabled={zmkSourceUnsupported}
                                 className={cn(
                                   "w-full flex items-center justify-between px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
-                                  zmkUnsupported 
+                                  zmkSourceUnsupported 
                                     ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]" 
                                     : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
                                 )}
-                                title={zmkUnsupported ? "ZMK export is currently implemented for RP2040 and nRF52840 projects only." : undefined}
+                                title={zmkSourceUnsupported ? "ZMK export is not supported for the selected MCU or development board." : undefined}
                               >
                                 <div className="flex items-center gap-2">
-                                  <Download size={14} className={zmkUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
+                                  <Download size={14} className={zmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
                                   <span>{t('header.exportZmkZip')}</span>
                                 </div>
-                                {zmkUnsupported && (
+                                {zmkSourceUnsupported && (
                                   <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-bold tracking-tighter">
-                                    RP2040/nRF52840のみ
+                                    Unsupported
                                   </span>
                                 )}
                               </button>

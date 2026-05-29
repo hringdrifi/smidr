@@ -71,6 +71,127 @@ type PinSet =
   | 'wb32f3g71';
 export type ZmkTarget = 'rp2040' | 'nrf52840';
 
+export const QMK_DEVELOPMENT_BOARDS = [
+  'bit_c_pro',
+  'blackpill_f401',
+  'blackpill_f411',
+  'blok',
+  'bluepill',
+  'bonsai_c4',
+  'elite_c',
+  'elite_pi',
+  'helios',
+  'imera',
+  'kb2040',
+  'liatris',
+  'michi',
+  'promicro',
+  'promicro_rp2040',
+  'proton_c',
+  'stemcell',
+  'svlinky',
+] as const;
+
+export const ZMK_DEVELOPMENT_BOARDS = [
+  'adafruit_kb2040',
+  'boardsource_blok',
+  'nrfmicro_nrf52833',
+  'nrfmicro_nrf52840_flipped',
+  'nrfmicro_nrf52840',
+  'bluemicro840',
+  'puchi_ble',
+  'nice_nano',
+  'proton_c',
+  'sparkfun_pro_micro_rp2040',
+  'mikoto',
+] as const;
+
+export type DevelopmentBoardOption = {
+  value: string;
+  label: string;
+  qmkBoard?: string;
+  zmkBoard?: string;
+};
+
+export const DEVELOPMENT_BOARD_OPTIONS: DevelopmentBoardOption[] = [
+  { value: 'bit_c_pro', label: 'Bit-C Pro', qmkBoard: 'bit_c_pro' },
+  { value: 'blackpill_f401', label: 'Blackpill F401', qmkBoard: 'blackpill_f401' },
+  { value: 'blackpill_f411', label: 'Blackpill F411', qmkBoard: 'blackpill_f411' },
+  { value: 'blok', label: 'Boardsource Blok', qmkBoard: 'blok', zmkBoard: 'boardsource_blok' },
+  { value: 'bluepill', label: 'Bluepill', qmkBoard: 'bluepill' },
+  { value: 'bonsai_c4', label: 'Bonsai C4', qmkBoard: 'bonsai_c4' },
+  { value: 'elite_c', label: 'Elite-C', qmkBoard: 'elite_c' },
+  { value: 'elite_pi', label: 'Elite-Pi', qmkBoard: 'elite_pi' },
+  { value: 'helios', label: 'Helios', qmkBoard: 'helios' },
+  { value: 'imera', label: 'Imera', qmkBoard: 'imera' },
+  { value: 'kb2040', label: 'Adafruit KB2040', qmkBoard: 'kb2040', zmkBoard: 'adafruit_kb2040' },
+  { value: 'liatris', label: 'Liatris', qmkBoard: 'liatris' },
+  { value: 'michi', label: 'Michi', qmkBoard: 'michi' },
+  { value: 'promicro', label: 'Pro Micro', qmkBoard: 'promicro' },
+  { value: 'promicro_rp2040', label: 'SparkFun Pro Micro RP2040', qmkBoard: 'promicro_rp2040', zmkBoard: 'sparkfun_pro_micro_rp2040' },
+  { value: 'proton_c', label: 'QMK Proton-C', qmkBoard: 'proton_c', zmkBoard: 'proton_c' },
+  { value: 'stemcell', label: 'Stemcell', qmkBoard: 'stemcell' },
+  { value: 'svlinky', label: 'Svlinky', qmkBoard: 'svlinky' },
+  { value: 'nrfmicro_nrf52833', label: 'nRFMicro (nRF52833)', zmkBoard: 'nrfmicro_nrf52833' },
+  { value: 'nrfmicro_nrf52840_flipped', label: 'nRFMicro nRF52840 (flipped)', zmkBoard: 'nrfmicro_nrf52840_flipped' },
+  { value: 'nrfmicro_nrf52840', label: 'nRFMicro (nRF52840) 1.1/1.2/1.3', zmkBoard: 'nrfmicro_nrf52840' },
+  { value: 'bluemicro840', label: 'BlueMicro840 v1', zmkBoard: 'bluemicro840' },
+  { value: 'puchi_ble', label: 'Puchi-BLE V1', zmkBoard: 'puchi_ble' },
+  { value: 'nice_nano', label: 'nice!nano', zmkBoard: 'nice_nano' },
+  { value: 'mikoto', label: 'Mikoto', zmkBoard: 'mikoto' },
+];
+
+export const getQmkDevelopmentBoard = (board: string | undefined) =>
+  DEVELOPMENT_BOARD_OPTIONS.find(option => option.value === board)?.qmkBoard || board || 'promicro';
+
+export const getZmkDevelopmentBoard = (board: string | undefined) =>
+  DEVELOPMENT_BOARD_OPTIONS.find(option => option.value === board)?.zmkBoard || board || 'nice_nano';
+
+export const isQmkDevelopmentBoardSupported = (board: string | undefined) => {
+  const option = DEVELOPMENT_BOARD_OPTIONS.find(candidate => candidate.value === board);
+  return option ? !!option.qmkBoard : QMK_DEVELOPMENT_BOARDS.includes(board as any);
+};
+
+export const isZmkDevelopmentBoardSupported = (board: string | undefined) => {
+  const option = DEVELOPMENT_BOARD_OPTIONS.find(candidate => candidate.value === board);
+  return option ? !!option.zmkBoard : ZMK_DEVELOPMENT_BOARDS.includes(board as any);
+};
+
+export const isQmkMcuSupported = (mcu: string | undefined) => {
+  const preset = getMcuPreset(mcu);
+  return !!preset && preset.qmkProcessor !== 'unknown';
+};
+
+export const isQmkSourceExportSupported = (hardware: { controllerType?: 'mcu' | 'development_board'; mcu?: string; board?: string } | undefined) => {
+  if (hardware?.controllerType === 'development_board') {
+    return isQmkDevelopmentBoardSupported(hardware.board);
+  }
+  return isQmkMcuSupported(hardware?.mcu);
+};
+
+export const isZmkSourceExportSupported = (hardware: { controllerType?: 'mcu' | 'development_board'; mcu?: string; board?: string } | undefined) => {
+  if (hardware?.controllerType === 'development_board') {
+    return isZmkDevelopmentBoardSupported(hardware.board);
+  }
+  return isZmkExportSupported(hardware?.mcu);
+};
+
+export const getDefaultDevelopmentBoard = (mcu: string | undefined) => {
+  const normalized = (mcu || '').toLowerCase();
+  if (normalized === 'rp2040') return 'promicro_rp2040';
+  if (normalized === 'stm32f401') return 'blackpill_f401';
+  if (normalized === 'stm32f411') return 'blackpill_f411';
+  if (normalized === 'stm32f103') return 'bluepill';
+  return 'promicro';
+};
+
+export const getDefaultZmkBoard = (mcu: string | undefined) => {
+  const target = getMcuPreset(mcu)?.zmkTarget;
+  if (target === 'nrf52840') return 'nice_nano';
+  if (target === 'rp2040') return 'promicro_rp2040';
+  return getDefaultDevelopmentBoard(mcu);
+};
+
 export interface McuPreset {
   value: QmkMcu | 'nRF52840';
   label: string;

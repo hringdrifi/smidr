@@ -14,6 +14,7 @@ const baseSettings: ProjectSettings = {
   matrix: { rows: 0, cols: 0 },
   pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
   hardware: {
+    controllerType: 'development_board',
     mcu: 'rp2040',
     board: 'promicro',
     diodeDirection: 'ROW2COL',
@@ -106,12 +107,56 @@ describe('export generation', () => {
     expect(zip.file('unmasked_board/unmasked_board.c')).toBeNull();
   });
 
-  it('emits QMK new-keyboard style processor and bootloader defaults', async () => {
+  it('emits QMK development_board without processor and bootloader', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Development Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        board: 'elite_pi',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('development_board/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.development_board).toBe('elite_pi');
+    expect(keyboardJson.processor).toBeUndefined();
+    expect(keyboardJson.bootloader).toBeUndefined();
+  });
+
+  it('emits QMK new-keyboard style processor and bootloader defaults when MCU is selected', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       name: 'STM Board',
       hardware: {
         ...baseSettings.hardware,
+        controllerType: 'mcu',
         mcu: 'STM32F103',
       },
       matrix: { rows: 1, cols: 1 },
@@ -391,6 +436,7 @@ describe('export generation', () => {
       name: 'Nordic Board',
       hardware: {
         ...baseSettings.hardware,
+        controllerType: 'mcu',
         mcu: 'nRF52840',
       },
       matrix: { rows: 1, cols: 1 },
@@ -427,5 +473,96 @@ describe('export generation', () => {
     expect(boardDts).toContain('#include <nordic/nrf52840_qiaa.dtsi>');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
+  });
+
+  it('emits ZMK as an existing board plus shield when development board is selected', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Shield Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P1.02'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const shieldOverlay = await zip.file('boards/shields/shield_board/shield_board.overlay')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(zip.file('boards/arm/shield_board/Kconfig.board')).toBeNull();
+    expect(shieldOverlay).toContain('zmk,kscan = &kscan0;');
+    expect(shieldOverlay).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
+    expect(shieldOverlay).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
+    expect(readme).toContain('- board: nice_nano');
+    expect(readme).toContain('shield: shield_board');
+  });
+
+  it('maps shared development board selections to ZMK board ids', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Shared Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'RP2040',
+        board: 'kb2040',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(readme).toContain('- board: adafruit_kb2040');
+    expect(readme).toContain('shield: shared_board');
   });
 });
