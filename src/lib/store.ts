@@ -217,7 +217,7 @@ const initialState: Partial<KeyboardState> = {
     matrix: { rows: 0, cols: 0 },
     pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
     hardware: { mcu: 'rp2040', board: 'promicro', diodeDirection: 'COL2ROW' },
-    qmk: { matrixMasked: false },
+    qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
     layoutOptions: {},
@@ -2021,7 +2021,11 @@ export const useKeyboardStore = create<KeyboardState>()(
           const { id, updatedAt, keys: rawKeys, ...settings } = project;
           const settingsWithDefaultMatrix = {
             ...settings,
-            qmk: { matrixMasked: false, ...(settings.qmk || {}) },
+            qmk: {
+              matrixMasked: false,
+              ...(settings.qmk || {}),
+              bootmagic: { enabled: true, ...(settings.qmk?.bootmagic || {}) },
+            },
             matrix: settings.matrix || {
               rows: settings.pins?.rows?.length || 0,
               cols: settings.pins?.cols?.length || 0

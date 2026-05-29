@@ -171,8 +171,16 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
         hardware = { mcu, board, diodeDirection };
       }
 
+      const bootmagicMatrix = Array.isArray(input.bootmagic?.matrix) ? input.bootmagic.matrix : undefined;
+      const bootmagicRow = bootmagicMatrix ? Number(bootmagicMatrix[0]) : undefined;
+      const bootmagicCol = bootmagicMatrix ? Number(bootmagicMatrix[1]) : undefined;
       const qmk: Partial<ProjectSettings['qmk']> = {
         matrixMasked: input.matrix_pins?.masked === true,
+        bootmagic: {
+          enabled: input.bootmagic?.enabled !== false && input.features?.bootmagic !== false,
+          row: Number.isInteger(bootmagicRow) ? bootmagicRow : undefined,
+          col: Number.isInteger(bootmagicCol) ? bootmagicCol : undefined,
+        },
       };
 
       let features: any = undefined;

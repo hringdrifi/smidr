@@ -104,6 +104,91 @@ describe('export generation', () => {
     expect(zip.file('unmasked_board/unmasked_board.c')).toBeNull();
   });
 
+  it('emits explicit QMK bootmagic settings', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Bootmagic Board',
+      matrix: { rows: 3, cols: 4 },
+      pins: {
+        rows: ['GP0', 'GP1', 'GP2'],
+        cols: ['GP3', 'GP4', 'GP5', 'GP6'],
+        splitRows: [],
+        splitCols: [],
+      },
+      qmk: {
+        bootmagic: {
+          enabled: true,
+          row: 1,
+          col: 2,
+        },
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('bootmagic_board/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.features.bootmagic).toBeUndefined();
+    expect(keyboardJson.bootmagic).toEqual({ enabled: true, matrix: [1, 2] });
+  });
+
+  it('emits disabled QMK bootmagic without a matrix position', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'No Bootmagic Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      qmk: {
+        bootmagic: {
+          enabled: false,
+        },
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('no_bootmagic_board/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.bootmagic).toEqual({ enabled: false });
+  });
+
   it('emits a matrix mask when MATRIX_MASKED is enabled', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -190,6 +275,8 @@ describe('export generation', () => {
     const keyboardC = await zip.file('vial_masked_board/vial_masked_board.c')!.async('string');
 
     expect(keyboardJson.matrix_pins.masked).toBeUndefined();
+    expect(keyboardJson.features.bootmagic).toBeUndefined();
+    expect(keyboardJson.bootmagic).toEqual({ enabled: true, matrix: [0, 0] });
     expect(rulesMk).toContain('MATRIX_MASKED = yes');
     expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
   });

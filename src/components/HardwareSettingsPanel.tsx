@@ -281,6 +281,20 @@ export const HardwareSettingsPanel = () => {
     hasRowColPinOverlap(settings.pins.rows, settings.pins.cols) ||
     (settings.features.split && hasRowColPinOverlap(rightRows, rightCols));
   const qmkMatrixMasked = settings.qmk?.matrixMasked === true;
+  const qmkBootmagic = settings.qmk?.bootmagic || { enabled: true };
+  const bootmagicEnabled = qmkBootmagic.enabled !== false;
+  const updateQmkSettings = (qmkUpdates: NonNullable<typeof settings.qmk>) => {
+    updateSettings({
+      qmk: {
+        ...(settings.qmk || {}),
+        ...qmkUpdates,
+        bootmagic: {
+          ...(settings.qmk?.bootmagic || {}),
+          ...(qmkUpdates.bootmagic || {}),
+        },
+      },
+    });
+  };
 
   const handleAssignPin = (pinName: string) => {
     if (activeBox === 'row') {
@@ -439,9 +453,7 @@ export const HardwareSettingsPanel = () => {
             <button
               type="button"
               aria-pressed={qmkMatrixMasked}
-              onClick={() => updateSettings({
-                qmk: { ...(settings.qmk || {}), matrixMasked: !qmkMatrixMasked }
-              })}
+              onClick={() => updateQmkSettings({ matrixMasked: !qmkMatrixMasked })}
               className={cn(
                 "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
                 qmkMatrixMasked ? "bg-amber-500" : "bg-[var(--bg-button)]"
@@ -462,6 +474,68 @@ export const HardwareSettingsPanel = () => {
               </p>
             </div>
           )}
+
+          <div className="space-y-3 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold text-[var(--text-main)] leading-none">BOOTMAGIC</span>
+                <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
+                  Set the bootmagic key position used by QMK/Vial source exports.
+                </span>
+              </div>
+              <button
+                type="button"
+                aria-pressed={bootmagicEnabled}
+                onClick={() => updateQmkSettings({ bootmagic: { enabled: !bootmagicEnabled } })}
+                className={cn(
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
+                  bootmagicEnabled ? "bg-amber-500" : "bg-[var(--bg-button)]"
+                )}
+              >
+                <span className={cn(
+                  "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all",
+                  bootmagicEnabled ? "left-[18px]" : "left-[2px]"
+                )} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Bootmagic Row</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  disabled={!bootmagicEnabled}
+                  value={Number.isInteger(qmkBootmagic.row) ? qmkBootmagic.row : ''}
+                  onChange={(e) => updateQmkSettings({
+                    bootmagic: {
+                      row: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                    },
+                  })}
+                  placeholder="First key"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all disabled:opacity-50"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Bootmagic Col</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  disabled={!bootmagicEnabled}
+                  value={Number.isInteger(qmkBootmagic.col) ? qmkBootmagic.col : ''}
+                  onChange={(e) => updateQmkSettings({
+                    bootmagic: {
+                      col: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                    },
+                  })}
+                  placeholder="First key"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </Section>
 

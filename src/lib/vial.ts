@@ -35,6 +35,25 @@ const shouldUseMatrixMask = (settings: ProjectSettings) => {
   return settings.qmk?.matrixMasked === true;
 };
 
+const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
+  if (settings.qmk?.bootmagic?.enabled === false) {
+    return { enabled: false };
+  }
+
+  const firstKey = validKeys[0];
+  const row = Number.isInteger(settings.qmk?.bootmagic?.row)
+    ? settings.qmk!.bootmagic!.row!
+    : firstKey?.row ?? 0;
+  const col = Number.isInteger(settings.qmk?.bootmagic?.col)
+    ? settings.qmk!.bootmagic!.col!
+    : firstKey?.col ?? 0;
+
+  return {
+    enabled: true,
+    matrix: [row, col],
+  };
+};
+
 const generateMatrixMaskC = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
   const matrix = getMatrixDimensions(settings, validKeys);
   const rowMasks = Array.from({ length: matrix.rows }, () => BigInt(0));
@@ -113,6 +132,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     throw new Error('Cannot export Vial firmware: no keys have valid matrix row/col assignments.');
   }
   const useMatrixMask = shouldUseMatrixMask(settings);
+  const bootmagic = getBootmagicConfig(settings, validKeys);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -129,7 +149,6 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     bootloader: settings.hardware.mcu === 'rp2040' ? 'rp2040' : 'pro_micro',
     diode_direction: settings.hardware.diodeDirection,
     features: {
-      bootmagic: true,
       command: false,
       console: false,
       extrakey: true,
@@ -139,6 +158,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
       rgblight: settings.features.rgb,
       via: true,  // Vial is built on top of VIA
     },
+    bootmagic,
     matrix_pins: {
       cols: settings.pins.cols,
       rows: settings.pins.rows

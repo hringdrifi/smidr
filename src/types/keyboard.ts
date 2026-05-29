@@ -67,6 +67,11 @@ export interface ProjectSettings {
   };
   qmk?: {
     matrixMasked?: boolean;
+    bootmagic?: {
+      enabled?: boolean;
+      row?: number;
+      col?: number;
+    };
   };
   features: {
     rgb: boolean;
