@@ -51,11 +51,29 @@ const keysOverlap = (a: PhysicalKey, b: PhysicalKey) => {
   return overlapX > 0.1 && overlapY > 0.1;
 };
 
+const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  const matrixKeys = keys.filter(key => (
+    key.row !== undefined &&
+    key.col !== undefined &&
+    key.row >= 0 &&
+    key.col >= 0
+  ));
+
+  const keyRows = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.row ?? 0)) + 1 : 0;
+  const keyCols = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.col ?? 0)) + 1 : 0;
+
+  return {
+    rows: Math.max(settings.matrix?.rows || 0, keyRows),
+    cols: Math.max(settings.matrix?.cols || 0, keyCols),
+  };
+};
+
 /**
  * Generates a VIA/Vial compatible JSON definition.
  */
 export const generateViaJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }) => {
   const { settings, keys } = state;
+  const matrix = getMatrixDimensions(settings, keys);
 
   // Format labels from layoutOptions
   const labels: any[] = [];
@@ -177,15 +195,15 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
   // Generate Keymaps array for VIA (layers -> rows -> cols)
   const layersCount = settings.layers || 4;
   const keymaps: string[][][] = Array.from({ length: layersCount }, () => 
-    Array.from({ length: settings.pins.rows.length }, () => 
-      Array.from({ length: settings.pins.cols.length }, () => 'KC_TRNS')
+    Array.from({ length: matrix.rows }, () =>
+      Array.from({ length: matrix.cols }, () => 'KC_TRNS')
     )
   );
 
   keys.forEach(key => {
     if (key.row !== undefined && key.col !== undefined &&
         key.row >= 0 && key.col >= 0 &&
-        key.row < settings.pins.rows.length && key.col < settings.pins.cols.length) {
+        key.row < matrix.rows && key.col < matrix.cols) {
       Object.entries(key.keymap || {}).forEach(([layer, action]) => {
         const l = parseInt(layer);
         if (l < layersCount) {
@@ -209,10 +227,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
     keycodes: [
       "qmk_lighting"
     ],
-    matrix: {
-      rows: settings.pins.rows.length,
-      cols: settings.pins.cols.length,
-    },
+    matrix,
     layouts: {
       labels: labels.length > 0 ? labels : undefined,
       keymap: kleData,

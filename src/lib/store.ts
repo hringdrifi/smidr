@@ -217,6 +217,7 @@ const initialState: Partial<KeyboardState> = {
     matrix: { rows: 0, cols: 0 },
     pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
     hardware: { mcu: 'rp2040', board: 'promicro', diodeDirection: 'COL2ROW' },
+    qmk: { matrixMasked: false },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
     layoutOptions: {},
@@ -2020,6 +2021,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const { id, updatedAt, keys: rawKeys, ...settings } = project;
           const settingsWithDefaultMatrix = {
             ...settings,
+            qmk: { matrixMasked: false, ...(settings.qmk || {}) },
             matrix: settings.matrix || {
               rows: settings.pins?.rows?.length || 0,
               cols: settings.pins?.cols?.length || 0
@@ -2089,7 +2091,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
 
             const result = parseKeyboardDefinition(input);
-            const { keys, name, vendorProductId, layoutOptions, pins, hardware, features } = result;
+            const { keys, name, vendorProductId, layoutOptions, pins, hardware, qmk, features } = result;
             
             // Update again with parsed info if successful
             if (typeof window !== 'undefined' && (window as any).setAppDebug) {
@@ -2154,6 +2156,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   activeOptions: {},
                   pins: pins ? { ...s.settings.pins, ...pins } : s.settings.pins,
                   hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
+                  qmk: qmk ? { ...(s.settings.qmk || {}), ...qmk } : s.settings.qmk,
                   features: features ? { ...s.settings.features, ...features } : s.settings.features,
                   matrix: {
                     rows: (pins && pins.rows && pins.rows.length > 0) ? pins.rows.length : (hasMatrix ? maxRow + 1 : s.settings.matrix.rows),

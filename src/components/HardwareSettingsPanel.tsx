@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Settings, Cpu, HardDrive, Hash, Lightbulb, Gauge, Monitor, ShieldCheck, ChevronRight, ChevronDown, Database, X, Check, Trash2 } from 'lucide-react';
+import { Settings, Cpu, HardDrive, Hash, Lightbulb, Gauge, Monitor, ShieldCheck, ChevronRight, ChevronDown, Database, X, Check, Trash2, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -266,6 +266,21 @@ export const HardwareSettingsPanel = () => {
   };
 
   const assignedPins = getAssignedPins();
+  const normalizePin = (pin: string | undefined) => (pin || '').trim().toUpperCase();
+  const hasRowColPinOverlap = (rows: string[] = [], cols: string[] = []) => {
+    const colPins = new Set(cols.map(normalizePin).filter(Boolean));
+    return rows.some(row => colPins.has(normalizePin(row)));
+  };
+  const rightRows = settings.pins.splitRows && settings.pins.splitRows.length === settings.pins.rows.length
+    ? settings.pins.splitRows
+    : settings.pins.rows;
+  const rightCols = settings.pins.splitCols && settings.pins.splitCols.length === settings.pins.cols.length
+    ? settings.pins.splitCols
+    : settings.pins.cols;
+  const hasMatrixPinOverlap =
+    hasRowColPinOverlap(settings.pins.rows, settings.pins.cols) ||
+    (settings.features.split && hasRowColPinOverlap(rightRows, rightCols));
+  const qmkMatrixMasked = settings.qmk?.matrixMasked === true;
 
   const handleAssignPin = (pinName: string) => {
     if (activeBox === 'row') {
@@ -408,6 +423,45 @@ export const HardwareSettingsPanel = () => {
               ))}
             </div>
           </div>
+        </div>
+      </Section>
+
+      {/* QMK Details */}
+      <Section title="QMK Details" icon={Settings}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold text-[var(--text-main)] leading-none">MATRIX_MASKED</span>
+              <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
+                Emit matrix_pins.masked and matrix_mask in QMK/Vial source exports.
+              </span>
+            </div>
+            <button
+              type="button"
+              aria-pressed={qmkMatrixMasked}
+              onClick={() => updateSettings({
+                qmk: { ...(settings.qmk || {}), matrixMasked: !qmkMatrixMasked }
+              })}
+              className={cn(
+                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
+                qmkMatrixMasked ? "bg-amber-500" : "bg-[var(--bg-button)]"
+              )}
+            >
+              <span className={cn(
+                "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all",
+                qmkMatrixMasked ? "left-[18px]" : "left-[2px]"
+              )} />
+            </button>
+          </div>
+
+          {hasMatrixPinOverlap && !qmkMatrixMasked && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-500">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <p className="text-[10px] leading-relaxed">
+                Row and column pins overlap. Enable MATRIX_MASKED if this wiring intentionally shares GPIOs.
+              </p>
+            </div>
+          )}
         </div>
       </Section>
 

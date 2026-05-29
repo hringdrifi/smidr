@@ -2,14 +2,56 @@ import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
 
+const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  const matrixKeys = keys.filter(key => (
+    key.row !== undefined &&
+    key.col !== undefined &&
+    key.row >= 0 &&
+    key.col >= 0
+  ));
+
+  const keyRows = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.row ?? 0)) + 1 : 0;
+  const keyCols = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.col ?? 0)) + 1 : 0;
+
+  return {
+    rows: Math.max(settings.matrix?.rows || 0, keyRows),
+    cols: Math.max(settings.matrix?.cols || 0, keyCols),
+  };
+};
+
 const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  const matrix = getMatrixDimensions(settings, keys);
+
   return keys.filter((key, idx) => {
     if (key.row === undefined || key.col === undefined) return false;
     if (key.row < 0 || key.col < 0) return false;
-    if (key.row >= settings.pins.rows.length || key.col >= settings.pins.cols.length) return false;
+    if (key.row >= matrix.rows || key.col >= matrix.cols) return false;
     const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
     return firstIdx === idx;
   });
+};
+
+const shouldUseMatrixMask = (settings: ProjectSettings) => {
+  return settings.qmk?.matrixMasked === true;
+};
+
+const generateMatrixMaskC = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
+  const matrix = getMatrixDimensions(settings, validKeys);
+  const rowMasks = Array.from({ length: matrix.rows }, () => BigInt(0));
+
+  validKeys.forEach(key => {
+    if (key.row === undefined || key.col === undefined) return;
+    rowMasks[key.row] |= BigInt(1) << BigInt(key.col);
+  });
+
+  const rows = rowMasks.map(mask => `    (matrix_row_t)0x${mask.toString(16).toUpperCase()}ULL`).join(',\n');
+
+  return `#include "quantum.h"
+
+const matrix_row_t matrix_mask[MATRIX_ROWS] = {
+${rows}
+};
+`;
 };
 
 const generateKeymapC = (validKeys: PhysicalKey[], keymapsArray: string[][][]) => {
@@ -67,6 +109,10 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
 
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
   const validKeys = getValidMatrixKeys(settings, keys);
+  if (validKeys.length === 0) {
+    throw new Error('Cannot export Vial firmware: no keys have valid matrix row/col assignments.');
+  }
+  const useMatrixMask = shouldUseMatrixMask(settings);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -95,7 +141,8 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     },
     matrix_pins: {
       cols: settings.pins.cols,
-      rows: settings.pins.rows
+      rows: settings.pins.rows,
+      ...(useMatrixMask ? { masked: true } : {})
     },
     usb: {
       device_version: '1.0.0',
@@ -139,6 +186,9 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     } : {})
   };
   kbFolder.file('keyboard.json', JSON.stringify(infoJson, null, 2));
+  if (useMatrixMask) {
+    kbFolder.file(`${kbName}.c`, generateMatrixMaskC(settings, validKeys));
+  }
 
   // 2. config.h (Keyboard level) - config_common.h is deprecated in modern QMK
   const configH = `/* Copyright 2026 Smidr User */
@@ -163,8 +213,7 @@ ${settings.features.rgb ? `
   const rulesMk = `# Rules are managed through keyboard.json\n`;
   kbFolder.file('rules.mk', rulesMk);
 
-  // Note: No [kbName].h or [kbName].c files are generated here, enabling QMK to automatically
-  // auto-generate the keyboard header with the LAYOUT macro from keyboard.json.
+  // No [kbName].h is generated, allowing QMK to auto-generate the LAYOUT macro from keyboard.json.
 
   const firmwareViaJson = generateViaJson({ settings, keys: validKeys });
   const keymapC = generateKeymapC(validKeys, firmwareViaJson.keymaps);

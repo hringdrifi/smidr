@@ -37,6 +37,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   layoutOptions?: ProjectSettings['layoutOptions'],
   pins?: Partial<ProjectSettings['pins']>,
   hardware?: Partial<ProjectSettings['hardware']>,
+  qmk?: Partial<ProjectSettings['qmk']>,
   features?: Partial<ProjectSettings['features']>
 } {
   const isDebug = options?.debug;
@@ -170,6 +171,10 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
         hardware = { mcu, board, diodeDirection };
       }
 
+      const qmk: Partial<ProjectSettings['qmk']> = {
+        matrixMasked: input.matrix_pins?.masked === true,
+      };
+
       let features: any = undefined;
       if (input.features) {
         features = {
@@ -210,6 +215,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           layoutOptions: {},
           pins,
           hardware,
+          qmk,
           features
         };
       } else {

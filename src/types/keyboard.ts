@@ -65,6 +65,9 @@ export interface ProjectSettings {
     board: string; // e.g. "promicro", "elite_c"
     diodeDirection: 'ROW2COL' | 'COL2ROW';
   };
+  qmk?: {
+    matrixMasked?: boolean;
+  };
   features: {
     rgb: boolean;
     encoder: boolean;
