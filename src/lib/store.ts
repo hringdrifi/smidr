@@ -1402,17 +1402,6 @@ export const useKeyboardStore = create<KeyboardState>()(
 
             await protocol.initialize(get().activeTransport || hidTransport);
             
-            if (isVial) {
-              const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
-              if (unlockStatus === 0) {
-                console.log("Device is locked, starting unlock flow...");
-                const success = await get().performDeviceUnlock(protocol as VialProtocol);
-                if (!success) {
-                  throw new Error("Unlock cancelled or failed.");
-                }
-              }
-            }
-            
             console.log(`[ZMK/VIA/Vial Write via AST] Layer:${layer} Row:${row} Col:${col}`, action);
             await protocol.setKey(layer, row, col, action);
 
@@ -1549,14 +1538,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                     : (isVial ? new VialProtocol() : new ViaProtocol());
                   await protocol.initialize(s.activeTransport || hidTransport);
 
-                  if (isVial) {
-                    const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
-                    if (unlockStatus === 0) {
-                      const success = await s.performDeviceUnlock(protocol as VialProtocol);
-                      if (!success) throw new Error("Unlock failed.");
-                    }
-                  }
-
                   // Set each key sequentially
                   for (let i = 0; i < targetKeys.length; i++) {
                     const tk = targetKeys[i];
@@ -1664,14 +1645,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                 : (isVial ? new VialProtocol() : new ViaProtocol());
               await protocol.initialize(s.activeTransport || hidTransport);
 
-              if (isVial) {
-                const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
-                if (unlockStatus === 0) {
-                  const success = await s.performDeviceUnlock(protocol as VialProtocol);
-                  if (!success) throw new Error("Unlock failed.");
-                }
-              }
-
               // Set each key sequentially
               for (const tk of targetKeys) {
                 const targetRow = isZmk && tk.zmkPosition !== undefined ? tk.zmkPosition : tk.row;
@@ -1754,14 +1727,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                 ? zmkProtocol
                 : (isVial ? new VialProtocol() : new ViaProtocol());
               await protocol.initialize(s.activeTransport || hidTransport);
-
-              if (isVial) {
-                const unlockStatus = await (protocol as VialProtocol).getUnlockStatus();
-                if (unlockStatus === 0) {
-                  const success = await s.performDeviceUnlock(protocol as VialProtocol);
-                  if (!success) throw new Error("Unlock failed.");
-                }
-              }
 
               // Set each key sequentially
               for (const tk of targetKeys) {
