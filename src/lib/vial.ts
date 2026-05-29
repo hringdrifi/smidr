@@ -141,8 +141,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     },
     matrix_pins: {
       cols: settings.pins.cols,
-      rows: settings.pins.rows,
-      ...(useMatrixMask ? { masked: true } : {})
+      rows: settings.pins.rows
     },
     usb: {
       device_version: '1.0.0',
@@ -209,8 +208,9 @@ ${settings.features.rgb ? `
 `;
   kbFolder.file('config.h', configH);
 
-  // 3. rules.mk (Keyboard level) - Left completely empty as settings are managed via keyboard.json
-  const rulesMk = `# Rules are managed through keyboard.json\n`;
+  // 3. rules.mk (Keyboard level)
+  const rulesMk = `# Rules are managed through keyboard.json
+${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
   kbFolder.file('rules.mk', rulesMk);
 
   // No [kbName].h is generated, allowing QMK to auto-generate the LAYOUT macro from keyboard.json.

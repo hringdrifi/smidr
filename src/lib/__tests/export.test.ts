@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { generateViaJson } from '../export';
 import { generateQmkZip } from '../qmk';
+import { generateVialZip } from '../vial';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
 const baseSettings: ProjectSettings = {
@@ -148,5 +149,48 @@ describe('export generation', () => {
     expect(keyboardJson.split.matrix_pins.right.rows).toEqual(['GP4', 'GP5']);
     expect(keyboardJson.split.matrix_pins.right.cols).toEqual(['GP5', 'GP6']);
     expect(keyboardC).toContain('(matrix_row_t)0x1ULL');
+  });
+
+  it('emits Vial MATRIX_MASKED through rules.mk instead of keyboard.json', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Vial Masked Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      qmk: {
+        matrixMasked: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('vial_masked_board/keyboard.json')!.async('string'));
+    const rulesMk = await zip.file('vial_masked_board/rules.mk')!.async('string');
+    const keyboardC = await zip.file('vial_masked_board/vial_masked_board.c')!.async('string');
+
+    expect(keyboardJson.matrix_pins.masked).toBeUndefined();
+    expect(rulesMk).toContain('MATRIX_MASKED = yes');
+    expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
   });
 });
