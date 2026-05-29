@@ -444,5 +444,48 @@ describe('protocols conversion tests', () => {
         0x18, 0x00
       ])).toBe(true);
     });
+
+    it('should pass through raw ZMK behavior strings by resolving behavior names', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]),
+        new Uint8Array([0x0a, 0x12, 0x08, 0x04, 0x2a, 0x0e, 0x0a, 0x0c, 0x0a, 0x0a, 0x08, 0x00, 0x12, 0x00, 0x1a, 0x04, 0x08, 0x24, 0x10, 0x00])
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++]
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 18, param1: 0, param2: 0 }] }],
+        availableLayers: 1,
+        maxLayerNameLength: 20
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { 'studio unlock': 18 };
+
+      await zmk.setKey(0, 0, 0, {
+        action: 'custom',
+        protocol: 'zmk',
+        rawCode: '&studio_unlock 0 0'
+      });
+
+      expect(containsSubsequence(Array.from(sent[1]), [
+        0x08, 0x24,
+        0x10, 0x00,
+        0x18, 0x00
+      ])).toBe(true);
+    });
   });
 });

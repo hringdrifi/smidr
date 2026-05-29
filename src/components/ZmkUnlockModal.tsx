@@ -32,7 +32,7 @@ export const ZmkUnlockModal = () => {
 
         {/* Title */}
         <h3 className="text-xl font-bold text-slate-100 tracking-wide mb-3 text-center">
-          ZMK Studio is Locked
+          Security Unlock Required
         </h3>
 
         {/* Description */}
@@ -41,25 +41,25 @@ export const ZmkUnlockModal = () => {
             Please physically press the <span className="text-amber-400 font-semibold">&ldquo;Studio Unlock&rdquo;</span> key combination on your physical keyboard to authorize keymap editing.
           </p>
           <p className="text-[10px] text-slate-500">
-            Once pressed, click the Sync button below to load and customize your keymaps.
+            Once pressed, Smiðr will reconnect to the editable keymap automatically.
           </p>
         </div>
 
         {/* Action Buttons */}
         <div className="w-full flex flex-col gap-3">
           <button
-            onClick={() => syncKeymap()}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-600 active:scale-98 transition-all text-black text-xs font-bold rounded-xl shadow-lg cursor-pointer"
-          >
-            <RefreshCw size={14} className="animate-spin-slow" />
-            Check again & Sync
-          </button>
-          
-          <button
             onClick={() => setZmkLocked(false)}
             className="w-full py-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
           >
-            Explore in Layout-only Mode
+            Dismiss
+          </button>
+
+          <button
+            onClick={() => syncKeymap()}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[10px] font-semibold text-slate-500 hover:text-slate-300 rounded-xl transition-all cursor-pointer"
+          >
+            <RefreshCw size={12} />
+            Check again if it does not update
           </button>
         </div>
       </div>

@@ -31,6 +31,7 @@ export const DeviceConnector: React.FC = () => {
       remoteMacros: Array(16).fill(null).map(() => []),
       remoteCombos: [],
       zmkLocked: false,
+      zmkUnsavedChanges: false,
     });
   }, []);
 
@@ -186,6 +187,9 @@ export const DeviceConnector: React.FC = () => {
       const transport = new ZmkSerialTransport();
       const success = await transport.connect();
       if (success) {
+        const portInfo = transport.getPortInfo();
+        const vid = portInfo.usbVendorId ?? 0;
+        const pid = portInfo.usbProductId ?? 0;
         setShowMenu(false);
         useKeyboardStore.getState().setActiveTransport(transport);
         registerDisconnectHandler(transport);
@@ -193,17 +197,18 @@ export const DeviceConnector: React.FC = () => {
 
         // Store ZMK connected device details
         setConnectedDevice({
-          vid: 0x1D50,
-          pid: 0x615E,
+          vid,
+          pid,
           productName: 'ZMK Studio (USB)',
           manufacturerName: 'ZMK',
           protocolType: 'zmk'
         });
 
         // Match connected device against local storage projects
-        const deviceVendorProductId = (0x1D50 << 16) | 0x615E;
+        const deviceVendorProductId = (vid << 16) | pid;
         const projects = listProjects();
         const match = projects.find(p => {
+          if (!deviceVendorProductId) return false;
           let projectVpid = p.vendorProductId;
           if (!projectVpid && p.vid && p.pid) {
             const parsedVid = parseInt(String(p.vid).replace(/0[xX]/, ''), 16) || 0;

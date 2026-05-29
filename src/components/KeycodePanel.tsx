@@ -18,7 +18,7 @@ export const KeycodePanel = () => {
   const { 
     keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
-    deviceCapabilities, isCapturingParam, setIsCapturingParam
+    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
@@ -78,6 +78,23 @@ export const KeycodePanel = () => {
     setSelectedKeycode(newAction);
   };
 
+  const getDefaultAnyAction = (): UniversalAction => {
+    const protocol = connectedDevice?.protocolType === 'zmk'
+      ? 'zmk'
+      : connectedDevice?.protocolType === 'vial'
+      ? 'vial'
+      : connectedDevice?.protocolType === 'via'
+      ? 'via'
+      : 'qmk';
+
+    return {
+      action: 'custom',
+      protocol,
+      rawCode: protocol === 'zmk' ? '&none' : '0x0000',
+      label: 'Any'
+    };
+  };
+
   const handleLtLayerChange = (newLayer: number) => {
     const newAction: UniversalAction = {
       action: 'lt',
@@ -114,6 +131,8 @@ export const KeycodePanel = () => {
         clickedAction = { action: 'trans' };
       } else if (code === 'none') {
         clickedAction = { action: 'none' };
+      } else if (code === 'any') {
+        clickedAction = getDefaultAnyAction();
       } else {
         clickedAction = { action: 'tap', keycode: code as UniversalKey };
       }
@@ -136,6 +155,7 @@ export const KeycodePanel = () => {
                             !code.startsWith('TG(') && 
                             !code.startsWith('TO(') && 
                             !code.startsWith('LT(') && 
+                            code !== 'any' &&
                             !code.startsWith('MACRO_') && 
                             !['RGB_TOG', 'RGB_MOD', 'RGB_RMOD', 'RGB_VAI', 'RGB_VAD', 'RGB_HUI', 'RGB_HUD', 'RGB_SAI', 'RGB_SAD', 'RGB_SPI', 'RGB_SPD'].includes(code);
 
@@ -145,6 +165,8 @@ export const KeycodePanel = () => {
         clickedAction = { action: 'trans' };
       } else if (code === 'none') {
         clickedAction = { action: 'none' };
+      } else if (code === 'any') {
+        clickedAction = getDefaultAnyAction();
       } else {
         clickedAction = { action: 'tap', keycode: code as UniversalKey };
       }
@@ -164,6 +186,8 @@ export const KeycodePanel = () => {
         clickedAction = { action: 'trans' };
       } else if (code === 'none') {
         clickedAction = { action: 'none' };
+      } else if (code === 'any') {
+        clickedAction = getDefaultAnyAction();
       } else if (code.startsWith('MO(')) {
         const layerId = parseInt((code.match(/\d+/) || ['0'])[0], 10);
         clickedAction = { action: 'mo', layerId };

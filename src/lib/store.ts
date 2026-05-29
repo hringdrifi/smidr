@@ -105,6 +105,8 @@ export interface KeyboardState {
   syncKeymap: () => Promise<void>;
   zmkLocked: boolean;
   setZmkLocked: (locked: boolean) => void;
+  zmkUnsavedChanges: boolean;
+  setZmkUnsavedChanges: (unsaved: boolean) => void;
   syncOfflineState: () => Promise<void>;
   updateRemoteKeycode: (layer: number, index: number, action: UniversalAction) => void;
   updateDeviceKeycode: (layer: number, row: number, col: number, action: UniversalAction) => Promise<void>;
@@ -250,6 +252,7 @@ const initialState: Partial<KeyboardState> = {
   actionClipboard: [],
   isCapturingParam: false,
   zmkLocked: false,
+  zmkUnsavedChanges: false,
   unlockState: {
     showModal: false,
     progress: 0,
@@ -311,6 +314,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setIsCapturingParam: (capturing: boolean) => set({ isCapturingParam: capturing }),
         setZmkLocked: (locked: boolean) => set({ zmkLocked: locked }),
+        setZmkUnsavedChanges: (unsaved: boolean) => set({ zmkUnsavedChanges: unsaved }),
 
         updateSettings: (sets: Partial<ProjectSettings>) => set((s) => ({ 
           settings: { ...s.settings, ...sets } 
@@ -415,7 +419,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const s = get();
           if (!s.connectedDevice) return;
           
-          set({ zmkLocked: false });
+          set({ zmkLocked: false, zmkUnsavedChanges: false });
 
           try {
             const isZmk = s.connectedDevice?.protocolType === 'zmk';
@@ -423,6 +427,25 @@ export const useKeyboardStore = create<KeyboardState>()(
             const protocol = isZmk
               ? zmkProtocol
               : (isVial ? new VialProtocol() : new ViaProtocol());
+
+            if (isZmk) {
+              (protocol as ZmkProtocol).setNotificationHandler((notification) => {
+                const nextState: Partial<KeyboardState> = {};
+                let shouldSyncAfterUnlock = false;
+                if (notification.lockStateChanged !== undefined) {
+                  const wasLocked = get().zmkLocked;
+                  nextState.zmkLocked = notification.lockStateChanged !== 1;
+                  shouldSyncAfterUnlock = wasLocked && !nextState.zmkLocked;
+                }
+                if (notification.unsavedChangesStatusChanged !== undefined) {
+                  nextState.zmkUnsavedChanges = notification.unsavedChangesStatusChanged;
+                }
+                set(nextState);
+                if (shouldSyncAfterUnlock) {
+                  void get().syncKeymap();
+                }
+              });
+            }
 
             await protocol.initialize(s.activeTransport || hidTransport);
             set({ deviceCapabilities: protocol.capabilities });

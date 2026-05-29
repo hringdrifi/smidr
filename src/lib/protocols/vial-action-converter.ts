@@ -19,7 +19,7 @@ export function vialCodeToAction(value: number): UniversalAction {
 
 // Encodes UniversalAction back into Vial-specific dynamic keycodes
 export function actionToVialCode(action: UniversalAction): number {
-  if (action.action === 'custom' && action.protocol === 'qmk') {
+  if (action.action === 'custom' && (action.protocol === 'qmk' || action.protocol === 'vial')) {
     // Check if it's dynamic Tap Dance TD(n)
     const match = action.rawCode.match(/^TD\((\d+)\)$/);
     if (match) {

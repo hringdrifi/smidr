@@ -334,7 +334,7 @@ export function actionToViaCode(action: UniversalAction): number {
       if (action.command === 'SPEED_DOWN') return 0x7C0A;
       return 0x0000;
     case 'custom':
-      if (action.protocol === 'qmk' && action.rawCode.startsWith('0x')) {
+      if ((action.protocol === 'qmk' || action.protocol === 'via' || action.protocol === 'vial') && action.rawCode.startsWith('0x')) {
         return parseInt(action.rawCode.slice(2), 16);
       }
       return 0x0000;

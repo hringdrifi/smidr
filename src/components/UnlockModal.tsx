@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Lock, ShieldAlert, ShieldCheck } from 'lucide-react';
 
 export const UnlockModal = () => {
   const { unlockState, keys, settings } = useKeyboardStore();
@@ -59,28 +59,28 @@ export const UnlockModal = () => {
   if (!unlockState.showModal) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-xs transition-opacity duration-300">
-      <div className="relative w-full max-w-xl p-8 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/95 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300 transform scale-100 flex flex-col items-center">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 backdrop-blur-[2px] transition-opacity duration-300">
+      <div className="relative w-full max-w-xl p-8 overflow-hidden rounded-3xl border border-amber-500/20 bg-slate-900/95 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-300 transform scale-100 flex flex-col items-center">
         {/* Glow effect backdrops */}
-        <div className="absolute -top-10 -left-10 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl" />
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl animate-pulse" />
 
-        {/* Title */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700/50">
-            {status === 'holding' && <ShieldAlert className="w-5 h-5 text-cyan-400 animate-pulse" />}
-            {status === 'success' && <ShieldCheck className="w-5 h-5 text-emerald-400 animate-bounce" />}
-            {status === 'failed' && <ShieldAlert className="w-5 h-5 text-red-400" />}
-          </div>
-          <h3 className="text-lg font-bold text-slate-100 tracking-wide uppercase">
-            {status === 'holding' && 'Security Unlock Required'}
-            {status === 'success' && 'Device Unlocked!'}
-            {status === 'failed' && 'Unlock Failed'}
-          </h3>
+        {/* Pulsing Status Icon */}
+        <div className="relative flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-6 shadow-inner animate-pulse">
+          {status === 'holding' && <Lock className="w-8 h-8 text-amber-500" />}
+          {status === 'success' && <ShieldCheck className="w-8 h-8 text-emerald-400 animate-bounce" />}
+          {status === 'failed' && <ShieldAlert className="w-8 h-8 text-red-400" />}
         </div>
 
+        {/* Title */}
+        <h3 className="text-xl font-bold text-slate-100 tracking-wide mb-3 text-center">
+          {status === 'holding' && 'Security Unlock Required'}
+          {status === 'success' && 'Device Unlocked!'}
+          {status === 'failed' && 'Unlock Failed'}
+        </h3>
+
         {/* Descriptions */}
-        <div className="text-center text-xs text-slate-400 max-w-lg mb-6 space-y-2 leading-relaxed font-medium">
+        <div className="text-center text-xs text-slate-400 max-w-lg mb-8 space-y-2 leading-relaxed font-medium">
           <p>
             In order to proceed, the keyboard must be set into unlocked mode.
             You should only perform this operation on computers that you trust.
@@ -92,14 +92,14 @@ export const UnlockModal = () => {
 
         {/* Press instruction */}
         {status === 'holding' && (
-          <p className="text-xs text-cyan-400 font-bold tracking-wider uppercase mb-4 animate-pulse">
+          <p className="text-xs text-amber-400 font-bold tracking-wider uppercase mb-4 animate-pulse">
             Press and hold the following highlighted keys:
           </p>
         )}
 
         {/* Dynamic Keyboard Minimap Preview */}
         {visKeys.length > 0 && (
-          <div className="w-full bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 mb-6 flex justify-center items-center shadow-inner overflow-hidden max-h-56">
+          <div className="w-full bg-slate-950/70 border border-amber-500/10 rounded-xl p-4 mb-6 flex justify-center items-center shadow-inner overflow-hidden max-h-56">
             <svg
               viewBox={`${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`}
               className="w-full h-auto max-h-48 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
@@ -124,7 +124,7 @@ export const UnlockModal = () => {
                   rx: 0.08, // Rounded corners in SVG coordinates
                   ry: 0.08,
                   className: unlockActive
-                    ? "fill-cyan-500 stroke-cyan-400 stroke-[0.04px] animate-pulse drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] cursor-default"
+                    ? "fill-amber-500 stroke-amber-300 stroke-[0.04px] animate-pulse drop-shadow-[0_0_8px_rgba(245,158,11,0.8)] cursor-default"
                     : "fill-slate-800/40 stroke-slate-700/50 stroke-[0.02px] cursor-default"
                 };
 
@@ -156,13 +156,13 @@ export const UnlockModal = () => {
           <div className="w-full flex flex-col gap-2">
             <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80 p-0.5">
               <div 
-                className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-400 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-300 ease-out"
+                className="h-full bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)] transition-all duration-300 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
             <div className="flex justify-between items-center text-[10px] font-bold tracking-wider text-slate-500 uppercase px-1">
               <span>Progress</span>
-              <span className="text-cyan-400">{progress}%</span>
+              <span className="text-amber-400">{progress}%</span>
             </div>
           </div>
         )}

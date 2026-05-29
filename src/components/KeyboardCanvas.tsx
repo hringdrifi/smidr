@@ -780,7 +780,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
       {/* Empty State Overlay (Remap Mode with no keys / layout metadata unavailable) */}
       {appMode === 'remap' && visKeys.length === 0 && !zmkLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/90 backdrop-blur-[4px] z-[200]">
+        <div className={`absolute inset-x-0 top-0 ${readonlyGeometry ? "bottom-[400px]" : "bottom-0"} flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/90 backdrop-blur-[4px] z-[200]`}>
           <div className="w-20 h-20 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-dim)] mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in zoom-in duration-500">
             <LayoutGrid size={40} className="text-amber-500" />
           </div>

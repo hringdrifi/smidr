@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
-import { Info, Check, Keyboard } from 'lucide-react';
+import { Info, Check, Keyboard, Code2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -19,17 +19,48 @@ const MODIFIERS: Modifier[] = ['LCTL', 'LSFT', 'LALT', 'LGUI', 'RCTL', 'RSFT', '
 export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
-    settings, remoteKeymap, updateDeviceKeycode, appMode,
+    settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
     isCapturingParam, setIsCapturingParam
   } = useKeyboardStore();
   const { t } = useTranslation();
+  const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
+    ? 'zmk'
+    : connectedDevice?.protocolType === 'vial'
+    ? 'vial'
+    : connectedDevice?.protocolType === 'via'
+    ? 'via'
+    : 'qmk';
+  const [rawDraft, setRawDraft] = useState('');
+  const [rawProtocolDraft, setRawProtocolDraft] = useState<'qmk' | 'via' | 'vial' | 'zmk'>(defaultCustomProtocol);
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
+  const hasMatrix = selectedKey?.row !== undefined;
+  let action: UniversalAction = { action: 'trans' };
+  if (selectedKey) {
+    if (appMode === 'remap') {
+      if (hasMatrix) {
+        const flatIndex = selectedKey.row! * 32 + selectedKey.col!;
+        action = remoteKeymap[currentLayer]?.[flatIndex] || { action: 'trans' };
+      }
+    } else {
+      action = selectedKey.keymap?.[currentLayer] || { action: 'trans' };
+    }
+  }
 
   useEffect(() => {
     setIsCapturingParam(false);
   }, [selectedKeyId, setIsCapturingParam]);
+
+  useEffect(() => {
+    if (action.action === 'custom') {
+      setRawDraft(action.rawCode);
+      setRawProtocolDraft(action.protocol);
+    } else {
+      setRawDraft(defaultCustomProtocol === 'zmk' ? '&kp A' : '0x0004');
+      setRawProtocolDraft(defaultCustomProtocol);
+    }
+  }, [action, defaultCustomProtocol]);
 
   if (selectedKeyIds.length !== 1 || !selectedKey) {
     return (
@@ -40,17 +71,6 @@ export const KeycodeConfigPanel = () => {
         </p>
       </div>
     );
-  }
-
-  const hasMatrix = selectedKey.row !== undefined;
-  let action: UniversalAction = { action: 'trans' };
-  if (appMode === 'remap') {
-    if (hasMatrix) {
-      const flatIndex = selectedKey.row! * 32 + selectedKey.col!;
-      action = remoteKeymap[currentLayer]?.[flatIndex] || { action: 'trans' };
-    }
-  } else {
-    action = selectedKey.keymap?.[currentLayer] || { action: 'trans' };
   }
 
   const updateSelectedAction = (newAction: UniversalAction) => {
@@ -119,6 +139,16 @@ export const KeycodeConfigPanel = () => {
           tapAction = { action: 'tap', keycode: existingKeycode as any };
         }
         newAction = { action: 'mt', modifiers: existingModifiers, tapAction };
+        break;
+      }
+      case 'custom': {
+        const protocol = action.action === 'custom' ? action.protocol : defaultCustomProtocol;
+        const rawCode = action.action === 'custom'
+          ? action.rawCode
+          : protocol === 'zmk'
+          ? '&kp A'
+          : '0x0004';
+        newAction = { action: 'custom', protocol, rawCode };
         break;
       }
       case 'tap':
@@ -260,6 +290,8 @@ export const KeycodeConfigPanel = () => {
   let currentType = 'tap';
   if (['mo', 'tg', 'to', 'lt', 'mt'].includes(action.action)) {
     currentType = action.action;
+  } else if (action.action === 'custom') {
+    currentType = 'custom';
   } else {
     currentType = 'tap';
   }
@@ -274,7 +306,20 @@ export const KeycodeConfigPanel = () => {
     currentActiveCode = action.tapAction.action === 'tap' ? action.tapAction.keycode : action.tapAction.action;
   } else if (action.action === 'trans' || action.action === 'none') {
     currentActiveCode = action.action;
+  } else if (action.action === 'custom') {
+    currentActiveCode = action.rawCode;
   }
+
+  const handleApplyRawAction = () => {
+    const rawCode = rawDraft.trim();
+    if (!rawCode) return;
+    updateSelectedAction({
+      action: 'custom',
+      protocol: rawProtocolDraft,
+      rawCode,
+      label: rawCode
+    });
+  };
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden">
@@ -304,6 +349,7 @@ export const KeycodeConfigPanel = () => {
                   const desc = t('keycodeConfig.modTapDescription');
                   return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Acts as modifiers when held, sends keycode when tapped.';
                 })()}
+                {currentType === 'custom' && 'Passes a protocol-specific raw keycode or behavior through to the connected device.'}
                 {currentType === 'mod' && (() => {
                   const desc = t('keycodeConfig.modifierDescription');
                   return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Sends modifier keys combined with a base key (e.g. Ctrl + Shift + A).';
@@ -322,12 +368,54 @@ export const KeycodeConfigPanel = () => {
             <option value="tg">{t('keycodeConfig.typeToggle') || 'Toggle Layer (TG)'}</option>
             <option value="to">{t('keycodeConfig.typeTo') || 'Direct Layer (TO)'}</option>
             <option value="lt">{t('keycodeConfig.typeTap') || 'Layer Tap (LT)'}</option>
+            <option value="custom">{t('keycodeConfig.customKeycode') || 'Any'}</option>
           </select>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
         {/* Layer Selector Grid */}
+        {action.action === 'custom' && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-amber-500">
+              <Code2 size={14} className="shrink-0" />
+              <label className="text-[10px] font-bold uppercase tracking-wider">
+                {t('keycodeConfig.customKeycode') || 'Any'}
+              </label>
+            </div>
+            <select
+              value={rawProtocolDraft}
+              onChange={(e) => setRawProtocolDraft(e.target.value as 'qmk' | 'via' | 'vial' | 'zmk')}
+              className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg px-3 py-2 text-xs font-bold text-[var(--text-highlight)] focus:outline-none focus:border-amber-500 cursor-pointer transition-colors"
+            >
+              <option value="qmk">QMK</option>
+              <option value="via">VIA</option>
+              <option value="vial">Vial</option>
+              <option value="zmk">ZMK</option>
+            </select>
+            <textarea
+              value={rawDraft}
+              onChange={(e) => setRawDraft(e.target.value)}
+              spellCheck={false}
+              rows={4}
+              className="w-full resize-none bg-zinc-950/60 border border-[var(--border-main)] rounded-lg p-3 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono leading-relaxed"
+              placeholder={rawProtocolDraft === 'zmk' ? '&kp A' : '0x0004'}
+            />
+            <button
+              onClick={handleApplyRawAction}
+              disabled={!rawDraft.trim()}
+              className={cn(
+                "w-full h-9 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border",
+                rawDraft.trim()
+                  ? "bg-amber-500 text-zinc-950 border-amber-500 hover:bg-amber-400"
+                  : "bg-[var(--bg-app)]/30 border-[var(--border-main)] text-[var(--text-dim)] cursor-not-allowed"
+              )}
+            >
+              {t('keycodeConfig.applyRawAction') || 'Apply Any'}
+            </button>
+          </div>
+        )}
+
         {(action.action === 'mo' ||
           action.action === 'tg' ||
           action.action === 'to' ||

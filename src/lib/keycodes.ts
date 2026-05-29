@@ -66,7 +66,8 @@ export const KEYCODES: Keycode[] = [
   { code: 'PMNS', label: '-', category: 'Basic', row: 1 },
 
   // Row 2
-  { code: 'TAB', label: 'Tab', category: 'Basic', row: 2, width: 1.5, spacer: 1.25 },
+  { code: 'any', label: 'Any', category: 'Basic', row: 2, description: 'Passes a raw protocol-specific keycode or behavior through' },
+  { code: 'TAB', label: 'Tab', category: 'Basic', row: 2, width: 1.5, spacer: 0.25 },
   ...['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(k => ({ code: k, label: k, category: 'Basic' as const, row: 2 })),
   { code: 'LBRC', label: '{\n[', category: 'Basic', row: 2 },
   { code: 'RBRC', label: '}\n]', category: 'Basic', row: 2 },
@@ -167,7 +168,8 @@ export const KEYCODES: Keycode[] = [
   { code: 'PMNS', label: '-', category: 'ISO/JIS', row: 1 },
 
   // Row 2
-  { code: 'TAB', label: 'Tab', category: 'ISO/JIS', row: 2, width: 1.5, spacer: 1.25 },
+  { code: 'any', label: 'Any', category: 'ISO/JIS', row: 2, description: 'Passes a raw protocol-specific keycode or behavior through' },
+  { code: 'TAB', label: 'Tab', category: 'ISO/JIS', row: 2, width: 1.5, spacer: 0.25 },
   ...['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(k => ({ code: k, label: k, category: 'ISO/JIS' as const, row: 2 })),
   { code: 'LBRC', label: '{\n[', category: 'ISO/JIS', row: 2 },
   { code: 'RBRC', label: '}\n]', category: 'ISO/JIS', row: 2 },

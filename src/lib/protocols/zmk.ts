@@ -77,6 +77,13 @@ const isZmkStudioLocked = (lockState: number) => lockState !== ZMK_STUDIO_LOCK_S
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+type ZmkFrameHandler = (payload: Uint8Array) => boolean;
+
+export interface ZmkStudioNotification {
+  lockStateChanged?: number;
+  unsavedChangesStatusChanged?: boolean;
+}
+
 /**
  * ZmkSerialTransport handles physical Web Serial communication (CDC ACM) for ZMK Studio.
  */
@@ -91,6 +98,7 @@ export class ZmkSerialTransport implements ITransport {
   private activeReader: any = null;
   private disconnectCallback: (() => void) | null = null;
   private disconnectNotified = false;
+  private frameHandler: ZmkFrameHandler | null = null;
 
   private handleSerialDisconnect = (event: any) => {
     if (event.target && this.port && event.target !== this.port) return;
@@ -114,9 +122,7 @@ export class ZmkSerialTransport implements ITransport {
       if (port) {
         this.port = port;
       } else {
-        this.port = await (navigator as any).serial.requestPort({
-          filters: [{ usbVendorId: 0x1D50, usbProductId: 0x615E }] // Standard ZMK USB CDC ACM VID/PID
-        });
+        this.port = await (navigator as any).serial.requestPort();
       }
       if (!this.port) return false;
 
@@ -177,6 +183,10 @@ export class ZmkSerialTransport implements ITransport {
       
       this.rxBuffer.splice(0, extracted.consumedCount);
       const payload = extracted.payload;
+
+      if (this.frameHandler?.(payload)) {
+        continue;
+      }
       
       const resolverIndex = this.pendingResolvers.findIndex(r => !r.filter || r.filter(payload));
       if (resolverIndex !== -1) {
@@ -219,6 +229,14 @@ export class ZmkSerialTransport implements ITransport {
 
   onDisconnect(callback: () => void): void {
     this.disconnectCallback = callback;
+  }
+
+  onFrame(handler: ZmkFrameHandler | null): void {
+    this.frameHandler = handler;
+  }
+
+  getPortInfo(): { usbVendorId?: number; usbProductId?: number } {
+    return this.port?.getInfo?.() || {};
   }
 
   async send(data: Uint8Array): Promise<void> {
@@ -281,6 +299,7 @@ export class ZmkBleTransport implements ITransport {
   private pendingResolvers: { resolve: (data: Uint8Array) => void; filter?: (data: Uint8Array) => boolean }[] = [];
   private disconnectCallback: (() => void) | null = null;
   private disconnectNotified = false;
+  private frameHandler: ZmkFrameHandler | null = null;
 
   private handleNotification = (event: any) => {
     const value = event.target.value;
@@ -325,6 +344,10 @@ export class ZmkBleTransport implements ITransport {
       
       this.rxBuffer.splice(0, extracted.consumedCount);
       const payload = extracted.payload;
+
+      if (this.frameHandler?.(payload)) {
+        continue;
+      }
       
       const resolverIndex = this.pendingResolvers.findIndex(r => !r.filter || r.filter(payload));
       if (resolverIndex !== -1) {
@@ -403,6 +426,10 @@ export class ZmkBleTransport implements ITransport {
 
   onDisconnect(callback: () => void): void {
     this.disconnectCallback = callback;
+  }
+
+  onFrame(handler: ZmkFrameHandler | null): void {
+    this.frameHandler = handler;
   }
 
   async send(data: Uint8Array): Promise<void> {
@@ -613,6 +640,11 @@ interface DecodedRequestResponse {
   keymap?: DecodedKeymapResponse;
 }
 
+interface DecodedNotification {
+  core?: { lockStateChanged?: number };
+  keymap?: { unsavedChangesStatusChanged?: boolean };
+}
+
 interface DecodedCoreResponse {
   getDeviceInfo?: { name: string; serialNumber: Uint8Array };
   getLockState?: number;
@@ -620,7 +652,27 @@ interface DecodedCoreResponse {
 
 interface DecodedBehaviorsResponse {
   listAllBehaviors?: { behaviors: number[] };
-  getBehaviorDetails?: { id: number; displayName: string };
+  getBehaviorDetails?: DecodedBehaviorDetails;
+}
+
+interface DecodedBehaviorDetails {
+  id: number;
+  displayName: string;
+  metadata: DecodedBehaviorBindingParametersSet[];
+}
+
+interface DecodedBehaviorBindingParametersSet {
+  param1: DecodedBehaviorParameterValueDescription[];
+  param2: DecodedBehaviorParameterValueDescription[];
+}
+
+interface DecodedBehaviorParameterValueDescription {
+  name: string;
+  nil?: boolean;
+  constant?: number;
+  range?: { min: number; max: number };
+  hidUsage?: { keyboardMax: number; consumerMax: number };
+  layerId?: boolean;
 }
 
 interface DecodedKeymapResponse {
@@ -668,16 +720,19 @@ interface DecodedKeyPhysicalAttrs {
   ry: number;
 }
 
-function decodeResponse(buffer: Uint8Array): { requestResponse?: DecodedRequestResponse } {
+function decodeResponse(buffer: Uint8Array): { requestResponse?: DecodedRequestResponse; notification?: DecodedNotification } {
   const decoder = new ProtoDecoder(buffer);
   let requestResponse: DecodedRequestResponse | undefined;
+  let notification: DecodedNotification | undefined;
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 2) {
       requestResponse = decodeRequestResponse(field.value);
+    } else if (field.fieldNumber === 2 && field.wireType === 2) {
+      notification = decodeNotification(field.value);
     }
   }
-  return { requestResponse };
+  return { requestResponse, notification };
 }
 
 function decodeRequestResponse(buffer: Uint8Array): DecodedRequestResponse {
@@ -719,6 +774,45 @@ function decodeMetaResponse(buffer: Uint8Array): DecodedMetaResponse {
   return { noResponse, simpleError };
 }
 
+function decodeNotification(buffer: Uint8Array): DecodedNotification {
+  const decoder = new ProtoDecoder(buffer);
+  let core: DecodedNotification['core'];
+  let keymap: DecodedNotification['keymap'];
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 2 && field.wireType === 2) {
+      core = decodeCoreNotification(field.value);
+    } else if (field.fieldNumber === 5 && field.wireType === 2) {
+      keymap = decodeKeymapNotification(field.value);
+    }
+  }
+  return { core, keymap };
+}
+
+function decodeCoreNotification(buffer: Uint8Array): { lockStateChanged?: number } {
+  const decoder = new ProtoDecoder(buffer);
+  let lockStateChanged: number | undefined;
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 0) {
+      lockStateChanged = field.value;
+    }
+  }
+  return { lockStateChanged };
+}
+
+function decodeKeymapNotification(buffer: Uint8Array): { unsavedChangesStatusChanged?: boolean } {
+  const decoder = new ProtoDecoder(buffer);
+  let unsavedChangesStatusChanged: boolean | undefined;
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 0) {
+      unsavedChangesStatusChanged = !!field.value;
+    }
+  }
+  return { unsavedChangesStatusChanged };
+}
+
 function decodeCoreResponse(buffer: Uint8Array): DecodedCoreResponse {
   const decoder = new ProtoDecoder(buffer);
   let getDeviceInfo: { name: string; serialNumber: Uint8Array } | undefined;
@@ -752,7 +846,7 @@ function decodeGetDeviceInfoResponse(buffer: Uint8Array): { name: string; serial
 function decodeBehaviorsResponse(buffer: Uint8Array): DecodedBehaviorsResponse {
   const decoder = new ProtoDecoder(buffer);
   let listAllBehaviors: { behaviors: number[] } | undefined;
-  let getBehaviorDetails: { id: number; displayName: string } | undefined;
+  let getBehaviorDetails: DecodedBehaviorDetails | undefined;
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 2) {
@@ -783,19 +877,81 @@ function decodeListAllBehaviorsResponse(buffer: Uint8Array): { behaviors: number
   return { behaviors };
 }
 
-function decodeGetBehaviorDetailsResponse(buffer: Uint8Array): { id: number; displayName: string } {
+function decodeGetBehaviorDetailsResponse(buffer: Uint8Array): DecodedBehaviorDetails {
   const decoder = new ProtoDecoder(buffer);
   let id = 0;
   let displayName = "";
+  const metadata: DecodedBehaviorBindingParametersSet[] = [];
 
   for (const field of decoder.readFields()) {
     if (field.fieldNumber === 1 && field.wireType === 0) {
       id = field.value;
     } else if (field.fieldNumber === 2 && field.wireType === 2) {
       displayName = new TextDecoder().decode(field.value);
+    } else if (field.fieldNumber === 3 && field.wireType === 2) {
+      metadata.push(decodeBehaviorBindingParametersSet(field.value));
     }
   }
-  return { id, displayName };
+  return { id, displayName, metadata };
+}
+
+function decodeBehaviorBindingParametersSet(buffer: Uint8Array): DecodedBehaviorBindingParametersSet {
+  const decoder = new ProtoDecoder(buffer);
+  const param1: DecodedBehaviorParameterValueDescription[] = [];
+  const param2: DecodedBehaviorParameterValueDescription[] = [];
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 2) {
+      param1.push(decodeBehaviorParameterValueDescription(field.value));
+    } else if (field.fieldNumber === 2 && field.wireType === 2) {
+      param2.push(decodeBehaviorParameterValueDescription(field.value));
+    }
+  }
+  return { param1, param2 };
+}
+
+function decodeBehaviorParameterRange(buffer: Uint8Array): { min: number; max: number } {
+  const decoder = new ProtoDecoder(buffer);
+  let min = 0;
+  let max = 0;
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 0) min = field.value;
+    if (field.fieldNumber === 2 && field.wireType === 0) max = field.value;
+  }
+  return { min, max };
+}
+
+function decodeBehaviorParameterHidUsage(buffer: Uint8Array): { keyboardMax: number; consumerMax: number } {
+  const decoder = new ProtoDecoder(buffer);
+  let keyboardMax = 0;
+  let consumerMax = 0;
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 0) keyboardMax = field.value;
+    if (field.fieldNumber === 2 && field.wireType === 0) consumerMax = field.value;
+  }
+  return { keyboardMax, consumerMax };
+}
+
+function decodeBehaviorParameterValueDescription(buffer: Uint8Array): DecodedBehaviorParameterValueDescription {
+  const decoder = new ProtoDecoder(buffer);
+  const result: DecodedBehaviorParameterValueDescription = { name: "" };
+
+  for (const field of decoder.readFields()) {
+    if (field.fieldNumber === 1 && field.wireType === 2) {
+      result.name = new TextDecoder().decode(field.value);
+    } else if (field.fieldNumber === 2 && field.wireType === 2) {
+      result.nil = true;
+    } else if (field.fieldNumber === 3 && field.wireType === 0) {
+      result.constant = field.value;
+    } else if (field.fieldNumber === 4 && field.wireType === 2) {
+      result.range = decodeBehaviorParameterRange(field.value);
+    } else if (field.fieldNumber === 5 && field.wireType === 2) {
+      result.hidUsage = decodeBehaviorParameterHidUsage(field.value);
+    } else if (field.fieldNumber === 6 && field.wireType === 2) {
+      result.layerId = true;
+    }
+  }
+  return result;
 }
 
 function decodeSaveChangesResponse(buffer: Uint8Array): { ok?: boolean; err?: number } {
@@ -1263,9 +1419,51 @@ function bindingToZmkString(
   return `&${dtsName} ${binding.param1} ${binding.param2}`.trim();
 }
 
+function normalizeBehaviorToken(value: string): string {
+  return value.toLowerCase().replace(/^&/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function resolveBehaviorParameterToken(
+  token: string | undefined,
+  behaviorId: number,
+  paramIndex: 1 | 2,
+  behaviorMetadata: Record<number, DecodedBehaviorDetails>
+): number {
+  if (!token || token === "0") return 0;
+  if (/^-?\d+$/.test(token)) return parseInt(token, 10);
+  if (/^0x[0-9a-f]+$/i.test(token)) return parseInt(token.slice(2), 16);
+
+  const metadataSets = behaviorMetadata[behaviorId]?.metadata || [];
+  const normalizedToken = normalizeBehaviorToken(token);
+  for (const set of metadataSets) {
+    const descriptions = paramIndex === 1 ? set.param1 : set.param2;
+    for (const desc of descriptions) {
+      if (desc.constant !== undefined && normalizeBehaviorToken(desc.name) === normalizedToken) {
+        return desc.constant;
+      }
+    }
+  }
+
+  const descriptions = metadataSets.flatMap(set => paramIndex === 1 ? set.param1 : set.param2);
+  if (descriptions.some(desc => desc.hidUsage)) {
+    const usage = encodeZmkKeyNameToUsage(token);
+    if (usage !== 0) return usage;
+  }
+  if (descriptions.some(desc => desc.layerId)) {
+    const parsedLayer = parseInt(token, 10);
+    if (!isNaN(parsedLayer)) return parsedLayer;
+  }
+
+  const usage = encodeZmkKeyNameToUsage(token);
+  if (usage !== 0) return usage;
+
+  throw new Error(`Unable to resolve ZMK behavior parameter "${token}" for behavior ${behaviorId}`);
+}
+
 function zmkStringToBinding(
   zmkStr: string,
-  behaviorIds: Record<string, number>
+  behaviorIds: Record<string, number>,
+  behaviorMetadata: Record<number, DecodedBehaviorDetails> = {}
 ): { behaviorId: number; param1: number; param2: number } {
   const trimmed = zmkStr.trim();
   
@@ -1391,11 +1589,15 @@ function zmkStringToBinding(
   match = trimmed.match(/^&([^\s]+)\s*(.*)$/);
   if (match) {
     const name = match[1];
-    const params = match[2].trim().split(/\s+/).map(Number).filter(n => !isNaN(n));
+    const behaviorId = resolveBehaviorId(behaviorIds, name);
+    if (!behaviorId) {
+      throw new Error(`Unknown ZMK behavior "${name}". Connect to a ZMK Studio device and sync behavior metadata first.`);
+    }
+    const params = match[2].trim().split(/\s+/).filter(Boolean);
     return {
-      behaviorId: behaviorIds[name] || 0,
-      param1: params[0] || 0,
-      param2: params[1] || 0
+      behaviorId,
+      param1: resolveBehaviorParameterToken(params[0], behaviorId, 1, behaviorMetadata),
+      param2: resolveBehaviorParameterToken(params[1], behaviorId, 2, behaviorMetadata)
     };
   }
   
@@ -1419,8 +1621,10 @@ export class ZmkProtocol implements IProtocolDriver {
   private currentRequestId: number = 1;
   private behaviorNames: Record<number, string> = {};
   private behaviorIds: Record<string, number> = {};
+  private behaviorMetadata: Record<number, DecodedBehaviorDetails> = {};
   private fetchedKeymap: DecodedKeymap | null = null;
   private requestQueue: Promise<void> = Promise.resolve();
+  private notificationHandler: ((notification: ZmkStudioNotification) => void) | null = null;
 
   private uiKeysProvider: (() => any[]) | null = null;
 
@@ -1492,6 +1696,26 @@ export class ZmkProtocol implements IProtocolDriver {
 
   constructor() {}
 
+  setNotificationHandler(handler: ((notification: ZmkStudioNotification) => void) | null): void {
+    this.notificationHandler = handler;
+  }
+
+  private handleIncomingNotification(notification: DecodedNotification): void {
+    const simplified: ZmkStudioNotification = {};
+
+    if (notification.core?.lockStateChanged !== undefined) {
+      simplified.lockStateChanged = notification.core.lockStateChanged;
+    }
+    if (notification.keymap?.unsavedChangesStatusChanged !== undefined) {
+      simplified.unsavedChangesStatusChanged = notification.keymap.unsavedChangesStatusChanged;
+    }
+
+    if (simplified.lockStateChanged !== undefined || simplified.unsavedChangesStatusChanged !== undefined) {
+      console.log('[ZMK notification]', simplified);
+      this.notificationHandler?.(simplified);
+    }
+  }
+
   public keyboardName: string = 'ZMK Keyboard';
   public layerCount: number = 3;
   public selectedLayoutName: string = 'Default Layout';
@@ -1507,6 +1731,7 @@ export class ZmkProtocol implements IProtocolDriver {
     this.currentRequestId = 1;
     this.behaviorNames = {};
     this.behaviorIds = {};
+    this.behaviorMetadata = {};
     this.fetchedKeymap = null;
     this.keyboardName = 'ZMK Keyboard';
     this.layerCount = 3;
@@ -1699,6 +1924,7 @@ export class ZmkProtocol implements IProtocolDriver {
           const cleanName = details.displayName.toLowerCase().replace(/_behavior$/, '');
           this.behaviorNames[details.id] = cleanName;
           this.behaviorIds[cleanName] = details.id;
+          this.behaviorMetadata[details.id] = details;
         }
       }
       this.behaviorsAvailable = true;
@@ -1808,6 +2034,17 @@ export class ZmkProtocol implements IProtocolDriver {
 
   async initialize(transport: ITransport): Promise<boolean> {
     this.transport = transport;
+    (transport as ITransport & { onFrame?: (handler: ZmkFrameHandler | null) => void }).onFrame?.((payload) => {
+      try {
+        const decoded = decodeResponse(payload);
+        if (!decoded.notification) return false;
+        this.handleIncomingNotification(decoded.notification);
+        return true;
+      } catch (err) {
+        console.warn('[ZMK notification] Failed to decode incoming frame:', err);
+        return false;
+      }
+    });
     console.log('ZMK Protocol Driver Initialized with Transport Capabilities:', this.capabilities);
     return true;
   }
@@ -1919,7 +2156,7 @@ export class ZmkProtocol implements IProtocolDriver {
 
     const zmkDtsStr = actionToZmkString(action);
     console.log(`[ZMK setKey] Mapping action "${zmkDtsStr}" using behaviorIds:`, JSON.stringify(this.behaviorIds));
-    const binding = zmkStringToBinding(zmkDtsStr, this.behaviorIds);
+    const binding = zmkStringToBinding(zmkDtsStr, this.behaviorIds, this.behaviorMetadata);
     console.log(`[ZMK setKey] Resolved binding: behaviorId=${binding.behaviorId}, param1=${binding.param1}, param2=${binding.param2}`);
 
     const getSetLayerBindingResponseEnumName = (s: number): string => {
@@ -1951,6 +2188,7 @@ export class ZmkProtocol implements IProtocolDriver {
       const lockState = decodedLock.requestResponse?.core?.getLockState;
       if (lockState !== undefined) {
         const isLocked = isZmkStudioLocked(lockState);
+        this.notificationHandler?.({ lockStateChanged: lockState });
         console.log(`[ZMK Write Pre-check] Lock State: ${isLocked ? 'LOCKED' : 'UNLOCKED'} (value: ${lockState})`);
         if (isLocked) {
           throw new Error('ZMK Studio is locked. Please trigger the Studio Unlock key on your keyboard to unlock.');
@@ -1999,6 +2237,7 @@ export class ZmkProtocol implements IProtocolDriver {
       if (saveChangesResult) {
         if (saveChangesResult.ok) {
           console.log('[ZMK SaveChanges RX] Status: SAVE_CHANGES_ERR_OK (ok=true)');
+          this.notificationHandler?.({ unsavedChangesStatusChanged: false });
         } else if (saveChangesResult.err !== undefined) {
           const errName = getSaveChangesErrorCodeName(saveChangesResult.err);
           console.log(`[ZMK SaveChanges RX] Status: ${errName} (err=${saveChangesResult.err})`);
