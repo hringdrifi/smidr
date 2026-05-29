@@ -101,6 +101,7 @@ describe('export generation', () => {
     const keyboardJson = JSON.parse(await zip.file('unmasked_board/keyboard.json')!.async('string'));
 
     expect(keyboardJson.matrix_pins.masked).toBeUndefined();
+    expect(keyboardJson.features.via).toBeUndefined();
     expect(zip.file('unmasked_board/unmasked_board.c')).toBeNull();
   });
 
@@ -228,13 +229,11 @@ describe('export generation', () => {
 
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const keyboardJson = JSON.parse(await zip.file('split_masked_board/keyboard.json')!.async('string'));
-    const configH = await zip.file('split_masked_board/config.h')!.async('string');
     const keyboardC = await zip.file('split_masked_board/split_masked_board.c')!.async('string');
 
     expect(keyboardJson.matrix_pins.masked).toBe(true);
     expect(keyboardJson.split.matrix_pins.right.rows).toEqual(['GP4', 'GP5']);
     expect(keyboardJson.split.matrix_pins.right.cols).toEqual(['GP5', 'GP6']);
-    expect(configH).toContain('#define MATRIX_MASKED');
     expect(keyboardC).toContain('(matrix_row_t)0x1ULL');
   });
 

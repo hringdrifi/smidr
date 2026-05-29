@@ -130,8 +130,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
       mousekey: true,
       nkro: true,
       encoder: settings.features.encoder,
-      rgblight: settings.features.rgb,
-      via: true
+      rgblight: settings.features.rgb
     },
     bootmagic,
     matrix_pins: {
@@ -188,7 +187,6 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   // 2. config.h - config_common.h is deprecated in modern QMK
   const configH = `/* Copyright 2026 Smidr User */
 #pragma once
-${useMatrixMask ? '\n#define MATRIX_MASKED\n' : ''}
 
 /* Encoder pins */
 ${settings.features.encoder ? `

@@ -132,7 +132,14 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
+  const warnIfQmkPinsMissing = () => {
+    if ((settings.pins.rows?.length ?? 0) === 0 || (settings.pins.cols?.length ?? 0) === 0) {
+      alert('QMK/VIA/Vial firmware export has no row or column pin assignments. The generated source may fail to compile until pins are configured in Hardware Settings.');
+    }
+  };
+
   const handleExportViaZip = async () => {
+    warnIfQmkPinsMissing();
     const zipBlob = await generateQmkZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_qmk.zip`, zipBlob);
@@ -142,6 +149,7 @@ export default function App() {
   };
 
   const handleExportVialZip = async () => {
+    warnIfQmkPinsMissing();
     const zipBlob = await generateVialZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_vial.zip`, zipBlob);
