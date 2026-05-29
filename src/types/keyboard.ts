@@ -12,6 +12,7 @@ export interface PhysicalKey {
   id?: string;   // runtime only - generated on load, stripped on save
   row?: number;  // matrix row (undefined if unassigned)
   col?: number;  // matrix col (undefined if unassigned)
+  zmkPosition?: number; // ZMK Studio keymap position index (runtime/source import aid)
   x: number;
   y: number;
   w: number; // default: 1

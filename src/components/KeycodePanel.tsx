@@ -54,14 +54,15 @@ export const KeycodePanel = () => {
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
-  const hasMatrix = selectedKey && selectedKey.row !== undefined;
+  const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
+    selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
+  );
 
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
     if (useKeyboardStore.getState().appMode === 'remap') {
-      if (hasMatrix) {
-        const flatIndex = selectedKey.row! * 32 + selectedKey.col!;
-        action = remoteKeymap[currentLayer]?.[flatIndex] || { action: 'trans' };
+      if (selectedRemoteIndex !== undefined) {
+        action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
       }
     } else {
       action = selectedKey.keymap?.[currentLayer] || { action: 'trans' };

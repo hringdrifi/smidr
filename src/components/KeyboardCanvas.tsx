@@ -211,6 +211,23 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     return Array.from(ids);
   }, [visKeys, editorMode, readonlyGeometry]);
 
+  const invalidMatrixIds = useMemo(() => {
+    if (editorMode !== 'matrix' || readonlyGeometry) return [];
+    const rowCount = settings.pins.rows.length;
+    const colCount = settings.pins.cols.length;
+    return visKeys
+      .filter(key => (
+        (key.row !== undefined && key.row >= rowCount) ||
+        (key.col !== undefined && key.col >= colCount)
+      ))
+      .map(key => key.id);
+  }, [visKeys, editorMode, readonlyGeometry, settings.pins.rows.length, settings.pins.cols.length]);
+
+  const warningKeyIds = useMemo(
+    () => Array.from(new Set([...collidingIds, ...invalidMatrixIds])),
+    [collidingIds, invalidMatrixIds]
+  );
+
   // Zoom handling
   const handleWheel = (e: any) => {
     e.evt.preventDefault();
@@ -472,7 +489,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           {visKeys.map(key => (
             <KeyComponent
               key={`${key.id}-body`} id={key.id} keyData={key}
-              isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={collidingIds.includes(key.id)}
+              isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
               editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap)}
               showLabel={false} draggable={!readonlyGeometry && appMode === 'design'}
               onDragStart={() => {
@@ -621,7 +638,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           {visKeys.map(key => (
             <KeyComponent
               key={`${key.id}-label`} id={`${key.id}-label`} keyData={key}
-              isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={collidingIds.includes(key.id)}
+              isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
               editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap)}
               showKeycap={false}
               onMouseDown={(e) => {

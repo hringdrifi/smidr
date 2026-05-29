@@ -128,13 +128,7 @@ export const DeviceConnector: React.FC = () => {
               if (hexUid === p.vialUid.toUpperCase()) return true;
             }
 
-            let projectVpid = p.vendorProductId;
-            if (!projectVpid && p.vid && p.pid) {
-              const parsedVid = parseInt(String(p.vid).replace(/0[xX]/, ''), 16) || 0;
-              const parsedPid = parseInt(String(p.pid).replace(/0[xX]/, ''), 16) || 0;
-              projectVpid = (parsedVid << 16) | parsedPid;
-            }
-            return projectVpid === deviceVendorProductId;
+            return p.vendorProductId === deviceVendorProductId;
           });
 
           if (isVial && smidrData) {
@@ -209,13 +203,7 @@ export const DeviceConnector: React.FC = () => {
         const projects = listProjects();
         const match = projects.find(p => {
           if (!deviceVendorProductId) return false;
-          let projectVpid = p.vendorProductId;
-          if (!projectVpid && p.vid && p.pid) {
-            const parsedVid = parseInt(String(p.vid).replace(/0[xX]/, ''), 16) || 0;
-            const parsedPid = parseInt(String(p.pid).replace(/0[xX]/, ''), 16) || 0;
-            projectVpid = (parsedVid << 16) | parsedPid;
-          }
-          return projectVpid === deviceVendorProductId;
+          return p.vendorProductId === deviceVendorProductId;
         });
 
         if (match) {

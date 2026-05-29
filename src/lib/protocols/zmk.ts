@@ -1767,6 +1767,8 @@ export class ZmkProtocol implements IProtocolDriver {
   }
 
   resolveZmkPosition(row: number, col: number): number {
+    if (col < 0) return row;
+
     let resolvedIndex = -1;
     let method = '';
 
@@ -1777,6 +1779,12 @@ export class ZmkProtocol implements IProtocolDriver {
         if (uiKeys && uiKeys.length > 0) {
           const uiKey = uiKeys.find((k: any) => k.row === row && k.col === col);
           if (uiKey) {
+            if (typeof uiKey.zmkPosition === 'number') {
+              resolvedIndex = uiKey.zmkPosition;
+              method = 'UI ZMK position';
+            }
+          }
+          if (uiKey && resolvedIndex === -1) {
             // Find the physical key with the closest coordinates (x, y)
             let closestIndex = -1;
             let minDistance = Infinity;
@@ -1860,7 +1868,7 @@ export class ZmkProtocol implements IProtocolDriver {
   public layerCount: number = 3;
   public selectedLayoutName: string = 'Default Layout';
   public physicalPositions: Array<{ row: number; col: number; index: number }> = [];
-  public physicalKeys: Array<{ x: number; y: number; w: number; h: number; row: number; col: number }> = [];
+  public physicalKeys: Array<{ x: number; y: number; w: number; h: number; r: number; rx: number; ry: number; zmkPosition: number }> = [];
   public isLayoutAvailable: boolean = false;
   public keyboardInfoAvailable: boolean = false;
   public behaviorsAvailable: boolean = false;
@@ -2170,24 +2178,19 @@ export class ZmkProtocol implements IProtocolDriver {
       const ZMK_LAYOUT_UNIT = 100;
       for (let i = 0; i < activeLayout.keys.length; i++) {
         const keyAttrs = activeLayout.keys[i];
-        const rx = keyAttrs.x / ZMK_LAYOUT_UNIT;
-        const ry = keyAttrs.y / ZMK_LAYOUT_UNIT;
+        const x = keyAttrs.x / ZMK_LAYOUT_UNIT;
+        const y = keyAttrs.y / ZMK_LAYOUT_UNIT;
         const rw = keyAttrs.width / ZMK_LAYOUT_UNIT || 1.0;
         const rh = keyAttrs.height / ZMK_LAYOUT_UNIT || 1.0;
-        
-        let row = Math.round(ry);
-        let col = Math.round(rx);
-        
-        while (this.physicalPositions.some(p => p.row === row && p.col === col)) {
-          col++;
-        }
-        
-        this.physicalPositions.push({ row, col, index: i });
-        this.physicalKeys.push({ x: rx, y: ry, w: rw, h: rh, row, col });
+        const rr = keyAttrs.r / 100;
+        const rrx = keyAttrs.rx / ZMK_LAYOUT_UNIT;
+        const rry = keyAttrs.ry / ZMK_LAYOUT_UNIT;
+
+        this.physicalKeys.push({ x, y, w: rw, h: rh, r: rr, rx: rrx, ry: rry, zmkPosition: i });
       }
     }
 
-    if (this.physicalPositions.length > 0) {
+    if (this.physicalKeys.length > 0) {
       this.physicalLayoutsAvailable = true;
       this.isLayoutAvailable = true;
       return true;
@@ -2286,16 +2289,13 @@ export class ZmkProtocol implements IProtocolDriver {
     }
 
     const keymap: Record<number, UniversalAction[]> = {};
-    const positions = this.physicalPositions.length > 0
-      ? this.physicalPositions
-      : this.physicalKeys.map((pk, index) => ({ row: pk.row, col: pk.col, index }));
 
     for (let layer = 0; layer < Math.min(this.fetchedKeymap.layers.length, 16); layer++) {
       const actions: UniversalAction[] = [];
       const layerBindings = this.fetchedKeymap.layers[layer]?.bindings || [];
-      for (const pos of positions) {
-        const binding = layerBindings[pos.index];
-        actions[pos.row * 32 + pos.col] = binding
+      for (const pk of this.physicalKeys) {
+        const binding = layerBindings[pk.zmkPosition];
+        actions[pk.zmkPosition] = binding
           ? zmkStringToAction(bindingToZmkString(binding, this.behaviorNames))
           : { action: 'none' };
       }

@@ -20,9 +20,11 @@ export const RemapView: React.FC = () => {
     if (selectedKeyIds.length === 0) return false;
     return keys.some(k => {
       if (!selectedKeyIds.includes(k.id)) return false;
-      if (k.row !== undefined && k.col !== undefined) {
-        const flatIndex = k.row * 32 + k.col;
-        const action = remoteKeymap[currentLayer]?.[flatIndex];
+      const remoteIndex = k.zmkPosition ?? (
+        k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
+      );
+      if (remoteIndex !== undefined) {
+        const action = remoteKeymap[currentLayer]?.[remoteIndex];
         return action && action.action !== 'trans';
       }
       return false;

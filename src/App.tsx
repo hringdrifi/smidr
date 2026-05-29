@@ -204,11 +204,13 @@ export default function App() {
     // Merge latest keycodes from real device to each key
     const keysWithCurrentKeymap = keys.map(k => {
       const keymap: Record<number, UniversalAction> = { ...k.keymap };
-      if (k.row !== undefined && k.col !== undefined) {
-        const flatIndex = k.row * 32 + k.col;
+      const remoteIndex = k.zmkPosition ?? (
+        k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
+      );
+      if (remoteIndex !== undefined) {
         Object.keys(remoteKeymap || {}).forEach(lStr => {
           const l = Number(lStr);
-          const action = remoteKeymap[l]?.[flatIndex];
+          const action = remoteKeymap[l]?.[remoteIndex];
           if (action) {
             keymap[l] = action;
           }
@@ -242,7 +244,11 @@ export default function App() {
       const layersCount = settings.layers || 4;
       
       importKeys.forEach((k: PhysicalKey) => {
-        const pos = (k.row !== undefined && k.col !== undefined) ? { row: k.row, col: k.col } : null;
+        const pos = k.zmkPosition !== undefined
+          ? { row: k.zmkPosition, col: -1 }
+          : (k.row !== undefined && k.col !== undefined)
+          ? { row: k.row, col: k.col }
+          : null;
         if (pos && k.keymap) {
           for (let l = 0; l < layersCount; l++) {
             const val = k.keymap[l];

@@ -35,13 +35,14 @@ export const KeycodeConfigPanel = () => {
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
-  const hasMatrix = selectedKey?.row !== undefined;
+  const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
+    selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
+  );
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
     if (appMode === 'remap') {
-      if (hasMatrix) {
-        const flatIndex = selectedKey.row! * 32 + selectedKey.col!;
-        action = remoteKeymap[currentLayer]?.[flatIndex] || { action: 'trans' };
+      if (selectedRemoteIndex !== undefined) {
+        action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
       }
     } else {
       action = selectedKey.keymap?.[currentLayer] || { action: 'trans' };
@@ -95,8 +96,10 @@ export const KeycodeConfigPanel = () => {
 
   const commitSelectedAction = (newAction: UniversalAction) => {
     if (appMode === 'remap') {
-      if (hasMatrix) {
-        updateDeviceKeycode(currentLayer, selectedKey.row!, selectedKey.col!, newAction);
+      if (selectedKey.zmkPosition !== undefined) {
+        updateDeviceKeycode(currentLayer, selectedKey.zmkPosition, -1, newAction);
+      } else if (selectedKey.row !== undefined && selectedKey.col !== undefined) {
+        updateDeviceKeycode(currentLayer, selectedKey.row, selectedKey.col, newAction);
       }
     } else {
       setKeycode(selectedKey.id!, currentLayer, newAction);

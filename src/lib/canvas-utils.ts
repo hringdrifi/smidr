@@ -222,8 +222,10 @@ export const getKeyLabel = (
   remoteKeymap?: Record<number, UniversalAction[]>
 ): LabelNode => {
   if (appMode === 'remap') {
-    if (k.row === undefined || k.col === undefined) return { type: 'empty' };
-    const flatIndex = k.row * 32 + k.col;
+    const flatIndex = k.zmkPosition ?? (
+      k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
+    );
+    if (flatIndex === undefined) return { type: 'empty' };
     const action = remoteKeymap?.[currentLayer]?.[flatIndex];
     if (!action) return { type: 'text', text: '...' };
     return formatActionLabel(action);

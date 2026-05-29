@@ -276,6 +276,45 @@ const isZmkDebugLoggingEnabled = () => (
   typeof localStorage !== 'undefined' && localStorage.getItem('smidr:zmk-debug') === '1'
 );
 
+const getMatrixDimensionsFromKeys = (
+  keys: PhysicalKey[],
+  fallback: ProjectSettings['matrix'] = { rows: 6, cols: 16 }
+): ProjectSettings['matrix'] => {
+  const matrixKeys = keys.filter(k => k.row !== undefined && k.col !== undefined);
+  if (matrixKeys.length === 0) return fallback;
+
+  return {
+    rows: Math.max(...matrixKeys.map(k => k.row ?? 0)) + 1,
+    cols: Math.max(...matrixKeys.map(k => k.col ?? 0)) + 1,
+  };
+};
+
+const getGeneratedZmkProjectSettings = (
+  state: KeyboardState,
+  keys: PhysicalKey[],
+  layerCount: number,
+  keyboardName?: string
+): ProjectSettings => {
+  const deviceVendorProductId = state.connectedDevice
+    ? (state.connectedDevice.vid << 16) | state.connectedDevice.pid
+    : 0;
+
+  return {
+    ...state.settings,
+    name: keyboardName || state.settings.name || 'ZMK Keyboard',
+    manufacturer: state.connectedDevice?.manufacturerName || state.settings.manufacturer || 'ZMK',
+    vendorProductId: deviceVendorProductId || state.settings.vendorProductId,
+    layers: layerCount,
+    matrix: getMatrixDimensionsFromKeys(keys, state.settings.matrix),
+  };
+};
+
+const getRemoteKeymapIndex = (key: Pick<PhysicalKey, 'row' | 'col' | 'zmkPosition'>): number | undefined => {
+  if (key.zmkPosition !== undefined) return key.zmkPosition;
+  if (key.row !== undefined && key.col !== undefined) return key.row * 32 + key.col;
+  return undefined;
+};
+
 const retargetLayerAction = (action: UniversalAction, deletedLayer: number): UniversalAction => {
   if (action.action === 'mo' || action.action === 'tg' || action.action === 'to') {
     return action.layerId === deletedLayer ? { ...action, layerId: 0 } : action;
@@ -522,7 +561,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               }
               
               const zmkProto = protocol as ZmkProtocol;
-              const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalPositions.length > 0;
+              const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalKeys.length > 0;
               const hasKeymap = zmkProto.keymapAvailable === true;
 
               if (!hasPhysicalLayout) {
@@ -539,7 +578,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 console.log('[ZMK sync]', {
                   layerCount,
                   physicalLayout: selectedLayoutName,
-                  positionCount: positions.length,
+                  positionCount: zmkProto.physicalKeys.length,
                   layerMetadata: zmkLayerMetadata,
                 });
               }
@@ -561,13 +600,15 @@ export const useKeyboardStore = create<KeyboardState>()(
                     updatedKeys = zmkProto.physicalKeys.map((pk) => {
                       return {
                         id: crypto.randomUUID(),
-                        label: `R${pk.row}C${pk.col}`,
+                        label: `P${pk.zmkPosition}`,
                         x: pk.x,
                         y: pk.y,
                         w: pk.w,
                         h: pk.h,
-                        row: pk.row,
-                        col: pk.col,
+                        r: pk.r,
+                        rx: pk.rx,
+                        ry: pk.ry,
+                        zmkPosition: pk.zmkPosition,
                         keymap: {}
                       } as RuntimeKey;
                     });
@@ -584,6 +625,9 @@ export const useKeyboardStore = create<KeyboardState>()(
                         y,
                         w: 1,
                         h: 1,
+                        r: 0,
+                        rx: x,
+                        ry: y,
                         row,
                         col,
                         keymap: {}
@@ -591,10 +635,22 @@ export const useKeyboardStore = create<KeyboardState>()(
                     });
                   }
                 }
-                set({
+                const shouldOpenGeneratedZmkProject = s.keys.length === 0 && updatedKeys.length > 0;
+                set((state) => ({
                   keys: updatedKeys,
-                  baseKeys: updatedKeys
-                });
+                  baseKeys: updatedKeys,
+                  ...(shouldOpenGeneratedZmkProject ? {
+                    settings: getGeneratedZmkProjectSettings(state, updatedKeys, layerCount, zmkProto.keyboardName),
+                    currentProjectId: crypto.randomUUID(),
+                    isProjectOpen: true,
+                    selectedKeyIds: [],
+                    focusedKeyId: null,
+                    selectionAnchorId: null,
+                    editorMode: 'layout' as const,
+                    currentLayer: 0,
+                    transform: getCenteredTransform(updatedKeys, state.settings.activeOptions || {}),
+                  } : {})
+                }));
 
                 // Background lock probe for ZMK
                 setTimeout(async () => {
@@ -711,9 +767,9 @@ export const useKeyboardStore = create<KeyboardState>()(
 
             // If no project is loaded for ZMK, dynamically generate runtime layout keys from positions
             let updatedKeys = [...s.keys];
-            if (isZmk && s.keys.length === 0 && positions.length > 0) {
+            if (isZmk && s.keys.length === 0 && ((protocol as ZmkProtocol).physicalKeys.length > 0 || positions.length > 0)) {
               const zmkProto = protocol as ZmkProtocol;
-              const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalPositions.length > 0;
+              const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalKeys.length > 0;
               const hasKeymap = zmkProto.keymapAvailable === true;
 
               if (hasPhysicalLayout && !hasKeymap) {
@@ -730,8 +786,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   const keymap: Record<number, UniversalAction> = {};
                   Object.keys(newRemoteKeymap).forEach(lStr => {
                     const l = Number(lStr);
-                    const flatIndex = pk.row * 32 + pk.col;
-                    const action = newRemoteKeymap[l]?.[flatIndex];
+                    const action = newRemoteKeymap[l]?.[pk.zmkPosition];
                     if (action) {
                       keymap[l] = action;
                     }
@@ -739,13 +794,15 @@ export const useKeyboardStore = create<KeyboardState>()(
 
                   return {
                     id: crypto.randomUUID(),
-                    label: `R${pk.row}C${pk.col}`,
+                    label: `P${pk.zmkPosition}`,
                     x: pk.x,
                     y: pk.y,
                     w: pk.w,
                     h: pk.h,
-                    row: pk.row,
-                    col: pk.col,
+                    r: pk.r,
+                    rx: pk.rx,
+                    ry: pk.ry,
+                    zmkPosition: pk.zmkPosition,
                     keymap
                   } as RuntimeKey;
                 });
@@ -773,6 +830,9 @@ export const useKeyboardStore = create<KeyboardState>()(
                     y,
                     w: 1,
                     h: 1,
+                    r: 0,
+                    rx: x,
+                    ry: y,
                     row,
                     col,
                     keymap
@@ -782,8 +842,10 @@ export const useKeyboardStore = create<KeyboardState>()(
             } else {
               // Standard merge: merge fetched physical keymap directly into editor keys
               updatedKeys = s.keys.map(k => {
-                if (k.row === undefined || k.col === undefined) return k;
-                const flatIndex = k.row * 32 + k.col;
+                const flatIndex = k.zmkPosition ?? (
+                  k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
+                );
+                if (flatIndex === undefined) return k;
                 const keymap = { ...k.keymap };
                 Object.keys(newRemoteKeymap).forEach(lStr => {
                   const l = Number(lStr);
@@ -796,18 +858,35 @@ export const useKeyboardStore = create<KeyboardState>()(
               });
             }
 
+            const shouldOpenGeneratedZmkProject = isZmk && s.keys.length === 0 && updatedKeys.length > 0;
             const finalMatrixRows = isZmk && s.keys.length === 0 ? 6 : matrixRows;
             const finalMatrixCols = isZmk && s.keys.length === 0 ? 16 : matrixCols;
 
-            set((state) => ({
-              remoteKeymap: newRemoteKeymap,
-              keys: updatedKeys,
-              baseKeys: updatedKeys,
-              settings: {
-                ...state.settings,
-                matrix: { rows: finalMatrixRows, cols: finalMatrixCols }
-              }
-            }));
+            set((state) => {
+              const generatedZmkSettings = shouldOpenGeneratedZmkProject
+                ? getGeneratedZmkProjectSettings(state, updatedKeys, layerCount, (protocol as ZmkProtocol).keyboardName)
+                : null;
+
+              return {
+                remoteKeymap: newRemoteKeymap,
+                keys: updatedKeys,
+                baseKeys: updatedKeys,
+                settings: generatedZmkSettings || {
+                  ...state.settings,
+                  matrix: { rows: finalMatrixRows, cols: finalMatrixCols }
+                },
+                ...(shouldOpenGeneratedZmkProject ? {
+                  currentProjectId: crypto.randomUUID(),
+                  isProjectOpen: true,
+                  selectedKeyIds: [],
+                  focusedKeyId: null,
+                  selectionAnchorId: null,
+                  editorMode: 'layout' as const,
+                  currentLayer: 0,
+                  transform: getCenteredTransform(updatedKeys, state.settings.activeOptions || {}),
+                } : {})
+              };
+            });
             
             // Auto-sync macros and combos if it is a Vial device
             if (isVial) {
@@ -1291,10 +1370,11 @@ export const useKeyboardStore = create<KeyboardState>()(
             await protocol.setKey(layer, row, col, action);
 
             if (isZmk) {
-              updateRemoteKeycode(layer, row * 32 + col, action);
+              const remoteIndex = col < 0 ? row : row * 32 + col;
+              updateRemoteKeycode(layer, remoteIndex, action);
               set((state) => {
                 const updatedKeys = state.keys.map(k => {
-                  if (k.row === row && k.col === col) {
+                  if ((col < 0 && k.zmkPosition === row) || (k.row === row && k.col === col)) {
                     return { ...k, keymap: { ...k.keymap, [layer]: action } };
                   }
                   return k;
@@ -1332,8 +1412,8 @@ export const useKeyboardStore = create<KeyboardState>()(
             return {
               actionClipboard: sortedSelectedKeys.map(k => {
                 if (s.appMode === 'remap') {
-                  if (k.row !== undefined && k.col !== undefined) {
-                    const flatIndex = k.row * 32 + k.col;
+                  const flatIndex = getRemoteKeymapIndex(k);
+                  if (flatIndex !== undefined) {
                     return s.remoteKeymap[s.currentLayer]?.[flatIndex] || { action: 'trans' as const };
                   }
                   return { action: 'trans' as const };
@@ -1397,10 +1477,11 @@ export const useKeyboardStore = create<KeyboardState>()(
                 if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
                 const newLayer = [...newRemoteKeymap[currentLayer]];
                 targetKeys.forEach((tk, idx) => {
-                  if (tk.row !== undefined && tk.col !== undefined) {
+                  const remoteIndex = getRemoteKeymapIndex(tk);
+                  if (remoteIndex !== undefined) {
                     const action = actionClipboard.length === 1 ? actionClipboard[0] : actionClipboard[idx];
                     if (action) {
-                      newLayer[tk.row * 32 + tk.col] = action;
+                      newLayer[remoteIndex] = action;
                     }
                   }
                 });
@@ -1432,11 +1513,13 @@ export const useKeyboardStore = create<KeyboardState>()(
                   // Set each key sequentially
                   for (let i = 0; i < targetKeys.length; i++) {
                     const tk = targetKeys[i];
-                    if (tk.row !== undefined && tk.col !== undefined) {
+                    const targetRow = isZmk && tk.zmkPosition !== undefined ? tk.zmkPosition : tk.row;
+                    const targetCol = isZmk && tk.zmkPosition !== undefined ? -1 : tk.col;
+                    if (targetRow !== undefined && targetCol !== undefined) {
                       const action = actionClipboard.length === 1 ? actionClipboard[0] : actionClipboard[i];
                       if (action) {
-                        console.log(`[ZMK/VIA/Vial Paste Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
-                        await protocol.setKey(currentLayer, tk.row, tk.col, action);
+                        console.log(`[ZMK/VIA/Vial Paste Write] Layer:${currentLayer} Row:${targetRow} Col:${targetCol}`, action);
+                        await protocol.setKey(currentLayer, targetRow, targetCol, action);
                       }
                     }
                   }
@@ -1446,13 +1529,16 @@ export const useKeyboardStore = create<KeyboardState>()(
                     console.log('[ZMK Sync] Syncing local UI store state after paste...');
                     const newRemoteKeymap = { ...get().remoteKeymap };
                     const updatedKeys = await Promise.all(get().keys.map(async (k) => {
-                      if (k.row === undefined || k.col === undefined) return k;
+                      const remoteIndex = getRemoteKeymapIndex(k);
+                      const targetRow = k.zmkPosition !== undefined ? k.zmkPosition : k.row;
+                      const targetCol = k.zmkPosition !== undefined ? -1 : k.col;
+                      if (remoteIndex === undefined || targetRow === undefined || targetCol === undefined) return k;
                       const keymap = { ...k.keymap };
                       for (let l = 0; l < zmkProto.layerCount; l++) {
-                        const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                        const actionVal = await zmkProto.getKey(l, targetRow, targetCol);
                         keymap[l] = actionVal;
                         if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
-                        newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
+                        newRemoteKeymap[l][remoteIndex] = actionVal;
                       }
                       return { ...k, keymap };
                     }));
@@ -1510,8 +1596,9 @@ export const useKeyboardStore = create<KeyboardState>()(
               if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
               const newLayer = [...newRemoteKeymap[currentLayer]];
               targetKeys.forEach(tk => {
-                if (tk.row !== undefined && tk.col !== undefined) {
-                  newLayer[tk.row * 32 + tk.col] = newAction;
+                const remoteIndex = getRemoteKeymapIndex(tk);
+                if (remoteIndex !== undefined) {
+                  newLayer[remoteIndex] = newAction;
                 }
               });
               newRemoteKeymap[currentLayer] = newLayer;
@@ -1540,9 +1627,11 @@ export const useKeyboardStore = create<KeyboardState>()(
 
               // Set each key sequentially
               for (const tk of targetKeys) {
-                if (tk.row !== undefined && tk.col !== undefined) {
-                  console.log(`[ZMK/VIA/Vial Delete Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, newAction);
-                  await protocol.setKey(currentLayer, tk.row, tk.col, newAction);
+                const targetRow = isZmk && tk.zmkPosition !== undefined ? tk.zmkPosition : tk.row;
+                const targetCol = isZmk && tk.zmkPosition !== undefined ? -1 : tk.col;
+                if (targetRow !== undefined && targetCol !== undefined) {
+                  console.log(`[ZMK/VIA/Vial Delete Write] Layer:${currentLayer} Row:${targetRow} Col:${targetCol}`, newAction);
+                  await protocol.setKey(currentLayer, targetRow, targetCol, newAction);
                 }
               }
 
@@ -1551,13 +1640,16 @@ export const useKeyboardStore = create<KeyboardState>()(
                 console.log('[ZMK Sync] Syncing local UI store state after delete...');
                 const newRemoteKeymap = { ...get().remoteKeymap };
                 const updatedKeys = await Promise.all(get().keys.map(async (k) => {
-                  if (k.row === undefined || k.col === undefined) return k;
+                  const remoteIndex = getRemoteKeymapIndex(k);
+                  const targetRow = k.zmkPosition !== undefined ? k.zmkPosition : k.row;
+                  const targetCol = k.zmkPosition !== undefined ? -1 : k.col;
+                  if (remoteIndex === undefined || targetRow === undefined || targetCol === undefined) return k;
                   const keymap = { ...k.keymap };
                   for (let l = 0; l < zmkProto.layerCount; l++) {
-                    const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                    const actionVal = await zmkProto.getKey(l, targetRow, targetCol);
                     keymap[l] = actionVal;
                     if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
-                    newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
+                    newRemoteKeymap[l][remoteIndex] = actionVal;
                   }
                   return { ...k, keymap };
                 }));
@@ -1595,8 +1687,9 @@ export const useKeyboardStore = create<KeyboardState>()(
               if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
               const newLayer = [...newRemoteKeymap[currentLayer]];
               targetKeys.forEach(tk => {
-                if (tk.row !== undefined && tk.col !== undefined) {
-                  newLayer[tk.row * 32 + tk.col] = action;
+                const remoteIndex = getRemoteKeymapIndex(tk);
+                if (remoteIndex !== undefined) {
+                  newLayer[remoteIndex] = action;
                 }
               });
               newRemoteKeymap[currentLayer] = newLayer;
@@ -1625,9 +1718,11 @@ export const useKeyboardStore = create<KeyboardState>()(
 
               // Set each key sequentially
               for (const tk of targetKeys) {
-                if (tk.row !== undefined && tk.col !== undefined) {
-                  console.log(`[ZMK/VIA/Vial Bulk Write] Layer:${currentLayer} Row:${tk.row} Col:${tk.col}`, action);
-                  await protocol.setKey(currentLayer, tk.row, tk.col, action);
+                const targetRow = isZmk && tk.zmkPosition !== undefined ? tk.zmkPosition : tk.row;
+                const targetCol = isZmk && tk.zmkPosition !== undefined ? -1 : tk.col;
+                if (targetRow !== undefined && targetCol !== undefined) {
+                  console.log(`[ZMK/VIA/Vial Bulk Write] Layer:${currentLayer} Row:${targetRow} Col:${targetCol}`, action);
+                  await protocol.setKey(currentLayer, targetRow, targetCol, action);
                 }
               }
 
@@ -1636,13 +1731,16 @@ export const useKeyboardStore = create<KeyboardState>()(
                 console.log('[ZMK Sync] Syncing local UI store state after bulk write...');
                 const newRemoteKeymap = { ...get().remoteKeymap };
                 const updatedKeys = await Promise.all(get().keys.map(async (k) => {
-                  if (k.row === undefined || k.col === undefined) return k;
+                  const remoteIndex = getRemoteKeymapIndex(k);
+                  const targetRow = k.zmkPosition !== undefined ? k.zmkPosition : k.row;
+                  const targetCol = k.zmkPosition !== undefined ? -1 : k.col;
+                  if (remoteIndex === undefined || targetRow === undefined || targetCol === undefined) return k;
                   const keymap = { ...k.keymap };
                   for (let l = 0; l < zmkProto.layerCount; l++) {
-                    const actionVal = await zmkProto.getKey(l, k.row, k.col);
+                    const actionVal = await zmkProto.getKey(l, targetRow, targetCol);
                     keymap[l] = actionVal;
                     if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
-                    newRemoteKeymap[l][k.row * 32 + k.col] = actionVal;
+                    newRemoteKeymap[l][remoteIndex] = actionVal;
                   }
                   return { ...k, keymap };
                 }));
