@@ -321,7 +321,7 @@ export default function App() {
 
           <div className="flex items-center gap-3">
             <div className="w-px h-4 bg-[var(--border-main)]" />
-            <span className="hidden xl:block text-[10px] font-medium text-[var(--text-dim)] uppercase tracking-[0.3em] whitespace-nowrap translate-y-[1px]">{t('header.tagline')}</span>
+            <span className="hidden xl:block text-[10px] font-medium text-[var(--text-dim)] uppercase tracking-[0.3em] whitespace-nowrap translate-y-[1px]">Custom Keyboard Forge</span>
           </div>
 
           {/* Global Actions: Undo/Redo */}
