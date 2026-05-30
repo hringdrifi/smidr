@@ -4,9 +4,11 @@ import React, { useMemo } from 'react';
 import { useKeyboardStore } from '@/lib/store';
 import { Lock, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { generatePath, getKeyVertices, UNIT } from '@/lib/canvas-utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const UnlockModal = () => {
   const { unlockState, keys, settings, cancelDeviceUnlock } = useKeyboardStore();
+  const { t } = useTranslation();
   const { progress, status, statusText, unlockKeys } = unlockState;
 
   // 1. Filter active layout keys for preview mapping
@@ -60,8 +62,8 @@ export const UnlockModal = () => {
             type="button"
             onClick={cancelDeviceUnlock}
             className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/70 bg-slate-950/60 text-slate-400 transition-colors hover:border-slate-500 hover:bg-slate-900 hover:text-slate-100"
-            aria-label="Cancel unlock"
-            title="Cancel unlock"
+            aria-label={t('unlock.cancel')}
+            title={t('unlock.cancel')}
           >
             <X size={16} />
           </button>
@@ -76,26 +78,25 @@ export const UnlockModal = () => {
 
         {/* Title */}
         <h3 className="text-xl font-bold text-slate-100 tracking-wide mb-3 text-center">
-          {status === 'holding' && 'Security Unlock Required'}
-          {status === 'success' && 'Device Unlocked!'}
-          {status === 'failed' && 'Unlock Failed'}
+          {status === 'holding' && t('unlock.securityRequired')}
+          {status === 'success' && t('unlock.deviceUnlocked')}
+          {status === 'failed' && t('unlock.failed')}
         </h3>
 
         {/* Descriptions */}
         <div className="text-center text-xs text-slate-400 max-w-lg mb-8 space-y-2 leading-relaxed font-medium">
           <p>
-            In order to proceed, the keyboard must be set into unlocked mode.
-            You should only perform this operation on computers that you trust.
+            {t('unlock.desc')}
           </p>
           <p className="text-[10px] text-slate-500">
-            To exit this mode, you will need to replug the keyboard or select Security &gt; Lock from the menu.
+            {t('unlock.exitDesc')}
           </p>
         </div>
 
         {/* Press instruction */}
         {status === 'holding' && (
           <p className="text-xs text-amber-400 font-bold tracking-wider uppercase mb-4 animate-pulse">
-            Press and hold the following highlighted keys:
+            {t('unlock.pressKeys')}
           </p>
         )}
 
@@ -139,7 +140,7 @@ export const UnlockModal = () => {
               />
             </div>
             <div className="flex justify-between items-center text-[10px] font-bold tracking-wider text-slate-500 uppercase px-1">
-              <span>Progress</span>
+              <span>{t('unlock.progress')}</span>
               <span className="text-amber-400">{progress}%</span>
             </div>
             <button
@@ -148,7 +149,7 @@ export const UnlockModal = () => {
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700/70 bg-slate-950/50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-colors hover:border-slate-500 hover:bg-slate-900 hover:text-slate-100"
             >
               <X size={13} />
-              Cancel Unlock
+              {t('unlock.cancelButton')}
             </button>
           </div>
         )}
@@ -156,14 +157,14 @@ export const UnlockModal = () => {
         {/* Success Banner */}
         {status === 'success' && (
           <div className="w-full py-2.5 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider text-center animate-pulse">
-            Proceeding...
+            {t('unlock.proceeding')}
           </div>
         )}
 
         {/* Failure Banner */}
         {status === 'failed' && (
           <div className="w-full py-2.5 px-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold uppercase tracking-wider text-center">
-            {statusText || 'Unable to authorize writing.'}
+            {statusText || t('unlock.unable')}
           </div>
         )}
       </div>

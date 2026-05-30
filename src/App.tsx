@@ -251,7 +251,7 @@ export default function App() {
       const json = JSON.parse(text) as SmidrProject;
       const importKeys = json.keys;
       if (!importKeys) {
-        alert(t('common.invalidFile') || "Invalid file format.");
+        alert(t('common.invalidFile'));
         return;
       }
 
@@ -276,7 +276,7 @@ export default function App() {
       });
 
       if (writeQueue.length === 0) {
-        alert("No valid keymap mappings found in this file.");
+        alert(t('remap.noValidMappings'));
         return;
       }
 
@@ -288,10 +288,10 @@ export default function App() {
       }
       
       await storeState.syncKeymap();
-      alert("Keymap backup restored successfully!");
+      alert(t('remap.restoreSuccess'));
     } catch (err) {
       console.error("Failed to restore backup:", err);
-      alert("Failed to restore backup. Please make sure it is a valid .smidr file.");
+      alert(t('remap.restoreFailed'));
     } finally {
       setIsRestoring(false);
       if (remapFileInputRef.current) remapFileInputRef.current.value = '';
@@ -305,8 +305,8 @@ export default function App() {
       {isRestoring && (
         <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-md z-[1000] flex flex-col items-center justify-center animate-in fade-in duration-300">
           <div className="w-16 h-16 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin mb-4" />
-          <h3 className="text-lg font-bold text-white mb-1">Restoring Keymap...</h3>
-          <p className="text-sm text-zinc-400">Please do not unplug the keyboard.</p>
+          <h3 className="text-lg font-bold text-white mb-1">{t('remap.restoring')}</h3>
+          <p className="text-sm text-zinc-400">{t('remap.restoringDesc')}</p>
         </div>
       )}
       {/* Header */}
@@ -321,7 +321,7 @@ export default function App() {
 
           <div className="flex items-center gap-3">
             <div className="w-px h-4 bg-[var(--border-main)]" />
-            <span className="hidden xl:block text-[10px] font-medium text-[var(--text-dim)] uppercase tracking-[0.3em] whitespace-nowrap translate-y-[1px]">Custom Keyboard Forge</span>
+            <span className="hidden xl:block text-[10px] font-medium text-[var(--text-dim)] uppercase tracking-[0.3em] whitespace-nowrap translate-y-[1px]">{t('header.tagline')}</span>
           </div>
 
           {/* Global Actions: Undo/Redo */}
@@ -360,7 +360,7 @@ export default function App() {
                   >
                     <Cpu size={14} className="text-amber-500" />
                     <span className="text-[10px] font-bold text-[var(--text-highlight)] uppercase tracking-wider">
-                      {connectedDevice.protocolType === 'zmk' ? `ZMK connected: ${settings.name || 'Segl'}` : (connectedDevice.productName || 'Keyboard')}
+                      {connectedDevice.protocolType === 'zmk' ? `${t('remap.connected')}: ${settings.name || 'Segl'}` : (connectedDevice.productName || t('remap.defaultKeyboard'))}
                     </span>
                   </div>
 
@@ -371,7 +371,7 @@ export default function App() {
                     <button 
                       onClick={() => remapFileInputRef.current?.click()}
                       className="flex items-center justify-center w-10 h-8 bg-[var(--bg-app)]/50 border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-highlight)] rounded-md transition-all group"
-                      title="Import Backup (.smidr)"
+                      title={t('remap.importBackup')}
                     >
                       <FileUp size={16} className="group-hover:scale-110 transition-transform" />
                     </button>
@@ -380,7 +380,7 @@ export default function App() {
                     <button 
                       onClick={handleExportBackup}
                       className="flex items-center justify-center w-10 h-8 bg-[var(--bg-app)]/50 border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-highlight)] rounded-md transition-all group"
-                      title="Export Backup (.smidr)"
+                      title={t('remap.exportBackup')}
                     >
                       <FileDown size={16} className="group-hover:scale-110 transition-transform" />
                     </button>
@@ -717,10 +717,10 @@ export default function App() {
                     ? "bg-amber-500 text-zinc-950 shadow-sm" 
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 )}
-                title="Remap"
+                title={t('modes.remap')}
               >
                 <Keyboard size={14} />
-                <span className="hidden lg:block">Remap</span>
+                <span className="hidden lg:block">{t('modes.remap')}</span>
               </button>
               <button
                 onClick={() => storeState.setAppMode('design')}
@@ -730,10 +730,10 @@ export default function App() {
                     ? "bg-amber-500 text-zinc-950 shadow-sm" 
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 )}
-                title="Design"
+                title={t('modes.design')}
               >
                 <SquarePen size={14} />
-                <span className="hidden lg:block">Design</span>
+                <span className="hidden lg:block">{t('modes.design')}</span>
               </button>
             </div>
           </div>

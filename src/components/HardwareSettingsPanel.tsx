@@ -6,11 +6,30 @@ import { Settings, Cpu, HardDrive, Hash, Lightbulb, Gauge, Monitor, ShieldCheck,
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTranslation } from '@/hooks/useTranslation';
-import { DEVELOPMENT_BOARD_OPTIONS, getDefaultBootloader, getDefaultDevelopmentBoard, getMcuPins, QMK_MCU_PRESETS } from '@/lib/mcu-presets';
+import {
+  DEVELOPMENT_BOARD_OPTIONS,
+  getDefaultBootloader,
+  getDefaultDevelopmentBoard,
+  getDevelopmentBoardLabel,
+  getDevelopmentBoardPins,
+  getMcuPins,
+  isQmkDevelopmentBoardSupported,
+  isQmkMcuSupported,
+  isZmkDevelopmentBoardSupported,
+  isZmkExportSupported,
+  QMK_MCU_PRESETS,
+} from '@/lib/mcu-presets';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+const getSupportBadge = (supportsQmk: boolean, supportsZmk: boolean) => {
+  if (supportsQmk && supportsZmk) return '[QMK/ZMK]';
+  if (supportsQmk) return '[QMK]';
+  if (supportsZmk) return '[ZMK]';
+  return '[Unsupported]';
+};
 
 const Section = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
   <div className="bg-[var(--bg-panel)]/50 border border-[var(--border-main)] rounded-lg overflow-hidden">
@@ -210,6 +229,11 @@ const PinTagInput = ({
 export const HardwareSettingsPanel = () => {
   const { settings, updateSettings, setPin } = useKeyboardStore();
   const { t } = useTranslation();
+  const format = (path: string, values: Record<string, string | number>) =>
+    Object.entries(values).reduce(
+      (text, [key, value]) => text.replace(`{${key}}`, String(value)),
+      t(path)
+    );
 
   const [activeBox, setActiveBox] = React.useState<'row' | 'col' | 'splitRow' | 'splitCol' | 'feature' | null>(null);
   const [focusedFeature, setFocusedFeature] = React.useState<string | null>(null);
@@ -217,6 +241,9 @@ export const HardwareSettingsPanel = () => {
   const [customPinText, setCustomPinText] = React.useState<string>('');
 
   const getPinPool = () => {
+    if ((settings.hardware.controllerType || 'development_board') === 'development_board') {
+      return getDevelopmentBoardPins(settings.hardware.board, settings.hardware.mcu);
+    }
     return getMcuPins(settings.hardware.mcu);
   };
 
@@ -266,6 +293,9 @@ export const HardwareSettingsPanel = () => {
   const selectedMcu = settings.hardware.mcu || 'RP2040';
   const controllerType = settings.hardware.controllerType || 'development_board';
   const selectedDevelopmentBoard = settings.hardware.board || getDefaultDevelopmentBoard(selectedMcu);
+  const pinPoolLabel = controllerType === 'development_board'
+    ? getDevelopmentBoardLabel(selectedDevelopmentBoard)
+    : selectedMcu.toUpperCase();
   const developmentBoardOptions = DEVELOPMENT_BOARD_OPTIONS.some(option => option.value === selectedDevelopmentBoard)
     ? DEVELOPMENT_BOARD_OPTIONS
     : [...DEVELOPMENT_BOARD_OPTIONS, { value: selectedDevelopmentBoard, label: selectedDevelopmentBoard }];
@@ -431,10 +461,10 @@ export const HardwareSettingsPanel = () => {
       <Section title={t('hardware.mcu')} icon={Cpu}>
         <div className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">Controller source</label>
+            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.controllerSource')}</label>
             <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
               {([
-                ['development_board', 'Development Board'],
+                ['development_board', t('hardware.developmentBoard')],
                 ['mcu', 'MCU'],
               ] as const).map(([type, label]) => (
                 <button
@@ -460,28 +490,40 @@ export const HardwareSettingsPanel = () => {
               onChange={(e) => updateMcu(e.target.value)}
               className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]"
             >
-              {QMK_MCU_PRESETS.map(preset => (
-                <option key={preset.value} value={preset.value}>{preset.label}</option>
-              ))}
+              {QMK_MCU_PRESETS.map(preset => {
+                const badge = getSupportBadge(
+                  isQmkMcuSupported(preset.value),
+                  isZmkExportSupported(preset.value)
+                );
+                return (
+                  <option key={preset.value} value={preset.value}>{preset.label} {badge}</option>
+                );
+              })}
             </select>
             <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
-              QMK/Vial exports write processor and bootloader when MCU is selected.
+              {t('hardware.mcuExportDesc')}
             </p>
           </div>
           ) : (
           <div className="space-y-1">
-            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">Development board</label>
+            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.developmentBoard')}</label>
             <select
               value={selectedDevelopmentBoard}
               onChange={(e) => updateHardware({ board: e.target.value.trim() })}
               className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)] font-mono"
             >
-              {developmentBoardOptions.map(board => (
-                <option key={board.value} value={board.value}>{board.label}</option>
-              ))}
+              {developmentBoardOptions.map(board => {
+                const badge = getSupportBadge(
+                  isQmkDevelopmentBoardSupported(board.value),
+                  isZmkDevelopmentBoardSupported(board.value)
+                );
+                return (
+                  <option key={board.value} value={board.value}>{board.label} {badge}</option>
+                );
+              })}
             </select>
             <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
-              QMK/Vial exports write this as keyboard.json development_board. ZMK exports build this board with the generated shield.
+              {t('hardware.boardExportDesc')}
             </p>
           </div>
           )}
@@ -506,13 +548,13 @@ export const HardwareSettingsPanel = () => {
       </Section>
 
       {/* QMK Details */}
-      <Section title="QMK Details" icon={Settings}>
+      <Section title={t('hardware.qmkDetails')} icon={Settings}>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-bold text-[var(--text-main)] leading-none">MATRIX_MASKED</span>
               <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
-                Emit matrix_pins.masked and matrix_mask in QMK/Vial source exports.
+                {t('hardware.matrixMaskedDesc')}
               </span>
             </div>
             <button
@@ -535,7 +577,7 @@ export const HardwareSettingsPanel = () => {
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-500">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <p className="text-[10px] leading-relaxed">
-                Row and column pins overlap. Enable MATRIX_MASKED if this wiring intentionally shares GPIOs.
+                {t('hardware.matrixOverlapWarning')}
               </p>
             </div>
           )}
@@ -545,7 +587,7 @@ export const HardwareSettingsPanel = () => {
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-[var(--text-main)] leading-none">BOOTMAGIC</span>
                 <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
-                  Set the bootmagic key position used by QMK/Vial source exports.
+                  {t('hardware.bootmagicDesc')}
                 </span>
               </div>
               <button
@@ -566,7 +608,7 @@ export const HardwareSettingsPanel = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Bootmagic Row</label>
+                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.bootmagicRow')}</label>
                 <input
                   type="number"
                   min={0}
@@ -578,12 +620,12 @@ export const HardwareSettingsPanel = () => {
                       row: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
                     },
                   })}
-                  placeholder="First key"
+                  placeholder={t('hardware.firstKey')}
                   className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all disabled:opacity-50"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Bootmagic Col</label>
+                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.bootmagicCol')}</label>
                 <input
                   type="number"
                   min={0}
@@ -595,7 +637,7 @@ export const HardwareSettingsPanel = () => {
                       col: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
                     },
                   })}
-                  placeholder="First key"
+                  placeholder={t('hardware.firstKey')}
                   className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all disabled:opacity-50"
                 />
               </div>
@@ -663,9 +705,9 @@ export const HardwareSettingsPanel = () => {
 
           <div className="space-y-3 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-[var(--text-main)] leading-none">Unlock Combo</span>
+              <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('hardware.vialUnlockCombo')}</span>
               <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
-                Set the two matrix positions emitted as VIAL_UNLOCK_COMBO_ROWS/COLS.
+                {t('hardware.vialUnlockComboDesc')}
               </span>
             </div>
 
@@ -674,10 +716,10 @@ export const HardwareSettingsPanel = () => {
               return (
                 <div key={keyId} className="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-3 items-end">
                   <div className="pb-2 text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                    Key {idx + 1}
+                    {format('hardware.keyNumber', { id: idx + 1 })}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Row</label>
+                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('matrix.row')}</label>
                     <input
                       type="number"
                       min={0}
@@ -686,12 +728,12 @@ export const HardwareSettingsPanel = () => {
                       onChange={(e) => updateVialUnlockCombo(keyId, {
                         row: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
                       })}
-                      placeholder={idx === 0 ? 'First key' : 'Last key'}
+                      placeholder={idx === 0 ? t('hardware.firstKey') : t('hardware.lastKey')}
                       className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">Col</label>
+                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('matrix.col')}</label>
                     <input
                       type="number"
                       min={0}
@@ -700,7 +742,7 @@ export const HardwareSettingsPanel = () => {
                       onChange={(e) => updateVialUnlockCombo(keyId, {
                         col: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)),
                       })}
-                      placeholder={idx === 0 ? 'First key' : 'Last key'}
+                      placeholder={idx === 0 ? t('hardware.firstKey') : t('hardware.lastKey')}
                       className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
                     />
                   </div>
@@ -894,7 +936,7 @@ export const HardwareSettingsPanel = () => {
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                  Available Pins Pool ({selectedMcu.toUpperCase()})
+                  Available Pins Pool ({pinPoolLabel})
                 </span>
                 <span className="text-[9px] text-[var(--text-dim)] mt-0.5">
                   QMK pin symbols are shown as candidates. Verify exposed pins against your board/package pinout.

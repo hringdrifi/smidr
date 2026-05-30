@@ -82,7 +82,7 @@ export const ZoomControls = () => {
       setEditingLayer(null);
       setLayerNameDraft('');
     } catch (err: any) {
-      setLayerNameError(err?.message || 'Failed to rename layer.');
+      setLayerNameError(err?.message || t('zoom.renameLayerFailed'));
     } finally {
       setIsRenamingLayer(false);
     }
@@ -195,7 +195,7 @@ export const ZoomControls = () => {
                   >
                     <Pencil size={12} />
                     <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
-                      Rename layer
+                      {t('zoom.renameLayer')}
                     </div>
                   </button>
                   <button
@@ -210,7 +210,7 @@ export const ZoomControls = () => {
                   >
                     <Plus size={12} />
                     <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
-                      Add ZMK layer
+                      {t('zoom.addZmkLayer')}
                     </div>
                   </button>
                   <button
@@ -225,7 +225,7 @@ export const ZoomControls = () => {
                   >
                     <Minus size={12} />
                     <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
-                      Remove last ZMK layer
+                      {t('zoom.removeLastZmkLayer')}
                     </div>
                   </button>
                 </>

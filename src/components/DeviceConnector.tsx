@@ -218,11 +218,11 @@ export const DeviceConnector: React.FC = () => {
         console.log('Fetching initial keymap...');
         await useKeyboardStore.getState().syncKeymap();
       } else {
-        setConnectionError('Could not open the serial port. Check that the keyboard is not already open in another app, then try again.');
+        setConnectionError(t('remap.serialPortError'));
       }
     } catch (err) {
       console.error('ZMK Serial Connection failed:', err);
-      setConnectionError(err instanceof Error ? err.message : 'Could not open the serial port.');
+      setConnectionError(err instanceof Error ? err.message : t('remap.serialPortOpenFailed'));
     } finally {
       setIsConnecting(false);
     }
@@ -273,7 +273,7 @@ export const DeviceConnector: React.FC = () => {
           <div className="fixed inset-0 z-[45]" onClick={() => setShowMenu(false)} />
           <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
             <div className="p-2 border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 flex justify-between items-center select-none">
-              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">Connection Mode</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">{t('remap.connectionMode')}</span>
             </div>
             <div className="p-1 flex flex-col gap-0.5">
               {connectionError && (
@@ -289,7 +289,7 @@ export const DeviceConnector: React.FC = () => {
                 <Usb size={14} className="text-amber-500 shrink-0" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase tracking-wider">QMK (VIA / Vial)</span>
-                  <span className="text-[9px] text-[var(--text-muted)]">Connect via WebHID</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">{t('remap.connectWebHid')}</span>
                 </div>
               </button>
 
@@ -300,19 +300,19 @@ export const DeviceConnector: React.FC = () => {
                 <Usb size={14} className="text-amber-500 shrink-0" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase tracking-wider">ZMK Studio (USB)</span>
-                  <span className="text-[9px] text-[var(--text-muted)]">Connect via WebSerial / COM Port</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">{t('remap.connectWebSerial')}</span>
                 </div>
               </button>
 
               <button 
                 disabled
-                title="ZMK Studio BLE editing is not supported in Chrome on Windows. Use USB or the native ZMK Studio app."
+                title={t('remap.unsupportedBle')}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded text-[var(--text-muted)] opacity-45 text-left cursor-not-allowed"
               >
                 <Bluetooth size={14} className="text-[var(--text-muted)] shrink-0" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase tracking-wider">ZMK Studio (BLE)</span>
-                  <span className="text-[9px] text-[var(--text-muted)]">Use USB or native app</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">{t('remap.useUsbOrNative')}</span>
                 </div>
               </button>
             </div>

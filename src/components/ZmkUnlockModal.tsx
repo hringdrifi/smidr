@@ -3,9 +3,11 @@
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
 import { Lock, RefreshCw, X } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const ZmkUnlockModal = () => {
   const { zmkLocked, syncKeymap, setZmkLocked, appMode } = useKeyboardStore();
+  const { t } = useTranslation();
 
   if (appMode !== 'remap' || !zmkLocked) return null;
 
@@ -20,7 +22,7 @@ export const ZmkUnlockModal = () => {
         <button
           onClick={() => setZmkLocked(false)}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
-          title="Dismiss"
+          title={t('unlock.dismiss')}
         >
           <X size={16} />
         </button>
@@ -32,16 +34,16 @@ export const ZmkUnlockModal = () => {
 
         {/* Title */}
         <h3 className="text-xl font-bold text-slate-100 tracking-wide mb-3 text-center">
-          Security Unlock Required
+          {t('unlock.securityRequired')}
         </h3>
 
         {/* Description */}
         <div className="text-center text-xs text-slate-400 max-w-sm mb-8 leading-relaxed font-medium space-y-2">
           <p>
-            Please physically press the <span className="text-amber-400 font-semibold">&ldquo;Studio Unlock&rdquo;</span> key combination on your physical keyboard to authorize keymap editing.
+            {t('unlock.zmkDesc')}
           </p>
           <p className="text-[10px] text-slate-500">
-            Once pressed, Smiðr will reconnect to the editable keymap automatically.
+            {t('unlock.zmkReconnect')}
           </p>
         </div>
 
@@ -51,7 +53,7 @@ export const ZmkUnlockModal = () => {
             onClick={() => setZmkLocked(false)}
             className="w-full py-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center"
           >
-            Dismiss
+            {t('unlock.dismiss')}
           </button>
 
           <button
@@ -59,7 +61,7 @@ export const ZmkUnlockModal = () => {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[10px] font-semibold text-slate-500 hover:text-slate-300 rounded-xl transition-all cursor-pointer"
           >
             <RefreshCw size={12} />
-            Check again if it does not update
+            {t('unlock.checkAgain')}
           </button>
         </div>
       </div>

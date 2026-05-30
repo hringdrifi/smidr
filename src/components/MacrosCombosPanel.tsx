@@ -24,6 +24,11 @@ import { cn } from '@/lib/utils';
 
 export const MacrosCombosPanel: React.FC = () => {
   const { t } = useTranslation();
+  const format = (path: string, values: Record<string, string | number>) =>
+    Object.entries(values).reduce(
+      (text, [key, value]) => text.replace(`{${key}}`, String(value)),
+      t(path)
+    );
   const { 
     remoteMacros, 
     remoteCombos, 
@@ -70,9 +75,9 @@ export const MacrosCombosPanel: React.FC = () => {
     try {
       const actions: MacroAction[] = [{ action: 'text', text: textValue }];
       await updateRemoteMacro(selectedMacroId, actions);
-      showMessage('Macro updated on keyboard!', 'success');
+      showMessage(t('macros.macroSaved'), 'success');
     } catch (err: any) {
-      showMessage(err.message || 'Failed to save macro', 'error');
+      showMessage(err.message || t('macros.macroSaveFailed'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -82,9 +87,9 @@ export const MacrosCombosPanel: React.FC = () => {
     setIsSaving(true);
     try {
       await updateRemoteMacro(selectedMacroId, actions);
-      showMessage('Macro sequence updated!', 'success');
+      showMessage(t('macros.sequenceSaved'), 'success');
     } catch (err: any) {
-      showMessage(err.message || 'Failed to save macro', 'error');
+      showMessage(err.message || t('macros.macroSaveFailed'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -171,9 +176,9 @@ export const MacrosCombosPanel: React.FC = () => {
       };
       await updateRemoteCombo(idx, combo);
       setEditingComboIdx(null);
-      showMessage(`Combo ${idx} saved to device!`, 'success');
+      showMessage(format('macros.comboSaved', { id: idx }), 'success');
     } catch (err: any) {
-      showMessage(err.message || 'Failed to save combo', 'error');
+      showMessage(err.message || t('macros.comboSaveFailed'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -207,7 +212,7 @@ export const MacrosCombosPanel: React.FC = () => {
           )}
         >
           <WandSparkles size={14} />
-          Macros
+          {t('macros.macros')}
         </button>
         <button
           onClick={() => setActiveTab('combos')}
@@ -219,7 +224,7 @@ export const MacrosCombosPanel: React.FC = () => {
           )}
         >
           <Workflow size={14} />
-          Combos
+          {t('macros.combos')}
         </button>
       </div>
 
@@ -260,7 +265,7 @@ export const MacrosCombosPanel: React.FC = () => {
               <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
                 <span className="text-xs font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
                   <Settings size={14} className="animate-spin-slow" />
-                  Macro {selectedMacroId} Editor
+                  {format('macros.macroEditor', { id: selectedMacroId })}
                 </span>
                 
                 <div className="flex bg-zinc-900 border border-[var(--border-main)] p-0.5 rounded-lg">
@@ -271,7 +276,7 @@ export const MacrosCombosPanel: React.FC = () => {
                       macroEditMode === 'text' ? "bg-amber-500 text-zinc-950" : "text-zinc-400 hover:text-white"
                     )}
                   >
-                    Text
+                    {t('macros.text')}
                   </button>
                   <button
                     onClick={() => setMacroEditMode('sequence')}
@@ -280,7 +285,7 @@ export const MacrosCombosPanel: React.FC = () => {
                       macroEditMode === 'sequence' ? "bg-amber-500 text-zinc-950" : "text-zinc-400 hover:text-white"
                     )}
                   >
-                    Sequence
+                    {t('macros.sequence')}
                   </button>
                 </div>
               </div>
@@ -288,16 +293,16 @@ export const MacrosCombosPanel: React.FC = () => {
               {macroEditMode === 'text' ? (
                 /* Text mode editor */
                 <div className="flex flex-col gap-3">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">keystroke text simulation</label>
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">{t('macros.textSimulation')}</label>
                   <textarea
                     value={textValue}
                     onChange={(e) => setTextValue(e.target.value)}
-                    placeholder="Enter macro string (e.g. MySecretPassword)"
+                    placeholder={t('macros.textPlaceholder')}
                     className="w-full min-h-[100px] bg-zinc-950/50 border border-[var(--border-main)] rounded-lg p-3 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-colors custom-scrollbar font-mono leading-relaxed"
                   />
                   <div className="text-[10px] text-zinc-500 leading-relaxed bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg flex items-start gap-2">
                     <Clock size={12} className="text-amber-500 shrink-0 mt-0.5" />
-                    <span>This macro will instantly type out the string sequentially on key press. Max delay defaults to standard QMK typing speed.</span>
+                    <span>{t('macros.textDesc')}</span>
                   </div>
                   <button
                     onClick={handleSaveTextMacro}
@@ -305,7 +310,7 @@ export const MacrosCombosPanel: React.FC = () => {
                     className="w-full h-9 bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-zinc-950 text-xs font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
                   >
                     <Save size={14} />
-                    {isSaving ? 'Saving...' : 'Save to Keyboard'}
+                    {isSaving ? t('macros.saving') : t('macros.saveToKeyboard')}
                   </button>
                 </div>
               ) : (
@@ -315,7 +320,7 @@ export const MacrosCombosPanel: React.FC = () => {
                   <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
                     {localMacroActions.length === 0 ? (
                       <div className="text-center py-8 text-xs text-zinc-500">
-                        No macro actions defined yet.
+                        {t('macros.noActions')}
                       </div>
                     ) : (
                       localMacroActions.map((action, idx) => (
@@ -338,7 +343,7 @@ export const MacrosCombosPanel: React.FC = () => {
                             {action.action === 'delay' ? (
                               <>
                                 <Clock size={13} className="text-amber-500 shrink-0" />
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase">Delay</span>
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('macros.delay')}</span>
                                 <input
                                   type="number"
                                   value={action.duration || 0}
@@ -350,7 +355,7 @@ export const MacrosCombosPanel: React.FC = () => {
                             ) : action.action === 'text' ? (
                               <>
                                 <Type size={13} className="text-amber-500 shrink-0" />
-                                <span className="text-[10px] font-bold text-zinc-500 uppercase">Text</span>
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('macros.text')}</span>
                                 <input
                                   type="text"
                                   value={action.text || ''}
@@ -397,35 +402,35 @@ export const MacrosCombosPanel: React.FC = () => {
                       className="h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-zinc-300 hover:text-amber-500"
                     >
                       <Plus size={10} />
-                      Tap Key
+                      {t('macros.tapKey')}
                     </button>
                     <button
                       onClick={() => addSequenceAction('down')}
                       className="h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-zinc-300 hover:text-amber-500"
                     >
                       <Plus size={10} />
-                      Down Key
+                      {t('macros.downKey')}
                     </button>
                     <button
                       onClick={() => addSequenceAction('up')}
                       className="h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-zinc-300 hover:text-amber-500"
                     >
                       <Plus size={10} />
-                      Up Key
+                      {t('macros.upKey')}
                     </button>
                     <button
                       onClick={() => addSequenceAction('delay')}
                       className="h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-zinc-300 hover:text-amber-500"
                     >
                       <Plus size={10} />
-                      Delay
+                      {t('macros.delay')}
                     </button>
                     <button
                       onClick={() => addSequenceAction('text')}
                       className="col-span-2 sm:col-span-1 h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-zinc-300 hover:text-amber-500"
                     >
                       <Plus size={10} />
-                      Text
+                      {t('macros.text')}
                     </button>
                   </div>
 
@@ -436,7 +441,7 @@ export const MacrosCombosPanel: React.FC = () => {
                     className="w-full h-9 bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-zinc-950 text-xs font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10"
                   >
                     <Save size={14} />
-                    {isSaving ? 'Saving...' : 'Save Sequence'}
+                    {isSaving ? t('macros.saving') : t('macros.saveSequence')}
                   </button>
                 </div>
               )}
@@ -448,9 +453,9 @@ export const MacrosCombosPanel: React.FC = () => {
             {remoteCombos.length === 0 ? (
               <div className="text-center py-12 bg-zinc-950/20 border border-[var(--border-main)] rounded-2xl p-6">
                 <Workflow className="w-10 h-10 text-zinc-600 mx-auto mb-3 animate-pulse" />
-                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">No Combos Configured</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">{t('macros.noCombos')}</h3>
                 <p className="text-[10px] text-zinc-500 max-w-[240px] mx-auto leading-relaxed">
-                  Your keyboard does not declare dynamic combos in its definition, or they have not been synchronized.
+                  {t('macros.noCombosDesc')}
                 </p>
               </div>
             ) : (
@@ -468,7 +473,7 @@ export const MacrosCombosPanel: React.FC = () => {
                     <div className="flex items-center justify-between border-b border-[var(--border-main)]/60 pb-2">
                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
                         <Sliders size={12} className="text-amber-500" />
-                        Combo {idx}
+                        {format('macros.combo', { id: idx })}
                       </span>
                       
                       {editingComboIdx === idx ? (
@@ -477,14 +482,14 @@ export const MacrosCombosPanel: React.FC = () => {
                             onClick={() => setEditingComboIdx(null)}
                             className="px-2 py-1 bg-zinc-900 border border-[var(--border-main)] text-zinc-400 hover:text-zinc-200 text-[10px] font-bold rounded"
                           >
-                            Cancel
+                            {t('common.cancel')}
                           </button>
                           <button
                             onClick={() => saveCombo(idx)}
                             className="px-2 py-1 bg-amber-500 text-zinc-950 hover:bg-amber-600 text-[10px] font-black rounded flex items-center gap-1"
                           >
                             <Check size={10} />
-                            Save
+                            {t('common.save')}
                           </button>
                         </div>
                       ) : (
@@ -492,7 +497,7 @@ export const MacrosCombosPanel: React.FC = () => {
                           onClick={() => startEditingCombo(idx, combo)}
                           className="px-2.5 py-1 border border-zinc-700 text-zinc-300 hover:border-amber-500/40 hover:text-amber-500 text-[10px] font-bold rounded transition-colors"
                         >
-                          Edit
+                          {t('macros.edit')}
                         </button>
                       )}
                     </div>
@@ -501,7 +506,7 @@ export const MacrosCombosPanel: React.FC = () => {
                       /* Editing Combo states */
                       <div className="flex flex-col gap-3">
                         <div className="flex flex-col gap-2">
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Trigger key inputs (Max 4)</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">{t('macros.triggerInputs')}</span>
                           <div className="grid grid-cols-4 gap-2">
                             {comboInputs.map((input, slotIdx) => {
                               const keyStr = input.action === 'tap' ? input.keycode : 'none';
@@ -512,7 +517,7 @@ export const MacrosCombosPanel: React.FC = () => {
                                   onChange={(e) => updateComboKey(slotIdx, e.target.value)}
                                   className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-1.5 text-[10px] font-mono text-zinc-300 select-arrow"
                                 >
-                                  <option value="none">- None -</option>
+                                  <option value="none">{t('macros.noneOption')}</option>
                                   {keyOptions.map((opt) => (
                                     <option key={opt} value={opt}>{opt}</option>
                                   ))}
@@ -523,13 +528,13 @@ export const MacrosCombosPanel: React.FC = () => {
                         </div>
 
                         <div className="flex items-center justify-between border-t border-[var(--border-main)] pt-3 mt-1">
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">Trigger Output Key</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">{t('macros.triggerOutput')}</span>
                           <select
                             value={comboOutput.action === 'tap' ? comboOutput.keycode : 'none'}
                             onChange={(e) => updateComboOutput(e.target.value)}
                             className="w-40 h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-amber-500 font-bold select-arrow"
                           >
-                            <option value="none">- None -</option>
+                            <option value="none">{t('macros.noneOption')}</option>
                             {keyOptions.map((opt) => (
                               <option key={opt} value={opt}>{opt}</option>
                             ))}
