@@ -67,6 +67,7 @@ const InteractivePinSlot = ({
   onFocus: () => void;
   onClear: () => void;
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1">
       <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{label}</label>
@@ -81,7 +82,7 @@ const InteractivePinSlot = ({
             : "border-dashed border-[var(--border-main)] text-[var(--text-muted)] hover:border-amber-500/50 hover:text-[var(--text-main)]"
         )}
       >
-        <span className="truncate">{value || '+ Assign'}</span>
+        <span className="truncate">{value || t('hardware.assignPin')}</span>
         {value && (
           <button
             type="button"
@@ -112,8 +113,16 @@ const PinTagInput = ({
   onFocus: () => void;
   onUpdatePins: (newPins: string[]) => void;
 }) => {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIdx, setDraggedIdx] = React.useState<number | null>(null);
+  const label = type === 'row'
+    ? t('hardware.leftRowPins')
+    : type === 'col'
+    ? t('hardware.leftColPins')
+    : type === 'splitRow'
+    ? t('hardware.rightRowPins')
+    : t('hardware.rightColPins');
 
   const handleAddFromText = (text: string) => {
     if (!text.trim()) return;
@@ -168,9 +177,7 @@ const PinTagInput = ({
   return (
     <div className="space-y-1 w-full">
       <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase font-bold tracking-wider">
-        {type === 'row' ? 'Left Row Pins (左・行)' : 
-         type === 'col' ? 'Left Col Pins (左・列)' : 
-         type === 'splitRow' ? 'Right Row Pins (右・行)' : 'Right Col Pins (右・列)'}
+        {label}
       </label>
       <div 
         onClick={onFocus}
@@ -185,7 +192,7 @@ const PinTagInput = ({
           const isDragging = draggedIdx === index;
           return (
             <div
-              key={`${pinName}-${index}`}
+              key={pinName + '-' + index}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => e.preventDefault()}
@@ -218,7 +225,7 @@ const PinTagInput = ({
           onKeyDown={handleKeyDown}
           onBlur={handleInputBlur}
           onFocus={onFocus}
-          placeholder={pins.length === 0 ? "Type or click pins..." : "+ Add"}
+          placeholder={pins.length === 0 ? t('hardware.typeOrClickPins') : t('hardware.addPin')}
           className="flex-1 min-w-[100px] bg-transparent outline-none border-none text-xs text-[var(--text-highlight)] font-mono py-0.5"
         />
       </div>
@@ -239,6 +246,13 @@ export const HardwareSettingsPanel = () => {
   const [focusedFeature, setFocusedFeature] = React.useState<string | null>(null);
   const [preventDuplicates, setPreventDuplicates] = React.useState<boolean>(true);
   const [customPinText, setCustomPinText] = React.useState<string>('');
+  const getPinGroupLabel = (box: typeof activeBox, feature: string | null) => {
+    if (box === 'row') return t('hardware.leftRowPins');
+    if (box === 'col') return t('hardware.leftColPins');
+    if (box === 'splitRow') return t('hardware.rightRowPins');
+    if (box === 'splitCol') return t('hardware.rightColPins');
+    return feature || '';
+  };
 
   const getPinPool = () => {
     if ((settings.hardware.controllerType || 'development_board') === 'development_board') {
@@ -764,9 +778,9 @@ export const HardwareSettingsPanel = () => {
                 {/* Dynamic Size Indicator - Borderless & Clean */}
                 <div className="flex gap-1 items-center text-xs text-[var(--text-highlight)] font-mono font-bold select-none animate-in fade-in zoom-in duration-200">
                   <span>{settings.pins.rows.length}</span>
-                  <span className="text-[var(--text-dim)] font-sans font-normal mx-0.5">×</span>
+                  <span className="text-[var(--text-dim)] font-sans font-normal mx-0.5">x</span>
                   <span>{settings.pins.cols.length}</span>
-                  <span className="text-[10px] text-[var(--text-muted)] font-sans font-normal ml-1">({settings.pins.rows.length * settings.pins.cols.length} keys)</span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-sans font-normal ml-1">{format('hardware.keyCount', { count: settings.pins.rows.length * settings.pins.cols.length })}</span>
                 </div>
 
                 {/* Clear All Pins Button */}
@@ -776,7 +790,7 @@ export const HardwareSettingsPanel = () => {
                   className="flex items-center gap-1 px-2.5 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/25 hover:border-red-500/40 text-[9px] font-bold cursor-pointer transition-all active:scale-95"
                 >
                   <Trash2 size={10} />
-                  <span>全ピンをクリア</span>
+                  <span>{t('hardware.clearAllPins')}</span>
                 </button>
               </div>
             </div>
@@ -936,24 +950,16 @@ export const HardwareSettingsPanel = () => {
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                  Available Pins Pool ({pinPoolLabel})
+                  {format('hardware.availablePinsPool', { label: pinPoolLabel })}
                 </span>
                 <span className="text-[9px] text-[var(--text-dim)] mt-0.5">
-                  QMK pin symbols are shown as candidates. Verify exposed pins against your board/package pinout.
+                  {t('hardware.pinPoolDesc')}
                 </span>
                 {activeBox && (
                   <span className="text-[9px] text-[var(--text-muted)] mt-0.5">
-                    Setting <span className="font-mono text-amber-500 font-bold uppercase">
-                      {activeBox === 'row' 
-                        ? 'Left Rows (左・行)' 
-                        : activeBox === 'col' 
-                        ? 'Left Cols (左・列)' 
-                        : activeBox === 'splitRow'
-                        ? 'Right Rows (右・行)'
-                        : activeBox === 'splitCol'
-                        ? 'Right Cols (右・列)'
-                        : focusedFeature}
-                    </span>. Click a pin below to set it.
+                    {t('hardware.settingPinGroup')} <span className="font-mono text-amber-500 font-bold uppercase">
+                      {getPinGroupLabel(activeBox, focusedFeature)}
+                    </span>. {t('hardware.clickPinToAssign')}
                   </span>
                 )}
               </div>
@@ -971,7 +977,7 @@ export const HardwareSettingsPanel = () => {
                   )}>
                     {preventDuplicates && <Check size={8} strokeWidth={3} />}
                   </div>
-                  <span>重複アサイン防止</span>
+                  <span>{t('hardware.preventDuplicatePins')}</span>
                 </button>
               </div>
             </div>
@@ -1028,7 +1034,7 @@ export const HardwareSettingsPanel = () => {
 
             {/* Custom pin override textbox */}
             <div className="flex gap-2 items-center justify-between border-t border-[var(--border-main)]/30 pt-3">
-              <span className="text-[9px] text-[var(--text-muted)] font-mono">Custom Pin Override</span>
+              <span className="text-[9px] text-[var(--text-muted)] font-mono">{t('hardware.customPinOverride')}</span>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -1047,7 +1053,7 @@ export const HardwareSettingsPanel = () => {
                   }}
                   className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 text-[10px] font-bold transition-all active:scale-95 cursor-pointer"
                 >
-                  Assign
+                  {t('hardware.assign')}
                 </button>
               </div>
             </div>
