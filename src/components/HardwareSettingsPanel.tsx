@@ -984,7 +984,7 @@ export const HardwareSettingsPanel = () => {
 
             {/* Pins Grid */}
             <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/30">
-              {getPinPool().map(pinName => {
+              {getPinPool().map((pinName: string) => {
                 const isAssigned = assignedPins.has(pinName);
                 
                 // Determine focused slot's current pin value

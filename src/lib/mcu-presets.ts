@@ -111,34 +111,43 @@ export type DevelopmentBoardOption = {
   label: string;
   qmkBoard?: string;
   zmkBoard?: string;
+  pinSet?: DevelopmentBoardPinSet;
 };
 
+type DevelopmentBoardPinSet =
+  | 'promicro_avr'
+  | 'promicro_avr_plus'
+  | 'rp2040_full'
+  | 'nrf52840_promicro'
+  | 'stm32_blackpill'
+  | 'stm32_bluepill';
+
 export const DEVELOPMENT_BOARD_OPTIONS: DevelopmentBoardOption[] = [
-  { value: 'bit_c_pro', label: 'Bit-C Pro', qmkBoard: 'bit_c_pro' },
-  { value: 'blackpill_f401', label: 'Blackpill F401', qmkBoard: 'blackpill_f401' },
-  { value: 'blackpill_f411', label: 'Blackpill F411', qmkBoard: 'blackpill_f411' },
-  { value: 'blok', label: 'Boardsource Blok', qmkBoard: 'blok', zmkBoard: 'boardsource_blok' },
-  { value: 'bluepill', label: 'Bluepill', qmkBoard: 'bluepill' },
-  { value: 'bonsai_c4', label: 'Bonsai C4', qmkBoard: 'bonsai_c4' },
-  { value: 'elite_c', label: 'Elite-C', qmkBoard: 'elite_c' },
-  { value: 'elite_pi', label: 'Elite-Pi', qmkBoard: 'elite_pi' },
-  { value: 'helios', label: 'Helios', qmkBoard: 'helios' },
-  { value: 'imera', label: 'Imera', qmkBoard: 'imera' },
-  { value: 'kb2040', label: 'Adafruit KB2040', qmkBoard: 'kb2040', zmkBoard: 'adafruit_kb2040' },
-  { value: 'liatris', label: 'Liatris', qmkBoard: 'liatris' },
-  { value: 'michi', label: 'Michi', qmkBoard: 'michi' },
-  { value: 'promicro', label: 'Pro Micro', qmkBoard: 'promicro' },
-  { value: 'promicro_rp2040', label: 'SparkFun Pro Micro RP2040', qmkBoard: 'promicro_rp2040', zmkBoard: 'sparkfun_pro_micro_rp2040' },
-  { value: 'proton_c', label: 'QMK Proton-C', qmkBoard: 'proton_c', zmkBoard: 'proton_c' },
-  { value: 'stemcell', label: 'Stemcell', qmkBoard: 'stemcell' },
-  { value: 'svlinky', label: 'Svlinky', qmkBoard: 'svlinky' },
-  { value: 'nrfmicro_nrf52833', label: 'nRFMicro (nRF52833)', zmkBoard: 'nrfmicro_nrf52833' },
-  { value: 'nrfmicro_nrf52840_flipped', label: 'nRFMicro nRF52840 (flipped)', zmkBoard: 'nrfmicro_nrf52840_flipped' },
-  { value: 'nrfmicro_nrf52840', label: 'nRFMicro (nRF52840) 1.1/1.2/1.3', zmkBoard: 'nrfmicro_nrf52840' },
-  { value: 'bluemicro840', label: 'BlueMicro840 v1', zmkBoard: 'bluemicro840' },
-  { value: 'puchi_ble', label: 'Puchi-BLE V1', zmkBoard: 'puchi_ble' },
-  { value: 'nice_nano', label: 'nice!nano', zmkBoard: 'nice_nano' },
-  { value: 'mikoto', label: 'Mikoto', zmkBoard: 'mikoto' },
+  { value: 'bit_c_pro', label: 'Bit-C Pro', qmkBoard: 'bit_c_pro', pinSet: 'promicro_avr_plus' },
+  { value: 'blackpill_f401', label: 'Blackpill F401', qmkBoard: 'blackpill_f401', pinSet: 'stm32_blackpill' },
+  { value: 'blackpill_f411', label: 'Blackpill F411', qmkBoard: 'blackpill_f411', pinSet: 'stm32_blackpill' },
+  { value: 'blok', label: 'Boardsource Blok', qmkBoard: 'blok', zmkBoard: 'boardsource_blok', pinSet: 'nrf52840_promicro' },
+  { value: 'bluepill', label: 'Bluepill', qmkBoard: 'bluepill', pinSet: 'stm32_bluepill' },
+  { value: 'bonsai_c4', label: 'Bonsai C4', qmkBoard: 'bonsai_c4', pinSet: 'promicro_avr' },
+  { value: 'elite_c', label: 'Elite-C', qmkBoard: 'elite_c', pinSet: 'promicro_avr_plus' },
+  { value: 'elite_pi', label: 'Elite-Pi', qmkBoard: 'elite_pi', pinSet: 'rp2040_full' },
+  { value: 'helios', label: 'Helios', qmkBoard: 'helios', pinSet: 'rp2040_full' },
+  { value: 'imera', label: 'Imera', qmkBoard: 'imera', pinSet: 'promicro_avr' },
+  { value: 'kb2040', label: 'Adafruit KB2040', qmkBoard: 'kb2040', zmkBoard: 'adafruit_kb2040', pinSet: 'rp2040_full' },
+  { value: 'liatris', label: 'Liatris', qmkBoard: 'liatris', pinSet: 'promicro_avr' },
+  { value: 'michi', label: 'Michi', qmkBoard: 'michi', pinSet: 'rp2040_full' },
+  { value: 'promicro', label: 'Pro Micro', qmkBoard: 'promicro', pinSet: 'promicro_avr' },
+  { value: 'promicro_rp2040', label: 'SparkFun Pro Micro RP2040', qmkBoard: 'promicro_rp2040', zmkBoard: 'sparkfun_pro_micro_rp2040', pinSet: 'rp2040_full' },
+  { value: 'proton_c', label: 'QMK Proton-C', qmkBoard: 'proton_c', zmkBoard: 'proton_c', pinSet: 'stm32_blackpill' },
+  { value: 'stemcell', label: 'Stemcell', qmkBoard: 'stemcell', pinSet: 'stm32_blackpill' },
+  { value: 'svlinky', label: 'Svlinky', qmkBoard: 'svlinky', pinSet: 'rp2040_full' },
+  { value: 'nrfmicro_nrf52833', label: 'nRFMicro (nRF52833)', zmkBoard: 'nrfmicro_nrf52833', pinSet: 'nrf52840_promicro' },
+  { value: 'nrfmicro_nrf52840_flipped', label: 'nRFMicro nRF52840 (flipped)', zmkBoard: 'nrfmicro_nrf52840_flipped', pinSet: 'nrf52840_promicro' },
+  { value: 'nrfmicro_nrf52840', label: 'nRFMicro (nRF52840) 1.1/1.2/1.3', zmkBoard: 'nrfmicro_nrf52840', pinSet: 'nrf52840_promicro' },
+  { value: 'bluemicro840', label: 'BlueMicro840 v1', zmkBoard: 'bluemicro840', pinSet: 'nrf52840_promicro' },
+  { value: 'puchi_ble', label: 'Puchi-BLE V1', zmkBoard: 'puchi_ble', pinSet: 'nrf52840_promicro' },
+  { value: 'nice_nano', label: 'nice!nano', zmkBoard: 'nice_nano', pinSet: 'nrf52840_promicro' },
+  { value: 'mikoto', label: 'Mikoto', zmkBoard: 'mikoto', pinSet: 'nrf52840_promicro' },
 ];
 
 export const getQmkDevelopmentBoard = (board: string | undefined) =>
@@ -301,6 +310,39 @@ const pins = {
   wb32f3g71: ports(['A', 'B', 'C', 'D', 'E', 'F']),
 } satisfies Record<PinSet, string[]>;
 
+const developmentBoardPins = {
+  promicro_avr: [
+    'D3', 'D2', 'D1', 'D0',
+    'D4', 'C6', 'D7', 'E6',
+    'B4', 'B5', 'B6', 'B2',
+    'B3', 'B1', 'F7', 'F6',
+    'F5', 'F4',
+  ],
+  promicro_avr_plus: [
+    'D3', 'D2', 'D1', 'D0',
+    'D4', 'C6', 'D7', 'E6',
+    'B4', 'B5', 'B6', 'B2',
+    'B3', 'B1', 'F7', 'F6',
+    'F5', 'F4', 'B0', 'D5',
+  ],
+  rp2040_full: range('GP', 0, 29),
+  nrf52840_promicro: [
+    'P0.02', 'P0.06', 'P0.08', 'P0.09',
+    'P0.10', 'P0.11', 'P0.17', 'P0.20',
+    'P0.22', 'P0.24', 'P0.29', 'P0.31',
+    'P1.00', 'P1.04', 'P1.06', 'P1.11',
+    'P1.13', 'P1.15',
+  ],
+  stm32_blackpill: [
+    ...ports(['A', 'B']),
+    'C13', 'C14', 'C15',
+  ],
+  stm32_bluepill: [
+    ...ports(['A', 'B']),
+    'C13', 'C14', 'C15',
+  ],
+} satisfies Record<DevelopmentBoardPinSet, string[]>;
+
 export const QMK_MCU_PRESETS: McuPreset[] = [
   { value: 'AT32F415', label: 'AT32F415', bootloader: 'at32-dfu', pinSet: 'at32f415', splitSerialDriver: 'bitbang' },
   { value: 'at90usb1286', label: 'AT90USB1286', bootloader: 'atmel-dfu', pinSet: 'avr_usb_big', splitSerialDriver: 'bitbang' },
@@ -322,7 +364,7 @@ export const QMK_MCU_PRESETS: McuPreset[] = [
   { value: 'MK64FX512', label: 'MK64FX512', bootloader: 'custom', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
   { value: 'MK66FX1M0', label: 'MK66FX1M0', bootloader: 'halfkay', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
   { value: 'MKL26Z64', label: 'MKL26Z64', bootloader: 'halfkay', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
-  { value: 'nRF52840', label: 'nRF52840 (ZMK custom board)', bootloader: 'custom', pinSet: 'nrf52840', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown', zmkTarget: 'nrf52840' },
+  { value: 'nRF52840', label: 'nRF52840', bootloader: 'custom', pinSet: 'nrf52840', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown', zmkTarget: 'nrf52840' },
   { value: 'RP2040', label: 'RP2040', bootloader: 'rp2040', pinSet: 'rp2040', splitSerialDriver: 'vendor', zmkTarget: 'rp2040' },
   { value: 'STM32F042', label: 'STM32F042', bootloader: 'stm32-dfu', pinSet: 'stm32f042', splitSerialDriver: 'bitbang' },
   { value: 'STM32F072', label: 'STM32F072', bootloader: 'stm32-dfu', pinSet: 'stm32f072', splitSerialDriver: 'bitbang' },
@@ -359,6 +401,14 @@ export const getQmkProcessor = (mcu: string | undefined) =>
 
 export const getMcuPins = (mcu: string | undefined) =>
   pins[getMcuPreset(mcu)?.pinSet || 'stm32h7'];
+
+export const getDevelopmentBoardPins = (board: string | undefined, fallbackMcu?: string) => {
+  const pinSet = DEVELOPMENT_BOARD_OPTIONS.find(option => option.value === board)?.pinSet;
+  return pinSet ? developmentBoardPins[pinSet] : getMcuPins(fallbackMcu);
+};
+
+export const getDevelopmentBoardLabel = (board: string | undefined) =>
+  DEVELOPMENT_BOARD_OPTIONS.find(option => option.value === board)?.label || board || 'Development Board';
 
 export const getSplitSerialDriver = (mcu: string | undefined) =>
   getMcuPreset(mcu)?.splitSerialDriver || 'bitbang';

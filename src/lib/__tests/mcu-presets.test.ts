@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getMcuPins, isQmkSourceExportSupported, isZmkSourceExportSupported } from '../mcu-presets';
+import { getDevelopmentBoardPins, getMcuPins, isQmkSourceExportSupported, isZmkSourceExportSupported } from '../mcu-presets';
 
 describe('MCU pin presets', () => {
   it('limits RP2040 to the GPIOs exposed by the MCU spec', () => {
@@ -62,5 +62,20 @@ describe('MCU pin presets', () => {
     expect(isZmkSourceExportSupported({ controllerType: 'development_board', board: 'nice_nano' })).toBe(true);
     expect(isQmkSourceExportSupported({ board: 'nice_nano', mcu: 'RP2040' })).toBe(false);
     expect(isZmkSourceExportSupported({ board: 'nice_nano', mcu: 'RP2040' })).toBe(true);
+  });
+
+  it('uses development board pin pools when a board is selected', () => {
+    const proMicroPins = getDevelopmentBoardPins('promicro', 'RP2040');
+    expect(proMicroPins).toContain('D3');
+    expect(proMicroPins).toContain('F4');
+    expect(proMicroPins).not.toContain('GP29');
+
+    const niceNanoPins = getDevelopmentBoardPins('nice_nano', 'RP2040');
+    expect(niceNanoPins).toContain('P0.06');
+    expect(niceNanoPins).toContain('P1.15');
+    expect(niceNanoPins).not.toContain('GP29');
+
+    const unknownPins = getDevelopmentBoardPins('custom_board', 'RP2040');
+    expect(unknownPins).toContain('GP29');
   });
 });
