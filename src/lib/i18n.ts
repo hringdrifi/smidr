@@ -45,7 +45,6 @@ export const TRANSLATIONS = {
       de: 'German',
     },
     header: {
-      tagline: 'Custom Keyboard Forge',
       projectName: 'Project Name',
       saveTooltip: 'Save to Local Storage',
       setupTooltip: 'Hardware Setup',
@@ -422,7 +421,6 @@ export const TRANSLATIONS = {
       de: '德文',
     },
     header: {
-      tagline: '定制键盘锻造厂',
       projectName: '项目名称',
       saveTooltip: '保存到本地存储',
       setupTooltip: '硬件设置',
@@ -699,7 +697,6 @@ export const TRANSLATIONS = {
       de: '독일어',
     },
     header: {
-      tagline: '커스텀 키보드 대장간',
       projectName: '프로젝트 이름',
       saveTooltip: '로컬 저장소에 저장',
       setupTooltip: '하드웨어 설정',
@@ -976,7 +973,6 @@ export const TRANSLATIONS = {
       de: 'ドイツ語',
     },
     header: {
-      tagline: '自作キーボード設計室',
       projectName: 'プロジェクト名',
       saveTooltip: 'ローカルストレージに保存',
       setupTooltip: 'ハードウェア設定',
@@ -1353,7 +1349,6 @@ export const TRANSLATIONS = {
       de: 'Alemán',
     },
     header: {
-      tagline: 'Forja de Teclados Personalizados',
       projectName: 'Nombre del Proyecto',
       saveTooltip: 'Guardar en almacenamiento local',
       setupTooltip: 'Configuración de Hardware',
@@ -1630,7 +1625,6 @@ export const TRANSLATIONS = {
       de: 'Deutsch',
     },
     header: {
-      tagline: 'Tastatur-Schmiede',
       projectName: 'Projektname',
       saveTooltip: 'Im lokalen Speicher speichern',
       setupTooltip: 'Hardware-Setup',
