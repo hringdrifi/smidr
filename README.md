@@ -59,11 +59,18 @@ npm run dev
 npm run desktop:dev
 ```
 
-デスクトップ版をビルドする場合は、Web 版のビルド後に Tauri 側をビルドします。
+デスクトップ版の exe をビルドする場合は、Tauri のビルドコマンドを実行します。内部で Web 版のビルドも実行されます。
 
 ```bash
-npm run build
 npm run desktop:build
+```
+
+生成された exe は `src-tauri/target/release/smidr.exe` に出力されます。
+
+`cargo tauri` が見つからない場合は、Tauri CLI をインストールしてください。
+
+```bash
+cargo install tauri-cli --version "^2"
 ```
 
 ## 開発ガイドライン

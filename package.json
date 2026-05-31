@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "desktop:dev": "cargo run --manifest-path src-tauri/Cargo.toml",
+    "desktop:dev": "cargo tauri dev",
     "build": "tsc && vite build",
-    "desktop:build": "cargo build --manifest-path src-tauri/Cargo.toml --release",
+    "desktop:build": "cargo tauri build --no-bundle",
     "preview": "vite preview",
     "lint": "eslint",
     "test": "vitest run src/lib/__tests",
