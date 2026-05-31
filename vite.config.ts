@@ -5,9 +5,8 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
-  base: process.env.NODE_ENV === 'production' ? '/smidr/' : '/',
+  base: process.env.TAURI_ENV_PLATFORM ? './' : (process.env.NODE_ENV === 'production' ? '/smidr/' : '/'),
   server: {
     host: true,
   },
 });
-
