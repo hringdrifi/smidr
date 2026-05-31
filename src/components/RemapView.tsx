@@ -40,8 +40,8 @@ export const RemapView: React.FC = () => {
         {connectedDevice ? (
           <>
             <div className="flex-1 relative flex flex-col overflow-hidden">
-              {/* Full-screen absolute canvas flowing underneath the UI panels */}
-              <div className="absolute inset-0 z-0">
+              {/* Canvas area stops above the keycode panel so centering and empty states use the visible workspace. */}
+              <div className="absolute inset-x-0 top-0 bottom-[400px] z-0">
                 <KeyboardCanvas readonlyGeometry={true} />
               </div>
               

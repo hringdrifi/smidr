@@ -747,8 +747,15 @@ export default function App() {
         {/* Main Workspace Area */}
         {storeState.appMode === 'design' ? (
           <main className="flex-1 relative overflow-hidden flex flex-col bg-[var(--bg-app)]">
-            {/* Full-screen absolute canvas flowing underneath the UI panels */}
-            <div className="absolute inset-0 z-0">
+            {/* Canvas area stops above the bottom tray so centering and empty states use the visible workspace. */}
+            <div
+              className="absolute inset-x-0 top-0 z-0 transition-all"
+              style={{
+                bottom: storeState.isProjectOpen
+                  ? editorMode === 'keymap' ? '400px' : (editorMode === 'layout' || editorMode === 'matrix') ? '288px' : '0px'
+                  : '0px'
+              }}
+            >
               <KeyboardCanvas />
             </div>
 
