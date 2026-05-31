@@ -2,6 +2,7 @@ import React from 'react';
 import { Power, Usb, Bluetooth, Loader2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { hidTransport } from '@/lib/transport/hid';
+import { isTauriRuntime, TauriZmkBleTransport } from '@/lib/transport/tauri-zmk-ble';
 import { ZmkSerialTransport, zmkProtocol } from '@/lib/protocols/zmk';
 import { ViaProtocol } from '@/lib/protocols/via';
 import { VialProtocol } from '@/lib/protocols/vial';
@@ -47,6 +48,43 @@ export const DeviceConnector: React.FC = () => {
   const registerDisconnectHandler = React.useCallback((transport: { onDisconnect?: (callback: () => void) => void }) => {
     transport.onDisconnect?.(clearConnectedDevice);
   }, [clearConnectedDevice]);
+
+  const finishZmkConnection = React.useCallback(async (
+    transport: ZmkSerialTransport | TauriZmkBleTransport,
+    deviceInfo: { vid: number; pid: number; productName: string; manufacturerName: string }
+  ) => {
+    setShowMenu(false);
+    useKeyboardStore.getState().setActiveTransport(transport);
+    registerDisconnectHandler(transport);
+    clearDeviceLayoutState();
+
+    setConnectedDevice({
+      vid: deviceInfo.vid,
+      pid: deviceInfo.pid,
+      productName: deviceInfo.productName,
+      manufacturerName: deviceInfo.manufacturerName,
+      protocolType: 'zmk'
+    });
+
+    const deviceVendorProductId = (deviceInfo.vid << 16) | deviceInfo.pid;
+    const projects = listProjects();
+    const match = projects.find(p => {
+      if (!deviceVendorProductId) return false;
+      return p.vendorProductId === deviceVendorProductId;
+    });
+
+    if (match) {
+      console.log(`Auto-loading ZMK project: ${match.name}`);
+      loadProject({
+        ...match,
+        name: match.name || 'ZMK Keyboard',
+        manufacturer: match.manufacturer || 'ZMK',
+      });
+    }
+
+    console.log('Fetching initial keymap...');
+    await useKeyboardStore.getState().syncKeymap();
+  }, [clearDeviceLayoutState, loadProject, registerDisconnectHandler, setConnectedDevice]);
 
   const connectHid = async () => {
     setIsConnecting(true);
@@ -182,47 +220,43 @@ export const DeviceConnector: React.FC = () => {
       const success = await transport.connect();
       if (success) {
         const portInfo = transport.getPortInfo();
-        const vid = portInfo.usbVendorId ?? 0;
-        const pid = portInfo.usbProductId ?? 0;
-        setShowMenu(false);
-        useKeyboardStore.getState().setActiveTransport(transport);
-        registerDisconnectHandler(transport);
-        clearDeviceLayoutState();
-
-        // Store ZMK connected device details
-        setConnectedDevice({
-          vid,
-          pid,
+        await finishZmkConnection(transport, {
+          vid: portInfo.usbVendorId ?? 0,
+          pid: portInfo.usbProductId ?? 0,
           productName: 'ZMK Studio (USB)',
           manufacturerName: 'ZMK',
-          protocolType: 'zmk'
         });
-
-        // Match connected device against local storage projects
-        const deviceVendorProductId = (vid << 16) | pid;
-        const projects = listProjects();
-        const match = projects.find(p => {
-          if (!deviceVendorProductId) return false;
-          return p.vendorProductId === deviceVendorProductId;
-        });
-
-        if (match) {
-          console.log(`Auto-loading ZMK project: ${match.name}`);
-          loadProject({
-            ...match,
-            name: match.name || 'ZMK Keyboard',
-            manufacturer: match.manufacturer || 'ZMK',
-          });
-        }
-
-        console.log('Fetching initial keymap...');
-        await useKeyboardStore.getState().syncKeymap();
       } else {
         setConnectionError(t('remap.serialPortError'));
       }
     } catch (err) {
       console.error('ZMK Serial Connection failed:', err);
       setConnectionError(err instanceof Error ? err.message : t('remap.serialPortOpenFailed'));
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const connectZmkNativeBle = async () => {
+    setIsConnecting(true);
+    setConnectionError(null);
+    try {
+      const transport = new TauriZmkBleTransport();
+      const success = await transport.connect();
+      if (success) {
+        const deviceInfo = transport.getDeviceInfo();
+        await finishZmkConnection(transport, {
+          vid: 0,
+          pid: 0,
+          productName: deviceInfo.name || 'ZMK Studio (BLE)',
+          manufacturerName: 'ZMK',
+        });
+      } else {
+        setConnectionError('Could not connect via native BLE.');
+      }
+    } catch (err) {
+      console.error('ZMK Native BLE Connection failed:', err);
+      setConnectionError(err instanceof Error ? err.message : 'Could not connect via native BLE.');
     } finally {
       setIsConnecting(false);
     }
@@ -305,14 +339,21 @@ export const DeviceConnector: React.FC = () => {
               </button>
 
               <button 
-                disabled
-                title={t('remap.unsupportedBle')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded text-[var(--text-muted)] opacity-45 text-left cursor-not-allowed"
+                onClick={isTauriRuntime() ? connectZmkNativeBle : undefined}
+                disabled={!isTauriRuntime()}
+                title={isTauriRuntime() ? 'Connect via native Windows BLE' : t('remap.unsupportedBle')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left transition-all ${
+                  isTauriRuntime()
+                    ? 'hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer'
+                    : 'text-[var(--text-muted)] opacity-45 cursor-not-allowed'
+                }`}
               >
-                <Bluetooth size={14} className="text-[var(--text-muted)] shrink-0" />
+                <Bluetooth size={14} className={isTauriRuntime() ? 'text-sky-400 shrink-0' : 'text-[var(--text-muted)] shrink-0'} />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase tracking-wider">ZMK Studio (BLE)</span>
-                  <span className="text-[9px] text-[var(--text-muted)]">{t('remap.useUsbOrNative')}</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">
+                    {isTauriRuntime() ? 'Native Windows BLE' : t('remap.useUsbOrNative')}
+                  </span>
                 </div>
               </button>
             </div>

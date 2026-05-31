@@ -1,0 +1,30 @@
+[package]
+name = "smidr"
+version = "0.1.0"
+description = "Smidr desktop shell"
+authors = ["Smidr"]
+edition = "2021"
+publish = false
+
+[lib]
+name = "smidr_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "smidr"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
+windows = { version = "0.62.2", features = [
+  "Devices_Bluetooth",
+  "Devices_Bluetooth_GenericAttributeProfile",
+  "Devices_Enumeration",
+  "Foundation",
+  "Storage_Streams",
+] }

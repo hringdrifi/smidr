@@ -15,6 +15,8 @@
 
 # vite
 /dist/
+/src-tauri/gen/
+/src-tauri/target/
 
 # production
 /build
@@ -43,4 +45,3 @@ yarn-error.log*
 /reference/
 /playwright-report/
 /test-results/
-
