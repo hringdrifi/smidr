@@ -43,6 +43,29 @@ npm run dev
 npm run build
 ```
 
+### 4. Desktop / Tauri
+
+Native Windows BLE support is available in the Tauri desktop app.
+
+For development, start the Vite dev server first:
+
+```bash
+npm run dev
+```
+
+Then, in another terminal:
+
+```bash
+npm run desktop:dev
+```
+
+For a desktop build:
+
+```bash
+npm run build
+npm run desktop:build
+```
+
 ## 開発ガイドライン
 
 開発の詳細については、以下のドキュメントを参照してください。
