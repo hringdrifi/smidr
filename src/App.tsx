@@ -328,8 +328,8 @@ export default function App() {
         </div>
       )}
       {/* Header */}
-      <header className="flex items-center justify-between h-14 px-4 bg-[var(--bg-panel)] border-b border-[var(--border-main)] shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:h-14 md:flex-nowrap md:px-4 md:py-0 bg-[var(--bg-panel)] border-b border-[var(--border-main)] shrink-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
               <img src={`${import.meta.env.BASE_URL}icon.png`} alt="Smiðr Logo" className="w-full h-full object-cover" />
@@ -367,17 +367,17 @@ export default function App() {
 
           {/* Device Connection Status (Remap Mode Only) */}
           {storeState.appMode === 'remap' && (
-            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+            <div className="flex min-w-0 items-center gap-2 md:gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
               <DeviceConnector />
               
               {connectedDevice && (
                 <>
                   <div 
-                    className="flex items-center gap-2 px-3 h-8 bg-amber-500/5 border border-amber-500/10 rounded-md shrink-0"
+                    className="flex min-w-0 items-center gap-2 px-3 h-8 bg-amber-500/5 border border-amber-500/10 rounded-md shrink"
                     title={`VID: 0x${connectedDevice.vid.toString(16).toUpperCase().padStart(4, '0')} PID: 0x${connectedDevice.pid.toString(16).toUpperCase().padStart(4, '0')}`}
                   >
-                    <Cpu size={14} className="text-amber-500" />
-                    <span className="text-[10px] font-bold text-[var(--text-highlight)] uppercase tracking-wider">
+                    <Cpu size={14} className="text-amber-500 shrink-0" />
+                    <span className="truncate text-[10px] font-bold text-[var(--text-highlight)] uppercase tracking-wider">
                       {connectedDeviceLabel}
                     </span>
                   </div>
@@ -669,7 +669,7 @@ export default function App() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center justify-end gap-2 md:w-auto">
 
 
 

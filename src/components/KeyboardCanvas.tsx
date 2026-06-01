@@ -34,11 +34,26 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const dimensionsRef = useRef({ width: 0, height: 0 });
   const stageRef = useRef<any>(null);
   const [selBox, setSelBox] = useState<{ start: { x: number, y: number }, end: { x: number, y: number }, isRealDrag: boolean } | null>(null);
+  const transformRef = useRef(transform);
+  const touchGestureRef = useRef<{
+    mode: 'pan' | 'pinch' | 'select';
+    startCenter: { x: number; y: number };
+    startWorld: { x: number; y: number };
+    endWorld?: { x: number; y: number };
+    startDistance?: number;
+    startScale?: number;
+    startTransform: typeof transform;
+    hasMoved: boolean;
+  } | null>(null);
 
   const displayKeys = previewKeys || keys;
   const visKeys = useMemo(() => (displayKeys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option)) as RuntimeKey[], [displayKeys, settings.activeOptions]);
 
   const focusedKey = useMemo(() => visKeys.find(k => k.id === focusedKeyId), [visKeys, focusedKeyId]);
+
+  useEffect(() => {
+    transformRef.current = transform;
+  }, [transform]);
 
   useEffect(() => { 
     setIsClient(true);
@@ -342,6 +357,178 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     }
   };
 
+  const getTouchPoint = (touch: Touch) => {
+    const container = stageRef.current?.container();
+    const rect = container?.getBoundingClientRect();
+    return {
+      x: touch.clientX - (rect?.left ?? 0),
+      y: touch.clientY - (rect?.top ?? 0)
+    };
+  };
+
+  const getTouchCenter = (touches: TouchList) => {
+    const a = getTouchPoint(touches[0]);
+    if (touches.length < 2) return a;
+    const b = getTouchPoint(touches[1]);
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  };
+
+  const getTouchDistance = (touches: TouchList) => {
+    if (touches.length < 2) return 0;
+    const a = getTouchPoint(touches[0]);
+    const b = getTouchPoint(touches[1]);
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+
+  const screenToStagePoint = (point: { x: number; y: number }, sourceTransform = transformRef.current) => ({
+    x: (point.x - (sourceTransform.x + PADDING_X)) / sourceTransform.scale,
+    y: (point.y - (sourceTransform.y + PADDING_Y)) / sourceTransform.scale
+  });
+
+  const applySelectionBox = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    const bX1 = Math.min(start.x, end.x);
+    const bY1 = Math.min(start.y, end.y);
+    const bX2 = Math.max(start.x, end.x);
+    const bY2 = Math.max(start.y, end.y);
+
+    const newIds = visKeys.filter(k => {
+      const vertices = getKeyVertices(k);
+      return vertices.every(v => v.x >= bX1 && v.x <= bX2 && v.y >= bY1 && v.y <= bY2);
+    }).map(k => k.id);
+
+    setSelectedKeyIds(newIds);
+    if (newIds.length > 0 && !focusedKeyId) {
+      setFocusedKeyId(newIds[0]);
+    }
+  };
+
+  const handleStageTouchStart = (e: any) => {
+    const touches = e.evt.touches as TouchList;
+    if (!stageRef.current || touches.length === 0) return;
+
+    if (touches.length >= 2) {
+      e.evt.preventDefault();
+      const center = getTouchCenter(touches);
+      touchGestureRef.current = {
+        mode: 'pinch',
+        startCenter: center,
+        startWorld: screenToStagePoint(center),
+        startDistance: getTouchDistance(touches),
+        startScale: transformRef.current.scale,
+        startTransform: transformRef.current,
+        hasMoved: false
+      };
+      setSelBox(null);
+      return;
+    }
+
+    const point = getTouchPoint(touches[0]);
+    const targetIsStage = e.target === e.target.getStage();
+    const shouldPan = readonlyGeometry || appMode === 'remap' || editorMode !== 'layout';
+
+    if (shouldPan || targetIsStage) {
+      const worldPoint = screenToStagePoint(point);
+      touchGestureRef.current = {
+        mode: shouldPan ? 'pan' : 'select',
+        startCenter: point,
+        startWorld: worldPoint,
+        endWorld: worldPoint,
+        startTransform: transformRef.current,
+        hasMoved: false
+      };
+    }
+  };
+
+  const handleStageTouchMove = (e: any) => {
+    const gesture = touchGestureRef.current;
+    const touches = e.evt.touches as TouchList;
+    if (!gesture || touches.length === 0) return;
+
+    if (touches.length >= 2) {
+      e.evt.preventDefault();
+      const center = getTouchCenter(touches);
+      const distance = getTouchDistance(touches);
+      if (gesture.mode !== 'pinch') {
+        touchGestureRef.current = {
+          mode: 'pinch',
+          startCenter: center,
+          startWorld: screenToStagePoint(center),
+          startDistance: distance,
+          startScale: transformRef.current.scale,
+          startTransform: transformRef.current,
+          hasMoved: false
+        };
+        setSelBox(null);
+        return;
+      }
+      const startDistance = gesture.startDistance || distance || 1;
+      const startScale = gesture.startScale || gesture.startTransform.scale;
+      const newScale = Math.min(Math.max(startScale * (distance / startDistance), 0.2), 5);
+      const newTransform = {
+        scale: newScale,
+        x: center.x - gesture.startWorld.x * newScale - PADDING_X,
+        y: center.y - gesture.startWorld.y * newScale - PADDING_Y
+      };
+      touchGestureRef.current = {
+        ...gesture,
+        mode: 'pinch',
+        hasMoved: true
+      };
+      setSelBox(null);
+      setTransform(newTransform);
+      return;
+    }
+
+    if (gesture.mode === 'pan') {
+      e.evt.preventDefault();
+      const point = getTouchPoint(touches[0]);
+      const dx = point.x - gesture.startCenter.x;
+      const dy = point.y - gesture.startCenter.y;
+      touchGestureRef.current = {
+        ...gesture,
+        hasMoved: gesture.hasMoved || Math.hypot(dx, dy) > 3
+      };
+      setTransform({
+        ...gesture.startTransform,
+        x: gesture.startTransform.x + dx,
+        y: gesture.startTransform.y + dy
+      });
+      return;
+    }
+
+    if (gesture.mode === 'select') {
+      e.evt.preventDefault();
+      const endWorld = screenToStagePoint(getTouchPoint(touches[0]));
+      const dx = endWorld.x - gesture.startWorld.x;
+      const dy = endWorld.y - gesture.startWorld.y;
+      const hasMoved = gesture.hasMoved || Math.hypot(dx, dy) > 3;
+      touchGestureRef.current = { ...gesture, endWorld, hasMoved };
+
+      if (hasMoved) {
+        if (!gesture.hasMoved) {
+          setSelectedKeyIds([]);
+        }
+        setSelBox({ start: gesture.startWorld, end: endWorld, isRealDrag: true });
+      }
+    }
+  };
+
+  const handleStageTouchEnd = () => {
+    const gesture = touchGestureRef.current;
+    if (!gesture) return;
+
+    if (gesture.mode === 'select') {
+      if (gesture.hasMoved && gesture.endWorld) {
+        applySelectionBox(gesture.startWorld, gesture.endWorld);
+      } else {
+        setSelectedKeyIds([]);
+      }
+      setSelBox(null);
+    }
+
+    touchGestureRef.current = null;
+  };
+
   const handleKeyDragMove = (e: any, id: string) => {
     if (readonlyGeometry) return;
     const pos = e.target.position(); // This is the PIVOT point
@@ -493,6 +680,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
         width={dimensions.width} height={dimensions.height} ref={stageRef}
         x={transform.x + PADDING_X} y={transform.y + PADDING_Y} scaleX={transform.scale} scaleY={transform.scale}
         onWheel={handleWheel} onMouseDown={handleStageMouseDown} onMouseMove={handleStageMouseMove} onMouseUp={handleStageMouseUp}
+        onTouchStart={handleStageTouchStart} onTouchMove={handleStageTouchMove} onTouchEnd={handleStageTouchEnd}
       >
         <Layer>
           {isLayoutMode(appMode, editorMode) && (
