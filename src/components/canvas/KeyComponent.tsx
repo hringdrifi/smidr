@@ -336,7 +336,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
       offsetY={pivotInLocalY}
       draggable={draggable && showKeycap && layoutMode}
       onDragStart={(e) => {
-        if (e.evt && e.evt.button !== 0) {
+        if (e.evt && typeof e.evt.button === 'number' && e.evt.button !== 0) {
           e.target.stopDrag();
           return;
         }
