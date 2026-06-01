@@ -1,12 +1,12 @@
 {
   "name": "smidr",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "scripts": {
     "dev": "vite",
     "desktop:dev": "cargo tauri dev",
     "build": "tsc && vite build",
-    "desktop:build": "cargo tauri build --no-bundle",
+    "desktop:build": "cargo tauri build --bundles nsis",
     "preview": "vite preview",
     "lint": "eslint",
     "test": "vitest run src/lib/__tests",
