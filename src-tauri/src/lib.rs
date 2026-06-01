@@ -1,6 +1,9 @@
 use serde::Serialize;
+#[cfg(windows)]
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+#[cfg(windows)]
+use tauri::Emitter;
+use tauri::{AppHandle, State};
 
 #[cfg(windows)]
 mod winrt_ble {
