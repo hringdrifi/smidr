@@ -106,6 +106,7 @@ export interface KeyboardState {
   remoteKeymap: Record<number, UniversalAction[]>; // layer -> array of actions
   setRemoteKeymap: (keymap: Record<number, UniversalAction[]>) => void;
   syncKeymap: () => Promise<void>;
+  isKeymapSyncing: boolean;
   zmkLayerMetadata: ZmkLayerMetadata | null;
   setZmkLayerMetadata: (metadata: ZmkLayerMetadata | null) => void;
   renameZmkLayer: (layerIndex: number, name: string) => Promise<void>;
@@ -254,6 +255,7 @@ const initialState: Partial<KeyboardState> = {
   deviceCapabilities: null,
   activeTransport: null,
   remoteKeymap: {},
+  isKeymapSyncing: false,
   zmkLayerMetadata: null,
   remoteMacros: Array(16).fill(null).map(() => []),
   remoteCombos: [],
@@ -607,7 +609,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const s = get();
           if (!s.connectedDevice) return;
           
-          set({ zmkLocked: false, zmkUnsavedChanges: false, zmkLayerMetadata: null });
+          set({ isKeymapSyncing: true, zmkLocked: false, zmkUnsavedChanges: false, zmkLayerMetadata: null });
 
           try {
             const isZmk = s.connectedDevice?.protocolType === 'zmk';
@@ -996,6 +998,8 @@ export const useKeyboardStore = create<KeyboardState>()(
           } catch (err) {
             console.error('Keymap sync failed:', err);
             throw err;
+          } finally {
+            set({ isKeymapSyncing: false });
           }
         },
 

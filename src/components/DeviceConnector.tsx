@@ -29,6 +29,7 @@ export const DeviceConnector: React.FC = () => {
       currentProjectId: null,
       isProjectOpen: false,
       remoteKeymap: {},
+      isKeymapSyncing: false,
       remoteMacros: Array(16).fill(null).map(() => []),
       remoteCombos: [],
       zmkLocked: false,

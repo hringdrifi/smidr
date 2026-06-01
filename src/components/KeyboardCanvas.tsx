@@ -7,7 +7,7 @@ import { PhysicalKey } from '@/types/keyboard';
 import { sortKeys } from '@/lib/sorting';
 import { keysIntersect } from '@/lib/collision';
 import { useTranslation } from '@/hooks/useTranslation';
-import { LayoutGrid, FolderOpen, Plus, Lock, RefreshCw } from 'lucide-react';
+import { LayoutGrid, FolderOpen, Plus, RefreshCw } from 'lucide-react';
 import { KeyComponent } from './canvas/KeyComponent';
 import { GridComponent } from './canvas/GridComponent';
 import { UNIT, num, round, roundCoord, roundRot, getVisualCenter, getKeyVertices, getKeyLabel, isLayoutMode, PADDING_X, PADDING_Y } from '@/lib/canvas-utils';
@@ -24,7 +24,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     isProjectOpen, setIsHardwareModalOpen, resetProject,
     setCanvasDimensions,
     connectedDevice, currentProjectId,
-    zmkLocked, syncKeymap
+    zmkLocked, isKeymapSyncing
   } = useKeyboardStore();
   
   const { t } = useTranslation();
@@ -814,18 +814,22 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
         </div>
       )}
 
-      {/* Empty State Overlay (Remap Mode with no keys / layout metadata unavailable) */}
+      {/* Empty State Overlay (Remap Mode with no keys / layout metadata loading or unavailable) */}
       {appMode === 'remap' && visKeys.length === 0 && !zmkLocked && (
-        <div className={`absolute inset-x-0 top-0 ${readonlyGeometry ? "bottom-[400px]" : "bottom-0"} flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/90 backdrop-blur-[4px] z-[200]`}>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-500 bg-[var(--bg-app)]/90 backdrop-blur-[4px] z-[200]">
           <div className="w-20 h-20 rounded-3xl bg-[var(--bg-panel)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-dim)] mb-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in zoom-in duration-500">
-            <LayoutGrid size={40} className="text-amber-500" />
+            {isKeymapSyncing ? (
+              <RefreshCw size={40} className="text-amber-500 animate-spin" />
+            ) : (
+              <LayoutGrid size={40} className="text-amber-500" />
+            )}
           </div>
           
           <h2 className="text-2xl font-bold text-[var(--text-highlight)] mb-3 tracking-tight">
-            Layout Metadata Unavailable
+            {isKeymapSyncing ? t('common.layoutMetadataLoadingTitle') : t('common.layoutMetadataUnavailableTitle')}
           </h2>
           <p className="text-sm text-[var(--text-muted)] max-w-md leading-relaxed mb-6">
-            The physical layout and key positions could not be retrieved from the device.
+            {isKeymapSyncing ? t('common.layoutMetadataLoadingDesc') : t('common.layoutMetadataUnavailableDesc')}
           </p>
         </div>
       )}
