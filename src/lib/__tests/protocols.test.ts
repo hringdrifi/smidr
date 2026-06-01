@@ -4,8 +4,38 @@ import { zmkStringToAction, actionToZmkString } from '../protocols/zmk-action-co
 import { UniversalAction } from '@/types/actions';
 import { ZmkProtocol } from '../protocols/zmk';
 import { ITransport } from '../transport/types';
+import { ViaProtocol } from '../protocols/via';
 
 describe('protocols conversion tests', () => {
+  describe('VIA protocol transport commands', () => {
+    it('should read dynamic keymap buffers', async () => {
+      let sent: Uint8Array | undefined;
+      const transport: ITransport = {
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data) => {
+          sent = data;
+        },
+        receive: async () => {
+          const resp = new Uint8Array(32);
+          resp.set([0xAA, 0xBB, 0xCC, 0xDD], 4);
+          return resp;
+        },
+      };
+
+      const protocol = new ViaProtocol();
+      await protocol.initialize(transport);
+      const buffer = await protocol.getKeymapBuffer(0x1234, 4);
+
+      expect(sent?.[0]).toBe(0x12);
+      expect(sent?.[1]).toBe(0x12);
+      expect(sent?.[2]).toBe(0x34);
+      expect(sent?.[3]).toBe(4);
+      expect(Array.from(buffer)).toEqual([0xAA, 0xBB, 0xCC, 0xDD]);
+    });
+  });
+
   describe('QMK/VIA Dynamic Keycode Converter', () => {
     it('should convert transparent and none keycodes', () => {
       expect(viaCodeToAction(0x0001)).toEqual({ action: 'trans' });

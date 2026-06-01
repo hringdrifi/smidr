@@ -7,6 +7,7 @@ describe('parseKeyboardDefinition', () => {
       name: 'Test VIA',
       vendorId: '0x1234',
       productId: '0xABCD',
+      matrix: { rows: 2, cols: 3 },
       layouts: {
         labels: ['Split Backspace'],
         keymap: [
@@ -20,5 +21,6 @@ describe('parseKeyboardDefinition', () => {
       '0': { name: 'Split Backspace', type: 'toggle' },
     });
     expect(result.activeOptions).toEqual({ '0': 0 });
+    expect(result.matrix).toEqual({ rows: 2, cols: 3 });
   });
 });

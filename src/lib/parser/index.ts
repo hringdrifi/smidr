@@ -67,6 +67,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   vendorProductId?: number,
   layoutOptions?: ProjectSettings['layoutOptions'],
   activeOptions?: ProjectSettings['activeOptions'],
+  matrix?: ProjectSettings['matrix'],
   pins?: Partial<ProjectSettings['pins']>,
   hardware?: Partial<ProjectSettings['hardware']>,
   qmk?: Partial<ProjectSettings['qmk']>,
@@ -79,6 +80,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   let vendorProductId: number | undefined;
   let layoutOptions: ProjectSettings['layoutOptions'] = {};
   let activeOptions: ProjectSettings['activeOptions'] = {};
+  let matrix: ProjectSettings['matrix'] | undefined;
 
   // 1. Detect format
   if (!input) {
@@ -113,6 +115,12 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       }
       name = input.name;
       vendorProductId = getVendorProductId(input);
+      if (Number.isFinite(input.matrix?.rows) && Number.isFinite(input.matrix?.cols)) {
+        matrix = {
+          rows: Number(input.matrix.rows),
+          cols: Number(input.matrix.cols),
+        };
+      }
       
       // Parse layout options from VIA labels
       if (input.layouts.labels) {
@@ -248,6 +256,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           vendorProductId,
           layoutOptions: {},
           activeOptions: {},
+          matrix: undefined,
           pins,
           hardware,
           qmk,
@@ -369,6 +378,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
     name, 
     vendorProductId, 
     layoutOptions,
-    activeOptions
+    activeOptions,
+    matrix
   };
 }

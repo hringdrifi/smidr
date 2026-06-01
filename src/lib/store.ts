@@ -13,7 +13,7 @@ import { convertVialToSmidr, packLayoutOptions } from './protocols/vial-converte
 import { VialProtocol } from './protocols/vial';
 import { DeviceCapability, ITransport } from './transport/types';
 import { ZmkLayerMetadata, ZmkProtocol, zmkProtocol } from './protocols/zmk';
-import { qmkStringToAction, actionToQmkString } from './protocols/via-action-converter';
+import { qmkStringToAction, actionToQmkString, viaCodeToAction } from './protocols/via-action-converter';
 import { getStoredTheme, setStoredTheme, getStoredLanguage, setStoredLanguage } from './storage';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
@@ -328,6 +328,15 @@ const getProjectVendorProductId = (project: SmidrProject): number | undefined =>
   return (vid << 16) | pid;
 };
 
+const getMatrixFromPins = (
+  pins: ProjectSettings['pins']
+): ProjectSettings['matrix'] | undefined => {
+  const rows = pins.rows?.length ?? 0;
+  const cols = pins.cols?.length ?? 0;
+  if (rows === 0 && cols === 0) return undefined;
+  return { rows, cols };
+};
+
 const getGeneratedZmkProjectSettings = (
   state: KeyboardState,
   keys: PhysicalKey[],
@@ -446,9 +455,16 @@ export const useKeyboardStore = create<KeyboardState>()(
         setZmkLocked: (locked: boolean) => set({ zmkLocked: locked }),
         setZmkUnsavedChanges: (unsaved: boolean) => set({ zmkUnsavedChanges: unsaved }),
 
-        updateSettings: (sets: Partial<ProjectSettings>) => set((s) => ({ 
-          settings: { ...s.settings, ...sets } 
-        })),
+        updateSettings: (sets: Partial<ProjectSettings>) => set((s) => {
+          const nextSettings = { ...s.settings, ...sets };
+          if (sets.pins) {
+            const pinMatrix = getMatrixFromPins(nextSettings.pins);
+            if (pinMatrix) {
+              nextSettings.matrix = pinMatrix;
+            }
+          }
+          return { settings: nextSettings };
+        }),
 
         updateEditorSettings: (es: Partial<EditorSettings>) => {
           if (es.theme) setStoredTheme(es.theme);
@@ -784,14 +800,14 @@ export const useKeyboardStore = create<KeyboardState>()(
                 const keysToFetch = matrixRows * matrixCols; 
                 const keysPerPacket = 14;
 
-                if (isVial) {
-                  // High-speed batch fetch for Vial
+                if (!isZmk) {
+                  // High-speed batch fetch for VIA/Vial
                   const layerOffset = l * matrixRows * matrixCols * 2;
                   console.log(`Layer ${l}: Syncing ${keysToFetch} keys (Matrix: ${matrixRows}x${matrixCols}) at offset ${layerOffset}`);
                   for (let k = 0; k < keysToFetch; k += keysPerPacket) {
                     try {
                       const offset = layerOffset + k * 2;
-                      const buffer = await (protocol as VialProtocol).getKeymapBuffer(offset, keysPerPacket * 2);
+                      const buffer = await (protocol as ViaProtocol | VialProtocol).getKeymapBuffer(offset, keysPerPacket * 2);
                       
                       if (!buffer || buffer.length === 0) {
                         throw new Error(`Empty buffer returned for offset ${offset}`);
@@ -810,7 +826,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                         
                         // Safety check for matrix bounds
                         const targetIdx = row * 32 + col;
-                        layerActions[targetIdx] = vialCodeToAction(val);
+                        layerActions[targetIdx] = isVial ? vialCodeToAction(val) : viaCodeToAction(val);
                       }
                     } catch (e) {
                       console.error(`Layer ${l} Error: Failed at key offset ${k}. Error:`, e);
@@ -1865,8 +1881,9 @@ export const useKeyboardStore = create<KeyboardState>()(
             (p.splitCols as any)[idx as number] = pin;
           }
           if (type === 'feature') (p as any)[idx as string] = pin;
+          const pinMatrix = getMatrixFromPins(p);
           return {
-            settings: { ...s.settings, pins: p }
+            settings: { ...s.settings, pins: p, ...(pinMatrix ? { matrix: pinMatrix } : {}) }
           };
         }),
 
@@ -2098,7 +2115,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
 
             const result = parseKeyboardDefinition(input);
-            const { keys, name, vendorProductId, layoutOptions, activeOptions, pins, hardware, qmk, features } = result;
+            const { keys, name, vendorProductId, layoutOptions, activeOptions, matrix, pins, hardware, qmk, features } = result;
             const initialActiveOptions = activeOptions
               ?? Object.fromEntries(Object.keys(layoutOptions || {}).map(id => [id, 0]));
             
@@ -2126,6 +2143,23 @@ export const useKeyboardStore = create<KeyboardState>()(
             const hasMatrix = keys.some(k => k.row !== undefined);
 
             set((s: KeyboardState) => {
+              const existingPinMatrix = getMatrixFromPins(s.settings.pins);
+              const importedPins = pins ? { ...s.settings.pins, ...pins } : s.settings.pins;
+              const importedPinMatrix = getMatrixFromPins(importedPins);
+              const pinMatrix = importedPinMatrix ?? existingPinMatrix;
+              const inferredMatrix = hasMatrix
+                ? { rows: maxRow + 1, cols: maxCol + 1 }
+                : s.settings.matrix;
+              let nextMatrix = pinMatrix ?? matrix ?? inferredMatrix;
+
+              if (
+                matrix &&
+                pinMatrix &&
+                (matrix.rows !== pinMatrix.rows || matrix.cols !== pinMatrix.cols)
+              ) {
+                alert(`Imported matrix (${matrix.rows}x${matrix.cols}) differs from configured pins (${pinMatrix.rows}x${pinMatrix.cols}). Keeping pin-based matrix.`);
+              }
+
               // Assign fresh runtime IDs first so keys and baseKeys share the exact same key list and references
               let appliedKeys = keys.map(k => ({ ...k, id: crypto.randomUUID() }));
               
@@ -2163,14 +2197,11 @@ export const useKeyboardStore = create<KeyboardState>()(
                   vendorProductId: vendorProductId ?? s.settings.vendorProductId,
                   layoutOptions: layoutOptions || {},
                   activeOptions: initialActiveOptions,
-                  pins: pins ? { ...s.settings.pins, ...pins } : s.settings.pins,
+                  pins: importedPins,
                   hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
                   qmk: qmk ? { ...(s.settings.qmk || {}), ...qmk } : s.settings.qmk,
                   features: features ? { ...s.settings.features, ...features } : s.settings.features,
-                  matrix: {
-                    rows: (pins && pins.rows && pins.rows.length > 0) ? pins.rows.length : (hasMatrix ? maxRow + 1 : s.settings.matrix.rows),
-                    cols: (pins && pins.cols && pins.cols.length > 0) ? pins.cols.length : (hasMatrix ? maxCol + 1 : s.settings.matrix.cols),
-                  }
+                  matrix: nextMatrix
                 },
                 isProjectOpen: true,
                 selectedKeyIds: [],

@@ -15,6 +15,7 @@ export enum ViaCommand {
   GetDeviceSignature = 0x03,
   
   DynamicKeymapGetLayerCount = 0x11,
+  DynamicKeymapGetBuffer = 0x12,
   DynamicKeymapGetKeycode = 0x04,
   DynamicKeymapSetKeycode = 0x05,
   
@@ -129,5 +130,17 @@ export class ViaProtocol implements IProtocolDriver {
     console.log(`[VIA Telegram Write]`, Array.from(data).map(b => b.toString(16).padStart(2, '0')).join(' '));
     await this.sendReport(data);
     await this.waitForReport(); // ACK
+  }
+
+  async getKeymapBuffer(offset: number, length: number): Promise<Uint8Array> {
+    const data = new Uint8Array(32);
+    data[0] = ViaCommand.DynamicKeymapGetBuffer;
+    data[1] = (offset >> 8) & 0xFF;
+    data[2] = offset & 0xFF;
+    data[3] = length;
+
+    await this.sendReport(data);
+    const resp = await this.waitForReport();
+    return resp.slice(4, 4 + length);
   }
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { useKeyboardStore } from '../store';
 import { UniversalAction } from '../../types/actions';
 
@@ -39,6 +39,7 @@ describe('useKeyboardStore', () => {
       name: 'Test VIA',
       vendorId: '0x1234',
       productId: '0xABCD',
+      matrix: { rows: 2, cols: 3 },
       layouts: {
         labels: ['Split Backspace'],
         keymap: [
@@ -53,6 +54,39 @@ describe('useKeyboardStore', () => {
       '0': { name: 'Split Backspace', type: 'toggle' },
     });
     expect(state.settings.activeOptions).toEqual({ '0': 0 });
+    expect(state.settings.matrix).toEqual({ rows: 2, cols: 3 });
+  });
+
+  it('should keep pin-based matrix when imported VIA matrix differs', () => {
+    const store = useKeyboardStore.getState();
+    const originalAlert = globalThis.alert;
+    globalThis.alert = vi.fn() as any;
+
+    try {
+      store.resetProject();
+      store.updateSettings({
+        pins: { rows: ['R0'], cols: ['C0', 'C1'] },
+      } as any);
+
+      store.importKeyboardDefinition({
+        name: 'Test VIA',
+        vendorId: '0x1234',
+        productId: '0xABCD',
+        matrix: { rows: 2, cols: 3 },
+        layouts: {
+          labels: [],
+          keymap: [
+            ['0,0'],
+          ],
+        },
+      });
+
+      const state = useKeyboardStore.getState();
+      expect(state.settings.matrix).toEqual({ rows: 1, cols: 2 });
+      expect(globalThis.alert).toHaveBeenCalledOnce();
+    } finally {
+      globalThis.alert = originalAlert;
+    }
   });
 
   it('should load .smidr vendorId/productId into internal vendorProductId', () => {
