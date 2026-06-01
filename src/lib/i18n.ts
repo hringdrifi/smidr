@@ -246,6 +246,8 @@ export const TRANSLATIONS = {
       bootmagicRow: 'Bootmagic Row',
       bootmagicCol: 'Bootmagic Col',
       assignPin: '+ Assign',
+      rowPins: 'Row Pins',
+      colPins: 'Col Pins',
       leftRowPins: 'Left Row Pins',
       leftColPins: 'Left Col Pins',
       rightRowPins: 'Right Row Pins',
@@ -611,6 +613,8 @@ export const TRANSLATIONS = {
       developer: '开发者设置',
       debugMode: '调试模式',
       debugModeDesc: '在控制台中显示解析和操作的详细日志',
+      rowPins: '行引脚',
+      colPins: '列引脚',
     },
     zoom: {
       gridSettings: '网格设置',
@@ -895,6 +899,8 @@ export const TRANSLATIONS = {
       developer: '개발자 설정',
       debugMode: '디버그 모드',
       debugModeDesc: '파서 및 작업에 대한 자세한 로그를 콘솔에 표시',
+      rowPins: '행 핀',
+      colPins: '열 핀',
     },
     zoom: {
       gridSettings: '그리드 설정',
@@ -1197,6 +1203,8 @@ export const TRANSLATIONS = {
       bootmagicRow: 'Bootmagic 行',
       bootmagicCol: 'Bootmagic 列',
       assignPin: '+ 割り当て',
+      rowPins: '行ピン',
+      colPins: '列ピン',
       leftRowPins: '左側 行ピン',
       leftColPins: '左側 列ピン',
       rightRowPins: '右側 行ピン',
@@ -1562,6 +1570,8 @@ export const TRANSLATIONS = {
       developer: 'Ajustes de Desarrollador',
       debugMode: 'Modo Depuración',
       debugModeDesc: 'Mostrar registros detallados en la consola',
+      rowPins: 'Pines de fila',
+      colPins: 'Pines de columna',
     },
     zoom: {
       gridSettings: 'Ajustes de Cuadrícula',
@@ -1846,6 +1856,8 @@ export const TRANSLATIONS = {
       developer: 'Entwickleroptionen',
       debugMode: 'Debug-Modus',
       debugModeDesc: 'Detaillierte Protokolle in der Konsole anzeigen',
+      rowPins: 'Zeilen-Pins',
+      colPins: 'Spalten-Pins',
     },
     zoom: {
       gridSettings: 'Gitter-Einstellungen',

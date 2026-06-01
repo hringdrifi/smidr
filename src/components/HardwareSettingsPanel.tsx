@@ -104,12 +104,14 @@ const PinTagInput = ({
   type,
   pins,
   isActive,
+  isSplitKeyboard,
   onFocus,
   onUpdatePins
 }: {
   type: 'row' | 'col' | 'splitRow' | 'splitCol';
   pins: string[];
   isActive: boolean;
+  isSplitKeyboard: boolean;
   onFocus: () => void;
   onUpdatePins: (newPins: string[]) => void;
 }) => {
@@ -117,9 +119,9 @@ const PinTagInput = ({
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIdx, setDraggedIdx] = React.useState<number | null>(null);
   const label = type === 'row'
-    ? t('hardware.leftRowPins')
+    ? (isSplitKeyboard ? t('hardware.leftRowPins') : t('hardware.rowPins'))
     : type === 'col'
-    ? t('hardware.leftColPins')
+    ? (isSplitKeyboard ? t('hardware.leftColPins') : t('hardware.colPins'))
     : type === 'splitRow'
     ? t('hardware.rightRowPins')
     : t('hardware.rightColPins');
@@ -247,8 +249,8 @@ export const HardwareSettingsPanel = () => {
   const [preventDuplicates, setPreventDuplicates] = React.useState<boolean>(true);
   const [customPinText, setCustomPinText] = React.useState<string>('');
   const getPinGroupLabel = (box: typeof activeBox, feature: string | null) => {
-    if (box === 'row') return t('hardware.leftRowPins');
-    if (box === 'col') return t('hardware.leftColPins');
+    if (box === 'row') return settings.features.split ? t('hardware.leftRowPins') : t('hardware.rowPins');
+    if (box === 'col') return settings.features.split ? t('hardware.leftColPins') : t('hardware.colPins');
     if (box === 'splitRow') return t('hardware.rightRowPins');
     if (box === 'splitCol') return t('hardware.rightColPins');
     return feature || '';
@@ -801,6 +803,7 @@ export const HardwareSettingsPanel = () => {
                   type="row"
                   pins={settings.pins.rows}
                   isActive={activeBox === 'row'}
+                  isSplitKeyboard={settings.features.split}
                   onFocus={() => {
                     setActiveBox('row');
                     setFocusedFeature(null);
@@ -816,6 +819,7 @@ export const HardwareSettingsPanel = () => {
                   type="col"
                   pins={settings.pins.cols}
                   isActive={activeBox === 'col'}
+                  isSplitKeyboard={settings.features.split}
                   onFocus={() => {
                     setActiveBox('col');
                     setFocusedFeature(null);
@@ -834,6 +838,7 @@ export const HardwareSettingsPanel = () => {
                     type="splitRow"
                     pins={settings.pins.splitRows || []}
                     isActive={activeBox === 'splitRow'}
+                    isSplitKeyboard={settings.features.split}
                     onFocus={() => {
                       setActiveBox('splitRow');
                       setFocusedFeature(null);
@@ -849,6 +854,7 @@ export const HardwareSettingsPanel = () => {
                     type="splitCol"
                     pins={settings.pins.splitCols || []}
                     isActive={activeBox === 'splitCol'}
+                    isSplitKeyboard={settings.features.split}
                     onFocus={() => {
                       setActiveBox('splitCol');
                       setFocusedFeature(null);
