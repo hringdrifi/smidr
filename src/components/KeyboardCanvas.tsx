@@ -578,15 +578,15 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     const startKeyAngle = num(focusedKey.r);
     const initialStates = visKeys.filter(k => selectedKeyIds.includes(k.id)).map(k => ({ ...k }));
 
-    const onMouseMove = (me: MouseEvent) => {
+    const updateRotation = (pos: { x: number; y: number } | null, freeRotate = false) => {
+      if (!pos) return;
       const container = stage.container();
       container.style.cursor = 'crosshair';
-      const pos = stage.getRelativePointerPosition();
 
       const currentMouseAngle = Math.atan2(pos.y - pivot.y, pos.x - pivot.x);
       let deltaAngle = ((currentMouseAngle - startMouseAngle) * 180) / Math.PI;
       
-      const nR = me.altKey ? roundRot(startKeyAngle + deltaAngle) : Math.round((startKeyAngle + deltaAngle) / 15) * 15;
+      const nR = freeRotate ? roundRot(startKeyAngle + deltaAngle) : Math.round((startKeyAngle + deltaAngle) / 15) * 15;
       const finalDeltaR = nR - startKeyAngle;
 
       const updatedKeys = displayKeys.map(k => {
@@ -634,23 +634,46 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
       setPreviewKeys(updatedKeys);
     };
 
+    const onMouseMove = (me: MouseEvent) => {
+      updateRotation(stage.getRelativePointerPosition(), me.altKey);
+    };
+
+    const onTouchMove = (te: TouchEvent) => {
+      te.preventDefault();
+      const touch = te.touches[0];
+      if (!touch) return;
+      const rect = stage.container().getBoundingClientRect();
+      const point = {
+        x: (touch.clientX - rect.left - stage.x()) / stage.scaleX(),
+        y: (touch.clientY - rect.top - stage.y()) / stage.scaleY()
+      };
+      updateRotation(point, false);
+    };
+
     const onMouseUp = () => {
       const container = stageRef.current ? stageRef.current.container() : document.body;
       container.style.cursor = 'default';
       commitPreviewKeys();
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onMouseUp);
+      window.removeEventListener('touchcancel', onMouseUp);
     };
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onMouseUp);
+    window.addEventListener('touchcancel', onMouseUp);
   };
 
   const handlePivotDragMove = (e: any, k: PhysicalKey) => {
     if (readonlyGeometry) return;
     const nRX = e.target.x() / UNIT;
     const nRY = e.target.y() / UNIT;
-    const snappedRX = e.evt.altKey ? nRX : Math.round(nRX / editorSettings.gridSnap) * editorSettings.gridSnap;
-    const snappedRY = e.evt.altKey ? nRY : Math.round(nRY / editorSettings.gridSnap) * editorSettings.gridSnap;
+    const freeMove = e.evt?.altKey === true;
+    const snappedRX = freeMove ? nRX : Math.round(nRX / editorSettings.gridSnap) * editorSettings.gridSnap;
+    const snappedRY = freeMove ? nRY : Math.round(nRY / editorSettings.gridSnap) * editorSettings.gridSnap;
 
     // Force the visual node to snap
     e.target.x(snappedRX * UNIT);
@@ -907,6 +930,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                 <Group 
                   y={-36} 
                   onMouseDown={handleRotationStart} 
+                  onTouchStart={handleRotationStart}
                   onMouseEnter={(e: any) => {
                     const container = e.target.getStage()?.container();
                     if (container) container.style.cursor = 'crosshair';
@@ -948,6 +972,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   if (container) container.style.cursor = 'default';
                 }}
                 onDragStart={(e: any) => {
+                  e.cancelBubble = true;
                   const container = e.target.getStage()?.container();
                   if (container) container.style.cursor = 'crosshair';
                 }}
