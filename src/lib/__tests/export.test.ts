@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { generateViaJson } from '../export';
+import { generateSmidrProjectJson, generateViaJson } from '../export';
 import { generateQmkZip } from '../qmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
@@ -32,6 +32,53 @@ const baseSettings: ProjectSettings = {
 };
 
 describe('export generation', () => {
+  it('omits split pin settings from saved projects when split is disabled', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: {
+        ...baseSettings.features,
+        split: false,
+      },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: ['GP3'],
+        splitSerial: 'GP4',
+      },
+    };
+
+    const project = generateSmidrProjectJson({ settings, keys: [] });
+
+    expect(project.pins).toEqual({
+      rows: ['GP0'],
+      cols: ['GP1'],
+    });
+  });
+
+  it('keeps split pin settings in saved projects when split is enabled', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: ['GP3'],
+        splitSerial: 'GP4',
+      },
+    };
+
+    const project = generateSmidrProjectJson({ settings, keys: [] });
+
+    expect(project.pins.splitRows).toEqual(['GP2']);
+    expect(project.pins.splitCols).toEqual(['GP3']);
+    expect(project.pins.splitSerial).toBe('GP4');
+  });
+
   it('derives VIA matrix dimensions from key row/col assignments when pins are not available', () => {
     const keys: PhysicalKey[] = [
       {

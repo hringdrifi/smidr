@@ -241,11 +241,18 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
  */
 export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
   const { settings, keys } = state;
-  const { matrix, ...settingsWithoutMatrix } = settings;
+  const { matrix, pins, ...settingsWithoutMatrix } = settings;
+  const savedPins = settings.features.split ? pins : { ...pins };
+  if (!settings.features.split) {
+    delete savedPins.splitRows;
+    delete savedPins.splitCols;
+    delete savedPins.splitSerial;
+  }
   return {
     id: crypto.randomUUID(),
     updatedAt: Date.now(),
     ...settingsWithoutMatrix,
+    pins: savedPins,
     // Strip runtime-only 'id' field before persisting
     keys: keys.map(({ id, ...keyData }) => keyData as PhysicalKey)
   } as unknown as SmidrProject;
