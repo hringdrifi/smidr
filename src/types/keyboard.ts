@@ -99,8 +99,6 @@ export interface ProjectSettings {
       key2?: { row?: number; col?: number };
     };
   };
-  vid?: string; // Legacy optional vid string
-  pid?: string; // Legacy optional pid string
 }
 
 export interface SmidrProjectData {
@@ -120,8 +118,11 @@ export interface EditorSettings {
   debugMode: boolean;
 }
 
-export type SmidrProject = ProjectSettings & {
+export type SmidrProject = Omit<ProjectSettings, 'vendorProductId'> & {
   id: string;
   updatedAt: number;
   keys: PhysicalKey[];
+  vendorProductId?: number; // internal/localStorage and legacy .smidr
+  vendorId?: string; // .smidr external representation
+  productId?: string; // .smidr external representation
 };

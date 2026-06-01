@@ -24,6 +24,28 @@ function reorderLabels(parts: string[], align: number): (string | null)[] {
   return ret;
 }
 
+function parseIdNumber(value: any): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+
+  const text = String(value).trim();
+  if (!text) return undefined;
+
+  const parsed = text.toLowerCase().startsWith('0x')
+    ? parseInt(text.slice(2), 16)
+    : /^[0-9a-f]+$/i.test(text)
+    ? parseInt(text, 16)
+    : parseInt(text, 10);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function getVendorProductId(vialJson: any): number {
+  const vid = parseIdNumber(vialJson.vendorId) ?? 0;
+  const pid = parseIdNumber(vialJson.productId) ?? 0;
+  return (vid << 16) | pid;
+}
+
 export function unpackLayoutOptions(options: number, labels: any[]): Record<number, number> {
   const values: Record<number, number> = {};
   let bits = options.toString(2).padStart(100, '0');
@@ -283,7 +305,7 @@ export function convertVialToSmidr(vialJson: any, layoutOptions: number = 0): { 
   }
   
   // Update debug console once at the end
-  if ((window as any).setAppDebug) {
+  if (typeof window !== 'undefined' && (window as any).setAppDebug) {
     (window as any).setAppDebug({
       type: 'import',
       raw: vialJson,
@@ -302,9 +324,7 @@ export function convertVialToSmidr(vialJson: any, layoutOptions: number = 0): { 
     keys,
     settings: {
       name: vialJson.name || 'Imported Vial Keyboard',
-      vendorProductId: ((vialJson.vendorId || 0) << 16) | (vialJson.productId || 0),
-      vid: vialJson.vendorId ? `0x${vialJson.vendorId.toString(16).toUpperCase()}` : '0x0000',
-      pid: vialJson.productId ? `0x${vialJson.productId.toString(16).toUpperCase()}` : '0x0000',
+      vendorProductId: getVendorProductId(vialJson),
       matrix: vialJson.matrix || { rows: 0, cols: 0 },
       layoutOptions: layoutOptionSettings,
       activeOptions: activeOptions

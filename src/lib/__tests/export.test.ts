@@ -56,6 +56,14 @@ describe('export generation', () => {
     });
   });
 
+  it('stores USB IDs in .smidr as vendorId/productId instead of vendorProductId', () => {
+    const project = generateSmidrProjectJson({ settings: baseSettings, keys: [] });
+
+    expect(project.vendorId).toBe('0xFEED');
+    expect(project.productId).toBe('0x0001');
+    expect(project).not.toHaveProperty('vendorProductId');
+  });
+
   it('keeps split pin settings in saved projects when split is enabled', () => {
     const settings: ProjectSettings = {
       ...baseSettings,

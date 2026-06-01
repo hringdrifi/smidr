@@ -301,6 +301,33 @@ const getMatrixDimensionsFromKeys = (
   };
 };
 
+const parseProjectUsbId = (value: unknown): number | undefined => {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+
+  const text = String(value).trim();
+  if (!text) return undefined;
+
+  const parsed = text.toLowerCase().startsWith('0x')
+    ? parseInt(text.slice(2), 16)
+    : /^[0-9a-f]+$/i.test(text)
+    ? parseInt(text, 16)
+    : parseInt(text, 10);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const getProjectVendorProductId = (project: SmidrProject): number | undefined => {
+  if (typeof project.vendorProductId === 'number' && Number.isFinite(project.vendorProductId)) {
+    return project.vendorProductId;
+  }
+
+  const vid = parseProjectUsbId(project.vendorId);
+  const pid = parseProjectUsbId(project.productId);
+  if (vid === undefined || pid === undefined) return undefined;
+  return (vid << 16) | pid;
+};
+
 const getGeneratedZmkProjectSettings = (
   state: KeyboardState,
   keys: PhysicalKey[],
@@ -1991,9 +2018,11 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         loadProject: (project: SmidrProject, preserveTransform = false) => set((s: KeyboardState) => {
           // Extract keys and id/updatedAt, rest is settings
-          const { id, updatedAt, keys: rawKeys, ...settings } = project;
+          const { id, updatedAt, keys: rawKeys, vendorId, productId, vendorProductId, ...settings } = project;
+          const normalizedVendorProductId = getProjectVendorProductId(project) ?? s.settings.vendorProductId;
           const settingsWithDefaultMatrix = {
             ...settings,
+            vendorProductId: normalizedVendorProductId,
             qmk: {
               matrixMasked: false,
               ...(settings.qmk || {}),
@@ -2069,7 +2098,9 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
 
             const result = parseKeyboardDefinition(input);
-            const { keys, name, vendorProductId, layoutOptions, pins, hardware, qmk, features } = result;
+            const { keys, name, vendorProductId, layoutOptions, activeOptions, pins, hardware, qmk, features } = result;
+            const initialActiveOptions = activeOptions
+              ?? Object.fromEntries(Object.keys(layoutOptions || {}).map(id => [id, 0]));
             
             // Update again with parsed info if successful
             if (typeof window !== 'undefined' && (window as any).setAppDebug) {
@@ -2129,9 +2160,9 @@ export const useKeyboardStore = create<KeyboardState>()(
                 settings: {
                   ...s.settings,
                   name: name || s.settings.name,
-                  vendorProductId: vendorProductId || s.settings.vendorProductId,
+                  vendorProductId: vendorProductId ?? s.settings.vendorProductId,
                   layoutOptions: layoutOptions || {},
-                  activeOptions: {},
+                  activeOptions: initialActiveOptions,
                   pins: pins ? { ...s.settings.pins, ...pins } : s.settings.pins,
                   hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
                   qmk: qmk ? { ...(s.settings.qmk || {}), ...qmk } : s.settings.qmk,
@@ -2146,7 +2177,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 focusedKeyId: null,
                 editorMode: 'layout',
                 currentLayer: 0,
-                transform: getCenteredTransform(finalKeys, {}),
+                transform: getCenteredTransform(finalKeys, initialActiveOptions),
               };
             });
           } catch (err: any) {

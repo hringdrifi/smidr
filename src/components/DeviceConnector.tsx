@@ -123,14 +123,8 @@ export const DeviceConnector: React.FC = () => {
               useKeyboardStore.getState().setDeviceCapabilities(vial.capabilities);
               const version = await vial.getVialVersion();
               if (version > 0) {
-                isVial = true;
                 console.log(`Vial detected (v${version}). Fetching Keyboard UID & definition...`);
-                
-                const current = useKeyboardStore.getState().connectedDevice;
-                if (current) {
-                  useKeyboardStore.getState().setConnectedDevice({ ...current, protocolType: 'vial' });
-                }
-                
+
                 try {
                   keyboardId = await vial.getKeyboardId();
                   console.log('Vial Unique ID:', keyboardId.toString(16).toUpperCase());
@@ -149,11 +143,23 @@ export const DeviceConnector: React.FC = () => {
                 }
 
                 smidrData = convertVialToSmidr(vialJson, layoutOptions);
+                isVial = true;
+                const current = useKeyboardStore.getState().connectedDevice;
+                if (current) {
+                  useKeyboardStore.getState().setConnectedDevice({ ...current, protocolType: 'vial' });
+                }
                 console.log('Vial definition loaded and converted.');
               }
             }
           } catch (err) {
             console.log('Not a Vial keyboard or failed to fetch definition.');
+            isVial = false;
+            smidrData = null;
+            keyboardId = BigInt(0);
+            const current = useKeyboardStore.getState().connectedDevice;
+            if (current) {
+              useKeyboardStore.getState().setConnectedDevice({ ...current, protocolType: 'via' });
+            }
           }
 
           // Match connected device against local storage projects

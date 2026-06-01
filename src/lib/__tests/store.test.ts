@@ -31,6 +31,69 @@ describe('useKeyboardStore', () => {
     expect(state.selectedKeyIds).toEqual([]);
   });
 
+  it('should keep imported VIA layout option selections active', () => {
+    const store = useKeyboardStore.getState();
+    store.resetProject();
+
+    store.importKeyboardDefinition({
+      name: 'Test VIA',
+      vendorId: '0x1234',
+      productId: '0xABCD',
+      layouts: {
+        labels: ['Split Backspace'],
+        keymap: [
+          [{ a: 4 }, '0,0\n\n\n\n\n\n\n\n0,0'],
+        ],
+      },
+    });
+
+    const state = useKeyboardStore.getState();
+    expect(state.settings.vendorProductId).toBe((0x1234 << 16) | 0xABCD);
+    expect(state.settings.layoutOptions).toEqual({
+      '0': { name: 'Split Backspace', type: 'toggle' },
+    });
+    expect(state.settings.activeOptions).toEqual({ '0': 0 });
+  });
+
+  it('should load .smidr vendorId/productId into internal vendorProductId', () => {
+    const store = useKeyboardStore.getState();
+    store.resetProject();
+
+    store.loadProject({
+      id: crypto.randomUUID(),
+      updatedAt: Date.now(),
+      name: 'Project IDs',
+      manufacturer: 'Test',
+      description: '',
+      vendorId: '0x1234',
+      productId: '0xABCD',
+      matrix: { rows: 0, cols: 0 },
+      pins: { rows: [], cols: [] },
+      hardware: {
+        controllerType: 'development_board',
+        mcu: 'rp2040',
+        board: 'promicro',
+        diodeDirection: 'ROW2COL',
+      },
+      features: {
+        rgb: false,
+        encoder: false,
+        oled: false,
+        via: true,
+        split: false,
+      },
+      layers: 4,
+      layoutOptions: {},
+      activeOptions: {},
+      keys: [],
+    });
+
+    const state = useKeyboardStore.getState();
+    expect(state.settings.vendorProductId).toBe((0x1234 << 16) | 0xABCD);
+    expect(state.settings).not.toHaveProperty('vendorId');
+    expect(state.settings).not.toHaveProperty('productId');
+  });
+
   it('should add a key successfully', () => {
     const store = useKeyboardStore.getState();
     store.addKey({ x: 1, y: 1, w: 1, h: 1, label: 'A' });

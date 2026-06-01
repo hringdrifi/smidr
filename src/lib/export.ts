@@ -241,7 +241,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
  */
 export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
   const { settings, keys } = state;
-  const { matrix, pins, ...settingsWithoutMatrix } = settings;
+  const { matrix, pins, vendorProductId, ...settingsWithoutRuntimeIds } = settings;
   const savedPins = settings.features.split ? pins : { ...pins };
   if (!settings.features.split) {
     delete savedPins.splitRows;
@@ -251,7 +251,9 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
   return {
     id: crypto.randomUUID(),
     updatedAt: Date.now(),
-    ...settingsWithoutMatrix,
+    ...settingsWithoutRuntimeIds,
+    vendorId: `0x${((vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
+    productId: `0x${(vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     pins: savedPins,
     // Strip runtime-only 'id' field before persisting
     keys: keys.map(({ id, ...keyData }) => keyData as PhysicalKey)

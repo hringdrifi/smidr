@@ -4,6 +4,36 @@ import { getDefaultBootloader, getQmkProcessor } from '../mcu-presets';
 
 const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
 
+const parseHexOrDec = (val: any): number | undefined => {
+  if (val === undefined || val === null || val === '') return undefined;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : undefined;
+
+  const s = String(val).trim();
+  if (!s) return undefined;
+  const parsed = s.toLowerCase().startsWith('0x')
+    ? parseInt(s.slice(2), 16)
+    : /^[0-9a-f]+$/i.test(s)
+    ? parseInt(s, 16)
+    : parseInt(s, 10);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const getVendorProductId = (input: any): number | undefined => {
+  if (input.vendorProductId !== undefined) {
+    const text = String(input.vendorProductId).trim();
+    const parsed = text.toLowerCase().startsWith('0x')
+      ? parseInt(text.slice(2), 16)
+      : Number(input.vendorProductId);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  const vid = parseHexOrDec(input.vendorId);
+  const pid = parseHexOrDec(input.productId);
+  if (vid === undefined || pid === undefined) return undefined;
+  return (vid << 16) | pid;
+};
+
 const labelMap = [
   // 0  1  2  3  4  5  6  7  8  9 10 11   # align flags
   [ 0, 6, 2, 8, 9, 11, 3, 5, 1, 4, 7, 10], // 0 = no centering
@@ -36,6 +66,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   name?: string,
   vendorProductId?: number,
   layoutOptions?: ProjectSettings['layoutOptions'],
+  activeOptions?: ProjectSettings['activeOptions'],
   pins?: Partial<ProjectSettings['pins']>,
   hardware?: Partial<ProjectSettings['hardware']>,
   qmk?: Partial<ProjectSettings['qmk']>,
@@ -47,6 +78,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   let name: string | undefined;
   let vendorProductId: number | undefined;
   let layoutOptions: ProjectSettings['layoutOptions'] = {};
+  let activeOptions: ProjectSettings['activeOptions'] = {};
 
   // 1. Detect format
   if (!input) {
@@ -61,11 +93,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
     if (first && typeof first === 'object' && !Array.isArray(first)) {
       if (isDebug) console.log('[Parser] Extracting metadata from first element:', first);
       name = first.name || first.kbName;
-      if (first.vendorProductId) {
-        vendorProductId = first.vendorProductId;
-      } else if (first.vid && first.pid) {
-        vendorProductId = (parseInt(String(first.vid), 16) << 16) | parseInt(String(first.pid), 16);
-      }
+      vendorProductId = getVendorProductId(first);
       rawKLE = input.slice(1);
     } else {
       rawKLE = input;
@@ -84,7 +112,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
         rawKLE = input.layouts.keymap;
       }
       name = input.name;
-      vendorProductId = input.vendorProductId;
+      vendorProductId = getVendorProductId(input);
       
       // Parse layout options from VIA labels
       if (input.layouts.labels) {
@@ -103,6 +131,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
               type: 'toggle'
             };
           }
+          activeOptions[groupId] = 0;
         });
       }
     } else if (input.layouts && Object.values(input.layouts).some((l: any) => typeof l === 'object' && l !== null && Array.isArray(l.layout))) {
@@ -110,17 +139,9 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       if (isDebug) console.log('[Parser] Detected Format: QMK info.json');
       name = input.keyboard_name || input.name;
       if (input.usb && input.usb.vid !== undefined && input.usb.pid !== undefined) {
-        const parseHexOrDec = (val: any) => {
-          if (typeof val === 'number') return val;
-          const s = String(val).trim();
-          if (s.toLowerCase().startsWith('0x')) {
-            return parseInt(s.slice(2), 16);
-          }
-          return parseInt(s, 10);
-        };
         const vid = parseHexOrDec(input.usb.vid);
         const pid = parseHexOrDec(input.usb.pid);
-        if (!isNaN(vid) && !isNaN(pid)) {
+        if (vid !== undefined && pid !== undefined) {
           vendorProductId = (vid << 16) | pid;
         }
       }
@@ -226,6 +247,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           name,
           vendorProductId,
           layoutOptions: {},
+          activeOptions: {},
           pins,
           hardware,
           qmk,
@@ -338,6 +360,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
         type: 'list',
         choices: ['Option 0', 'Option 1', 'Option 2', 'Option 3'] // Fallback choices
       };
+      activeOptions[k.group] = 0;
     }
   });
 
@@ -345,6 +368,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
     keys, 
     name, 
     vendorProductId, 
-    layoutOptions
+    layoutOptions,
+    activeOptions
   };
 }
