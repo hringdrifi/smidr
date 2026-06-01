@@ -61,6 +61,24 @@ export default function App() {
   const remapFileInputRef = React.useRef<HTMLInputElement>(null);
   const keyboardFileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const connectedDeviceLabel = React.useMemo(() => {
+    if (!connectedDevice) return '';
+
+    const protocolLabel =
+      connectedDevice.protocolType === 'vial'
+        ? t('remap.vialConnected')
+        : connectedDevice.protocolType === 'via'
+          ? t('remap.viaConnected')
+          : t('remap.zmkConnected');
+
+    const deviceName =
+      connectedDevice.protocolType === 'zmk'
+        ? settings.name || connectedDevice.productName || t('remap.defaultKeyboard')
+        : connectedDevice.productName || settings.name || t('remap.defaultKeyboard');
+
+    return `${protocolLabel}: ${deviceName}`;
+  }, [connectedDevice, settings.name, t]);
+
   const hasDeletableSelection = React.useMemo(() => {
     if (selectedKeyIds.length === 0) return false;
     return keys.some(k => {
@@ -360,7 +378,7 @@ export default function App() {
                   >
                     <Cpu size={14} className="text-amber-500" />
                     <span className="text-[10px] font-bold text-[var(--text-highlight)] uppercase tracking-wider">
-                      {connectedDevice.protocolType === 'zmk' ? `${t('remap.connected')}: ${settings.name || 'Segl'}` : (connectedDevice.productName || t('remap.defaultKeyboard'))}
+                      {connectedDeviceLabel}
                     </span>
                   </div>
 

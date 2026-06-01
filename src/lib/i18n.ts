@@ -333,6 +333,9 @@ export const TRANSLATIONS = {
       importBackup: 'Import Backup (.smidr)',
       exportBackup: 'Export Backup (.smidr)',
       connected: 'ZMK connected',
+      zmkConnected: 'ZMK connected',
+      viaConnected: 'VIA connected',
+      vialConnected: 'Vial connected',
       defaultKeyboard: 'Keyboard',
       connectionMode: 'Connection Mode',
       connectWebHid: 'Connect via WebHID',
@@ -668,6 +671,10 @@ export const TRANSLATIONS = {
       connect: '连接',
       connecting: '连接中...',
       deleteAssignment: '清除键映射',
+      zmkConnected: 'ZMK 已连接',
+      viaConnected: 'VIA 已连接',
+      vialConnected: 'Vial 已连接',
+      defaultKeyboard: '键盘',
     }
   },
   ko: {
@@ -948,6 +955,10 @@ export const TRANSLATIONS = {
       connect: '연결',
       connecting: '연결 중...',
       deleteAssignment: '키맵 삭제',
+      zmkConnected: 'ZMK 연결됨',
+      viaConnected: 'VIA 연결됨',
+      vialConnected: 'Vial 연결됨',
+      defaultKeyboard: '키보드',
     }
   },
   ja: {
@@ -1273,6 +1284,9 @@ export const TRANSLATIONS = {
       importBackup: 'バックアップをインポート (.smidr)',
       exportBackup: 'バックアップをエクスポート (.smidr)',
       connected: 'ZMK 接続中',
+      zmkConnected: 'ZMK 接続中',
+      viaConnected: 'VIA 接続中',
+      vialConnected: 'Vial 接続中',
       defaultKeyboard: 'キーボード',
       connectionMode: '接続方式',
       connectWebHid: 'WebHID で接続',
@@ -1608,6 +1622,10 @@ export const TRANSLATIONS = {
       connect: 'Conectar',
       connecting: 'Conectando...',
       deleteAssignment: 'Eliminar mapa de teclas',
+      zmkConnected: 'ZMK conectado',
+      viaConnected: 'VIA conectado',
+      vialConnected: 'Vial conectado',
+      defaultKeyboard: 'Teclado',
     }
   },
   de: {
@@ -1888,6 +1906,10 @@ export const TRANSLATIONS = {
       connect: 'Verbinden',
       connecting: 'Verbinden...',
       deleteAssignment: 'Tastenbelegung löschen',
+      zmkConnected: 'ZMK verbunden',
+      viaConnected: 'VIA verbunden',
+      vialConnected: 'Vial verbunden',
+      defaultKeyboard: 'Tastatur',
     }
   }
 };
