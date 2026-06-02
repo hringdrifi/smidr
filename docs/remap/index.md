@@ -24,7 +24,7 @@ import { withBase } from 'vitepress'
 - `WebHID`: VIA / Vial 互換キーボードで使うことが多い接続方式です。
 - `WebSerial`: ZMK Studio 互換キーボードを USB / COM ポート経由で編集する場合に使います。
 
-ZMK Studio 互換キーボードを無線で編集する場合は、ブラウザ版ではなく ZMK Studio のネイティブアプリを使ってください。特に Windows 版 Chrome では、ZMK Studio の BLE 編集には対応していません。
+ZMK Studio 互換キーボードを無線で編集する場合は、ブラウザ版ではなく Smiðr のネイティブアプリを使ってください。特に Windows 版 Chrome では、ブラウザ版 Smiðr からの BLE 編集には対応していません。
 
 ブラウザからデバイス選択ダイアログが表示されたら、編集したいキーボードを選びます。接続できない場合は、別のアプリがキーボードを開いていないか、対応ファームウェアが書き込まれているかを確認します。
 
