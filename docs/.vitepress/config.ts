@@ -41,6 +41,7 @@ export default {
         text: 'リファレンス',
         items: [
           { text: 'ショートカット', link: '/reference/shortcuts' },
+          { text: 'アクション / キーコード', link: '/reference/actions' },
           { text: '用語集', link: '/reference/glossary' },
         ],
       },
