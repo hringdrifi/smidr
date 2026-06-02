@@ -40,6 +40,25 @@
   line-height: 1.7;
 }
 
+.VPSidebarItem.level-0 > .item > .text {
+  color: var(--vp-c-text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.VPSidebarItem.level-1 > .item > .link > .text {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.VPSidebarItem.level-1.is-active > .item > .link > .text {
+  color: var(--vp-c-brand-1);
+  font-weight: 700;
+}
+
 .VPDoc table {
   display: table;
   width: 100%;
