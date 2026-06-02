@@ -34,7 +34,7 @@ export default {
         items: [
           { text: '設計モード', link: '/design/' },
           { text: 'レイアウト編集', link: '/design/layout' },
-          { text: 'マトリックス編集', link: '/design/matrix' },
+          { text: 'マトリクス編集', link: '/design/matrix' },
           { text: 'キーマップ編集', link: '/design/keymap' },
           { text: 'ハードウェア設定', link: '/design/hardware' },
         ],
