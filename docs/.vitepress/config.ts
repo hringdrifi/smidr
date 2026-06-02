@@ -21,9 +21,9 @@ export default {
         ],
       },
       {
-        text: 'Design',
+        text: '設計',
         items: [
-          { text: 'Design モード', link: '/design/' },
+          { text: '設計モード', link: '/design/' },
           { text: 'レイアウト編集', link: '/design/layout' },
           { text: 'マトリックス編集', link: '/design/matrix' },
           { text: 'キーマップ編集', link: '/design/keymap' },
@@ -31,8 +31,8 @@ export default {
         ],
       },
       {
-        text: 'Remap',
-        items: [{ text: 'Remap モード', link: '/remap/' }],
+        text: 'リマップ',
+        items: [{ text: 'リマップモード', link: '/remap/' }],
       },
       {
         text: 'データ',

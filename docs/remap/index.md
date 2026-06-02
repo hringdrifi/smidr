@@ -1,22 +1,22 @@
 ---
-title: Remap モード
+title: リマップモード
 ---
 
 <script setup>
 import { withBase } from 'vitepress'
 </script>
 
-# Remap モード
+# リマップモード
 
-Remap モードでは、VIA / Vial または ZMK Studio 互換のキーボードに接続し、現在のキーマップを読み込んで編集します。接続方式はキーボードの対応状況により、WebHID、WebUSB、WebBLE などを使います。
+リマップモードでは、VIA / Vial または ZMK Studio 互換のキーボードに接続し、現在のキーマップを読み込んで編集します。接続方式はキーボードの対応状況により、WebHID、WebUSB、WebBLE などを使います。
 
 <figure>
-  <img :src="withBase('/assets/smidr-remap-before-connect.png')" alt="Remap モードの接続待ち画面">
+  <img :src="withBase('/assets/smidr-remap-before-connect.png')" alt="リマップモードの接続待ち画面">
   <figcaption>接続前は、対応キーボードを接続してから上部の接続ボタンを使います。</figcaption>
 </figure>
 
 <figure>
-  <img :src="withBase('/assets/smidr-remap-connect.png')" alt="Remap モードの接続メニュー">
+  <img :src="withBase('/assets/smidr-remap-connect.png')" alt="リマップモードの接続メニュー">
   <figcaption>接続メニューから、キーボードが対応している方式を選びます。</figcaption>
 </figure>
 
