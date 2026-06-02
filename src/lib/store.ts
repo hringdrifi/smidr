@@ -13,7 +13,7 @@ import { convertVialToSmidr, packLayoutOptions } from './protocols/vial-converte
 import { VialProtocol } from './protocols/vial';
 import { DeviceCapability, ITransport } from './transport/types';
 import { ZmkLayerMetadata, ZmkProtocol, zmkProtocol } from './protocols/zmk';
-import { qmkStringToAction, actionToQmkString, viaCodeToAction } from './protocols/via-action-converter';
+import { qmkStringToAction, viaCodeToAction } from './protocols/via-action-converter';
 import {
   getStoredAppMode,
   getStoredEditorMode,
@@ -125,7 +125,6 @@ export interface KeyboardState {
   setZmkLocked: (locked: boolean) => void;
   zmkUnsavedChanges: boolean;
   setZmkUnsavedChanges: (unsaved: boolean) => void;
-  syncOfflineState: () => Promise<void>;
   updateRemoteKeycode: (layer: number, index: number, action: UniversalAction) => void;
   updateDeviceKeycode: (layer: number, row: number, col: number, action: UniversalAction) => Promise<void>;
   
@@ -1118,46 +1117,6 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
         },
  
-        syncOfflineState: async () => {
-          const s = get();
-          if (!s.connectedDevice) return;
-          
-          console.log('[Offline Sync] Checking for keymap sync disparities (UI-priority)...');
-          try {
-            const isZmk = s.connectedDevice?.protocolType === 'zmk';
-            const isVial = s.connectedDevice?.protocolType === 'vial';
-            const protocol = isZmk
-              ? zmkProtocol
-              : (isVial ? new VialProtocol() : new ViaProtocol());
-
-            await protocol.initialize(s.activeTransport || hidTransport);
-            
-            // Sync all matrix positions configured in the project keys
-            for (const key of s.keys) {
-              if (key.row === undefined || key.col === undefined) continue;
-              
-              for (let l = 0; l < (s.settings.layers || 4); l++) {
-                const localAction = key.keymap?.[l];
-                if (!localAction) continue;
-                
-                // Fetch the actual action from the physical device
-                const action = await protocol.getKey(l, key.row!, key.col!);
-                const remoteCode = actionToQmkString(action);
-                const localCode = actionToQmkString(localAction);
-                
-                if (localCode !== remoteCode) {
-                  console.log(`[Offline Sync] Syncing Row:${key.row} Col:${key.col} Layer:${l} -> Device (Setting ${localCode} over ${remoteCode})`);
-                  await protocol.setKey(l, key.row!, key.col!, localAction);
-                  s.updateRemoteKeycode(l, key.row! * 32 + key.col!, localAction);
-                }
-              }
-            }
-            console.log('[Offline Sync] Sync complete. Device and editor keymaps are aligned.');
-          } catch (err) {
-            console.error('[Offline Sync] Auto-sync encountered an error:', err);
-          }
-        },
-
         setActiveOption: (g: string, i: number) => set((s) => {
           const newActiveOptions = { ...s.settings.activeOptions, [g]: i };
           

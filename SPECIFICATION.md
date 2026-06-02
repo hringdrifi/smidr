@@ -140,16 +140,9 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
 - **トランスポート契約**: すべての通信メディアは `ITransport` インターフェース（`connect`, `disconnect`, `send`, `receive`）を実装し、WebHID, WebUSB, WebBLE などのブラウザ API の差異を吸収します。
 - **ドライバー契約**: 各プロトコルは `IProtocolDriver` インターフェース（`initialize`, `getKey`, `setKey`）に準拠し、エディタコアに対して通信プロトコル中立な API を提供します。
 
-### 9.4 ZMK Studio 統合 & シミュレータ (ZMK Studio & Serializing Simulation)
-- **トランスポート**: 有線通信用の `ZmkUsbTransport` (WebUSB Bulk) と無線通信用の `ZmkBleTransport` (GATT Characteristics) の両方を定義し、ブラウザによる有線・無線接続をカバーします。物理デバイスが接続されていない場合は、開発体験を損なわないようメモリ上のシミュレータ層へ自動フォールバックします。
-- **バイナリ & DTS シミュレート**: キーコード設定時、AST から ZMK DTS 表現（例：`&lt 1 SPC`）や Protobuf RPC メッセージタグ（バイト列）をシリアライズ生成し、送信されるバイナリ HEX 列とともにデバッグコンソールへ詳細ログ出力します。
-
-### 9.5 UI優先型二重同期 (UI-Prioritized Offline Sync)
-- **競合解決アルゴリズム**: デバイス接続復帰時（Offline Sync 時）に、ローカルのエディタ（Zustand Store）側の編集結果を優先し、デバイスの全マトリクスキーと差分がある場合に自動的に物理デバイスへ書き戻して同期します。
-- **同期処理の流れ**:
-  1. プロジェクトに登録されている全物理キーのマトリクス座標 `(row, col)` をスキャン。
-  2. デバイス上のキーマップ値を取得し、`actionToQmkString` を用いて QMK 文字列形式で比較。
-  3. 差異を検出した場合、ローカルの値をデバイスへ `setKey` で書き戻し、リモート状態ストアを同期完了状態へ自動修復。
+### 9.4 ZMK Studio 統合 (ZMK Studio Integration)
+- **トランスポート**: 有線通信用の `ZmkSerialTransport` (Web Serial / CDC ACM) と、Tauri 実行時の無線通信用 `TauriZmkBleTransport` を通じて ZMK Studio 互換デバイスへの接続を扱います。
+- **キーマップ取得・更新**: 接続時はデバイス側のメタデータとキーマップを取得して `remoteKeymap` とエディタ表示へ反映します。キーコード変更時は AST から ZMK Studio RPC 向けのバイナリメッセージを生成し、対象レイヤー・ポジションへ送信します。
 
 ## 8. 実装時の注意
 - 新機能を追加する際は、必ず `KeyboardCanvas` でのインタラクションと `PropertyPanel` での数値編集の両方から操作可能にすること。
