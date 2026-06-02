@@ -18,11 +18,11 @@ UI はこの中間レイヤを編集し、接続先や出力先に応じて QMK 
 | --- | --- | --- | --- |
 | `trans` | アクションタイプではなく、透過キーとして選択 | 透過。下位レイヤーの割り当てを使います。 | `{ action: 'trans' }` |
 | `none` | アクションタイプではなく、何もしないキーとして選択 | 何もしないキーです。 | `{ action: 'none' }` |
-| `tap` | タップキー | 通常のキー入力です。修飾キー同時押しも `mods` で表します。 | `{ action: 'tap', keycode: 'A' }` |
+| `tap` | タップキー | 通常のキー入力です。修飾キー同時押しも `mods` で表します。 | `{ action: 'tap', keycode: 'A' }`<br>`{ action: 'tap', keycode: 'A', mods: ['LCTL', 'LSFT'] }` |
 | `mo` | レイヤー一時切り替え | 押している間だけ指定レイヤーへ移動します。 | `{ action: 'mo', layerId: 1 }` |
 | `tg` | レイヤートグル | 指定レイヤーの有効/無効を切り替えます。 | `{ action: 'tg', layerId: 2 }` |
 | `to` | レイヤー置換 | 指定レイヤーへ直接切り替えます。 | `{ action: 'to', layerId: 3 }` |
-| `lt` | レイヤータップ | ホールドでレイヤー、タップで別アクションを実行します。 | `{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'SPC' } }` |
+| `lt` | レイヤータップ | ホールドでレイヤー、タップで別アクションを実行します。 | `{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'SPC' } }`<br>`{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'A', mods: ['LCTL'] } }` |
 | `mt` | モッドタップ | ホールドで修飾キー、タップで別アクションを実行します。 | `{ action: 'mt', modifiers: ['LCTL'], tapAction: { action: 'tap', keycode: 'A' } }` |
 | `macro` | キーコードパレットのマクロ | マクロを呼び出します。 | `{ action: 'macro', macroId: 0 }` |
 | `lighting` | キーコードパレットのライティング | ライティング操作です。 | `{ action: 'lighting', command: 'TOGGLE' }` |
@@ -60,6 +60,16 @@ UI はこの中間レイヤを編集し、接続先や出力先に応じて QMK 
   action: 'lt',
   layerId: 1,
   tapAction: { action: 'tap', keycode: 'SPC' }
+}
+```
+
+タップ側のアクションにも `mods` を含められます。
+
+```ts
+{
+  action: 'lt',
+  layerId: 1,
+  tapAction: { action: 'tap', keycode: 'A', mods: ['LCTL'] }
 }
 ```
 
