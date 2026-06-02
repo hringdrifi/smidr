@@ -22,8 +22,8 @@ Smiðr には、実機に接続してキー割り当てを調整する **リマ�
 新しいキーボードを作る、レイアウトやマトリクスを整理する、ファームウェア向けのファイルを書き出す場合は **設計** モードを使います。
 
 <figure>
-  <img :src="withBase('/assets/smidr-remap-before-connect.png')" alt="Smiðr のリマップモード">
-  <figcaption>一般的なキー割り当ての変更は、リマップモードから始めます。</figcaption>
+  <img :src="withBase('/assets/smidr-remap-connected.png')" alt="接続済みキーボードを編集している Smiðr のリマップモード">
+  <figcaption>一般的なキー割り当ての変更は、リマップモードで実機のキーマップを読み込んで編集します。</figcaption>
 </figure>
 
 ## 基本の流れ
