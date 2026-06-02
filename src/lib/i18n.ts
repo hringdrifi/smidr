@@ -1133,7 +1133,7 @@ export const TRANSLATIONS = {
       noneSelected: 'キーを1つ選択すると、パラメータを設定できます',
     },
     keycode: {
-      palette: 'キーコードパレット',
+      palette: 'キーパレット',
       layerTapLayer: 'レイヤー',
       layerTapTap: 'タップ',
       layerHold: 'ホールド',
