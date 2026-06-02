@@ -7,8 +7,10 @@ import { ZmkSerialTransport, zmkProtocol } from '@/lib/protocols/zmk';
 import { ViaProtocol } from '@/lib/protocols/via';
 import { VialProtocol } from '@/lib/protocols/vial';
 import { convertVialToSmidr } from '@/lib/protocols/vial-converter';
-import { listProjects } from '@/lib/storage';
+import { listProjects, saveProject } from '@/lib/storage';
 import { useTranslation } from '@/hooks/useTranslation';
+import { fetchViaDefinition } from '@/lib/via-definitions';
+import { parseKeyboardDefinition } from '@/lib/parser';
 
 export const DeviceConnector: React.FC = () => {
   const { connectedDevice, setConnectedDevice, loadProject } = useKeyboardStore();
@@ -204,7 +206,40 @@ export const DeviceConnector: React.FC = () => {
                 manufacturer: device.manufacturerName || match.manufacturer || 'Custom',
               });
             } else {
-              console.log('No matching VIA project found in local storage.');
+              console.log('No matching VIA project found in local storage. Fetching VIA definition...');
+              try {
+                const viaDefinition = await fetchViaDefinition(deviceVendorProductId);
+                if (viaDefinition) {
+                  const parsed = parseKeyboardDefinition(viaDefinition);
+                  const currentSettings = useKeyboardStore.getState().settings;
+                  const project = {
+                    id: crypto.randomUUID(),
+                    updatedAt: Date.now(),
+                    ...currentSettings,
+                    name: device.productName || parsed.name || viaDefinition.name || 'VIA Keyboard',
+                    manufacturer: device.manufacturerName || currentSettings.manufacturer || 'Custom',
+                    vendorProductId: parsed.vendorProductId ?? deviceVendorProductId,
+                    keys: parsed.keys,
+                    layoutOptions: parsed.layoutOptions || {},
+                    activeOptions: parsed.activeOptions || {},
+                    matrix: parsed.matrix || currentSettings.matrix,
+                    pins: parsed.pins ? { ...currentSettings.pins, ...parsed.pins } : currentSettings.pins,
+                    hardware: parsed.hardware ? { ...currentSettings.hardware, ...parsed.hardware } : currentSettings.hardware,
+                    qmk: parsed.qmk ? { ...(currentSettings.qmk || {}), ...parsed.qmk } : currentSettings.qmk,
+                    features: parsed.features ? { ...currentSettings.features, ...parsed.features } : currentSettings.features,
+                  };
+
+                  saveProject(project);
+                  loadProject(project);
+                  console.log(`Auto-loaded VIA definition and saved project: ${project.name}`);
+                } else {
+                  console.log('No matching VIA definition found on usevia.app.');
+                  setConnectionError(t('common.layoutMetadataUnavailableTitle'));
+                }
+              } catch (definitionErr) {
+                console.warn('Failed to fetch or import VIA definition:', definitionErr);
+                setConnectionError(t('common.layoutMetadataUnavailableTitle'));
+              }
             }
           }
 
