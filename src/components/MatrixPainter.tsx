@@ -78,7 +78,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
             <div className="flex items-center gap-1">
               <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tighter hidden xl:block mr-1">{t('matrix.autoIncrement')}</span>
               <div className="flex bg-[var(--bg-app)] p-0.5 rounded border border-[var(--border-main)]/50">
-                {(['col', 'row', 'none'] as const).map((mode) => (
+                {(['matrix', 'col', 'row'] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setPainter({ autoIncrement: mode })}
@@ -89,7 +89,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
                         : "text-[var(--text-dim)] hover:text-[var(--text-main)]"
                     )}
                   >
-                    {mode === 'none' ? 'OFF' : mode.toUpperCase()}
+                    {t('matrix.inc' + mode.charAt(0).toUpperCase() + mode.slice(1))}
                   </button>
                 ))}
               </div>
@@ -210,7 +210,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
             <div className="space-y-1">
               <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('matrix.autoIncrement')}</label>
               <div className="grid grid-cols-3 gap-1">
-                {(['col', 'row', 'none'] as const).map((mode) => (
+                {(['matrix', 'col', 'row'] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setPainter({ autoIncrement: mode })}
@@ -220,16 +220,12 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
                         : 'bg-[var(--bg-button)] text-[var(--text-muted)] border-[var(--border-main)] hover:bg-[var(--bg-hover)]'
                     }`}
                   >
-                    {mode === 'none' ? t('matrix.incNone') : t('matrix.inc' + mode.charAt(0).toUpperCase() + mode.slice(1))}
+                    {t('matrix.inc' + mode.charAt(0).toUpperCase() + mode.slice(1))}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-main)] bg-[var(--bg-app)] p-2 rounded border border-[var(--border-main)]">
-              <span>{t('matrix.nextAssignment')}</span>
-              <span className="text-amber-500 font-bold">({painter.currentRow}, {painter.currentCol})</span>
-            </div>
           </div>
         </div>
       ) : (
@@ -245,7 +241,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-zinc-800/50 border border-[var(--border-main)] rounded-xl p-4 space-y-4">
+              <div className="bg-[var(--bg-app)]/60 border border-[var(--border-main)] rounded-xl p-4 space-y-4 shadow-sm">
                 <div className="flex items-center gap-2 text-[var(--text-highlight)] mb-1">
                   <Edit2 size={14} className="text-amber-500" />
                   <span className="text-xs font-bold uppercase tracking-tight">{t('properties.title')}</span>
@@ -285,7 +281,7 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
                 onClick={() => setMatrixPosition(selectedKeyId, undefined, undefined)}
                 className="w-full py-2 px-3 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20 text-[10px] font-bold uppercase tracking-wider border border-red-500/20 transition-all"
               >
-                {t('matrix.clearMatrix')}
+                {t('matrix.clearAssignment')}
               </button>
             </div>
           )}

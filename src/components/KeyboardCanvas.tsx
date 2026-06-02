@@ -18,6 +18,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const { 
     keys, previewKeys, settings, editorSettings, selectedKeyIds, focusedKeyId, selectionAnchorId,
     transform, editorMode, currentLayer, appMode, remoteKeymap,
+    matrixSubMode, painter,
     setSelectedKeyIds, toggleKeySelection, setFocusedKeyId, setSelectionAnchorId,
     batchUpdateKeys, removeKey, undo, redo, setTransform, paintKey,
     setPreviewKeys, commitPreviewKeys, copyKeys, pasteKeys,
@@ -34,6 +35,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const dimensionsRef = useRef({ width: 0, height: 0 });
   const stageRef = useRef<any>(null);
   const [selBox, setSelBox] = useState<{ start: { x: number, y: number }, end: { x: number, y: number }, isRealDrag: boolean } | null>(null);
+  const [paintHintPos, setPaintHintPos] = useState<{ x: number; y: number } | null>(null);
   const transformRef = useRef(transform);
   const touchGestureRef = useRef<{
     mode: 'pan' | 'pinch' | 'select';
@@ -50,6 +52,36 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const visKeys = useMemo(() => (displayKeys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option)) as RuntimeKey[], [displayKeys, settings.activeOptions]);
 
   const focusedKey = useMemo(() => visKeys.find(k => k.id === focusedKeyId), [visKeys, focusedKeyId]);
+
+  const isMatrixPaintEvent = useCallback((e: any) => {
+    if (readonlyGeometry || appMode !== 'design') return false;
+    if (editorMode !== 'matrix' || matrixSubMode !== 'paint') return false;
+    const evt = e.evt;
+    return !(evt?.ctrlKey || evt?.metaKey || evt?.shiftKey || evt?.altKey);
+  }, [appMode, editorMode, matrixSubMode, readonlyGeometry]);
+
+  const handleMatrixPaintClick = useCallback((e: any, key: RuntimeKey) => {
+    if (!isMatrixPaintEvent(e)) return false;
+    e.cancelBubble = true;
+    paintKey(key.id);
+    setFocusedKeyId(key.id);
+    setSelectionAnchorId(key.id);
+    return true;
+  }, [isMatrixPaintEvent, paintKey, setFocusedKeyId, setSelectionAnchorId]);
+
+  const updatePaintHintPosition = useCallback((e: any) => {
+    if (readonlyGeometry || appMode !== 'design' || editorMode !== 'matrix' || matrixSubMode !== 'paint') return;
+    const stage = e.target?.getStage?.();
+    const pointer = stage?.getPointerPosition?.();
+    if (!pointer) return;
+    setPaintHintPos({ x: pointer.x, y: pointer.y });
+  }, [appMode, editorMode, matrixSubMode, readonlyGeometry]);
+
+  useEffect(() => {
+    if (readonlyGeometry || appMode !== 'design' || editorMode !== 'matrix' || matrixSubMode !== 'paint') {
+      setPaintHintPos(null);
+    }
+  }, [appMode, editorMode, matrixSubMode, readonlyGeometry]);
 
   useEffect(() => {
     transformRef.current = transform;
@@ -295,6 +327,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   };
 
   const handleStageMouseMove = (e: any) => {
+    updatePaintHintPosition(e);
     if (!selBox) return;
     const stage = e.target.getStage();
     const pos = stage.getRelativePointerPosition();
@@ -698,7 +731,12 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   if (!isClient) return null;
 
   return (
-    <div ref={containerRef} id="keyboard-canvas-container" className="absolute inset-0 overflow-hidden bg-[var(--bg-app)] cursor-default select-none touch-none">
+    <div
+      ref={containerRef}
+      id="keyboard-canvas-container"
+      className="absolute inset-0 overflow-hidden bg-[var(--bg-app)] cursor-default select-none touch-none"
+      onMouseLeave={() => setPaintHintPos(null)}
+    >
       <Stage
         width={dimensions.width} height={dimensions.height} ref={stageRef}
         x={transform.x + PADDING_X} y={transform.y + PADDING_Y} scaleX={transform.scale} scaleY={transform.scale}
@@ -736,6 +774,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
               }}
               onMouseDown={(e) => {
                 if (e.evt && e.evt.button !== 0) return;
+                if (isMatrixPaintEvent(e)) {
+                  e.cancelBubble = true;
+                  return;
+                }
                 const isM = e.evt.ctrlKey || e.evt.metaKey;
                 const isS = e.evt.shiftKey;
                 const isA = e.evt.altKey;
@@ -768,7 +810,9 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   }
                 }
               }}
+              onMouseMove={updatePaintHintPosition}
               onClick={(e) => {
+                if (handleMatrixPaintClick(e, key)) return;
                 const isM = e.evt.ctrlKey || e.evt.metaKey;
                 const isS = e.evt.shiftKey;
                 const isA = e.evt.altKey;
@@ -873,6 +917,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
               showKeycap={false}
               onMouseDown={(e) => {
                 if (e.evt && e.evt.button !== 0) return;
+                if (isMatrixPaintEvent(e)) {
+                  e.cancelBubble = true;
+                  return;
+                }
                 const isM = e.evt.ctrlKey || e.evt.metaKey;
                 const isS = e.evt.shiftKey;
                 const isA = e.evt.altKey;
@@ -905,7 +953,9 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   }
                 }
               }}
+              onMouseMove={updatePaintHintPosition}
               onClick={(e) => {
+                if (handleMatrixPaintClick(e, key)) return;
                 const isM = e.evt.ctrlKey || e.evt.metaKey;
                 const isS = e.evt.shiftKey;
                 const isA = e.evt.altKey;
@@ -997,6 +1047,21 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           )}
         </Layer>
       </Stage>
+
+      {appMode === 'design' && editorMode === 'matrix' && matrixSubMode === 'paint' && !readonlyGeometry && paintHintPos && (
+        <div
+          className="absolute z-[120] pointer-events-none rounded-full border border-amber-500/30 bg-[var(--bg-panel)]/90 px-2.5 py-1 shadow-2xl backdrop-blur-md"
+          style={{
+            left: Math.min(paintHintPos.x + 14, dimensions.width - 132),
+            top: Math.max(8, paintHintPos.y - 12)
+          }}
+        >
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
+            <span className="text-[var(--text-muted)]">{t('matrix.nextAssignment')}</span>
+            <span className="font-mono text-amber-500">R{painter.currentRow}:C{painter.currentCol}</span>
+          </div>
+        </div>
+      )}
 
       {/* Empty State Overlay (Design Mode) */}
       {!isProjectOpen && appMode === 'design' && (

@@ -28,6 +28,7 @@ interface KeyComponentProps {
   onDragMove?: (e: any) => void;
   onDragEnd?: (e: any) => void;
   onMouseDown?: (e: any) => void;
+  onMouseMove?: (e: any) => void;
   onClick?: (e: any) => void;
 }
 
@@ -47,6 +48,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   onDragMove,
   onDragEnd,
   onMouseDown,
+  onMouseMove,
   onClick
 }) => {
   const { x, y, w, h, r, rx, ry, x2, y2, w2, h2, stepped } = keyData;
@@ -361,6 +363,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
         container.style.cursor = 'default';
       }}
       onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
       onTap={onClick}
       onClick={onClick}
       listening={showKeycap || showLabel}

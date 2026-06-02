@@ -131,7 +131,7 @@ export interface KeyboardState {
 
   // Matrix Painting
   setMatrixPosition: (id: string, row: number | undefined, col: number | undefined) => void;
-  painter: { currentRow: number; currentCol: number; autoIncrement: 'col' | 'row' | 'none'; };
+  painter: { currentRow: number; currentCol: number; autoIncrement: 'matrix' | 'col' | 'row'; };
   setPainter: (painter: Partial<KeyboardState['painter']>) => void;
   paintKey: (id: string) => void;
   matrixSubMode: 'paint' | 'manual';
@@ -259,7 +259,7 @@ const initialState: Partial<KeyboardState> = {
   zmkLayerMetadata: null,
   remoteMacros: Array(16).fill(null).map(() => []),
   remoteCombos: [],
-  painter: { currentRow: 0, currentCol: 0, autoIncrement: 'col' },
+  painter: { currentRow: 0, currentCol: 0, autoIncrement: 'matrix' },
   matrixSubMode: 'paint',
   currentProjectId: null,
   isProjectOpen: false,
@@ -1862,8 +1862,10 @@ export const useKeyboardStore = create<KeyboardState>()(
         
         paintKey: (id: string) => set((s) => {
           const { currentRow: r, currentCol: c, autoIncrement: a } = s.painter;
-          const nextRow = a === 'row' ? r + 1 : r;
-          const nextCol = a === 'col' ? c + 1 : c;
+          const matrixColCount = s.settings.pins.cols.length || s.settings.matrix.cols || 1;
+          const matrixNextCol = c + 1;
+          const nextRow = a === 'row' || (a === 'matrix' && matrixNextCol >= matrixColCount) ? r + 1 : r;
+          const nextCol = a === 'col' ? c + 1 : a === 'matrix' ? matrixNextCol % matrixColCount : c;
           return {
             keys: s.keys.map(k => k.id === id ? { ...k, row: r, col: c } : k),
             painter: { ...s.painter, currentRow: nextRow, currentCol: nextCol }
