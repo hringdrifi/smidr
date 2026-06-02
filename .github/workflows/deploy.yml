@@ -41,7 +41,9 @@ jobs:
           VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID || secrets.VITE_GA_MEASUREMENT_ID }}
 
       - name: Build docs
-        run: npm run docs:build
+        run: |
+          npm install --no-save vitepress@1.6.4
+          npm run docs:build
 
       - name: Attach docs
         run: cp -R docs/.vitepress/dist dist/docs
