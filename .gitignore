@@ -15,6 +15,7 @@
 
 # vite
 /dist/
+/docs/.vitepress/dist/
 /src-tauri/gen/
 /src-tauri/target/
 

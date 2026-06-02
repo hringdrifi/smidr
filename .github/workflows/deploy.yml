@@ -40,6 +40,11 @@ jobs:
         env:
           VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID || secrets.VITE_GA_MEASUREMENT_ID }}
 
+      - name: Build docs
+        run: npm run docs:build
+
+      - name: Attach docs
+        run: cp -R docs/.vitepress/dist dist/docs
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

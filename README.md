@@ -4,6 +4,8 @@ Smiðr は、直感的な操作でカスタムキーボードの物理レイア�
 
 [🚀 デモページを開く (GitHub Pages)](https://hringdrifi.github.io/smidr/)
 
+[📚 ドキュメントを読む](https://hringdrifi.github.io/smidr/docs/)
+
 ## 特徴
 
 - **直感的なキャンバス操作**: `react-konva` を使用したスムーズな 2D キャンバス上でのキー配置、回転、複数選択。
