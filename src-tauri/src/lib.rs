@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::sync::Mutex;
 #[cfg(windows)]
 use tauri::Emitter;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 #[cfg(windows)]
 mod winrt_ble {
@@ -354,6 +354,12 @@ fn zmk_ble_disconnect(state: State<'_, NativeBleState>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(NativeBleState::default())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&format!("Smidr v{}", env!("CARGO_PKG_VERSION")));
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             zmk_ble_connect,
             zmk_ble_send,
