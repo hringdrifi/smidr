@@ -157,8 +157,7 @@ export const KeycodePanel = () => {
                             !code.startsWith('TO(') && 
                             !code.startsWith('LT(') && 
                             code !== 'any' &&
-                            !code.startsWith('MACRO_') && 
-                            !['RGB_TOG', 'RGB_MOD', 'RGB_RMOD', 'RGB_VAI', 'RGB_VAD', 'RGB_HUI', 'RGB_HUD', 'RGB_SAI', 'RGB_SAD', 'RGB_SPI', 'RGB_SPD'].includes(code);
+                            !code.startsWith('MACRO_');
 
     if (isNormalKeycode && (action.action === 'lt' || action.action === 'mt' || (action.action === 'tap' && action.mods !== undefined))) {
       let clickedAction: UniversalAction;
@@ -204,21 +203,6 @@ export const KeycodePanel = () => {
       } else if (code.startsWith('MACRO_')) {
         const macroId = parseInt(code.split('_')[1] || '0', 10);
         clickedAction = { action: 'macro', macroId };
-      } else if (['RGB_TOG', 'RGB_MOD', 'RGB_RMOD', 'RGB_VAI', 'RGB_VAD', 'RGB_HUI', 'RGB_HUD', 'RGB_SAI', 'RGB_SAD', 'RGB_SPI', 'RGB_SPD'].includes(code)) {
-        const lightingMap: Record<string, any> = {
-          'RGB_TOG': 'TOGGLE',
-          'RGB_MOD': 'MODE_UP',
-          'RGB_RMOD': 'MODE_DOWN',
-          'RGB_VAI': 'BRIGHTNESS_UP',
-          'RGB_VAD': 'BRIGHTNESS_DOWN',
-          'RGB_HUI': 'HUE_UP',
-          'RGB_HUD': 'HUE_DOWN',
-          'RGB_SAI': 'SAT_UP',
-          'RGB_SAD': 'SAT_DOWN',
-          'RGB_SPI': 'SPEED_UP',
-          'RGB_SPD': 'SPEED_DOWN'
-        };
-        clickedAction = { action: 'lighting', command: lightingMap[code] };
       } else {
         clickedAction = { action: 'tap', keycode: code as UniversalKey };
       }

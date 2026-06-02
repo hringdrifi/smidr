@@ -87,6 +87,19 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "BRIU": "C_BRI_UP",
   "BRID": "C_BRI_DN",
 
+  // Lighting
+  "RGB_TOG": "RGB_TOG",
+  "RGB_MOD": "RGB_EFF",
+  "RGB_RMOD": "RGB_EFR",
+  "RGB_VAI": "RGB_BRI",
+  "RGB_VAD": "RGB_BRD",
+  "RGB_HUI": "RGB_HUI",
+  "RGB_HUD": "RGB_HUD",
+  "RGB_SAI": "RGB_SAI",
+  "RGB_SAD": "RGB_SAD",
+  "RGB_SPI": "RGB_SPI",
+  "RGB_SPD": "RGB_SPD",
+
   // Mouse Keys
   "MOUSE_UP": "MOVE_UP",
   "MOUSE_DOWN": "MOVE_DOWN",
@@ -150,6 +163,9 @@ export function actionToZmkString(action: UniversalAction): string {
       return '&none';
     case 'tap': {
       const zKey = ZMK_KEY_MAP[action.keycode] || action.keycode;
+      if (action.keycode.startsWith('RGB_')) {
+        return `&rgb_ug ${zKey}`;
+      }
       if (action.keycode.startsWith('MOUSE_BTN')) {
         return `&mkp ${zKey}`;
       }
@@ -190,22 +206,6 @@ export function actionToZmkString(action: UniversalAction): string {
     }
     case 'macro':
       return `&macro_${action.macroId}`;
-    case 'lighting': {
-      const cmdMap: Record<string, string> = {
-        'TOGGLE': 'RGB_TOG',
-        'MODE_UP': 'RGB_EFF',
-        'MODE_DOWN': 'RGB_EFR',
-        'BRIGHTNESS_UP': 'RGB_BRI',
-        'BRIGHTNESS_DOWN': 'RGB_BRD',
-        'HUE_UP': 'RGB_HUI',
-        'HUE_DOWN': 'RGB_HUD',
-        'SAT_UP': 'RGB_SAI',
-        'SAT_DOWN': 'RGB_SAD',
-        'SPEED_UP': 'RGB_SPI',
-        'SPEED_DOWN': 'RGB_SPD'
-      };
-      return `&rgb_ug ${cmdMap[action.command] || 'RGB_TOG'}`;
-    }
     case 'custom':
       return action.rawCode;
     default:
@@ -260,21 +260,8 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
   match = trimmed.match(/^&rgb_ug\s+([^\s]+)$/);
   if (match) {
     const cmd = match[1];
-    const cmdMap: Record<string, string> = {
-      'RGB_TOG': 'TOGGLE',
-      'RGB_EFF': 'MODE_UP',
-      'RGB_EFR': 'MODE_DOWN',
-      'RGB_BRI': 'BRIGHTNESS_UP',
-      'RGB_BRD': 'BRIGHTNESS_DOWN',
-      'RGB_HUI': 'HUE_UP',
-      'RGB_HUD': 'HUE_DOWN',
-      'RGB_SAI': 'SAT_UP',
-      'RGB_SAD': 'SAT_DOWN',
-      'RGB_SPI': 'SPEED_UP',
-      'RGB_SPD': 'SPEED_DOWN'
-    };
-    if (cmdMap[cmd]) {
-      return { action: 'lighting', command: cmdMap[cmd] as any };
+    if (ZMK_TO_UNIVERSAL[cmd]) {
+      return { action: 'tap', keycode: ZMK_TO_UNIVERSAL[cmd] };
     }
   }
 

@@ -200,13 +200,6 @@ export const formatActionLabel = (action: UniversalAction | undefined): LabelNod
       return { type: 'mod_tap', modifiers: action.modifiers, tapLabel: formatActionLabel(action.tapAction) };
     case 'macro':
       return { type: 'text', text: `Macro\n${action.macroId}` };
-    case 'lighting': {
-      const lightLabels: Record<string, string> = {
-        TOGGLE: 'RGB\nToggle', MODE_UP: 'RGB\nMode +', MODE_DOWN: 'RGB\nMode -',
-        BRIGHTNESS_UP: 'RGB\nBright +', BRIGHTNESS_DOWN: 'RGB\nBright -',
-      };
-      return { type: 'text', text: lightLabels[action.command] ?? `RGB\n${action.command}` };
-    }
     case 'custom':
       return { type: 'text', text: action.rawCode };
     default:

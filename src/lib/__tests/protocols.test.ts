@@ -104,13 +104,38 @@ describe('protocols conversion tests', () => {
       })).toBe(0x232C);
     });
 
-    it('should convert macro calls and keep bootloader distinct from lighting', () => {
+    it('should convert macro calls and bootloader keys', () => {
       expect(viaCodeToAction(0x7701)).toEqual({ action: 'macro', macroId: 1 });
       expect(actionToViaCode({ action: 'macro', macroId: 1 })).toBe(0x7701);
 
       expect(viaCodeToAction(0x7C00)).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
       expect(actionToViaCode({ action: 'tap', keycode: 'BOOTLOADER' })).toBe(0x7C00);
-      expect(actionToViaCode({ action: 'lighting', command: 'TOGGLE' })).toBe(0x0000);
+    });
+
+    it('should convert RGB lighting keycodes as tap actions', () => {
+      expect(viaCodeToAction(0x7820)).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
+      expect(viaCodeToAction(0x7821)).toEqual({ action: 'tap', keycode: 'RGB_MOD' });
+      expect(viaCodeToAction(0x7822)).toEqual({ action: 'tap', keycode: 'RGB_RMOD' });
+      expect(viaCodeToAction(0x7823)).toEqual({ action: 'tap', keycode: 'RGB_HUI' });
+      expect(viaCodeToAction(0x7824)).toEqual({ action: 'tap', keycode: 'RGB_HUD' });
+      expect(viaCodeToAction(0x7825)).toEqual({ action: 'tap', keycode: 'RGB_SAI' });
+      expect(viaCodeToAction(0x7826)).toEqual({ action: 'tap', keycode: 'RGB_SAD' });
+      expect(viaCodeToAction(0x7827)).toEqual({ action: 'tap', keycode: 'RGB_VAI' });
+      expect(viaCodeToAction(0x7828)).toEqual({ action: 'tap', keycode: 'RGB_VAD' });
+      expect(viaCodeToAction(0x7829)).toEqual({ action: 'tap', keycode: 'RGB_SPI' });
+      expect(viaCodeToAction(0x782A)).toEqual({ action: 'tap', keycode: 'RGB_SPD' });
+
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_TOG' })).toBe(0x7820);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_MOD' })).toBe(0x7821);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_RMOD' })).toBe(0x7822);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_HUI' })).toBe(0x7823);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_HUD' })).toBe(0x7824);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SAI' })).toBe(0x7825);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SAD' })).toBe(0x7826);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_VAI' })).toBe(0x7827);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_VAD' })).toBe(0x7828);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SPI' })).toBe(0x7829);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SPD' })).toBe(0x782A);
     });
   });
 
@@ -120,12 +145,12 @@ describe('protocols conversion tests', () => {
       expect(qmkStringToAction('KC_NO')).toEqual({ action: 'none' });
       expect(qmkStringToAction('KC_A')).toEqual({ action: 'tap', keycode: 'A' });
       expect(qmkStringToAction('QK_BOOT')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
-      expect(qmkStringToAction('RGB_TOG')).toEqual({ action: 'custom', protocol: 'qmk', rawCode: 'RGB_TOG' });
+      expect(qmkStringToAction('RGB_TOG')).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
 
       expect(actionToQmkString({ action: 'trans' })).toBe('KC_TRNS');
       expect(actionToQmkString({ action: 'none' })).toBe('KC_NO');
       expect(actionToQmkString({ action: 'tap', keycode: 'A' })).toBe('KC_A');
-      expect(actionToQmkString({ action: 'lighting', command: 'TOGGLE' })).toBe('KC_NO');
+      expect(actionToQmkString({ action: 'tap', keycode: 'RGB_TOG' })).toBe('RGB_TOG');
     });
 
     it('should parse and format nested modifiers and shortcuts', () => {
@@ -237,6 +262,14 @@ describe('protocols conversion tests', () => {
 
       expect(zmkStringToAction('&mmv MOVE_UP')).toEqual({ action: 'tap', keycode: 'MOUSE_UP' });
       expect(actionToZmkString({ action: 'tap', keycode: 'MOUSE_UP' })).toBe('&mmv MOVE_UP');
+    });
+
+    it('should parse and format ZMK lighting keys as tap actions', () => {
+      expect(zmkStringToAction('&rgb_ug RGB_TOG')).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
+      expect(zmkStringToAction('&rgb_ug RGB_EFF')).toEqual({ action: 'tap', keycode: 'RGB_MOD' });
+
+      expect(actionToZmkString({ action: 'tap', keycode: 'RGB_TOG' })).toBe('&rgb_ug RGB_TOG');
+      expect(actionToZmkString({ action: 'tap', keycode: 'RGB_MOD' })).toBe('&rgb_ug RGB_EFF');
     });
 
     it('should parse and format ZMK modifier combinations', () => {

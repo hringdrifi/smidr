@@ -18,15 +18,14 @@ UI はこの中間レイヤを編集し、接続先や出力先に応じて QMK 
 | --- | --- | --- | --- |
 | `trans` | アクションタイプではなく、透過キーとして選択 | 透過。下位レイヤーの割り当てを使います。 | `{ action: 'trans' }` |
 | `none` | アクションタイプではなく、何もしないキーとして選択 | 何もしないキーです。 | `{ action: 'none' }` |
-| `tap` | タップキー | 通常のキー入力です。修飾キー同時押しも `mods` で表します。 | `{ action: 'tap', keycode: 'A' }`<br>`{ action: 'tap', keycode: 'A', mods: ['LCTL', 'LSFT'] }` |
+| `tap` | タップキー | 通常のキー入力です。修飾キー同時押しやライティング操作も `keycode` で表します。 | `{ action: 'tap', keycode: 'A' }`<br>`{ action: 'tap', keycode: 'A', mods: ['LCTL', 'LSFT'] }`<br>`{ action: 'tap', keycode: 'RGB_TOG' }` |
 | `mo` | レイヤー一時切り替え | 押している間だけ指定レイヤーへ移動します。 | `{ action: 'mo', layerId: 1 }` |
 | `tg` | レイヤートグル | 指定レイヤーの有効/無効を切り替えます。 | `{ action: 'tg', layerId: 2 }` |
 | `to` | レイヤー置換 | 指定レイヤーへ直接切り替えます。 | `{ action: 'to', layerId: 3 }` |
 | `lt` | レイヤータップ | ホールドでレイヤー、タップで別アクションを実行します。 | `{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'SPC' } }`<br>`{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'A', mods: ['LCTL'] } }` |
 | `mt` | モッドタップ | ホールドで修飾キー、タップで別アクションを実行します。 | `{ action: 'mt', modifiers: ['LCTL'], tapAction: { action: 'tap', keycode: 'A' } }` |
 | `macro` | キーコードパレットのマクロ | マクロを呼び出します。 | `{ action: 'macro', macroId: 0 }` |
-| `lighting` | キーコードパレットのライティング | ライティング操作です。 | `{ action: 'lighting', command: 'TOGGLE' }` |
-| `custom` | 任意 | Smiðr の標準アクションでは表しきれないコードを扱います。 | `{ action: 'custom', protocol: 'qmk', rawCode: 'RGB_TOG' }` |
+| `custom` | 任意 | Smiðr の標準アクションでは表しきれないコードを扱います。 | `{ action: 'custom', protocol: 'qmk', rawCode: 'QK_USER_0' }` |
 
 ## tap
 
@@ -35,6 +34,7 @@ UI はこの中間レイヤを編集し、接続先や出力先に応じて QMK 
 ```ts
 { action: 'tap', keycode: 'A' }
 { action: 'tap', keycode: 'SPC' }
+{ action: 'tap', keycode: 'RGB_TOG' }
 ```
 
 修飾キーを同時に押す場合は `mods` を使います。
@@ -169,6 +169,16 @@ BRIU BRID
 BOOTLOADER SYSTEM_RESET
 ```
 
+### ライティング
+
+```text
+RGB_TOG RGB_MOD RGB_RMOD
+RGB_VAI RGB_VAD
+RGB_HUI RGB_HUD
+RGB_SAI RGB_SAD
+RGB_SPI RGB_SPD
+```
+
 ### マウスキー
 
 ```text
@@ -188,14 +198,14 @@ TRNS NO
 
 `custom` は、Smiðr の標準アクションでは表しきれない QMK / VIA / Vial / ZMK のコードを、そのまま保持するためのアクションです。
 
-たとえば、Smiðr がまだ専用のアクションとして扱っていない QMK のキーコードや、ファームウェア固有の記法を入力したい場合に使います。`rawCode` に入力した値は、指定した `protocol` のコードとして出力または送信されます。
+たとえば、Smiðr がまだ `UniversalKey` として扱っていない QMK のキーコードや、ファームウェア固有の記法を入力したい場合に使います。`rawCode` に入力した値は、指定した `protocol` のコードとして出力または送信されます。
 
 ```ts
 {
   action: 'custom',
   protocol: 'qmk',
-  rawCode: 'RGB_TOG',
-  label: 'RGB Toggle'
+  rawCode: 'QK_USER_0',
+  label: 'User 0'
 }
 ```
 

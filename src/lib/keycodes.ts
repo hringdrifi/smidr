@@ -250,6 +250,18 @@ export const KEYCODES: Keycode[] = [
 
   ...Array.from({ length: 16 }, (_, i) => ({ code: `MACRO_${i}`, label: `M${i}`, category: 'Macro' as const })),
 
+  { code: 'RGB_TOG', label: 'RGB\nToggle', category: 'Lighting', description: 'Toggle RGB lighting' },
+  { code: 'RGB_MOD', label: 'Mode +', category: 'Lighting', description: 'Cycle RGB lighting mode forward' },
+  { code: 'RGB_RMOD', label: 'Mode -', category: 'Lighting', description: 'Cycle RGB lighting mode backward' },
+  { code: 'RGB_VAI', label: 'Bright +', category: 'Lighting', description: 'Increase RGB lighting brightness' },
+  { code: 'RGB_VAD', label: 'Bright -', category: 'Lighting', description: 'Decrease RGB lighting brightness' },
+  { code: 'RGB_HUI', label: 'Hue +', category: 'Lighting', description: 'Increase RGB lighting hue' },
+  { code: 'RGB_HUD', label: 'Hue -', category: 'Lighting', description: 'Decrease RGB lighting hue' },
+  { code: 'RGB_SAI', label: 'Sat +', category: 'Lighting', description: 'Increase RGB lighting saturation' },
+  { code: 'RGB_SAD', label: 'Sat -', category: 'Lighting', description: 'Decrease RGB lighting saturation' },
+  { code: 'RGB_SPI', label: 'Speed +', category: 'Lighting', description: 'Increase RGB lighting effect speed' },
+  { code: 'RGB_SPD', label: 'Speed -', category: 'Lighting', description: 'Decrease RGB lighting effect speed' },
+
   { code: 'transparent', label: '▽', category: 'Special', description: 'Passes through the keycode of the layer below (Transparent)' },
   { code: 'none', label: 'None', category: 'Special', description: 'Disables the key (No action)' },
   { code: 'BOOTLOADER', label: 'Reset', category: 'Special', description: 'Enters bootloader / system reset mode' },

@@ -143,6 +143,19 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "BRIU": { qmk: "KC_BRIU", hid: 0x006F },
   "BRID": { qmk: "KC_BRID", hid: 0x0070 },
 
+  // Lighting
+  "RGB_TOG": { qmk: "RGB_TOG", hid: 0x7820 },
+  "RGB_MOD": { qmk: "RGB_MOD", hid: 0x7821 },
+  "RGB_RMOD": { qmk: "RGB_RMOD", hid: 0x7822 },
+  "RGB_VAI": { qmk: "RGB_VAI", hid: 0x7827 },
+  "RGB_VAD": { qmk: "RGB_VAD", hid: 0x7828 },
+  "RGB_HUI": { qmk: "RGB_HUI", hid: 0x7823 },
+  "RGB_HUD": { qmk: "RGB_HUD", hid: 0x7824 },
+  "RGB_SAI": { qmk: "RGB_SAI", hid: 0x7825 },
+  "RGB_SAD": { qmk: "RGB_SAD", hid: 0x7826 },
+  "RGB_SPI": { qmk: "RGB_SPI", hid: 0x7829 },
+  "RGB_SPD": { qmk: "RGB_SPD", hid: 0x782A },
+
   // Mouse Keys
   "MOUSE_UP": { qmk: "KC_MS_U", hid: 0x00F0 },
   "MOUSE_DOWN": { qmk: "KC_MS_D", hid: 0x00F1 },
@@ -307,8 +320,6 @@ export function actionToViaCode(action: UniversalAction): number {
     }
     case 'macro':
       return 0x7700 + (action.macroId & 0x1F);
-    case 'lighting':
-      return 0x0000;
     case 'custom':
       if ((action.protocol === 'qmk' || action.protocol === 'via' || action.protocol === 'vial') && action.rawCode.startsWith('0x')) {
         return parseInt(action.rawCode.slice(2), 16);
@@ -354,8 +365,6 @@ export function actionToQmkString(action: UniversalAction): string {
     }
     case 'macro':
       return `MACRO(${action.macroId})`;
-    case 'lighting':
-      return 'KC_NO';
     case 'custom':
       return action.rawCode;
     default:
@@ -453,12 +462,6 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
   // MACRO(n)
   match = trimmed.match(/^MACRO\((\d+)\)$/);
   if (match) return { action: 'macro', macroId: parseInt(match[1]) };
-
-  // RGB / Light keycodes are intentionally kept as raw strings until the exact
-  // QMK/VIA numeric ranges are verified.
-  if (/^(RGB|UG|RM)_/.test(trimmed)) {
-    return { action: 'custom', protocol: 'qmk', rawCode: trimmed };
-  }
 
   // Basic keys lookup
   if (QMK_TO_UNIVERSAL[trimmed]) {

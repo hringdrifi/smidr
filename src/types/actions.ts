@@ -34,6 +34,12 @@ export type UniversalKey =
   | "MPLY" | "MSTP" | "MNXT" | "MPRV"
   | "VOLU" | "VOLD" | "MUTE"
   | "BRIU" | "BRID"
+  // ライティング
+  | "RGB_TOG" | "RGB_MOD" | "RGB_RMOD"
+  | "RGB_VAI" | "RGB_VAD"
+  | "RGB_HUI" | "RGB_HUD"
+  | "RGB_SAI" | "RGB_SAD"
+  | "RGB_SPI" | "RGB_SPD"
   // マウスキー (QMK / ZMK 共通)
   | "MOUSE_UP" | "MOUSE_DOWN" | "MOUSE_LEFT" | "MOUSE_RIGHT"
   | "MOUSE_BTN1" | "MOUSE_BTN2" | "MOUSE_BTN3" | "MOUSE_BTN4" | "MOUSE_BTN5"
@@ -55,7 +61,6 @@ export type UniversalAction =
   | { action: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
   | { action: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
   | { action: "macro"; macroId: number }                                   // マクロ
-  | { action: "lighting"; command: "TOGGLE" | "MODE_UP" | "MODE_DOWN" | "BRIGHTNESS_UP" | "BRIGHTNESS_DOWN" | "HUE_UP" | "HUE_DOWN" | "SAT_UP" | "SAT_DOWN" | "SPEED_UP" | "SPEED_DOWN" } // 統一ライティング操作
   | { action: "custom"; protocol: "qmk" | "via" | "vial" | "zmk"; rawCode: string; label?: string };        // エスケープハッチ
 
 export interface MacroAction {
