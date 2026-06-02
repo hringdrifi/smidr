@@ -20,6 +20,10 @@ export default {
         ],
       },
       {
+        text: 'リマップ',
+        items: [{ text: 'リマップモード', link: '/remap/' }],
+      },
+      {
         text: '設計',
         items: [
           { text: '設計モード', link: '/design/' },
@@ -28,10 +32,6 @@ export default {
           { text: 'キーマップ編集', link: '/design/keymap' },
           { text: 'ハードウェア設定', link: '/design/hardware' },
         ],
-      },
-      {
-        text: 'リマップ',
-        items: [{ text: 'リマップモード', link: '/remap/' }],
       },
       {
         text: 'データ',
