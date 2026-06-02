@@ -2,12 +2,16 @@
 title: キーマップ編集
 ---
 
+<script setup>
+import { withBase } from 'vitepress'
+</script>
+
 # キーマップ編集
 
 Keymap では、現在のレイヤーを選び、選択中のキーにキーコードを割り当てます。通常キーだけでなく、透過、無効、Momentary、Toggle、Layer Tap、Mod Tap などのアクションも扱います。
 
 <figure>
-  <img :src="$withBase('/assets/smidr-editor-keymap.png')" alt="Keymap エディタでキーコードを編集している画面">
+  <img :src="withBase('/assets/smidr-editor-keymap.png')" alt="Keymap エディタでキーコードを編集している画面">
   <figcaption>設計時のキーマップは、Remap モードやエクスポート時の元データになります。</figcaption>
 </figure>
 

@@ -3,12 +3,16 @@ title: はじめに
 description: Smiðr の役割と、最初に知っておくと迷いにくい考え方。
 ---
 
+<script setup>
+import { withBase } from 'vitepress'
+</script>
+
 # はじめに
 
 Smiðr は、カスタムキーボードの物理レイアウト、マトリックス、キーマップ、ハードウェア設定をブラウザ上でまとめて扱うためのツールです。KLE 互換のレイアウト編集から、VIA / Vial / ZMK Studio 互換キーボードのリマップまでを、同じ作業の流れで扱えることを目指しています。
 
 <figure>
-  <img :src="$withBase('/assets/smidr-design-corne.png')" alt="Corne プリセットを開いた Smiðr の Design モード">
+  <img :src="withBase('/assets/smidr-design-corne.png')" alt="Corne プリセットを開いた Smiðr の Design モード">
   <figcaption>Design モードでは、キーの形、位置、回転、配線情報、キーマップをひとつのキャンバス上で編集します。</figcaption>
 </figure>
 

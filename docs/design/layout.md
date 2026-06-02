@@ -2,12 +2,16 @@
 title: レイアウト編集
 ---
 
+<script setup>
+import { withBase } from 'vitepress'
+</script>
+
 # レイアウト編集
 
 Layout では、キーを追加し、ドラッグで位置を調整します。座標は 1u を基準にしており、通常操作では 0.25u 単位にスナップします。
 
 <figure>
-  <img :src="$withBase('/assets/smidr-editor-layout.png')" alt="Layout エディタでキー配置を編集している画面">
+  <img :src="withBase('/assets/smidr-editor-layout.png')" alt="Layout エディタでキー配置を編集している画面">
   <figcaption>分割キーボードや親指クラスタのような、傾きのある配置も扱えます。</figcaption>
 </figure>
 
@@ -24,6 +28,6 @@ Layout では、キーを追加し、ドラッグで位置を調整します。�
 ISO / ANSI の差分や、分割スペースバー、複数の親指キー構成のように、同じキーボード内で選択式の形を持つ場合は Layout Options を使います。
 
 <figure>
-  <img :src="$withBase('/assets/smidr-editor-layout-options.png')" alt="Layout Options パネルを開いた画面">
+  <img :src="withBase('/assets/smidr-editor-layout-options.png')" alt="Layout Options パネルを開いた画面">
   <figcaption>レイアウトオプションは、VIA / Vial 系の layout option と対応させるための情報としても使います。</figcaption>
 </figure>
