@@ -1,11 +1,17 @@
+const base = process.env.NODE_ENV === 'production' ? '/smidr/docs/' : '/';
+
 export default {
   title: 'Smiðr Docs',
   description: 'Smiðr の日本語ユーザーガイド',
   lang: 'ja-JP',
-  base: process.env.NODE_ENV === 'production' ? '/smidr/docs/' : '/',
+  base,
   cleanUrls: true,
+  head: [
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: `${base}favicon-32x32.png` }],
+    ['link', { rel: 'apple-touch-icon', href: `${base}icon.png` }],
+  ],
   themeConfig: {
-    logo: '/assets/smidr-design-corne.png',
+    logo: '/icon.png',
     siteTitle: 'Smiðr Docs',
     nav: [
       { text: 'Guide', link: '/' },
