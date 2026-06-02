@@ -17,7 +17,6 @@ export default {
         text: '概要',
         items: [
           { text: 'はじめに', link: '/' },
-          { text: 'Smiðr でできること', link: '/overview' },
         ],
       },
       {
