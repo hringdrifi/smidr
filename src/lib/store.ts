@@ -14,7 +14,16 @@ import { VialProtocol } from './protocols/vial';
 import { DeviceCapability, ITransport } from './transport/types';
 import { ZmkLayerMetadata, ZmkProtocol, zmkProtocol } from './protocols/zmk';
 import { qmkStringToAction, actionToQmkString, viaCodeToAction } from './protocols/via-action-converter';
-import { getStoredTheme, setStoredTheme, getStoredLanguage, setStoredLanguage } from './storage';
+import {
+  getStoredAppMode,
+  getStoredEditorMode,
+  getStoredTheme,
+  setStoredAppMode,
+  setStoredEditorMode,
+  setStoredTheme,
+  getStoredLanguage,
+  setStoredLanguage
+} from './storage';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
 
@@ -248,8 +257,8 @@ const initialState: Partial<KeyboardState> = {
   selectedKeyIds: [],
   focusedKeyId: null,
   selectionAnchorId: null,
-  appMode: 'remap',
-  editorMode: 'layout',
+  appMode: getStoredAppMode(),
+  editorMode: getStoredEditorMode(),
   currentLayer: 0,
   connectedDevice: null,
   deviceCapabilities: null,
@@ -745,7 +754,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                     selectedKeyIds: [],
                     focusedKeyId: null,
                     selectionAnchorId: null,
-                    editorMode: 'layout' as const,
                     currentLayer: 0,
                     transform: getCenteredTransform(updatedKeys, state.settings.activeOptions || {}),
                   } : {})
@@ -980,7 +988,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                   selectedKeyIds: [],
                   focusedKeyId: null,
                   selectionAnchorId: null,
-                  editorMode: 'layout' as const,
                   currentLayer: 0,
                   transform: getCenteredTransform(updatedKeys, state.settings.activeOptions || {}),
                 } : {})
@@ -1333,6 +1340,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         }),
 
         setAppMode: (m: 'design' | 'remap') => {
+          setStoredAppMode(m);
           if (m === 'design') {
             const transport = get().activeTransport || hidTransport;
             transport.disconnect().catch(err => {
@@ -1350,7 +1358,10 @@ export const useKeyboardStore = create<KeyboardState>()(
             set({ appMode: m, selectedKeyIds: [] });
           }
         },
-        setEditorMode: (m: 'layout' | 'matrix' | 'hardware' | 'keymap') => set({ editorMode: m, selectedKeyIds: [] }),
+        setEditorMode: (m: 'layout' | 'matrix' | 'hardware' | 'keymap') => {
+          setStoredEditorMode(m);
+          set({ editorMode: m, selectedKeyIds: [] });
+        },
 
         setConnectedDevice: (d: KeyboardState['connectedDevice']) => set({
           connectedDevice: d,
@@ -2099,7 +2110,6 @@ export const useKeyboardStore = create<KeyboardState>()(
             isProjectOpen: true,
             selectedKeyIds: [],
             focusedKeyId: null,
-            editorMode: 'layout',
             currentLayer: 0,
             transform: nextTransform,
           };
@@ -2212,7 +2222,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                 isProjectOpen: true,
                 selectedKeyIds: [],
                 focusedKeyId: null,
-                editorMode: 'layout',
                 currentLayer: 0,
                 transform: getCenteredTransform(finalKeys, initialActiveOptions),
               };
@@ -2236,7 +2245,6 @@ export const useKeyboardStore = create<KeyboardState>()(
           isProjectOpen: keepOpen,
           selectedKeyIds: [],
           focusedKeyId: null,
-          editorMode: 'layout',
           currentLayer: 0,
           transform: { scale: 1, x: 0, y: 0 },
         })),

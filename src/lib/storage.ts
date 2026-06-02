@@ -4,8 +4,12 @@ import { Language } from './i18n';
 
 const STORAGE_KEY = 'smidr_projects';
 const THEME_STORAGE_KEY = 'smidr_theme';
+const APP_MODE_STORAGE_KEY = 'smidr_app_mode';
+const EDITOR_MODE_STORAGE_KEY = 'smidr_editor_mode';
 
 export type StoredTheme = 'dark' | 'light';
+export type StoredAppMode = 'design' | 'remap';
+export type StoredEditorMode = 'layout' | 'matrix' | 'hardware' | 'keymap';
 
 export const getStoredTheme = (): StoredTheme | null => {
   if (typeof window === 'undefined') return null;
@@ -17,6 +21,30 @@ export const getStoredTheme = (): StoredTheme | null => {
 export const setStoredTheme = (theme: StoredTheme): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(THEME_STORAGE_KEY, theme);
+};
+
+export const getStoredAppMode = (): StoredAppMode => {
+  if (typeof window === 'undefined') return 'remap';
+  const value = localStorage.getItem(APP_MODE_STORAGE_KEY);
+  if (value === 'design' || value === 'remap') return value;
+  return 'remap';
+};
+
+export const setStoredAppMode = (mode: StoredAppMode): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(APP_MODE_STORAGE_KEY, mode);
+};
+
+export const getStoredEditorMode = (): StoredEditorMode => {
+  if (typeof window === 'undefined') return 'layout';
+  const value = localStorage.getItem(EDITOR_MODE_STORAGE_KEY);
+  if (value === 'layout' || value === 'matrix' || value === 'hardware' || value === 'keymap') return value;
+  return 'layout';
+};
+
+export const setStoredEditorMode = (mode: StoredEditorMode): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(EDITOR_MODE_STORAGE_KEY, mode);
 };
 
 export const listProjects = (): SmidrProject[] => {
@@ -79,4 +107,3 @@ export const setStoredLanguage = (lang: Language): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
 };
-

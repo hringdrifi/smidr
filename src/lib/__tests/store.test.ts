@@ -1,11 +1,37 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { useKeyboardStore } from '../store';
+import {
+  getStoredAppMode,
+  getStoredEditorMode,
+  setStoredAppMode,
+  setStoredEditorMode,
+} from '../storage';
 import { UniversalAction } from '../../types/actions';
 
 // Polyfill crypto if not present in Node test environment
 if (!globalThis.crypto) {
   globalThis.crypto = require('node:crypto').webcrypto as any;
 }
+
+const createMemoryStorage = (): Storage => {
+  let data: Record<string, string> = {};
+  return {
+    get length() {
+      return Object.keys(data).length;
+    },
+    clear: () => {
+      data = {};
+    },
+    getItem: (key: string) => data[key] ?? null,
+    key: (index: number) => Object.keys(data)[index] ?? null,
+    removeItem: (key: string) => {
+      delete data[key];
+    },
+    setItem: (key: string, value: string) => {
+      data[key] = value;
+    },
+  };
+};
 
 describe('useKeyboardStore', () => {
   beforeEach(() => {
@@ -29,6 +55,46 @@ describe('useKeyboardStore', () => {
     const state = useKeyboardStore.getState();
     expect(state.keys).toEqual([]);
     expect(state.selectedKeyIds).toEqual([]);
+  });
+
+  it('should persist app and editor mode selections', () => {
+    const storage = createMemoryStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    vi.stubGlobal('localStorage', storage);
+
+    try {
+      const store = useKeyboardStore.getState();
+
+      store.setAppMode('remap');
+      store.setEditorMode('matrix');
+
+      expect(getStoredAppMode()).toBe('remap');
+      expect(getStoredEditorMode()).toBe('matrix');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('should ignore invalid stored mode values', () => {
+    const storage = createMemoryStorage();
+    vi.stubGlobal('window', { localStorage: storage });
+    vi.stubGlobal('localStorage', storage);
+
+    try {
+      localStorage.setItem('smidr_app_mode', 'invalid');
+      localStorage.setItem('smidr_editor_mode', 'invalid');
+
+      expect(getStoredAppMode()).toBe('remap');
+      expect(getStoredEditorMode()).toBe('layout');
+
+      setStoredAppMode('design');
+      setStoredEditorMode('keymap');
+
+      expect(getStoredAppMode()).toBe('design');
+      expect(getStoredEditorMode()).toBe('keymap');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('should keep imported VIA layout option selections active', () => {
