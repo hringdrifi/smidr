@@ -1,6 +1,4 @@
-import { defineConfig } from 'vitepress';
-
-export default defineConfig({
+export default {
   title: 'Smiðr Docs',
   description: 'Smiðr の日本語ユーザーガイド',
   lang: 'ja-JP',
@@ -61,4 +59,4 @@ export default defineConfig({
     returnToTopLabel: 'トップへ戻る',
     outlineTitle: 'このページ',
   },
-});
+};
