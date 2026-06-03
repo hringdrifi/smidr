@@ -155,6 +155,12 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "RGB_SAD": { qmk: "RGB_SAD", hid: 0x7826 },
   "RGB_SPI": { qmk: "RGB_SPI", hid: 0x7829 },
   "RGB_SPD": { qmk: "RGB_SPD", hid: 0x782A },
+  "BL_ON": { qmk: "BL_ON", hid: 0x7800 },
+  "BL_OFF": { qmk: "BL_OFF", hid: 0x7801 },
+  "BL_TOGG": { qmk: "BL_TOGG", hid: 0x7802 },
+  "BL_DOWN": { qmk: "BL_DOWN", hid: 0x7803 },
+  "BL_UP": { qmk: "BL_UP", hid: 0x7804 },
+  "BL_STEP": { qmk: "BL_STEP", hid: 0x7805 },
 
   // Mouse Keys
   "MOUSE_UP": { qmk: "KC_MS_U", hid: 0x00F0 },

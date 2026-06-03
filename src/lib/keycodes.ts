@@ -1,6 +1,6 @@
 // src/lib/keycodes.ts
 
-export type KeycodeCategory = 'Basic' | 'ISO/JIS' | 'Layers' | 'Media' | 'Macro' | 'Lighting' | 'Special';
+export type KeycodeCategory = 'Basic' | 'ISO/JIS' | 'Layers' | 'Media' | 'Macro' | 'Backlight' | 'Special';
 
 export interface Keycode {
   code: string;
@@ -16,7 +16,7 @@ export interface Keycode {
   y2?: number;
 }
 
-export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Special'];
+export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Backlight', 'Special'];
 
 export const KEYCODES: Keycode[] = [
   // ==========================================
@@ -250,17 +250,23 @@ export const KEYCODES: Keycode[] = [
 
   ...Array.from({ length: 16 }, (_, i) => ({ code: `MACRO_${i}`, label: `M${i}`, category: 'Macro' as const })),
 
-  { code: 'RGB_TOG', label: 'RGB\nToggle', category: 'Lighting', description: 'Toggle RGB lighting' },
-  { code: 'RGB_MOD', label: 'Mode +', category: 'Lighting', description: 'Cycle RGB lighting mode forward' },
-  { code: 'RGB_RMOD', label: 'Mode -', category: 'Lighting', description: 'Cycle RGB lighting mode backward' },
-  { code: 'RGB_VAI', label: 'Bright +', category: 'Lighting', description: 'Increase RGB lighting brightness' },
-  { code: 'RGB_VAD', label: 'Bright -', category: 'Lighting', description: 'Decrease RGB lighting brightness' },
-  { code: 'RGB_HUI', label: 'Hue +', category: 'Lighting', description: 'Increase RGB lighting hue' },
-  { code: 'RGB_HUD', label: 'Hue -', category: 'Lighting', description: 'Decrease RGB lighting hue' },
-  { code: 'RGB_SAI', label: 'Sat +', category: 'Lighting', description: 'Increase RGB lighting saturation' },
-  { code: 'RGB_SAD', label: 'Sat -', category: 'Lighting', description: 'Decrease RGB lighting saturation' },
-  { code: 'RGB_SPI', label: 'Speed +', category: 'Lighting', description: 'Increase RGB lighting effect speed' },
-  { code: 'RGB_SPD', label: 'Speed -', category: 'Lighting', description: 'Decrease RGB lighting effect speed' },
+  { code: 'BL_TOGG', label: 'BL\nToggle', category: 'Backlight', description: 'Toggle keyboard backlight' },
+  { code: 'BL_STEP', label: 'BL\nStep', category: 'Backlight', description: 'Cycle keyboard backlight levels' },
+  { code: 'BL_UP', label: 'BL +', category: 'Backlight', description: 'Increase keyboard backlight level' },
+  { code: 'BL_DOWN', label: 'BL -', category: 'Backlight', description: 'Decrease keyboard backlight level' },
+  { code: 'BL_ON', label: 'BL On', category: 'Backlight', description: 'Turn keyboard backlight on' },
+  { code: 'BL_OFF', label: 'BL Off', category: 'Backlight', description: 'Turn keyboard backlight off' },
+  { code: 'RGB_TOG', label: 'RGB\nToggle', category: 'Backlight', description: 'Toggle RGB backlight' },
+  { code: 'RGB_MOD', label: 'Mode +', category: 'Backlight', description: 'Cycle RGB backlight mode forward' },
+  { code: 'RGB_RMOD', label: 'Mode -', category: 'Backlight', description: 'Cycle RGB backlight mode backward' },
+  { code: 'RGB_VAI', label: 'Bright +', category: 'Backlight', description: 'Increase RGB backlight brightness' },
+  { code: 'RGB_VAD', label: 'Bright -', category: 'Backlight', description: 'Decrease RGB backlight brightness' },
+  { code: 'RGB_HUI', label: 'Hue +', category: 'Backlight', description: 'Increase RGB backlight hue' },
+  { code: 'RGB_HUD', label: 'Hue -', category: 'Backlight', description: 'Decrease RGB backlight hue' },
+  { code: 'RGB_SAI', label: 'Sat +', category: 'Backlight', description: 'Increase RGB backlight saturation' },
+  { code: 'RGB_SAD', label: 'Sat -', category: 'Backlight', description: 'Decrease RGB backlight saturation' },
+  { code: 'RGB_SPI', label: 'Speed +', category: 'Backlight', description: 'Increase RGB backlight effect speed' },
+  { code: 'RGB_SPD', label: 'Speed -', category: 'Backlight', description: 'Decrease RGB backlight effect speed' },
 
   { code: 'transparent', label: '▽', category: 'Special', description: 'Passes through the keycode of the layer below (Transparent)' },
   { code: 'none', label: 'None', category: 'Special', description: 'Disables the key (No action)' },

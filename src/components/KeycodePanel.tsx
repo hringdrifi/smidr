@@ -254,7 +254,7 @@ export const KeycodePanel = () => {
   const isTabSupported = (tab: KeycodeCategory) => {
     if (!deviceCapabilities) return true; // Offline design mode: assume support
     if (tab === 'Macro') return deviceCapabilities.hasMacros;
-    if (tab === 'Lighting') return deviceCapabilities.hasLighting;
+    if (tab === 'Backlight') return deviceCapabilities.hasLighting;
     return true;
   };
 

@@ -193,7 +193,7 @@ export const TRANSLATIONS = {
       Layers: 'Layers',
       Media: 'Media',
       Macro: 'Macro',
-      Lighting: 'Lighting',
+      Backlight: 'Backlight',
       Special: 'Special',
     },
     hardware: {
@@ -581,7 +581,7 @@ export const TRANSLATIONS = {
       Layers: '层',
       Media: '媒体',
       Macro: '宏',
-      Lighting: '灯光',
+      Backlight: 'Backlight',
       Special: '特殊',
     },
     hardware: {
@@ -868,7 +868,7 @@ export const TRANSLATIONS = {
       Layers: '레이어',
       Media: '미디어',
       Macro: '매크로',
-      Lighting: '조명',
+      Backlight: 'Backlight',
       Special: '특수',
     },
     hardware: {
@@ -1158,7 +1158,7 @@ export const TRANSLATIONS = {
       Layers: 'レイヤー',
       Media: 'メディア',
       Macro: 'マクロ',
-      Lighting: 'ライティング',
+      Backlight: 'バックライト',
       Special: '特殊',
     },
     hardware: {
@@ -1546,7 +1546,7 @@ export const TRANSLATIONS = {
       Layers: 'Capas',
       Media: 'Multimedia',
       Macro: 'Macro',
-      Lighting: 'Iluminación',
+      Backlight: 'Backlight',
       Special: 'Especial',
     },
     hardware: {
@@ -1833,7 +1833,7 @@ export const TRANSLATIONS = {
       Layers: 'Ebenen',
       Media: 'Medien',
       Macro: 'Makro',
-      Lighting: 'Beleuchtung',
+      Backlight: 'Backlight',
       Special: 'Spezial',
     },
     hardware: {

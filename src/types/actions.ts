@@ -40,6 +40,8 @@ export type UniversalKey =
   | "RGB_HUI" | "RGB_HUD"
   | "RGB_SAI" | "RGB_SAD"
   | "RGB_SPI" | "RGB_SPD"
+  | "BL_ON" | "BL_OFF" | "BL_TOGG"
+  | "BL_DOWN" | "BL_UP" | "BL_STEP"
   // マウスキー (QMK / ZMK 共通)
   | "MOUSE_UP" | "MOUSE_DOWN" | "MOUSE_LEFT" | "MOUSE_RIGHT"
   | "MOUSE_BTN1" | "MOUSE_BTN2" | "MOUSE_BTN3" | "MOUSE_BTN4" | "MOUSE_BTN5"

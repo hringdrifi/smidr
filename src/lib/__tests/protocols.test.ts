@@ -137,6 +137,22 @@ describe('protocols conversion tests', () => {
       expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SPI' })).toBe(0x7829);
       expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SPD' })).toBe(0x782A);
     });
+
+    it('should convert backlight keycodes as tap actions', () => {
+      expect(viaCodeToAction(0x7800)).toEqual({ action: 'tap', keycode: 'BL_ON' });
+      expect(viaCodeToAction(0x7801)).toEqual({ action: 'tap', keycode: 'BL_OFF' });
+      expect(viaCodeToAction(0x7802)).toEqual({ action: 'tap', keycode: 'BL_TOGG' });
+      expect(viaCodeToAction(0x7803)).toEqual({ action: 'tap', keycode: 'BL_DOWN' });
+      expect(viaCodeToAction(0x7804)).toEqual({ action: 'tap', keycode: 'BL_UP' });
+      expect(viaCodeToAction(0x7805)).toEqual({ action: 'tap', keycode: 'BL_STEP' });
+
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_ON' })).toBe(0x7800);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_OFF' })).toBe(0x7801);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_TOGG' })).toBe(0x7802);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_DOWN' })).toBe(0x7803);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_UP' })).toBe(0x7804);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_STEP' })).toBe(0x7805);
+    });
   });
 
   describe('QMK C-String notation Parser and Formatter', () => {
@@ -146,11 +162,13 @@ describe('protocols conversion tests', () => {
       expect(qmkStringToAction('KC_A')).toEqual({ action: 'tap', keycode: 'A' });
       expect(qmkStringToAction('QK_BOOT')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
       expect(qmkStringToAction('RGB_TOG')).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
+      expect(qmkStringToAction('BL_TOGG')).toEqual({ action: 'tap', keycode: 'BL_TOGG' });
 
       expect(actionToQmkString({ action: 'trans' })).toBe('KC_TRNS');
       expect(actionToQmkString({ action: 'none' })).toBe('KC_NO');
       expect(actionToQmkString({ action: 'tap', keycode: 'A' })).toBe('KC_A');
       expect(actionToQmkString({ action: 'tap', keycode: 'RGB_TOG' })).toBe('RGB_TOG');
+      expect(actionToQmkString({ action: 'tap', keycode: 'BL_TOGG' })).toBe('BL_TOGG');
     });
 
     it('should parse and format nested modifiers and shortcuts', () => {

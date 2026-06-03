@@ -99,6 +99,12 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "RGB_SAD": "RGB_SAD",
   "RGB_SPI": "RGB_SPI",
   "RGB_SPD": "RGB_SPD",
+  "BL_ON": "BL_ON",
+  "BL_OFF": "BL_OFF",
+  "BL_TOGG": "BL_TOGG",
+  "BL_DOWN": "BL_DOWN",
+  "BL_UP": "BL_UP",
+  "BL_STEP": "BL_STEP",
 
   // Mouse Keys
   "MOUSE_UP": "MOVE_UP",
