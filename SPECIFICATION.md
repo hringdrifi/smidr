@@ -40,6 +40,7 @@
 - **アクセント:** Amber (500) を選択状態や Pivot の強調に使用。
 - **操作性:** 複数選択は `Ctrl/Cmd + Click`。削除は `Delete/Backspace`。Undo は `Ctrl + Z`。ドラッグ・回転時のスナップ無効化は `Alt` キー。
 - **モード選択の保持:** 最後に選択したアプリモード（リマップ / 設計）および設計内モード（レイアウト / マトリクス / ハードウェア / キーマップ）は `localStorage` に保存し、次回起動時に復元する。
+- **Visual Layout（論理配列）:** キーマップ表示およびキーコードパレットのキートップレジェンドは `settings.visualLayout` に従って切り替える。値は `qwerty-us` 形式（例: `qwerty-us`, `qwerty-jp`, `qwerty-kr`, `qwerty-es`, `qwertz-de`, `azerty-fr`）で管理し、キーコード自体やエクスポート値は変更しない。未指定の既存プロジェクトは `qwerty-us` として扱う。
 
 ## 6. 操作仕様 (Mouse & Keyboard Shortcuts)
 

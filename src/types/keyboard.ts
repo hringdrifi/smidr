@@ -1,6 +1,7 @@
 // src/types/keyboard.ts
 import { UniversalAction } from './actions';
 import type { QmkMcu } from '@/lib/mcu-presets';
+import type { VisualLayoutId } from '@/lib/visual-layouts';
 
 export interface Point { x: number; y: number; }
 
@@ -84,6 +85,7 @@ export interface ProjectSettings {
     split: boolean;
   };
   layers: number;
+  visualLayout?: VisualLayoutId;
   layoutOptions: {
     [groupId: string]: {
       name: string; // e.g. "Backspace"

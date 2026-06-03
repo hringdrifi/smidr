@@ -1,7 +1,7 @@
 import { PhysicalKey } from '../types/keyboard';
 import { UniversalAction, Modifier } from '../types/actions';
-import { KEYCODES } from './keycodes';
 import { actionToQmkString } from './protocols/via-action-converter';
+import { DEFAULT_VISUAL_LAYOUT, getKeycodeLegend, VisualLayoutId } from './visual-layouts';
 
 export const UNIT = 48;
 export const TOP_INSET = 0.08;
@@ -161,7 +161,10 @@ export const labelNodeToText = (node: LabelNode): string => {
   }
 };
 
-export const formatActionLabel = (action: UniversalAction | undefined): LabelNode => {
+export const formatActionLabel = (
+  action: UniversalAction | undefined,
+  visualLayout: VisualLayoutId = DEFAULT_VISUAL_LAYOUT
+): LabelNode => {
   if (!action) return { type: 'text', text: '▽' };
   switch (action.action) {
     case 'trans':
@@ -169,8 +172,7 @@ export const formatActionLabel = (action: UniversalAction | undefined): LabelNod
     case 'none':
       return { type: 'empty' };
     case 'tap': {
-      const match = KEYCODES.find(kc => kc.code === action.keycode);
-      let baseLabel = match?.label || action.keycode;
+      let baseLabel = getKeycodeLegend(action.keycode, visualLayout);
       if (action.keycode === 'TRNS') {
         baseLabel = '▽';
       } else if (action.keycode === 'NO') {
@@ -195,9 +197,9 @@ export const formatActionLabel = (action: UniversalAction | undefined): LabelNod
     case 'to':
       return { type: 'layer_action', variant: 'to', layerId: action.layerId };
     case 'lt':
-      return { type: 'layer_tap', layerId: action.layerId, tapLabel: formatActionLabel(action.tapAction) };
+      return { type: 'layer_tap', layerId: action.layerId, tapLabel: formatActionLabel(action.tapAction, visualLayout) };
     case 'mt':
-      return { type: 'mod_tap', modifiers: action.modifiers, tapLabel: formatActionLabel(action.tapAction) };
+      return { type: 'mod_tap', modifiers: action.modifiers, tapLabel: formatActionLabel(action.tapAction, visualLayout) };
     case 'macro':
       return { type: 'text', text: `Macro\n${action.macroId}` };
     case 'custom':
@@ -212,7 +214,8 @@ export const getKeyLabel = (
   mode: string, 
   currentLayer: number, 
   appMode?: string,
-  remoteKeymap?: Record<number, UniversalAction[]>
+  remoteKeymap?: Record<number, UniversalAction[]>,
+  visualLayout: VisualLayoutId = DEFAULT_VISUAL_LAYOUT
 ): LabelNode => {
   if (appMode === 'remap') {
     const flatIndex = k.zmkPosition ?? (
@@ -221,7 +224,7 @@ export const getKeyLabel = (
     if (flatIndex === undefined) return { type: 'empty' };
     const action = remoteKeymap?.[currentLayer]?.[flatIndex];
     if (!action) return { type: 'text', text: '...' };
-    return formatActionLabel(action);
+    return formatActionLabel(action, visualLayout);
   }
 
   if (mode === 'matrix') {
@@ -231,7 +234,7 @@ export const getKeyLabel = (
   }
   if (mode === 'keymap') {
     const action = k.keymap?.[currentLayer];
-    return formatActionLabel(action);
+    return formatActionLabel(action, visualLayout);
   }
   return { type: 'empty' };
 };

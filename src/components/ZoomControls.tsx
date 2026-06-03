@@ -2,11 +2,12 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Check, Pencil, Plus, Minus, Scan, Grid, MousePointer2, Hash, RefreshCcw, X } from 'lucide-react';
+import { Check, Pencil, Plus, Minus, Scan, Grid, MousePointer2, Hash, RefreshCcw, X, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 
 import { getKeyVertices, PADDING_X, PADDING_Y } from '@/lib/canvas-utils';
+import { VISUAL_LAYOUTS, normalizeVisualLayout } from '@/lib/visual-layouts';
 
 export const ZoomControls = () => {
   const { 
@@ -14,6 +15,7 @@ export const ZoomControls = () => {
     setTransform, 
     editorSettings, 
     updateEditorSettings, 
+    updateSettings,
     editorMode,
     keys,
     settings,
@@ -31,7 +33,7 @@ export const ZoomControls = () => {
     removeLastZmkLayer
   } = useKeyboardStore();
   const { t } = useTranslation();
-  const [activeMenu, setActiveMenu] = React.useState<'grid' | 'mouse' | null>(null);
+  const [activeMenu, setActiveMenu] = React.useState<'grid' | 'mouse' | 'visual' | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [editingLayer, setEditingLayer] = React.useState<number | null>(null);
   const [layerNameDraft, setLayerNameDraft] = React.useState('');
@@ -318,7 +320,7 @@ export const ZoomControls = () => {
         )}
 
         {/* Popovers Container */}
-        {appMode !== 'remap' && editorMode === 'layout' && activeMenu && (
+        {activeMenu && (
           <>
             <div className="fixed inset-0" onClick={() => setActiveMenu(null)} />
             
@@ -414,6 +416,62 @@ export const ZoomControls = () => {
                 </section>
               </div>
             )}
+
+            {activeMenu === 'visual' && (
+              <div className="absolute bottom-full left-0 mb-2 w-64 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] p-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="flex items-center gap-2 px-2 py-2 text-[var(--text-muted)] border-b border-[var(--border-main)]">
+                  <Languages size={12} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Visual Layout</span>
+                </div>
+                <div className="pt-1 max-h-72 overflow-y-auto custom-scrollbar">
+                  {VISUAL_LAYOUTS.map(layout => {
+                    const active = normalizeVisualLayout(settings.visualLayout) === layout.id;
+                    return (
+                      <button
+                        key={layout.id}
+                        onClick={() => {
+                          updateSettings({ visualLayout: layout.id });
+                          setActiveMenu(null);
+                        }}
+                        className={cn(
+                          "w-full px-2.5 py-2 rounded-lg text-left transition-colors flex items-center justify-between gap-3",
+                          active ? "bg-amber-500/10 text-amber-500" : "text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-[11px] font-bold">{layout.name}</span>
+                          <span className="block text-[9px] text-[var(--text-muted)] truncate">{layout.description}</span>
+                        </span>
+                        <span className={cn(
+                          "shrink-0 min-w-8 rounded border px-1.5 py-0.5 text-center text-[9px] font-black",
+                          active ? "border-amber-500/40 bg-amber-500 text-zinc-950" : "border-[var(--border-main)] text-[var(--text-muted)]"
+                        )}>
+                          {layout.shortName}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        {(appMode === 'remap' || editorMode === 'keymap') && (
+          <>
+            <button
+              onClick={() => setActiveMenu(activeMenu === 'visual' ? null : 'visual')}
+              className={cn(
+                "p-2 rounded transition-all relative",
+                activeMenu === 'visual' ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20" : "bg-[var(--bg-app)] border border-[var(--border-main)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+              )}
+              title="Visual Layout"
+            >
+              <Languages size={14} />
+              <span className="absolute -right-1 -bottom-1 min-w-5 h-4 px-1 rounded-full bg-amber-500 text-zinc-950 text-[8px] font-black leading-4 border border-zinc-950">
+                {VISUAL_LAYOUTS.find(layout => layout.id === normalizeVisualLayout(settings.visualLayout))?.shortName}
+              </span>
+            </button>
+            <div className="w-px h-4 bg-[var(--bg-button)] mx-1" />
           </>
         )}
         {appMode !== 'remap' && editorMode === 'layout' && (

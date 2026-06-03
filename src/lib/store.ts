@@ -26,6 +26,7 @@ import {
 } from './storage';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
+import { DEFAULT_VISUAL_LAYOUT, normalizeVisualLayout } from './visual-layouts';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 
@@ -236,6 +237,7 @@ const initialState: Partial<KeyboardState> = {
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
+    visualLayout: DEFAULT_VISUAL_LAYOUT,
     layoutOptions: {},
     activeOptions: {},
     vial: {},
@@ -2016,6 +2018,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const settingsWithDefaultMatrix = {
             ...settings,
             vendorProductId: normalizedVendorProductId,
+            visualLayout: normalizeVisualLayout((settings as Partial<ProjectSettings>).visualLayout),
             qmk: {
               matrixMasked: false,
               ...(settings.qmk || {}),
@@ -2170,6 +2173,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   ...s.settings,
                   name: name || s.settings.name,
                   vendorProductId: vendorProductId ?? s.settings.vendorProductId,
+                  visualLayout: normalizeVisualLayout((result as any).visualLayout ?? s.settings.visualLayout),
                   layoutOptions: layoutOptions || {},
                   activeOptions: initialActiveOptions,
                   pins: importedPins,

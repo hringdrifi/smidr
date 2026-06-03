@@ -9,6 +9,7 @@ import { twMerge } from 'tailwind-merge';
 import { Keyboard, ChevronLeft, ChevronRight, Layers2 as LayersIcon } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey } from '@/types/actions';
+import { applyVisualLayoutToKeycode } from '@/lib/visual-layouts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -34,7 +35,7 @@ export const KeycodePanel = () => {
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `TO(${i})`, label: `TO(${i})`, category: 'Layers' as const, description: `Direct layer: switches directly to layer ${i}` })),
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `LT(${i})`, label: `LT(${i})`, category: 'Layers' as const, description: `Layer Tap: switches to layer ${i} when held, sends transparent keycode when tapped` })),
       ]
-    : KEYCODES.filter(k => k.category === activeTab);
+    : KEYCODES.filter(k => k.category === activeTab).map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
 
 
 
@@ -242,7 +243,9 @@ export const KeycodePanel = () => {
   const calcWidth = (w: number) => (w * U) + (w - 1) * G;
   const calcMargin = (s: number) => s * (U + G);
 
-  const selectKeycodes = KEYCODES.filter(k => k.category !== 'Layers' && k.code !== 'ISO_ENT_GHOST');
+  const selectKeycodes = KEYCODES
+    .filter(k => k.category !== 'Layers' && k.code !== 'ISO_ENT_GHOST')
+    .map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
   const filteredSelectKeycodes = selectKeycodes.filter(k => 
     k.code.toLowerCase().includes(tapSearchQuery.toLowerCase()) || 
     k.label.toLowerCase().includes(tapSearchQuery.toLowerCase())

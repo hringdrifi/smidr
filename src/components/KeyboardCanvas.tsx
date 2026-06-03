@@ -758,7 +758,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
             <KeyComponent
               key={`${key.id}-body`} id={key.id} keyData={key}
               isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
-              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap)}
+              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout)}
               showLabel={false} draggable={!readonlyGeometry && appMode === 'design'}
               onDragStart={() => {
                 if (readonlyGeometry || appMode !== 'design') return;
@@ -913,7 +913,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
             <KeyComponent
               key={`${key.id}-label`} id={`${key.id}-label`} keyData={key}
               isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
-              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap)}
+              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout)}
               showKeycap={false}
               onMouseDown={(e) => {
                 if (e.evt && e.evt.button !== 0) return;
