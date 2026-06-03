@@ -283,6 +283,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
             offsetX={textWidth / 2}
             offsetY={(num(h) * UNIT) / 2}
             fontSize={11}
+            lineHeight={1.18}
             fontStyle="bold"
             fill={editorMode === 'matrix' ? colors.accent : colors.text}
             align="center"
