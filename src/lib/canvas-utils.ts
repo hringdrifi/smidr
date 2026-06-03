@@ -153,16 +153,25 @@ export type LabelNode =
   | { type: 'layer_tap'; layerId: number; tapLabel: LabelNode }
   | { type: 'mod_tap'; modifiers: string[]; tapLabel: LabelNode };
 
-export const labelNodeToText = (node: LabelNode): string => {
+export type LayerActionLabelFormatter = (variant: 'momentary' | 'toggle' | 'to') => string;
+
+export const getDefaultLayerActionLabel = (variant: 'momentary' | 'toggle' | 'to') => (
+  variant === 'momentary' ? 'Hold' : variant === 'toggle' ? 'Toggle' : 'Go to'
+);
+
+export const labelNodeToText = (
+  node: LabelNode,
+  formatLayerActionLabel: LayerActionLabelFormatter = getDefaultLayerActionLabel
+): string => {
   switch (node.type) {
     case 'text': return node.text.replace(/\n/g, ' ');
     case 'empty': return '';
     case 'layer_action': {
-      const verb = node.variant === 'momentary' ? 'Hold' : node.variant === 'toggle' ? 'Toggle' : 'Go to';
+      const verb = formatLayerActionLabel(node.variant);
       return `${verb} L${node.layerId}`;
     }
-    case 'layer_tap': return `L${node.layerId} + ${labelNodeToText(node.tapLabel)}`;
-    case 'mod_tap': return `${node.modifiers.join('+')} + ${labelNodeToText(node.tapLabel)}`;
+    case 'layer_tap': return `L${node.layerId} + ${labelNodeToText(node.tapLabel, formatLayerActionLabel)}`;
+    case 'mod_tap': return `${node.modifiers.join('+')} + ${labelNodeToText(node.tapLabel, formatLayerActionLabel)}`;
   }
 };
 

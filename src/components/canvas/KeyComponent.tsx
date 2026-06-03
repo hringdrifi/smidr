@@ -4,6 +4,7 @@ import { PhysicalKey } from '../../types/keyboard';
 import { UNIT, TOP_INSET, num, round, getUnionVertices, generatePath, offsetPolygon, getVisualCenter, generateFocusBrackets, isLayoutMode, LabelNode, labelNodeToText } from '../../lib/canvas-utils';
 import { useKeyboardStore } from '../../lib/store';
 import { THEME_COLORS } from '../../lib/colors';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // Lucide "Layers2" icon SVG paths (viewBox 0 0 24 24)
 const LAYERS_P1 = 'm16.02 12 5.48 3.13a1 1 0 0 1 0 1.74L13 21.74a2 2 0 0 1-2 0l-8.5-4.87a1 1 0 0 1 0-1.74L7.98 12';
@@ -53,6 +54,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
 }) => {
   const { x, y, w, h, r, rx, ry, x2, y2, w2, h2, stepped } = keyData;
   const isDebug = useKeyboardStore(s => s.editorSettings.debugMode);
+  const { t } = useTranslation();
   
   if (isDebug && (x2 !== undefined || y2 !== undefined || w2 !== undefined || h2 !== undefined)) {
     console.log(`[KeyComponent] Rendering secondary shape for "${keyData.label}":`, { x2, y2, w2, h2 });
@@ -156,9 +158,15 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
     );
   };
 
+  const getLayerActionText = (variant: 'momentary' | 'toggle' | 'to') => {
+    if (variant === 'momentary') return t('keycode.layerHold') || 'Hold';
+    if (variant === 'toggle') return t('keycode.layerToggle') || 'Toggle';
+    return t('keycode.layerGoTo') || 'Go to';
+  };
+
   // Helper: render tap keycode as simple text (no pill frame)
   const renderTapText = (tapLabel: LabelNode, textCenterY: number) => {
-    const tapText = labelNodeToText(tapLabel);
+    const tapText = labelNodeToText(tapLabel, getLayerActionText);
     const fontSize = 10;
     return (
       <Text
@@ -284,7 +292,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
         );
 
       case 'layer_action': {
-        const verb = label.variant === 'momentary' ? 'Hold' : label.variant === 'toggle' ? 'Toggle' : 'Go to';
+        const verb = getLayerActionText(label.variant);
         return (
           <Group listening={false}>
             <Text
