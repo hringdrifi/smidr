@@ -188,7 +188,7 @@ export const TRANSLATIONS = {
       noneDesc: 'Does nothing',
     },
     keycodeTabs: {
-      Basic: 'Basic',
+      Basic: 'ANSI',
       'ISO/JIS': 'ISO/JIS',
       Layers: 'Layers',
       Media: 'Media',
@@ -573,7 +573,7 @@ export const TRANSLATIONS = {
       noneDesc: '无操作',
     },
     keycodeTabs: {
-      Basic: '基础',
+      Basic: 'ANSI',
       'ISO/JIS': 'ISO/JIS',
       Layers: '层',
       Media: '媒体',
@@ -860,7 +860,7 @@ export const TRANSLATIONS = {
       noneDesc: '아무것도 하지 않음',
     },
     keycodeTabs: {
-      Basic: '기본',
+      Basic: 'ANSI',
       'ISO/JIS': 'ISO/JIS',
       Layers: '레이어',
       Media: '미디어',
@@ -1150,7 +1150,7 @@ export const TRANSLATIONS = {
       noneDesc: '何もしない',
     },
     keycodeTabs: {
-      Basic: '基本',
+      Basic: 'ANSI',
       'ISO/JIS': 'ISO/JIS',
       Layers: 'レイヤー',
       Media: 'メディア',
@@ -1535,7 +1535,7 @@ export const TRANSLATIONS = {
       noneDesc: 'No hace nada',
     },
     keycodeTabs: {
-      Basic: 'Básico',
+      Basic: 'ANSI',
       'ISO/JIS': 'ISO/JIS',
       Layers: 'Capas',
       Media: 'Multimedia',
@@ -1822,7 +1822,7 @@ export const TRANSLATIONS = {
       noneDesc: 'Tut nichts',
     },
     keycodeTabs: {
-      Basic: 'Standard',
+      Basic: 'ANSI',
       'ISO/JIS': 'ISO/JIS',
       Layers: 'Ebenen',
       Media: 'Medien',

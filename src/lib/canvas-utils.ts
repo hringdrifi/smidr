@@ -7,6 +7,11 @@ export const UNIT = 48;
 export const TOP_INSET = 0.08;
 export const PADDING_X = 48 + 1.5 * UNIT;
 export const PADDING_Y = 48;
+export const MIN_ZOOM = 0.2;
+export const MAX_ZOOM = 5.0;
+export const ZOOM_STEP = 0.1;
+
+export const clampZoom = (scale: number) => Math.min(Math.max(scale, MIN_ZOOM), MAX_ZOOM);
 
 export const num = (v: any): number => {
   if (v === undefined || v === null) return 0;

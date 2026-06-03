@@ -1,11 +1,13 @@
 import { SmidrProject } from '@/types/keyboard';
 import { Language } from './i18n';
+import { DEFAULT_VISUAL_LAYOUT, normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
 
 
 const STORAGE_KEY = 'smidr_projects';
 const THEME_STORAGE_KEY = 'smidr_theme';
 const APP_MODE_STORAGE_KEY = 'smidr_app_mode';
 const EDITOR_MODE_STORAGE_KEY = 'smidr_editor_mode';
+const VISUAL_LAYOUT_STORAGE_KEY = 'smidr_visual_layout';
 
 export type StoredTheme = 'dark' | 'light';
 export type StoredAppMode = 'design' | 'remap';
@@ -45,6 +47,16 @@ export const getStoredEditorMode = (): StoredEditorMode => {
 export const setStoredEditorMode = (mode: StoredEditorMode): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(EDITOR_MODE_STORAGE_KEY, mode);
+};
+
+export const getStoredVisualLayout = (): VisualLayoutId => {
+  if (typeof window === 'undefined') return DEFAULT_VISUAL_LAYOUT;
+  return normalizeVisualLayout(localStorage.getItem(VISUAL_LAYOUT_STORAGE_KEY));
+};
+
+export const setStoredVisualLayout = (layout: VisualLayoutId): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(VISUAL_LAYOUT_STORAGE_KEY, normalizeVisualLayout(layout));
 };
 
 export const listProjects = (): SmidrProject[] => {

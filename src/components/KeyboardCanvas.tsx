@@ -10,7 +10,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { LayoutGrid, FolderOpen, Plus, RefreshCw } from 'lucide-react';
 import { KeyComponent } from './canvas/KeyComponent';
 import { GridComponent } from './canvas/GridComponent';
-import { UNIT, num, round, roundCoord, roundRot, getVisualCenter, getKeyVertices, getKeyLabel, isLayoutMode, PADDING_X, PADDING_Y } from '@/lib/canvas-utils';
+import { UNIT, num, round, roundCoord, roundRot, getVisualCenter, getKeyVertices, getKeyLabel, isLayoutMode, PADDING_X, PADDING_Y, clampZoom, ZOOM_STEP } from '@/lib/canvas-utils';
 
 const ROTATE_ICON_PATH = "M3 2v6h6 M3 13a9 9 0 1 0 3-7.7L3 8";
 
@@ -302,7 +302,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
     const mousePointTo = { x: (pointer.x - stage.x()) / oldScale, y: (pointer.y - stage.y()) / oldScale };
-    const newScale = Math.min(Math.max(oldScale + (e.evt.deltaY > 0 ? -0.1 : 0.1), 0.2), 5);
+    const newScale = clampZoom(oldScale + (e.evt.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP));
     const newPos = { x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale };
     setTransform({ scale: newScale, x: newPos.x - PADDING_X, y: newPos.y - PADDING_Y });
   };
@@ -496,7 +496,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
       }
       const startDistance = gesture.startDistance || distance || 1;
       const startScale = gesture.startScale || gesture.startTransform.scale;
-      const newScale = Math.min(Math.max(startScale * (distance / startDistance), 0.2), 5);
+      const newScale = clampZoom(startScale * (distance / startDistance));
       const newTransform = {
         scale: newScale,
         x: center.x - gesture.startWorld.x * newScale - PADDING_X,

@@ -241,7 +241,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
  */
 export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
   const { settings, keys } = state;
-  const { matrix, pins, vendorProductId, ...settingsWithoutRuntimeIds } = settings;
+  const { matrix, pins, vendorProductId, visualLayout, ...settingsWithoutRuntimeIds } = settings;
   const savedPins = settings.features.split ? pins : { ...pins };
   if (!settings.features.split) {
     delete savedPins.splitRows;

@@ -6,7 +6,7 @@ import { Check, Pencil, Plus, Minus, Scan, Grid, MousePointer2, Hash, RefreshCcw
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
 
-import { getKeyVertices, PADDING_X, PADDING_Y } from '@/lib/canvas-utils';
+import { clampZoom, getKeyVertices, PADDING_X, PADDING_Y, ZOOM_STEP } from '@/lib/canvas-utils';
 import { VISUAL_LAYOUTS, normalizeVisualLayout } from '@/lib/visual-layouts';
 
 export const ZoomControls = () => {
@@ -15,7 +15,7 @@ export const ZoomControls = () => {
     setTransform, 
     editorSettings, 
     updateEditorSettings, 
-    updateSettings,
+    setVisualLayout,
     editorMode,
     keys,
     settings,
@@ -113,7 +113,7 @@ export const ZoomControls = () => {
   };
 
   const handleZoom = (delta: number) => {
-    const newScale = Math.min(Math.max(transform.scale + delta, 0.1), 3.0);
+    const newScale = clampZoom(transform.scale + delta);
     setTransform({ ...transform, scale: newScale });
   };
 
@@ -430,7 +430,7 @@ export const ZoomControls = () => {
                       <button
                         key={layout.id}
                         onClick={() => {
-                          updateSettings({ visualLayout: layout.id });
+                          setVisualLayout(layout.id);
                           setActiveMenu(null);
                         }}
                         className={cn(
@@ -519,7 +519,7 @@ export const ZoomControls = () => {
 
         <div className="flex items-center bg-[var(--bg-app)] border border-[var(--border-main)] rounded overflow-hidden">
           <button 
-            onClick={() => handleZoom(-0.1)}
+            onClick={() => handleZoom(-ZOOM_STEP)}
             className="p-2 hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-colors"
             title={t('zoom.zoomOut')}
           >
@@ -529,7 +529,7 @@ export const ZoomControls = () => {
             {Math.round(transform.scale * 100)}%
           </div>
           <button 
-            onClick={() => handleZoom(0.1)}
+            onClick={() => handleZoom(ZOOM_STEP)}
             className="p-2 hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-colors"
             title={t('zoom.zoomIn')}
           >

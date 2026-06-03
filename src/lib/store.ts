@@ -22,11 +22,13 @@ import {
   setStoredEditorMode,
   setStoredTheme,
   getStoredLanguage,
-  setStoredLanguage
+  setStoredLanguage,
+  getStoredVisualLayout,
+  setStoredVisualLayout
 } from './storage';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
-import { DEFAULT_VISUAL_LAYOUT, normalizeVisualLayout } from './visual-layouts';
+import { normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 
@@ -75,6 +77,7 @@ export interface KeyboardState {
   // Global Actions
   updateSettings: (settings: Partial<ProjectSettings>) => void;
   updateEditorSettings: (settings: Partial<EditorSettings>) => void;
+  setVisualLayout: (layout: VisualLayoutId) => void;
   setTransform: (transform: { scale: number, x: number, y: number }) => void;
   setActiveOption: (groupId: string, value: number) => void;
   
@@ -237,7 +240,7 @@ const initialState: Partial<KeyboardState> = {
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
-    visualLayout: DEFAULT_VISUAL_LAYOUT,
+    visualLayout: getStoredVisualLayout(),
     layoutOptions: {},
     activeOptions: {},
     vial: {},
@@ -469,6 +472,10 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         updateSettings: (sets: Partial<ProjectSettings>) => set((s) => {
           const nextSettings = { ...s.settings, ...sets };
+          if (sets.visualLayout) {
+            nextSettings.visualLayout = normalizeVisualLayout(sets.visualLayout);
+            setStoredVisualLayout(nextSettings.visualLayout);
+          }
           if (sets.pins) {
             const pinMatrix = getMatrixFromPins(nextSettings.pins);
             if (pinMatrix) {
@@ -482,6 +489,14 @@ export const useKeyboardStore = create<KeyboardState>()(
           if (es.theme) setStoredTheme(es.theme);
           set((s) => ({
             editorSettings: { ...s.editorSettings, ...es }
+          }));
+        },
+
+        setVisualLayout: (layout: VisualLayoutId) => {
+          const nextLayout = normalizeVisualLayout(layout);
+          setStoredVisualLayout(nextLayout);
+          set((s) => ({
+            settings: { ...s.settings, visualLayout: nextLayout }
           }));
         },
 
@@ -2018,7 +2033,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const settingsWithDefaultMatrix = {
             ...settings,
             vendorProductId: normalizedVendorProductId,
-            visualLayout: normalizeVisualLayout((settings as Partial<ProjectSettings>).visualLayout),
+            visualLayout: normalizeVisualLayout(s.settings.visualLayout),
             qmk: {
               matrixMasked: false,
               ...(settings.qmk || {}),
@@ -2173,7 +2188,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   ...s.settings,
                   name: name || s.settings.name,
                   vendorProductId: vendorProductId ?? s.settings.vendorProductId,
-                  visualLayout: normalizeVisualLayout((result as any).visualLayout ?? s.settings.visualLayout),
+                  visualLayout: normalizeVisualLayout(s.settings.visualLayout),
                   layoutOptions: layoutOptions || {},
                   activeOptions: initialActiveOptions,
                   pins: importedPins,
@@ -2201,7 +2216,8 @@ export const useKeyboardStore = create<KeyboardState>()(
         resetProject: (keepOpen = false) => set((s: KeyboardState) => ({
           settings: {
             ...initialState.settings,
-            vialUid: generateRandomVialUid()
+            vialUid: generateRandomVialUid(),
+            visualLayout: normalizeVisualLayout(s.settings.visualLayout)
           } as ProjectSettings,
           keys: [],
           currentProjectId: null,
