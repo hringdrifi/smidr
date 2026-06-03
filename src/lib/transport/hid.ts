@@ -39,6 +39,27 @@ export class HidTransport implements ITransport {
     return null;
   }
 
+  async getDevices(filters: any[] = []): Promise<any[]> {
+    try {
+      const devices = await (navigator as any).hid?.getDevices?.();
+      if (!devices) return [];
+
+      if (filters.length === 0) return devices;
+      return devices.filter((device: any) => {
+        return device.collections?.some((collection: any) => {
+          return filters.some(filter => {
+            const usagePageMatches = filter.usagePage === undefined || filter.usagePage === collection.usagePage;
+            const usageMatches = filter.usage === undefined || filter.usage === collection.usage;
+            return usagePageMatches && usageMatches;
+          });
+        });
+      });
+    } catch (err) {
+      console.error('HID Get Devices Error:', err);
+      return [];
+    }
+  }
+
   // ITransport connection contract (allows dynamic device mapping)
   async connect(device?: any): Promise<boolean> {
     try {

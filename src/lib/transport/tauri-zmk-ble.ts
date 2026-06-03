@@ -29,6 +29,12 @@ export const isTauriRuntime = (): boolean => {
   return typeof tauri?.core?.invoke === 'function' && typeof tauri?.event?.listen === 'function';
 };
 
+export const listTauriZmkBleDevices = async (): Promise<NativeDeviceInfo[]> => {
+  const tauri = getTauri();
+  if (!tauri?.core?.invoke) return [];
+  return tauri.core.invoke<NativeDeviceInfo[]>('zmk_ble_list_devices');
+};
+
 export class TauriZmkBleTransport implements ITransport {
   public isConnected = false;
   private receiveQueue: Uint8Array[] = [];
@@ -37,7 +43,7 @@ export class TauriZmkBleTransport implements ITransport {
   private unlistenFrame: (() => void) | null = null;
   private deviceInfo: NativeDeviceInfo = {};
 
-  async connect(nameFilter?: string): Promise<boolean> {
+  async connect(deviceId?: string): Promise<boolean> {
     const tauri = getTauri();
     if (!tauri?.core?.invoke || !tauri.event?.listen) {
       console.warn('Tauri native BLE transport is not available.');
@@ -52,7 +58,7 @@ export class TauriZmkBleTransport implements ITransport {
       });
 
       this.deviceInfo = await tauri.core.invoke<NativeDeviceInfo>('zmk_ble_connect', {
-        nameFilter: nameFilter?.trim() || null,
+        deviceId: deviceId?.trim() || null,
       });
       this.isConnected = true;
       console.log('ZMK Native BLE Transport Connected', this.deviceInfo);

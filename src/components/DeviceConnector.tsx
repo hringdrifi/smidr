@@ -2,7 +2,7 @@ import React from 'react';
 import { Power, Usb, Bluetooth, Loader2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { hidTransport } from '@/lib/transport/hid';
-import { isTauriRuntime, TauriZmkBleTransport } from '@/lib/transport/tauri-zmk-ble';
+import { isTauriRuntime, listTauriZmkBleDevices, TauriZmkBleTransport } from '@/lib/transport/tauri-zmk-ble';
 import { ZmkSerialTransport, zmkProtocol } from '@/lib/protocols/zmk';
 import { ViaProtocol } from '@/lib/protocols/via';
 import { VialProtocol } from '@/lib/protocols/vial';
@@ -12,12 +12,22 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { fetchViaDefinition } from '@/lib/via-definitions';
 import { parseKeyboardDefinition } from '@/lib/parser';
 
+type DeviceCandidate =
+  | { id: string; kind: 'hid'; label: string; detail: string; device: any }
+  | { id: string; kind: 'serial'; label: string; detail: string; port: any }
+  | { id: string; kind: 'ble'; label: string; detail: string; deviceId: string };
+
+const VIA_HID_FILTERS = [{ usagePage: 0xFF60, usage: 0x61 }];
+
 export const DeviceConnector: React.FC = () => {
   const { connectedDevice, setConnectedDevice, loadProject } = useKeyboardStore();
   const { t } = useTranslation();
+  const authorizedSerialDeviceLabel = t('remap.authorizedSerialDevice');
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
+  const [isLoadingDevices, setIsLoadingDevices] = React.useState(false);
+  const [availableDevices, setAvailableDevices] = React.useState<DeviceCandidate[]>([]);
 
   const clearDeviceLayoutState = React.useCallback(() => {
     zmkProtocol.resetRuntimeState();
@@ -89,13 +99,73 @@ export const DeviceConnector: React.FC = () => {
     await useKeyboardStore.getState().syncKeymap();
   }, [clearDeviceLayoutState, loadProject, registerDisconnectHandler, setConnectedDevice]);
 
-  const connectHid = async () => {
+  const loadAvailableDevices = React.useCallback(async () => {
+    setIsLoadingDevices(true);
+    try {
+      const candidates: DeviceCandidate[] = [];
+
+      const hidDevices = await hidTransport.getDevices(VIA_HID_FILTERS);
+      hidDevices.forEach((device: any, index: number) => {
+        const vid = device.vendorId?.toString(16).toUpperCase().padStart(4, '0') || '0000';
+        const pid = device.productId?.toString(16).toUpperCase().padStart(4, '0') || '0000';
+        candidates.push({
+          id: `hid-${device.vendorId}-${device.productId}-${index}`,
+          kind: 'hid',
+          label: device.productName || 'QMK Keyboard',
+          detail: `QMK (VIA / Vial) - VID 0x${vid} PID 0x${pid}`,
+          device,
+        });
+      });
+
+      const serialPorts = await (navigator as any).serial?.getPorts?.();
+      serialPorts?.forEach((port: any, index: number) => {
+        const info = port.getInfo?.() || {};
+        const vid = info.usbVendorId?.toString(16).toUpperCase().padStart(4, '0');
+        const pid = info.usbProductId?.toString(16).toUpperCase().padStart(4, '0');
+        candidates.push({
+          id: `serial-${info.usbVendorId ?? 'unknown'}-${info.usbProductId ?? 'unknown'}-${index}`,
+          kind: 'serial',
+          label: vid && pid ? `ZMK Studio USB 0x${vid}:0x${pid}` : 'ZMK Studio USB',
+          detail: authorizedSerialDeviceLabel,
+          port,
+        });
+      });
+
+      if (isTauriRuntime()) {
+        const bleDevices = await listTauriZmkBleDevices();
+        bleDevices.forEach((device, index) => {
+          if (!device.id) return;
+          candidates.push({
+            id: `ble-${device.id}-${index}`,
+            kind: 'ble',
+            label: device.name || 'ZMK Studio BLE',
+            detail: 'ZMK Studio (BLE)',
+            deviceId: device.id,
+          });
+        });
+      }
+
+      setAvailableDevices(candidates);
+    } catch (err) {
+      console.warn('Failed to list available keyboard devices:', err);
+      setAvailableDevices([]);
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  }, [authorizedSerialDeviceLabel]);
+
+  React.useEffect(() => {
+    if (showMenu) {
+      void loadAvailableDevices();
+    }
+  }, [loadAvailableDevices, showMenu]);
+
+  const connectHid = async (knownDevice?: any) => {
     setIsConnecting(true);
     setShowMenu(false);
     setConnectionError(null);
     try {
-      const filters = [{ usagePage: 0xFF60, usage: 0x61 }];
-      const device = await hidTransport.requestDevice(filters);
+      const device = knownDevice || await hidTransport.requestDevice(VIA_HID_FILTERS);
       
       if (device) {
         const success = await hidTransport.connect(device);
@@ -254,12 +324,12 @@ export const DeviceConnector: React.FC = () => {
     }
   };
 
-  const connectZmkSerial = async () => {
+  const connectZmkSerial = async (knownPort?: any) => {
     setIsConnecting(true);
     setConnectionError(null);
     try {
       const transport = new ZmkSerialTransport();
-      const success = await transport.connect();
+      const success = await transport.connect(knownPort);
       if (success) {
         const portInfo = transport.getPortInfo();
         await finishZmkConnection(transport, {
@@ -279,12 +349,12 @@ export const DeviceConnector: React.FC = () => {
     }
   };
 
-  const connectZmkNativeBle = async () => {
+  const connectZmkNativeBle = async (deviceId?: string) => {
     setIsConnecting(true);
     setConnectionError(null);
     try {
       const transport = new TauriZmkBleTransport();
-      const success = await transport.connect();
+      const success = await transport.connect(deviceId);
       if (success) {
         const deviceInfo = transport.getDeviceInfo();
         await finishZmkConnection(transport, {
@@ -302,6 +372,18 @@ export const DeviceConnector: React.FC = () => {
     } finally {
       setIsConnecting(false);
     }
+  };
+
+  const connectAvailableDevice = async (candidate: DeviceCandidate) => {
+    if (candidate.kind === 'hid') {
+      await connectHid(candidate.device);
+      return;
+    }
+    if (candidate.kind === 'serial') {
+      await connectZmkSerial(candidate.port);
+      return;
+    }
+    await connectZmkNativeBle(candidate.deviceId);
   };
 
   const handleDisconnect = async () => {
@@ -347,7 +429,7 @@ export const DeviceConnector: React.FC = () => {
       {showMenu && (
         <>
           <div className="fixed inset-0 z-[45]" onClick={() => setShowMenu(false)} />
-          <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
+          <div className="absolute top-full left-0 mt-2 w-72 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1">
             <div className="p-2 border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 flex justify-between items-center select-none">
               <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">{t('remap.connectionMode')}</span>
             </div>
@@ -358,8 +440,40 @@ export const DeviceConnector: React.FC = () => {
                 </div>
               )}
 
+              {(isLoadingDevices || availableDevices.length > 0) && (
+                <div className="mb-1 border-b border-[var(--border-main)] pb-1">
+                  <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    {t('remap.availableDevices')}
+                  </div>
+                  {isLoadingDevices ? (
+                    <div className="flex items-center gap-2 px-3 py-2 text-[10px] font-semibold text-[var(--text-muted)]">
+                      <Loader2 size={12} className="animate-spin" />
+                      {t('remap.scanningDevices')}
+                    </div>
+                  ) : (
+                    availableDevices.map(candidate => (
+                      <button
+                        key={candidate.id}
+                        onClick={() => connectAvailableDevice(candidate)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all text-left cursor-pointer"
+                      >
+                        {candidate.kind === 'ble' ? (
+                          <Bluetooth size={14} className="text-sky-400 shrink-0" />
+                        ) : (
+                          <Usb size={14} className="text-amber-500 shrink-0" />
+                        )}
+                        <div className="min-w-0 flex flex-col">
+                          <span className="truncate text-[10px] font-bold uppercase tracking-wider">{candidate.label}</span>
+                          <span className="truncate text-[9px] text-[var(--text-muted)]">{candidate.detail}</span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+
               <button 
-                onClick={connectHid}
+                onClick={() => connectHid()}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all text-left cursor-pointer"
               >
                 <Usb size={14} className="text-amber-500 shrink-0" />
@@ -370,7 +484,7 @@ export const DeviceConnector: React.FC = () => {
               </button>
 
               <button 
-                onClick={connectZmkSerial}
+                onClick={() => connectZmkSerial()}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all text-left cursor-pointer"
               >
                 <Usb size={14} className="text-amber-500 shrink-0" />
@@ -381,7 +495,7 @@ export const DeviceConnector: React.FC = () => {
               </button>
 
               <button 
-                onClick={isTauriRuntime() ? connectZmkNativeBle : undefined}
+                onClick={isTauriRuntime() ? () => connectZmkNativeBle() : undefined}
                 disabled={!isTauriRuntime()}
                 title={isTauriRuntime() ? 'Connect via native Windows BLE' : t('remap.unsupportedBle')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left transition-all ${

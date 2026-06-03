@@ -143,6 +143,53 @@ mod winrt_ble {
         bail!("No ZMK Studio BLE device found");
     }
 
+    pub async fn list_studio_devices() -> Result<Vec<ConnectedDevice>> {
+        let devices = find_devices(None).await?;
+        let mut studio_devices = Vec::new();
+
+        for info in devices {
+            let id = info.Id()?;
+            let device = BluetoothLEDevice::FromIdAsync(&id)?.into_future().await?;
+            let services_result = device
+                .GetGattServicesForUuidAsync(ZMK_STUDIO_SERVICE)?
+                .into_future()
+                .await?;
+            if services_result.Status()? == GattCommunicationStatus::Success
+                && services_result.Services()?.Size()? > 0
+            {
+                studio_devices.push(ConnectedDevice {
+                    name: info.Name()?.to_string(),
+                    id: id.to_string(),
+                });
+            }
+        }
+
+        Ok(studio_devices)
+    }
+
+    async fn find_studio_device_by_id(device_id: &str) -> Result<(DeviceInformation, BluetoothLEDevice)> {
+        let devices = find_devices(None).await?;
+        for info in devices {
+            let id = info.Id()?;
+            if id.to_string() != device_id {
+                continue;
+            }
+
+            let device = BluetoothLEDevice::FromIdAsync(&id)?.into_future().await?;
+            let services_result = device
+                .GetGattServicesForUuidAsync(ZMK_STUDIO_SERVICE)?
+                .into_future()
+                .await?;
+            if services_result.Status()? == GattCommunicationStatus::Success
+                && services_result.Services()?.Size()? > 0
+            {
+                return Ok((info, device));
+            }
+        }
+
+        bail!("Selected ZMK Studio BLE device was not found");
+    }
+
     async fn get_studio_characteristic(device: &BluetoothLEDevice) -> Result<GattCharacteristic> {
         let services_result = device
             .GetGattServicesForUuidAsync(ZMK_STUDIO_SERVICE)?
@@ -180,9 +227,13 @@ mod winrt_ble {
 
     pub async fn connect(
         app: AppHandle,
-        name_filter: Option<String>,
+        device_id: Option<String>,
     ) -> Result<(ConnectedDevice, Connection)> {
-        let (info, device) = find_studio_device(name_filter.as_deref()).await?;
+        let (info, device) = if let Some(device_id) = device_id.as_deref() {
+            find_studio_device_by_id(device_id).await?
+        } else {
+            find_studio_device(None).await?
+        };
         let characteristic = get_studio_characteristic(&device).await?;
         let props = characteristic.CharacteristicProperties()?;
         if !props.contains(GattCharacteristicProperties::Write) {
@@ -290,11 +341,11 @@ struct NativeBleDeviceInfo {
 fn zmk_ble_connect(
     app: AppHandle,
     state: State<'_, NativeBleState>,
-    name_filter: Option<String>,
+    device_id: Option<String>,
 ) -> Result<NativeBleDeviceInfo, String> {
     #[cfg(windows)]
     {
-        let (device, connection) = tauri::async_runtime::block_on(winrt_ble::connect(app, name_filter))
+        let (device, connection) = tauri::async_runtime::block_on(winrt_ble::connect(app, device_id))
             .map_err(|err| err.to_string())?;
         *state.connection.lock().map_err(|err| err.to_string())? = Some(connection);
         Ok(NativeBleDeviceInfo {
@@ -305,8 +356,29 @@ fn zmk_ble_connect(
 
     #[cfg(not(windows))]
     {
-        let _ = (app, state, name_filter);
+        let _ = (app, state, device_id);
         Err("Native ZMK BLE is currently only implemented on Windows.".to_string())
+    }
+}
+
+#[tauri::command]
+fn zmk_ble_list_devices() -> Result<Vec<NativeBleDeviceInfo>, String> {
+    #[cfg(windows)]
+    {
+        let devices = tauri::async_runtime::block_on(winrt_ble::list_studio_devices())
+            .map_err(|err| err.to_string())?;
+        Ok(devices
+            .into_iter()
+            .map(|device| NativeBleDeviceInfo {
+                name: device.name,
+                id: device.id,
+            })
+            .collect())
+    }
+
+    #[cfg(not(windows))]
+    {
+        Ok(Vec::new())
     }
 }
 
@@ -361,6 +433,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            zmk_ble_list_devices,
             zmk_ble_connect,
             zmk_ble_send,
             zmk_ble_disconnect
