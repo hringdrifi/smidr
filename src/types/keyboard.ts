@@ -1,5 +1,5 @@
 // src/types/keyboard.ts
-import { UniversalAction } from './actions';
+import { UniversalAction, TapDanceEntry } from './actions';
 import type { QmkMcu } from '@/lib/mcu-presets';
 import type { VisualLayoutId } from '@/lib/visual-layouts';
 
@@ -85,6 +85,7 @@ export interface ProjectSettings {
     split: boolean;
   };
   layers: number;
+  tapDances?: TapDanceEntry[];
   visualLayout?: VisualLayoutId;
   layoutOptions: {
     [groupId: string]: {

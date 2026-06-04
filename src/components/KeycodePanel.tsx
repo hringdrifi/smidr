@@ -171,7 +171,8 @@ export const KeycodePanel = () => {
                             !code.startsWith('TO(') && 
                             !code.startsWith('LT(') && 
                             code !== 'any' &&
-                            !code.startsWith('MACRO_');
+                            !code.startsWith('MACRO_') &&
+                            !code.startsWith('TD_');
 
     if (isNormalKeycode && (action.action === 'lt' || action.action === 'mt' || (action.action === 'tap' && action.mods !== undefined))) {
       let clickedAction: UniversalAction;
@@ -217,6 +218,9 @@ export const KeycodePanel = () => {
       } else if (code.startsWith('MACRO_')) {
         const macroId = parseInt(code.split('_')[1] || '0', 10);
         clickedAction = { action: 'macro', macroId };
+      } else if (code.startsWith('TD_')) {
+        const tapDanceId = parseInt(code.split('_')[1] || '0', 10);
+        clickedAction = { action: 'td', tapDanceId };
       } else {
         clickedAction = { action: 'tap', keycode: code as UniversalKey };
       }

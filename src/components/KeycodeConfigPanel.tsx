@@ -171,6 +171,9 @@ export const KeycodeConfigPanel = () => {
         newAction = { action: 'mt', modifiers: existingModifiers, tapAction };
         break;
       }
+      case 'td':
+        newAction = { action: 'td', tapDanceId: activeAction.action === 'td' ? activeAction.tapDanceId : 0 };
+        break;
       case 'custom': {
         const protocol = activeAction.action === 'custom' ? activeAction.protocol : defaultCustomProtocol;
         const rawCode = activeAction.action === 'custom'
@@ -211,6 +214,12 @@ export const KeycodeConfigPanel = () => {
       activeAction.action === 'lt'
     ) {
       updateDraftAction({ ...activeAction, layerId });
+    }
+  };
+
+  const handleTapDanceChange = (tapDanceId: number) => {
+    if (activeAction.action === 'td') {
+      updateDraftAction({ ...activeAction, tapDanceId });
     }
   };
 
@@ -318,7 +327,7 @@ export const KeycodeConfigPanel = () => {
 
   // Determine current active config type string
   let currentType = 'tap';
-  if (['mo', 'tg', 'to', 'lt', 'mt'].includes(activeAction.action)) {
+  if (['mo', 'tg', 'to', 'lt', 'mt', 'td'].includes(activeAction.action)) {
     currentType = activeAction.action;
   } else if (activeAction.action === 'custom') {
     currentType = 'custom';
@@ -380,6 +389,10 @@ export const KeycodeConfigPanel = () => {
                   return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Acts as modifiers when held, sends keycode when tapped.';
                 })()}
                 {currentType === 'custom' && 'Passes a protocol-specific raw keycode or behavior through to the connected device.'}
+                {currentType === 'td' && (() => {
+                  const desc = t('keycodeConfig.tapDanceDescription');
+                  return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Runs the selected Tap Dance definition from the project firmware.';
+                })()}
                 {currentType === 'mod' && (() => {
                   const desc = t('keycodeConfig.modifierDescription');
                   return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Sends modifier keys combined with a base key (e.g. Ctrl + Shift + A).';
@@ -398,6 +411,7 @@ export const KeycodeConfigPanel = () => {
             <option value="tg">{t('keycodeConfig.typeToggle') || 'Toggle Layer (TG)'}</option>
             <option value="to">{t('keycodeConfig.typeTo') || 'Direct Layer (TO)'}</option>
             <option value="lt">{t('keycodeConfig.typeTap') || 'Layer Tap (LT)'}</option>
+            <option value="td">{t('keycodeConfig.typeTapDance') || 'Tap Dance (TD)'}</option>
             <option value="custom">{t('keycodeConfig.customKeycode') || 'Any'}</option>
           </select>
         </div>
@@ -469,6 +483,33 @@ export const KeycodeConfigPanel = () => {
                     )}
                   >
                     {idx}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {activeAction.action === 'td' && (
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              {t('keycodeConfig.tapDance') || 'Tap Dance'}
+            </label>
+            <div className="grid grid-cols-4 gap-1">
+              {Array.from({ length: 16 }).map((_, idx) => {
+                const isActive = activeAction.tapDanceId === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleTapDanceChange(idx)}
+                    className={cn(
+                      "py-1.5 text-xs font-bold rounded transition-all shadow-sm flex items-center justify-center border",
+                      isActive
+                        ? "bg-amber-500 text-zinc-950 border-amber-500 shadow-amber-500/10 scale-105"
+                        : "bg-[var(--bg-app)]/50 border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    )}
+                  >
+                    TD{idx}
                   </button>
                 );
               })}

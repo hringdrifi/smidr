@@ -1,6 +1,8 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
+import { TapDanceEntry, UniversalAction } from '@/types/actions';
+import { actionToQmkString } from './protocols/via-action-converter';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
@@ -74,9 +76,42 @@ ${rows}
 `;
 };
 
-const generateKeymapC = (validKeys: PhysicalKey[], keymapsArray: string[][][]) => {
+const tapDanceActionToQmkKey = (action: UniversalAction | undefined) => {
+  if (!action) return 'KC_NO';
+  const qmk = actionToQmkString(action);
+  return qmk.startsWith('TD(') ? 'KC_NO' : qmk;
+};
+
+const generateTapDanceC = (tapDances: TapDanceEntry[] = []) => {
+  const entries = tapDances
+    .filter(entry => entry.tapAction)
+    .sort((a, b) => a.id - b.id)
+    .map(entry => {
+      const tap = tapDanceActionToQmkKey(entry.tapAction);
+      if (entry.kind === 'layerMove') {
+        return `    [${entry.id}] = ACTION_TAP_DANCE_LAYER_MOVE(${tap}, ${entry.layerId ?? 0}),`;
+      }
+      if (entry.kind === 'layerToggle') {
+        return `    [${entry.id}] = ACTION_TAP_DANCE_LAYER_TOGGLE(${tap}, ${entry.layerId ?? 0}),`;
+      }
+      const doubleTap = tapDanceActionToQmkKey(entry.doubleTapAction);
+      return `    [${entry.id}] = ACTION_TAP_DANCE_DOUBLE(${tap}, ${doubleTap}),`;
+    });
+
+  if (entries.length === 0) return '';
+
+  return `
+tap_dance_action_t tap_dance_actions[] = {
+${entries.join('\n')}
+};
+
+`;
+};
+
+const generateKeymapC = (validKeys: PhysicalKey[], keymapsArray: string[][][], tapDances: TapDanceEntry[] = []) => {
   let keymapC = `#include QMK_KEYBOARD_H
 
+${generateTapDanceC(tapDances)}
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 `;
 
@@ -216,13 +251,14 @@ ${settings.features.rgb ? `
   // No [kbName].h is generated, allowing QMK to auto-generate the LAYOUT macro from keyboard.json.
 
   const firmwareViaJson = generateViaJson({ settings, keys: validKeys });
-  const keymapC = generateKeymapC(validKeys, firmwareViaJson.keymaps);
+  const keymapC = generateKeymapC(validKeys, firmwareViaJson.keymaps, settings.tapDances || []);
+  const tapDanceRules = (settings.tapDances || []).length > 0 ? `TAP_DANCE_ENABLE = yes\n` : '';
 
   // 4. keymaps/default/
   const defaultFolder = kbFolder.folder('keymaps')?.folder('default');
   if (defaultFolder) {
     defaultFolder.file('keymap.c', keymapC);
-    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n`);
+    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${tapDanceRules}`);
   }
 
   // 5. keymaps/via/
@@ -233,7 +269,7 @@ ${settings.features.rgb ? `
     viaFolder.file('keymap.c', keymapC);
 
     // keymaps/via/rules.mk
-    viaFolder.file('rules.mk', `VIA_ENABLE = yes\n`);
+    viaFolder.file('rules.mk', `VIA_ENABLE = yes\n${tapDanceRules}`);
   }
 
   return await zip.generateAsync({ type: 'blob' });

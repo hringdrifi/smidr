@@ -107,6 +107,8 @@ describe('protocols conversion tests', () => {
     it('should convert macro calls, bootloader keys, and system reset keys', () => {
       expect(viaCodeToAction(0x7701)).toEqual({ action: 'macro', macroId: 1 });
       expect(actionToViaCode({ action: 'macro', macroId: 1 })).toBe(0x7701);
+      expect(viaCodeToAction(0x5702)).toEqual({ action: 'td', tapDanceId: 2 });
+      expect(actionToViaCode({ action: 'td', tapDanceId: 2 })).toBe(0x5702);
 
       expect(viaCodeToAction(0x7C00)).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
       expect(actionToViaCode({ action: 'tap', keycode: 'BOOTLOADER' })).toBe(0x7C00);
@@ -222,6 +224,8 @@ describe('protocols conversion tests', () => {
       expect(actionToQmkString({ action: 'tap', keycode: 'BL_BRTG' })).toBe('BL_BRTG');
       expect(actionToQmkString({ action: 'tap', keycode: 'LM_TOGG' })).toBe('LM_TOGG');
       expect(actionToQmkString({ action: 'tap', keycode: 'RM_TOGG' })).toBe('RM_TOGG');
+      expect(qmkStringToAction('TD(3)')).toEqual({ action: 'td', tapDanceId: 3 });
+      expect(actionToQmkString({ action: 'td', tapDanceId: 3 })).toBe('TD(3)');
     });
 
     it('should parse and format nested modifiers and shortcuts', () => {
@@ -290,6 +294,8 @@ describe('protocols conversion tests', () => {
       expect(actionToZmkString({ action: 'trans' })).toBe('&trans');
       expect(actionToZmkString({ action: 'none' })).toBe('&none');
       expect(actionToZmkString({ action: 'tap', keycode: 'A' })).toBe('&kp A');
+      expect(zmkStringToAction('&td 4')).toEqual({ action: 'td', tapDanceId: 4 });
+      expect(actionToZmkString({ action: 'td', tapDanceId: 4 })).toBe('&td 4');
     });
 
     it('should parse and format ZMK layer operations', () => {

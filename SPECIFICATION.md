@@ -131,8 +131,16 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
   - `to`: レイヤー置換切り替え（Replace）。
   - `lt`: レイヤータップ（Holdで対象レイヤー、Tapでキー入力）。
   - `mt`: モッドタップ（Holdで修飾キー、Tapでキー入力）。
+  - `td`: タップダンス。`tapDanceId` でプロジェクト内の `tapDances` 定義を参照し、QMK/Vial エクスポート時は `TD(n)` として出力する。
 - **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`action: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
 - **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
+
+### 9.5 タップダンス定義 (Tap Dance)
+- **プロジェクト定義**: タップダンス定義は `ProjectSettings.tapDances` に保存する。各定義は `id`, `name`, `kind`, `tapAction`, `doubleTapAction`, `layerId` を持つ。
+- **対応種類**: Smiðr UI から登録できる種類は `ACTION_TAP_DANCE_DOUBLE(kc1, kc2)`, `ACTION_TAP_DANCE_LAYER_MOVE(kc, layer)`, `ACTION_TAP_DANCE_LAYER_TOGGLE(kc, layer)` に対応する。
+- **キーマップ割当**: キー上の割当は `UniversalAction` の `action: 'td'` と `tapDanceId` で保持する。
+- **QMK/Vial エクスポート**: `tapDances` が存在する場合、`keymap.c` に `tap_dance_actions[]` を生成し、対象 keymap の `rules.mk` に `TAP_DANCE_ENABLE = yes` を追加する。
+- **制限**: Tap Dance 定義の登録は firmware source export 向けの設計機能であり、WebHID 経由で接続済み VIA/Vial デバイスへ Tap Dance 定義そのものを動的登録する機能ではない。
 
 ### 9.2 デバイス指向の自己適応型 UI (Device-Oriented Self-Adaptive UI)
 - **仕様**: 接続された物理デバイスのケイパビリティフラグ（`DeviceCapability`: `hasMacros`, `hasLighting` など）を監視し、デバイスのサポート状況に応じてエディタの UI を自己適応的に制御します。

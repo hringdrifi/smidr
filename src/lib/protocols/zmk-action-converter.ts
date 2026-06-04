@@ -287,6 +287,8 @@ export function actionToZmkString(action: UniversalAction): string {
     }
     case 'macro':
       return `&macro_${action.macroId}`;
+    case 'td':
+      return `&td ${action.tapDanceId}`;
     case 'custom':
       return action.rawCode;
     default:
@@ -336,6 +338,10 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
   // macro (&macro_0)
   match = trimmed.match(/^&macro_(\d+)$/);
   if (match) return { action: 'macro', macroId: parseInt(match[1]) };
+
+  // tap dance (&td 0)
+  match = trimmed.match(/^&td\s+(\d+)$/);
+  if (match) return { action: 'td', tapDanceId: parseInt(match[1]) };
 
   // rgb_ug (&rgb_ug UG_TOGG)
   match = trimmed.match(/^&rgb_ug\s+([^\s]+)$/);

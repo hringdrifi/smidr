@@ -216,6 +216,8 @@ export const formatActionLabel = (
       return { type: 'mod_tap', modifiers: action.modifiers, tapLabel: formatActionLabel(action.tapAction, visualLayout) };
     case 'macro':
       return { type: 'text', text: `Macro\n${action.macroId}` };
+    case 'td':
+      return { type: 'text', text: `TD\n${action.tapDanceId}` };
     case 'custom':
       return { type: 'text', text: action.rawCode };
     default:

@@ -18,6 +18,7 @@ const ZMK_UNSUPPORTED_PREFIXES = [
 
 const isLayerKey = (code: string) => /^(MO|TG|TO|LT)\(\d+\)$/.test(code);
 const isMacroKey = (code: string) => /^MACRO_\d+$/.test(code);
+const isTapDanceKey = (code: string) => /^TD_\d+$/.test(code);
 
 const isZmkUnsupportedKey = (code: string) => (
   ZMK_UNSUPPORTED_KEYS.has(code) ||
@@ -49,5 +50,6 @@ export function isUniversalKeycode(code: string): code is UniversalKey {
     code !== 'none' &&
     code !== 'any' &&
     !isLayerKey(code) &&
-    !isMacroKey(code);
+    !isMacroKey(code) &&
+    !isTapDanceKey(code);
 }

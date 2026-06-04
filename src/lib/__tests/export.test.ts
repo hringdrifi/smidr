@@ -27,6 +27,7 @@ const baseSettings: ProjectSettings = {
     split: false,
   },
   layers: 2,
+  tapDances: [],
   layoutOptions: {},
   activeOptions: {},
 };
@@ -247,6 +248,58 @@ describe('export generation', () => {
     expect(keyboardJson.bootloader).toBe('stm32duino');
   });
 
+  it('emits QMK tap dance definitions and rules when configured', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Tap Dance Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      tapDances: [
+        {
+          id: 0,
+          name: 'Esc Caps',
+          kind: 'double',
+          tapAction: { action: 'tap', keycode: 'ESC' },
+          doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+        },
+      ],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'td', tapDanceId: 0 },
+        },
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymapC = await zip.file('tap_dance_board/keymaps/default/keymap.c')!.async('string');
+    const rulesMk = await zip.file('tap_dance_board/keymaps/default/rules.mk')!.async('string');
+
+    expect(keymapC).toContain('tap_dance_action_t tap_dance_actions[]');
+    expect(keymapC).toContain('[0] = ACTION_TAP_DANCE_DOUBLE(KC_ESC, KC_CAPS)');
+    expect(keymapC).toContain('TD(0)');
+    expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
+  });
+
   it('emits explicit QMK bootmagic settings', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -426,6 +479,57 @@ describe('export generation', () => {
     expect(configH).toContain('#define MATRIX_MASKED');
     expect(rulesMk).toContain('MATRIX_MASKED = yes');
     expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
+  });
+
+  it('emits Vial tap dance definitions and rules when configured', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Vial Tap Dance',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      tapDances: [
+        {
+          id: 1,
+          name: 'Esc Layer',
+          kind: 'layerToggle',
+          tapAction: { action: 'tap', keycode: 'ESC' },
+          layerId: 1,
+        },
+      ],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'td', tapDanceId: 1 },
+        },
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymapC = await zip.file('vial_tap_dance/keymaps/vial/keymap.c')!.async('string');
+    const rulesMk = await zip.file('vial_tap_dance/keymaps/vial/rules.mk')!.async('string');
+
+    expect(keymapC).toContain('[1] = ACTION_TAP_DANCE_LAYER_TOGGLE(KC_ESC, 1)');
+    expect(keymapC).toContain('TD(1)');
+    expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
 
   it('emits configured Vial unlock combo positions', async () => {

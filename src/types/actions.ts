@@ -79,6 +79,7 @@ export type UniversalAction =
   | { action: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
   | { action: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
   | { action: "macro"; macroId: number }                                   // マクロ
+  | { action: "td"; tapDanceId: number }                                   // タップダンス
   | { action: "custom"; protocol: "qmk" | "via" | "vial" | "zmk"; rawCode: string; label?: string };        // エスケープハッチ
 
 export interface MacroAction {
@@ -91,4 +92,13 @@ export interface MacroAction {
 export interface ComboEntry {
   inputs: UniversalAction[];
   output: UniversalAction;
+}
+
+export interface TapDanceEntry {
+  id: number;
+  name: string;
+  kind: 'double' | 'layerMove' | 'layerToggle';
+  tapAction: UniversalAction;
+  doubleTapAction?: UniversalAction;
+  layerId?: number;
 }

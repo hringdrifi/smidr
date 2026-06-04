@@ -1,7 +1,7 @@
 import { create, StateCreator } from 'zustand';
 import { temporal } from 'zundo';
 import { PhysicalKey, ProjectSettings, EditorSettings, SmidrProject } from '@/types/keyboard';
-import { UniversalAction, MacroAction, ComboEntry } from '@/types/actions';
+import { UniversalAction, MacroAction, ComboEntry, TapDanceEntry } from '@/types/actions';
 import { deserializeMacros, serializeMacros } from './protocols/vial-macro-converter';
 import { Language } from './i18n';
 import { sortKeys } from './sorting';
@@ -139,6 +139,7 @@ export interface KeyboardState {
   setRemoteCombos: (combos: ComboEntry[]) => void;
   updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
   updateRemoteCombo: (index: number, combo: ComboEntry) => Promise<void>;
+  updateTapDance: (id: number, entry: TapDanceEntry) => void;
   syncMacrosAndCombos: (existingProtocol?: VialProtocol) => Promise<void>;
 
   // Matrix Painting
@@ -240,6 +241,7 @@ const initialState: Partial<KeyboardState> = {
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
+    tapDances: [],
     visualLayout: getStoredVisualLayout(),
     layoutOptions: {},
     activeOptions: {},
@@ -390,6 +392,13 @@ const retargetLayerAction = (action: UniversalAction, deletedLayer: number): Uni
   }
   return action;
 };
+
+const retargetTapDance = (entry: TapDanceEntry, deletedLayer: number): TapDanceEntry => ({
+  ...entry,
+  tapAction: retargetLayerAction(entry.tapAction, deletedLayer),
+  doubleTapAction: entry.doubleTapAction ? retargetLayerAction(entry.doubleTapAction, deletedLayer) : undefined,
+  layerId: entry.layerId === deletedLayer ? 0 : entry.layerId,
+});
 
 const removeLayerFromKeymap = (
   keymap: Record<number, UniversalAction> | undefined,
@@ -1028,6 +1037,19 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setRemoteMacros: (macros: MacroAction[][]) => set({ remoteMacros: macros }),
         setRemoteCombos: (combos: ComboEntry[]) => set({ remoteCombos: combos }),
+        updateTapDance: (id: number, entry: TapDanceEntry) => set((s) => {
+          const current = s.settings.tapDances || [];
+          const exists = current.some(td => td.id === id);
+          const nextTapDances = exists
+            ? current.map(td => td.id === id ? entry : td)
+            : [...current, entry];
+          return {
+            settings: {
+              ...s.settings,
+              tapDances: nextTapDances.sort((a, b) => a.id - b.id)
+            }
+          };
+        }),
 
         syncMacrosAndCombos: async (existingProtocol?: VialProtocol) => {
           const s = get();
@@ -1829,7 +1851,11 @@ export const useKeyboardStore = create<KeyboardState>()(
           }));
 
           return {
-            settings: { ...s.settings, layers: nextLayers },
+            settings: {
+              ...s.settings,
+              layers: nextLayers,
+              tapDances: (s.settings.tapDances || []).map(entry => retargetTapDance(entry, deletedLayer))
+            },
             currentLayer: Math.min(s.currentLayer, nextLayers - 1),
             keys: nextKeys,
             baseKeys: nextKeys,
@@ -2040,6 +2066,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               bootmagic: { enabled: true, ...(settings.qmk?.bootmagic || {}) },
             },
             vial: settings.vial || {},
+            tapDances: settings.tapDances || [],
             matrix: settings.matrix || {
               rows: settings.pins?.rows?.length || 0,
               cols: settings.pins?.cols?.length || 0
@@ -2195,6 +2222,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
                   qmk: qmk ? { ...(s.settings.qmk || {}), ...qmk } : s.settings.qmk,
                   features: features ? { ...s.settings.features, ...features } : s.settings.features,
+                  tapDances: s.settings.tapDances || [],
                   matrix: nextMatrix
                 },
                 isProjectOpen: true,
@@ -2217,6 +2245,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           settings: {
             ...initialState.settings,
             vialUid: generateRandomVialUid(),
+            tapDances: [],
             visualLayout: normalizeVisualLayout(s.settings.visualLayout)
           } as ProjectSettings,
           keys: [],

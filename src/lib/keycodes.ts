@@ -1,6 +1,6 @@
 // src/lib/keycodes.ts
 
-export type KeycodeCategory = 'Basic' | 'ISO/JIS' | 'Layers' | 'Media' | 'Macro' | 'Lighting' | 'Special';
+export type KeycodeCategory = 'Basic' | 'ISO/JIS' | 'Layers' | 'Media' | 'Macro' | 'Tap Dance' | 'Lighting' | 'Special';
 
 export interface Keycode {
   code: string;
@@ -16,7 +16,7 @@ export interface Keycode {
   y2?: number;
 }
 
-export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Lighting', 'Special'];
+export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Tap Dance', 'Lighting', 'Special'];
 
 export const KEYCODES: Keycode[] = [
   // ==========================================
@@ -249,6 +249,7 @@ export const KEYCODES: Keycode[] = [
   { code: 'MOUSE_BTN5', label: 'Btn 5', category: 'Media' },
 
   ...Array.from({ length: 16 }, (_, i) => ({ code: `MACRO_${i}`, label: `M${i}`, category: 'Macro' as const })),
+  ...Array.from({ length: 16 }, (_, i) => ({ code: `TD_${i}`, label: `TD${i}`, category: 'Tap Dance' as const, description: `Tap Dance ${i}` })),
 
   { code: 'BL_TOGG', label: 'BL\nToggle', category: 'Lighting', description: 'Toggle keyboard backlight' },
   { code: 'BL_STEP', label: 'BL\nStep', category: 'Lighting', description: 'Cycle keyboard backlight levels' },

@@ -253,6 +253,9 @@ export const MODIFIER_MASKS: Record<Modifier, number> = {
   "RGUI": 0x18
 };
 
+const QK_TAP_DANCE = 0x5700;
+const QK_TAP_DANCE_MAX = 0x57FF;
+
 // Decodes standard 16-bit QMK keycodes into the unified UniversalAction AST
 export function viaCodeToAction(value: number): UniversalAction {
   // Transparent (Pass-through)
@@ -333,6 +336,11 @@ export function viaCodeToAction(value: number): UniversalAction {
     return { action: 'macro', macroId: value - 0x7700 };
   }
 
+  // Tap Dance TD(n) -> QK_TAP_DANCE range
+  if (value >= QK_TAP_DANCE && value <= QK_TAP_DANCE_MAX) {
+    return { action: 'td', tapDanceId: value - QK_TAP_DANCE };
+  }
+
   // Basic keys lookup
   if (HID_TO_UNIVERSAL[value]) {
     return { action: 'tap', keycode: HID_TO_UNIVERSAL[value] };
@@ -376,6 +384,8 @@ export function actionToViaCode(action: UniversalAction): number {
     }
     case 'macro':
       return 0x7700 + (action.macroId & 0x1F);
+    case 'td':
+      return QK_TAP_DANCE + (action.tapDanceId & 0xFF);
     case 'custom':
       if ((action.protocol === 'qmk' || action.protocol === 'via' || action.protocol === 'vial') && action.rawCode.startsWith('0x')) {
         return parseInt(action.rawCode.slice(2), 16);
@@ -421,6 +431,8 @@ export function actionToQmkString(action: UniversalAction): string {
     }
     case 'macro':
       return `MACRO(${action.macroId})`;
+    case 'td':
+      return `TD(${action.tapDanceId})`;
     case 'custom':
       return action.rawCode;
     default:
@@ -518,6 +530,10 @@ export function qmkStringToAction(qmkStr: string): UniversalAction {
   // MACRO(n)
   match = trimmed.match(/^MACRO\((\d+)\)$/);
   if (match) return { action: 'macro', macroId: parseInt(match[1]) };
+
+  // TD(n)
+  match = trimmed.match(/^TD\((\d+)\)$/);
+  if (match) return { action: 'td', tapDanceId: parseInt(match[1]) };
 
   // Basic keys lookup
   if (QMK_TO_UNIVERSAL[trimmed]) {
