@@ -122,6 +122,27 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "PSCR": { qmk: "KC_PSCR", hid: 0x0046 },
   "PAUS": { qmk: "KC_PAUS", hid: 0x0048 },
 
+  // Keypad / Application
+  "P0": { qmk: "KC_P0", hid: 0x0062 },
+  "P1": { qmk: "KC_P1", hid: 0x0059 },
+  "P2": { qmk: "KC_P2", hid: 0x005A },
+  "P3": { qmk: "KC_P3", hid: 0x005B },
+  "P4": { qmk: "KC_P4", hid: 0x005C },
+  "P5": { qmk: "KC_P5", hid: 0x005D },
+  "P6": { qmk: "KC_P6", hid: 0x005E },
+  "P7": { qmk: "KC_P7", hid: 0x005F },
+  "P8": { qmk: "KC_P8", hid: 0x0060 },
+  "P9": { qmk: "KC_P9", hid: 0x0061 },
+  "PSLS": { qmk: "KC_PSLS", hid: 0x0054 },
+  "PAST": { qmk: "KC_PAST", hid: 0x0055 },
+  "PMNS": { qmk: "KC_PMNS", hid: 0x0056 },
+  "PPLS": { qmk: "KC_PPLS", hid: 0x0057 },
+  "PENT": { qmk: "KC_PENT", hid: 0x0058 },
+  "PDOT": { qmk: "KC_PDOT", hid: 0x0063 },
+  "PCMM": { qmk: "KC_PCMM", hid: 0x0085 },
+  "PEQL": { qmk: "KC_PEQL", hid: 0x0067 },
+  "APP": { qmk: "KC_APP", hid: 0x0065 },
+
   // Modifiers
   "LCTL": { qmk: "KC_LCTL", hid: 0x00E0 },
   "LSFT": { qmk: "KC_LSFT", hid: 0x00E1 },

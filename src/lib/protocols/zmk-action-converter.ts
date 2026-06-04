@@ -66,6 +66,27 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "PSCR": "PSCRN",
   "PAUS": "PAUSE_BREAK",
 
+  // Keypad / Application
+  "P0": "KP_N0",
+  "P1": "KP_N1",
+  "P2": "KP_N2",
+  "P3": "KP_N3",
+  "P4": "KP_N4",
+  "P5": "KP_N5",
+  "P6": "KP_N6",
+  "P7": "KP_N7",
+  "P8": "KP_N8",
+  "P9": "KP_N9",
+  "PSLS": "KP_SLASH",
+  "PAST": "KP_ASTERISK",
+  "PMNS": "KP_MINUS",
+  "PPLS": "KP_PLUS",
+  "PENT": "KP_ENTER",
+  "PDOT": "KP_DOT",
+  "PCMM": "KP_COMMA",
+  "PEQL": "KP_EQUAL",
+  "APP": "K_APP",
+
   // Modifiers
   "LCTL": "LCTRL",
   "LSFT": "LSHIFT",

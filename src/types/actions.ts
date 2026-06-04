@@ -27,6 +27,10 @@ export type UniversalKey =
   | "INS" | "DEL" | "HOME" | "END" | "PGUP" | "PGDN"
   // ロックキー (KC_ を除去)
   | "NLCK" | "SCRL" | "PSCR" | "PAUS"
+  // テンキー・アプリケーションキー
+  | "P0" | "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "P9"
+  | "PSLS" | "PAST" | "PMNS" | "PPLS" | "PENT" | "PDOT" | "PCMM" | "PEQL"
+  | "APP"
   // 統一された修飾キー
   | "LCTL" | "LSFT" | "LALT" | "LGUI"
   | "RCTL" | "RSFT" | "RALT" | "RGUI"
