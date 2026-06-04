@@ -10,22 +10,32 @@ import { Keyboard, ChevronLeft, ChevronRight, Layers2 as LayersIcon } from 'luci
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey } from '@/types/actions';
 import { applyVisualLayoutToKeycode } from '@/lib/visual-layouts';
+import { getKeycodeSupport, KeycodeSupportTarget } from '@/lib/keycode-support';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const SUPPORT_TARGETS: Array<{ id: KeycodeSupportTarget; label: string }> = [
+  { id: 'all', label: 'ALL' },
+  { id: 'via', label: 'VIA' },
+  { id: 'vial', label: 'Vial' },
+  { id: 'zmk', label: 'ZMK' },
+];
+
 export const KeycodePanel = () => {
   const { 
     keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
-    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam
+    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam, appMode
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [tapSearchQuery, setTapSearchQuery] = useState('');
+  const [supportTarget, setSupportTarget] = useState<KeycodeSupportTarget>('all');
   const tabContainerRef = useRef<HTMLDivElement>(null);
+  const showSupportTargetFilter = appMode === 'design';
 
   const layersCount = settings.layers || 4;
   let filteredKeycodes: Keycode[] = activeTab === 'Layers' 
@@ -61,7 +71,7 @@ export const KeycodePanel = () => {
 
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
-    if (useKeyboardStore.getState().appMode === 'remap') {
+    if (appMode === 'remap') {
       if (selectedRemoteIndex !== undefined) {
         action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
       }
@@ -254,8 +264,16 @@ export const KeycodePanel = () => {
   const isTabSupported = (tab: KeycodeCategory) => {
     if (!deviceCapabilities) return true; // Offline design mode: assume support
     if (tab === 'Macro') return deviceCapabilities.hasMacros;
-    if (tab === 'Backlight') return deviceCapabilities.hasLighting;
+    if (tab === 'Lighting') return deviceCapabilities.hasLighting;
     return true;
+  };
+
+  const getKeycodeTitle = (k: Keycode, support: ReturnType<typeof getKeycodeSupport>) => {
+    if (!support.supported) return `${k.code} (${support.reason})`;
+    const translatedDescription = t(`keycodeDescriptions.${k.code}`);
+    return translatedDescription === `keycodeDescriptions.${k.code}`
+      ? (k.description || k.code)
+      : translatedDescription;
   };
 
   return (
@@ -296,6 +314,26 @@ export const KeycodePanel = () => {
           })}
         </div>
 
+        {showSupportTargetFilter && (
+          <div className="ml-3 flex items-center rounded border border-[var(--border-main)] bg-[var(--bg-panel)] p-0.5 shrink-0">
+            {SUPPORT_TARGETS.map(target => (
+              <button
+                key={target.id}
+                type="button"
+                onClick={() => setSupportTarget(target.id)}
+                className={cn(
+                  "px-2.5 py-1 text-[10px] font-bold rounded transition-colors",
+                  supportTarget === target.id
+                    ? "bg-amber-500 text-zinc-950"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+                )}
+              >
+                {target.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {isOverflowing && (
           <div className="flex items-center border-l border-[var(--border-main)] shrink-0 bg-[var(--bg-app)]/50">
             <button onClick={() => scrollTabs('left')} className="p-3 text-[var(--text-muted)] hover:text-[var(--text-highlight)] hover:bg-[var(--bg-hover)] transition-colors">
@@ -331,7 +369,9 @@ export const KeycodePanel = () => {
                       const isIsoEnter = activeTab === 'ISO/JIS' && k.code === 'ENT' && k.w2 !== undefined && k.h2 !== undefined;
                       const w = calcWidth(k.width ?? 1.0);
                       const h = isIsoEnter ? (2 * 48 + G) : 48;
-                      const isKeyDisabled = selectedKeyIds.length === 0;
+                      const support = getKeycodeSupport(k.code, showSupportTargetFilter ? supportTarget : 'all');
+                      const isKeyDisabled = selectedKeyIds.length === 0 || !support.supported;
+                      const title = getKeycodeTitle(k, support);
 
                       return (
                         <div 
@@ -376,7 +416,7 @@ export const KeycodePanel = () => {
                           <button
                             onClick={() => handleKeycodeClick(k.code)}
                             disabled={isKeyDisabled}
-                            title={k.code}
+                            title={title}
                             style={{ 
                               width: `${w}px`,
                               height: `${h}px`,
@@ -410,7 +450,8 @@ export const KeycodePanel = () => {
               ))
             ) : (
             filteredKeycodes.map(k => {
-                const isKeyDisabled = selectedKeyIds.length === 0;
+                const support = getKeycodeSupport(k.code, showSupportTargetFilter ? supportTarget : 'all');
+                const isKeyDisabled = selectedKeyIds.length === 0 || !support.supported;
                 const isLayersTab = activeTab === 'Layers';
 
                 // Layers tab: determine action type and layer number for JSX rendering
@@ -432,7 +473,7 @@ export const KeycodePanel = () => {
                     key={k.code}
                     onClick={() => handleKeycodeClick(k.code)}
                     disabled={isKeyDisabled}
-                    title={k.description || k.code}
+                    title={getKeycodeTitle(k, support)}
                     style={{ width: `${U}px` }}
                     className={cn(
                       "flex flex-col items-center justify-center rounded border transition-colors h-12 group shadow-sm gap-0.5 px-1",

@@ -1,6 +1,6 @@
 // src/lib/keycodes.ts
 
-export type KeycodeCategory = 'Basic' | 'ISO/JIS' | 'Layers' | 'Media' | 'Macro' | 'Backlight' | 'Special';
+export type KeycodeCategory = 'Basic' | 'ISO/JIS' | 'Layers' | 'Media' | 'Macro' | 'Lighting' | 'Special';
 
 export interface Keycode {
   code: string;
@@ -16,7 +16,7 @@ export interface Keycode {
   y2?: number;
 }
 
-export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Backlight', 'Special'];
+export const VIAL_TABS: KeycodeCategory[] = ['Basic', 'ISO/JIS', 'Layers', 'Media', 'Macro', 'Lighting', 'Special'];
 
 export const KEYCODES: Keycode[] = [
   // ==========================================
@@ -250,23 +250,50 @@ export const KEYCODES: Keycode[] = [
 
   ...Array.from({ length: 16 }, (_, i) => ({ code: `MACRO_${i}`, label: `M${i}`, category: 'Macro' as const })),
 
-  { code: 'BL_TOGG', label: 'BL\nToggle', category: 'Backlight', description: 'Toggle keyboard backlight' },
-  { code: 'BL_STEP', label: 'BL\nStep', category: 'Backlight', description: 'Cycle keyboard backlight levels' },
-  { code: 'BL_UP', label: 'BL +', category: 'Backlight', description: 'Increase keyboard backlight level' },
-  { code: 'BL_DOWN', label: 'BL -', category: 'Backlight', description: 'Decrease keyboard backlight level' },
-  { code: 'BL_ON', label: 'BL On', category: 'Backlight', description: 'Turn keyboard backlight on' },
-  { code: 'BL_OFF', label: 'BL Off', category: 'Backlight', description: 'Turn keyboard backlight off' },
-  { code: 'RGB_TOG', label: 'RGB\nToggle', category: 'Backlight', description: 'Toggle RGB backlight' },
-  { code: 'RGB_MOD', label: 'Mode +', category: 'Backlight', description: 'Cycle RGB backlight mode forward' },
-  { code: 'RGB_RMOD', label: 'Mode -', category: 'Backlight', description: 'Cycle RGB backlight mode backward' },
-  { code: 'RGB_VAI', label: 'Bright +', category: 'Backlight', description: 'Increase RGB backlight brightness' },
-  { code: 'RGB_VAD', label: 'Bright -', category: 'Backlight', description: 'Decrease RGB backlight brightness' },
-  { code: 'RGB_HUI', label: 'Hue +', category: 'Backlight', description: 'Increase RGB backlight hue' },
-  { code: 'RGB_HUD', label: 'Hue -', category: 'Backlight', description: 'Decrease RGB backlight hue' },
-  { code: 'RGB_SAI', label: 'Sat +', category: 'Backlight', description: 'Increase RGB backlight saturation' },
-  { code: 'RGB_SAD', label: 'Sat -', category: 'Backlight', description: 'Decrease RGB backlight saturation' },
-  { code: 'RGB_SPI', label: 'Speed +', category: 'Backlight', description: 'Increase RGB backlight effect speed' },
-  { code: 'RGB_SPD', label: 'Speed -', category: 'Backlight', description: 'Decrease RGB backlight effect speed' },
+  { code: 'BL_TOGG', label: 'BL\nToggle', category: 'Lighting', description: 'Toggle keyboard backlight' },
+  { code: 'BL_STEP', label: 'BL\nStep', category: 'Lighting', description: 'Cycle keyboard backlight levels' },
+  { code: 'BL_ON', label: 'BL On', category: 'Lighting', description: 'Turn keyboard backlight on' },
+  { code: 'BL_OFF', label: 'BL Off', category: 'Lighting', description: 'Turn keyboard backlight off' },
+  { code: 'BL_UP', label: 'BL +', category: 'Lighting', description: 'Increase keyboard backlight level' },
+  { code: 'BL_DOWN', label: 'BL -', category: 'Lighting', description: 'Decrease keyboard backlight level' },
+  { code: 'BL_BRTG', label: 'BL\nBreath', category: 'Lighting', description: 'Toggle keyboard backlight breathing' },
+  { code: 'LM_ON', label: 'LM On', category: 'Lighting', description: 'Turn LED Matrix on' },
+  { code: 'LM_OFF', label: 'LM Off', category: 'Lighting', description: 'Turn LED Matrix off' },
+  { code: 'LM_TOGG', label: 'LM\nToggle', category: 'Lighting', description: 'Toggle LED Matrix' },
+  { code: 'LM_NEXT', label: 'LM\nNext', category: 'Lighting', description: 'Cycle LED Matrix mode forward' },
+  { code: 'LM_PREV', label: 'LM\nPrev', category: 'Lighting', description: 'Cycle LED Matrix mode backward' },
+  { code: 'LM_BRIU', label: 'LM Bri+', category: 'Lighting', description: 'Increase LED Matrix brightness' },
+  { code: 'LM_BRID', label: 'LM Bri-', category: 'Lighting', description: 'Decrease LED Matrix brightness' },
+  { code: 'LM_SPDU', label: 'LM Spd+', category: 'Lighting', description: 'Increase LED Matrix effect speed' },
+  { code: 'LM_SPDD', label: 'LM Spd-', category: 'Lighting', description: 'Decrease LED Matrix effect speed' },
+  { code: 'LM_FLGN', label: 'LM Flag+', category: 'Lighting', description: 'Increase LED Matrix LED flags' },
+  { code: 'LM_FLGP', label: 'LM Flag-', category: 'Lighting', description: 'Decrease LED Matrix LED flags' },
+  { code: 'UG_TOGG', label: 'UG\nToggle', category: 'Lighting', description: 'Toggle RGB underglow' },
+  { code: 'UG_NEXT', label: 'UG\nNext', category: 'Lighting', description: 'Cycle RGB underglow mode forward' },
+  { code: 'UG_PREV', label: 'UG\nPrev', category: 'Lighting', description: 'Cycle RGB underglow mode backward' },
+  { code: 'UG_VALU', label: 'UG Val+', category: 'Lighting', description: 'Increase RGB underglow value' },
+  { code: 'UG_VALD', label: 'UG Val-', category: 'Lighting', description: 'Decrease RGB underglow value' },
+  { code: 'UG_HUEU', label: 'UG Hue+', category: 'Lighting', description: 'Increase RGB underglow hue' },
+  { code: 'UG_HUED', label: 'UG Hue-', category: 'Lighting', description: 'Decrease RGB underglow hue' },
+  { code: 'UG_SATU', label: 'UG Sat+', category: 'Lighting', description: 'Increase RGB underglow saturation' },
+  { code: 'UG_SATD', label: 'UG Sat-', category: 'Lighting', description: 'Decrease RGB underglow saturation' },
+  { code: 'UG_SPDU', label: 'UG Spd+', category: 'Lighting', description: 'Increase RGB underglow effect speed' },
+  { code: 'UG_SPDD', label: 'UG Spd-', category: 'Lighting', description: 'Decrease RGB underglow effect speed' },
+  { code: 'RM_ON', label: 'RM On', category: 'Lighting', description: 'Turn RGB Matrix on' },
+  { code: 'RM_OFF', label: 'RM Off', category: 'Lighting', description: 'Turn RGB Matrix off' },
+  { code: 'RM_TOGG', label: 'RM\nToggle', category: 'Lighting', description: 'Toggle RGB Matrix' },
+  { code: 'RM_NEXT', label: 'RM\nNext', category: 'Lighting', description: 'Cycle RGB Matrix mode forward' },
+  { code: 'RM_PREV', label: 'RM\nPrev', category: 'Lighting', description: 'Cycle RGB Matrix mode backward' },
+  { code: 'RM_HUEU', label: 'RM Hue+', category: 'Lighting', description: 'Increase RGB Matrix hue' },
+  { code: 'RM_HUED', label: 'RM Hue-', category: 'Lighting', description: 'Decrease RGB Matrix hue' },
+  { code: 'RM_SATU', label: 'RM Sat+', category: 'Lighting', description: 'Increase RGB Matrix saturation' },
+  { code: 'RM_SATD', label: 'RM Sat-', category: 'Lighting', description: 'Decrease RGB Matrix saturation' },
+  { code: 'RM_VALU', label: 'RM Val+', category: 'Lighting', description: 'Increase RGB Matrix value' },
+  { code: 'RM_VALD', label: 'RM Val-', category: 'Lighting', description: 'Decrease RGB Matrix value' },
+  { code: 'RM_SPDU', label: 'RM Spd+', category: 'Lighting', description: 'Increase RGB Matrix effect speed' },
+  { code: 'RM_SPDD', label: 'RM Spd-', category: 'Lighting', description: 'Decrease RGB Matrix effect speed' },
+  { code: 'RM_FLGN', label: 'RM Flag+', category: 'Lighting', description: 'Increase RGB Matrix LED flags' },
+  { code: 'RM_FLGP', label: 'RM Flag-', category: 'Lighting', description: 'Decrease RGB Matrix LED flags' },
 
   { code: 'transparent', label: '▽', category: 'Special', description: 'Passes through the keycode of the layer below (Transparent)' },
   { code: 'none', label: 'None', category: 'Special', description: 'Disables the key (No action)' },

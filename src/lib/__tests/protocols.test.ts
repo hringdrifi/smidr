@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+﻿import { describe, it, expect } from 'vitest';
 import { viaCodeToAction, actionToViaCode, actionToQmkString, qmkStringToAction } from '../protocols/via-action-converter';
 import { zmkStringToAction, actionToZmkString } from '../protocols/zmk-action-converter';
 import { UniversalAction } from '@/types/actions';
@@ -112,30 +112,30 @@ describe('protocols conversion tests', () => {
       expect(actionToViaCode({ action: 'tap', keycode: 'BOOTLOADER' })).toBe(0x7C00);
     });
 
-    it('should convert RGB lighting keycodes as tap actions', () => {
-      expect(viaCodeToAction(0x7820)).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
-      expect(viaCodeToAction(0x7821)).toEqual({ action: 'tap', keycode: 'RGB_MOD' });
-      expect(viaCodeToAction(0x7822)).toEqual({ action: 'tap', keycode: 'RGB_RMOD' });
-      expect(viaCodeToAction(0x7823)).toEqual({ action: 'tap', keycode: 'RGB_HUI' });
-      expect(viaCodeToAction(0x7824)).toEqual({ action: 'tap', keycode: 'RGB_HUD' });
-      expect(viaCodeToAction(0x7825)).toEqual({ action: 'tap', keycode: 'RGB_SAI' });
-      expect(viaCodeToAction(0x7826)).toEqual({ action: 'tap', keycode: 'RGB_SAD' });
-      expect(viaCodeToAction(0x7827)).toEqual({ action: 'tap', keycode: 'RGB_VAI' });
-      expect(viaCodeToAction(0x7828)).toEqual({ action: 'tap', keycode: 'RGB_VAD' });
-      expect(viaCodeToAction(0x7829)).toEqual({ action: 'tap', keycode: 'RGB_SPI' });
-      expect(viaCodeToAction(0x782A)).toEqual({ action: 'tap', keycode: 'RGB_SPD' });
+    it('should convert underglow keycodes as tap actions', () => {
+      expect(viaCodeToAction(0x7820)).toEqual({ action: 'tap', keycode: 'UG_TOGG' });
+      expect(viaCodeToAction(0x7821)).toEqual({ action: 'tap', keycode: 'UG_NEXT' });
+      expect(viaCodeToAction(0x7822)).toEqual({ action: 'tap', keycode: 'UG_PREV' });
+      expect(viaCodeToAction(0x7823)).toEqual({ action: 'tap', keycode: 'UG_HUEU' });
+      expect(viaCodeToAction(0x7824)).toEqual({ action: 'tap', keycode: 'UG_HUED' });
+      expect(viaCodeToAction(0x7825)).toEqual({ action: 'tap', keycode: 'UG_SATU' });
+      expect(viaCodeToAction(0x7826)).toEqual({ action: 'tap', keycode: 'UG_SATD' });
+      expect(viaCodeToAction(0x7827)).toEqual({ action: 'tap', keycode: 'UG_VALU' });
+      expect(viaCodeToAction(0x7828)).toEqual({ action: 'tap', keycode: 'UG_VALD' });
+      expect(viaCodeToAction(0x7829)).toEqual({ action: 'tap', keycode: 'UG_SPDU' });
+      expect(viaCodeToAction(0x782A)).toEqual({ action: 'tap', keycode: 'UG_SPDD' });
 
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_TOG' })).toBe(0x7820);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_MOD' })).toBe(0x7821);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_RMOD' })).toBe(0x7822);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_HUI' })).toBe(0x7823);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_HUD' })).toBe(0x7824);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SAI' })).toBe(0x7825);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SAD' })).toBe(0x7826);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_VAI' })).toBe(0x7827);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_VAD' })).toBe(0x7828);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SPI' })).toBe(0x7829);
-      expect(actionToViaCode({ action: 'tap', keycode: 'RGB_SPD' })).toBe(0x782A);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_TOGG' })).toBe(0x7820);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_NEXT' })).toBe(0x7821);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_PREV' })).toBe(0x7822);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_HUEU' })).toBe(0x7823);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_HUED' })).toBe(0x7824);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_SATU' })).toBe(0x7825);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_SATD' })).toBe(0x7826);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_VALU' })).toBe(0x7827);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_VALD' })).toBe(0x7828);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_SPDU' })).toBe(0x7829);
+      expect(actionToViaCode({ action: 'tap', keycode: 'UG_SPDD' })).toBe(0x782A);
     });
 
     it('should convert backlight keycodes as tap actions', () => {
@@ -145,6 +145,7 @@ describe('protocols conversion tests', () => {
       expect(viaCodeToAction(0x7803)).toEqual({ action: 'tap', keycode: 'BL_DOWN' });
       expect(viaCodeToAction(0x7804)).toEqual({ action: 'tap', keycode: 'BL_UP' });
       expect(viaCodeToAction(0x7805)).toEqual({ action: 'tap', keycode: 'BL_STEP' });
+      expect(viaCodeToAction(0x7806)).toEqual({ action: 'tap', keycode: 'BL_BRTG' });
 
       expect(actionToViaCode({ action: 'tap', keycode: 'BL_ON' })).toBe(0x7800);
       expect(actionToViaCode({ action: 'tap', keycode: 'BL_OFF' })).toBe(0x7801);
@@ -152,6 +153,45 @@ describe('protocols conversion tests', () => {
       expect(actionToViaCode({ action: 'tap', keycode: 'BL_DOWN' })).toBe(0x7803);
       expect(actionToViaCode({ action: 'tap', keycode: 'BL_UP' })).toBe(0x7804);
       expect(actionToViaCode({ action: 'tap', keycode: 'BL_STEP' })).toBe(0x7805);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BL_BRTG' })).toBe(0x7806);
+    });
+
+    it('should convert LED Matrix keycodes as tap actions', () => {
+      expect(viaCodeToAction(0x7810)).toEqual({ action: 'tap', keycode: 'LM_ON' });
+      expect(viaCodeToAction(0x7811)).toEqual({ action: 'tap', keycode: 'LM_OFF' });
+      expect(viaCodeToAction(0x7812)).toEqual({ action: 'tap', keycode: 'LM_TOGG' });
+      expect(viaCodeToAction(0x7813)).toEqual({ action: 'tap', keycode: 'LM_NEXT' });
+      expect(viaCodeToAction(0x7814)).toEqual({ action: 'tap', keycode: 'LM_PREV' });
+      expect(viaCodeToAction(0x7815)).toEqual({ action: 'tap', keycode: 'LM_BRIU' });
+      expect(viaCodeToAction(0x7816)).toEqual({ action: 'tap', keycode: 'LM_BRID' });
+      expect(viaCodeToAction(0x7817)).toEqual({ action: 'tap', keycode: 'LM_SPDU' });
+      expect(viaCodeToAction(0x7818)).toEqual({ action: 'tap', keycode: 'LM_SPDD' });
+      expect(viaCodeToAction(0x7819)).toEqual({ action: 'tap', keycode: 'LM_FLGN' });
+      expect(viaCodeToAction(0x781A)).toEqual({ action: 'tap', keycode: 'LM_FLGP' });
+
+      expect(actionToViaCode({ action: 'tap', keycode: 'LM_ON' })).toBe(0x7810);
+      expect(actionToViaCode({ action: 'tap', keycode: 'LM_FLGP' })).toBe(0x781A);
+    });
+
+    it('should convert RGB Matrix keycodes as tap actions', () => {
+      expect(viaCodeToAction(0x7840)).toEqual({ action: 'tap', keycode: 'RM_ON' });
+      expect(viaCodeToAction(0x7841)).toEqual({ action: 'tap', keycode: 'RM_OFF' });
+      expect(viaCodeToAction(0x7842)).toEqual({ action: 'tap', keycode: 'RM_TOGG' });
+      expect(viaCodeToAction(0x7843)).toEqual({ action: 'tap', keycode: 'RM_NEXT' });
+      expect(viaCodeToAction(0x7844)).toEqual({ action: 'tap', keycode: 'RM_PREV' });
+      expect(viaCodeToAction(0x7845)).toEqual({ action: 'tap', keycode: 'RM_HUEU' });
+      expect(viaCodeToAction(0x7846)).toEqual({ action: 'tap', keycode: 'RM_HUED' });
+      expect(viaCodeToAction(0x7847)).toEqual({ action: 'tap', keycode: 'RM_SATU' });
+      expect(viaCodeToAction(0x7848)).toEqual({ action: 'tap', keycode: 'RM_SATD' });
+      expect(viaCodeToAction(0x7849)).toEqual({ action: 'tap', keycode: 'RM_VALU' });
+      expect(viaCodeToAction(0x784A)).toEqual({ action: 'tap', keycode: 'RM_VALD' });
+      expect(viaCodeToAction(0x784B)).toEqual({ action: 'tap', keycode: 'RM_SPDU' });
+      expect(viaCodeToAction(0x784C)).toEqual({ action: 'tap', keycode: 'RM_SPDD' });
+      expect(viaCodeToAction(0x784D)).toEqual({ action: 'tap', keycode: 'RM_FLGN' });
+      expect(viaCodeToAction(0x784E)).toEqual({ action: 'tap', keycode: 'RM_FLGP' });
+
+      expect(actionToViaCode({ action: 'tap', keycode: 'RM_ON' })).toBe(0x7840);
+      expect(actionToViaCode({ action: 'tap', keycode: 'RM_FLGP' })).toBe(0x784E);
     });
   });
 
@@ -161,14 +201,20 @@ describe('protocols conversion tests', () => {
       expect(qmkStringToAction('KC_NO')).toEqual({ action: 'none' });
       expect(qmkStringToAction('KC_A')).toEqual({ action: 'tap', keycode: 'A' });
       expect(qmkStringToAction('QK_BOOT')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
-      expect(qmkStringToAction('RGB_TOG')).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
+      expect(qmkStringToAction('UG_TOGG')).toEqual({ action: 'tap', keycode: 'UG_TOGG' });
       expect(qmkStringToAction('BL_TOGG')).toEqual({ action: 'tap', keycode: 'BL_TOGG' });
+      expect(qmkStringToAction('BL_BRTG')).toEqual({ action: 'tap', keycode: 'BL_BRTG' });
+      expect(qmkStringToAction('LM_TOGG')).toEqual({ action: 'tap', keycode: 'LM_TOGG' });
+      expect(qmkStringToAction('RM_TOGG')).toEqual({ action: 'tap', keycode: 'RM_TOGG' });
 
       expect(actionToQmkString({ action: 'trans' })).toBe('KC_TRNS');
       expect(actionToQmkString({ action: 'none' })).toBe('KC_NO');
       expect(actionToQmkString({ action: 'tap', keycode: 'A' })).toBe('KC_A');
-      expect(actionToQmkString({ action: 'tap', keycode: 'RGB_TOG' })).toBe('RGB_TOG');
+      expect(actionToQmkString({ action: 'tap', keycode: 'UG_TOGG' })).toBe('UG_TOGG');
       expect(actionToQmkString({ action: 'tap', keycode: 'BL_TOGG' })).toBe('BL_TOGG');
+      expect(actionToQmkString({ action: 'tap', keycode: 'BL_BRTG' })).toBe('BL_BRTG');
+      expect(actionToQmkString({ action: 'tap', keycode: 'LM_TOGG' })).toBe('LM_TOGG');
+      expect(actionToQmkString({ action: 'tap', keycode: 'RM_TOGG' })).toBe('RM_TOGG');
     });
 
     it('should parse and format nested modifiers and shortcuts', () => {
@@ -283,11 +329,18 @@ describe('protocols conversion tests', () => {
     });
 
     it('should parse and format ZMK lighting keys as tap actions', () => {
-      expect(zmkStringToAction('&rgb_ug RGB_TOG')).toEqual({ action: 'tap', keycode: 'RGB_TOG' });
-      expect(zmkStringToAction('&rgb_ug RGB_EFF')).toEqual({ action: 'tap', keycode: 'RGB_MOD' });
+      expect(zmkStringToAction('&rgb_ug UG_TOGG')).toEqual({ action: 'tap', keycode: 'UG_TOGG' });
+      expect(zmkStringToAction('&rgb_ug UG_NEXT')).toEqual({ action: 'tap', keycode: 'UG_NEXT' });
+      expect(zmkStringToAction('&bl BL_TOG')).toEqual({ action: 'tap', keycode: 'BL_TOGG' });
+      expect(zmkStringToAction('&bl BL_INC')).toEqual({ action: 'tap', keycode: 'BL_UP' });
 
-      expect(actionToZmkString({ action: 'tap', keycode: 'RGB_TOG' })).toBe('&rgb_ug RGB_TOG');
-      expect(actionToZmkString({ action: 'tap', keycode: 'RGB_MOD' })).toBe('&rgb_ug RGB_EFF');
+      expect(actionToZmkString({ action: 'tap', keycode: 'UG_TOGG' })).toBe('&rgb_ug UG_TOGG');
+      expect(actionToZmkString({ action: 'tap', keycode: 'UG_NEXT' })).toBe('&rgb_ug UG_NEXT');
+      expect(actionToZmkString({ action: 'tap', keycode: 'BL_TOGG' })).toBe('&bl BL_TOG');
+      expect(actionToZmkString({ action: 'tap', keycode: 'BL_STEP' })).toBe('&bl BL_CYCLE');
+      expect(() => actionToZmkString({ action: 'tap', keycode: 'BL_BRTG' })).toThrow('ZMK backlight does not support BL_BRTG.');
+      expect(() => actionToZmkString({ action: 'tap', keycode: 'LM_TOGG' })).toThrow('ZMK LED Matrix does not support LM_TOGG.');
+      expect(() => actionToZmkString({ action: 'tap', keycode: 'RM_TOGG' })).toThrow('ZMK RGB Matrix does not support RM_TOGG.');
     });
 
     it('should parse and format ZMK modifier combinations', () => {

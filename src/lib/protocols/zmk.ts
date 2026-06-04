@@ -1432,6 +1432,7 @@ function resolveBehaviorId(behaviorIds: Record<string, number>, shortName: strin
     if (normShort === "to" && normKey === "tolayer") return value;
     if (normShort === "lt" && normKey === "layertap") return value;
     if (normShort === "mt" && (normKey === "modtap" || normKey === "holdtap")) return value;
+    if (normShort === "bl" && normKey === "backlight") return value;
   }
 
   // Fallback defaults if not found dynamically from device
@@ -1456,6 +1457,7 @@ function getBehaviorAliases(displayName: string): string[] {
   if (normalized === "modtap" || normalized === "holdtap") aliases.push("mt");
   if (normalized === "transparent") aliases.push("trans");
   if (normalized === "none" || normalized === "nooperation" || normalized === "noop") aliases.push("none");
+  if (normalized === "backlight") aliases.push("bl");
 
   return aliases;
 }
@@ -1532,21 +1534,32 @@ function bindingToZmkString(
   }
   if (name === "rgbug") {
     const cmdMap: Record<number, string> = {
-      0: "RGB_TOG",
-      1: "RGB_ON",
-      2: "RGB_OFF",
-      3: "RGB_HUI",
-      4: "RGB_HUD",
-      5: "RGB_SAI",
-      6: "RGB_SAD",
-      7: "RGB_BRI",
-      8: "RGB_BRD",
-      9: "RGB_SPI",
-      10: "RGB_SPD",
-      11: "RGB_EFF",
-      12: "RGB_EFR"
+      0: "UG_TOGG",
+      1: "UG_ON",
+      2: "UG_OFF",
+      3: "UG_HUEU",
+      4: "UG_HUED",
+      5: "UG_SATU",
+      6: "UG_SATD",
+      7: "UG_VALU",
+      8: "UG_VALD",
+      9: "UG_SPDU",
+      10: "UG_SPDD",
+      11: "UG_NEXT",
+      12: "UG_PREV"
     };
-    return `&rgb_ug ${cmdMap[binding.param1] || "RGB_TOG"}`;
+    return `&rgb_ug ${cmdMap[binding.param1] || "UG_TOGG"}`;
+  }
+  if (name === "bl" || name === "backlight") {
+    const cmdMap: Record<number, string> = {
+      0: "BL_ON",
+      1: "BL_OFF",
+      2: "BL_TOG",
+      3: "BL_INC",
+      4: "BL_DEC",
+      5: "BL_CYCLE"
+    };
+    return `&bl ${cmdMap[binding.param1] || "BL_TOG"}`;
   }
   
   const dtsName = rawName.replace(/[\s_]+/g, '_');
@@ -1699,24 +1712,47 @@ function zmkStringToBinding(
   if (match) {
     const cmd = match[1];
     const cmdMap: Record<string, number> = {
-      "RGB_TOG": 0,
-      "RGB_ON": 1,
-      "RGB_OFF": 2,
-      "RGB_HUI": 3,
-      "RGB_HUD": 4,
-      "RGB_SAI": 5,
-      "RGB_SAD": 6,
-      "RGB_BRI": 7,
-      "RGB_BRD": 8,
-      "RGB_SPI": 9,
-      "RGB_SPD": 10,
-      "RGB_EFF": 11,
-      "RGB_EFR": 12
+      "UG_TOGG": 0,
+      "UG_ON": 1,
+      "UG_OFF": 2,
+      "UG_HUEU": 3,
+      "UG_HUED": 4,
+      "UG_SATU": 5,
+      "UG_SATD": 6,
+      "UG_VALU": 7,
+      "UG_VALD": 8,
+      "UG_SPDU": 9,
+      "UG_SPDD": 10,
+      "UG_NEXT": 11,
+      "UG_PREV": 12
     };
     return {
       behaviorId: behaviorIds["rgb_ug"] || 0,
       param1: cmdMap[cmd] !== undefined ? cmdMap[cmd] : 0,
       param2: 0
+    };
+  }
+
+  match = trimmed.match(/^&bl\s+([^\s]+)(?:\s+(-?\d+))?$/);
+  if (match) {
+    const cmd = match[1];
+    const cmdMap: Record<string, number> = {
+      "BL_ON": 0,
+      "BL_OFF": 1,
+      "BL_TOG": 2,
+      "BL_INC": 3,
+      "BL_DEC": 4,
+      "BL_CYCLE": 5,
+      "BL_SET": 6
+    };
+    const behaviorId = resolveBehaviorId(behaviorIds, "bl");
+    if (!behaviorId) {
+      throw new Error('Unknown ZMK behavior "bl". Connect to a ZMK Studio device with backlight support and sync behavior metadata first.');
+    }
+    return {
+      behaviorId,
+      param1: cmdMap[cmd] !== undefined ? cmdMap[cmd] : 2,
+      param2: cmd === "BL_SET" ? parseInt(match[2] || "0", 10) : 0
     };
   }
   

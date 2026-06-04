@@ -88,23 +88,50 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "BRID": "C_BRI_DN",
 
   // Lighting
-  "RGB_TOG": "RGB_TOG",
-  "RGB_MOD": "RGB_EFF",
-  "RGB_RMOD": "RGB_EFR",
-  "RGB_VAI": "RGB_BRI",
-  "RGB_VAD": "RGB_BRD",
-  "RGB_HUI": "RGB_HUI",
-  "RGB_HUD": "RGB_HUD",
-  "RGB_SAI": "RGB_SAI",
-  "RGB_SAD": "RGB_SAD",
-  "RGB_SPI": "RGB_SPI",
-  "RGB_SPD": "RGB_SPD",
+  "UG_TOGG": "UG_TOGG",
+  "UG_NEXT": "UG_NEXT",
+  "UG_PREV": "UG_PREV",
+  "UG_VALU": "UG_VALU",
+  "UG_VALD": "UG_VALD",
+  "UG_HUEU": "UG_HUEU",
+  "UG_HUED": "UG_HUED",
+  "UG_SATU": "UG_SATU",
+  "UG_SATD": "UG_SATD",
+  "UG_SPDU": "UG_SPDU",
+  "UG_SPDD": "UG_SPDD",
   "BL_ON": "BL_ON",
   "BL_OFF": "BL_OFF",
   "BL_TOGG": "BL_TOGG",
   "BL_DOWN": "BL_DOWN",
   "BL_UP": "BL_UP",
   "BL_STEP": "BL_STEP",
+  "BL_BRTG": "BL_BRTG",
+  "LM_ON": "LM_ON",
+  "LM_OFF": "LM_OFF",
+  "LM_TOGG": "LM_TOGG",
+  "LM_NEXT": "LM_NEXT",
+  "LM_PREV": "LM_PREV",
+  "LM_BRIU": "LM_BRIU",
+  "LM_BRID": "LM_BRID",
+  "LM_SPDU": "LM_SPDU",
+  "LM_SPDD": "LM_SPDD",
+  "LM_FLGN": "LM_FLGN",
+  "LM_FLGP": "LM_FLGP",
+  "RM_ON": "RM_ON",
+  "RM_OFF": "RM_OFF",
+  "RM_TOGG": "RM_TOGG",
+  "RM_NEXT": "RM_NEXT",
+  "RM_PREV": "RM_PREV",
+  "RM_HUEU": "RM_HUEU",
+  "RM_HUED": "RM_HUED",
+  "RM_SATU": "RM_SATU",
+  "RM_SATD": "RM_SATD",
+  "RM_VALU": "RM_VALU",
+  "RM_VALD": "RM_VALD",
+  "RM_SPDU": "RM_SPDU",
+  "RM_SPDD": "RM_SPDD",
+  "RM_FLGN": "RM_FLGN",
+  "RM_FLGP": "RM_FLGP",
 
   // Mouse Keys
   "MOUSE_UP": "MOVE_UP",
@@ -127,6 +154,20 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
 // Reversing mappings for fast lookup
 export const ZMK_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(ZMK_KEY_MAP).reduce((acc, [k, v]) => {
   acc[v] = k as UniversalKey;
+  return acc;
+}, {} as Record<string, UniversalKey>);
+
+export const ZMK_BACKLIGHT_KEY_MAP: Partial<Record<UniversalKey, string>> = {
+  "BL_ON": "BL_ON",
+  "BL_OFF": "BL_OFF",
+  "BL_TOGG": "BL_TOG",
+  "BL_DOWN": "BL_DEC",
+  "BL_UP": "BL_INC",
+  "BL_STEP": "BL_CYCLE"
+};
+
+export const ZMK_BACKLIGHT_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(ZMK_BACKLIGHT_KEY_MAP).reduce((acc, [key, value]) => {
+  if (value) acc[value] = key as UniversalKey;
   return acc;
 }, {} as Record<string, UniversalKey>);
 
@@ -169,7 +210,20 @@ export function actionToZmkString(action: UniversalAction): string {
       return '&none';
     case 'tap': {
       const zKey = ZMK_KEY_MAP[action.keycode] || action.keycode;
-      if (action.keycode.startsWith('RGB_')) {
+      if (action.keycode.startsWith('LM_')) {
+        throw new Error(`ZMK LED Matrix does not support ${action.keycode}.`);
+      }
+      if (action.keycode.startsWith('RM_')) {
+        throw new Error(`ZMK RGB Matrix does not support ${action.keycode}.`);
+      }
+      if (action.keycode.startsWith('BL_')) {
+        const blAction = ZMK_BACKLIGHT_KEY_MAP[action.keycode];
+        if (!blAction) {
+          throw new Error(`ZMK backlight does not support ${action.keycode}.`);
+        }
+        return `&bl ${blAction}`;
+      }
+      if (action.keycode.startsWith('UG_')) {
         return `&rgb_ug ${zKey}`;
       }
       if (action.keycode.startsWith('MOUSE_BTN')) {
@@ -262,12 +316,21 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
   match = trimmed.match(/^&macro_(\d+)$/);
   if (match) return { action: 'macro', macroId: parseInt(match[1]) };
 
-  // rgb_ug (&rgb_ug RGB_TOG)
+  // rgb_ug (&rgb_ug UG_TOGG)
   match = trimmed.match(/^&rgb_ug\s+([^\s]+)$/);
   if (match) {
     const cmd = match[1];
     if (ZMK_TO_UNIVERSAL[cmd]) {
       return { action: 'tap', keycode: ZMK_TO_UNIVERSAL[cmd] };
+    }
+  }
+
+  // backlight (&bl BL_TOG)
+  match = trimmed.match(/^&bl\s+([^\s]+)(?:\s+\d+)?$/);
+  if (match) {
+    const cmd = match[1];
+    if (ZMK_BACKLIGHT_TO_UNIVERSAL[cmd]) {
+      return { action: 'tap', keycode: ZMK_BACKLIGHT_TO_UNIVERSAL[cmd] };
     }
   }
 
