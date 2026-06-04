@@ -104,12 +104,14 @@ describe('protocols conversion tests', () => {
       })).toBe(0x232C);
     });
 
-    it('should convert macro calls and bootloader keys', () => {
+    it('should convert macro calls, bootloader keys, and system reset keys', () => {
       expect(viaCodeToAction(0x7701)).toEqual({ action: 'macro', macroId: 1 });
       expect(actionToViaCode({ action: 'macro', macroId: 1 })).toBe(0x7701);
 
       expect(viaCodeToAction(0x7C00)).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
       expect(actionToViaCode({ action: 'tap', keycode: 'BOOTLOADER' })).toBe(0x7C00);
+      expect(viaCodeToAction(0x7C01)).toEqual({ action: 'tap', keycode: 'SYSTEM_RESET' });
+      expect(actionToViaCode({ action: 'tap', keycode: 'SYSTEM_RESET' })).toBe(0x7C01);
     });
 
     it('should convert underglow keycodes as tap actions', () => {
@@ -201,6 +203,9 @@ describe('protocols conversion tests', () => {
       expect(qmkStringToAction('KC_NO')).toEqual({ action: 'none' });
       expect(qmkStringToAction('KC_A')).toEqual({ action: 'tap', keycode: 'A' });
       expect(qmkStringToAction('QK_BOOT')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
+      expect(qmkStringToAction('QK_BOOTLOADER')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
+      expect(qmkStringToAction('QK_REBOOT')).toEqual({ action: 'tap', keycode: 'SYSTEM_RESET' });
+      expect(qmkStringToAction('QK_RBT')).toEqual({ action: 'tap', keycode: 'SYSTEM_RESET' });
       expect(qmkStringToAction('UG_TOGG')).toEqual({ action: 'tap', keycode: 'UG_TOGG' });
       expect(qmkStringToAction('BL_TOGG')).toEqual({ action: 'tap', keycode: 'BL_TOGG' });
       expect(qmkStringToAction('BL_BRTG')).toEqual({ action: 'tap', keycode: 'BL_BRTG' });
@@ -210,6 +215,8 @@ describe('protocols conversion tests', () => {
       expect(actionToQmkString({ action: 'trans' })).toBe('KC_TRNS');
       expect(actionToQmkString({ action: 'none' })).toBe('KC_NO');
       expect(actionToQmkString({ action: 'tap', keycode: 'A' })).toBe('KC_A');
+      expect(actionToQmkString({ action: 'tap', keycode: 'BOOTLOADER' })).toBe('QK_BOOT');
+      expect(actionToQmkString({ action: 'tap', keycode: 'SYSTEM_RESET' })).toBe('QK_REBOOT');
       expect(actionToQmkString({ action: 'tap', keycode: 'UG_TOGG' })).toBe('UG_TOGG');
       expect(actionToQmkString({ action: 'tap', keycode: 'BL_TOGG' })).toBe('BL_TOGG');
       expect(actionToQmkString({ action: 'tap', keycode: 'BL_BRTG' })).toBe('BL_BRTG');

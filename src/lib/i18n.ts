@@ -242,7 +242,8 @@ export const TRANSLATIONS = {
       RM_SPDD: 'Decrease RGB Matrix effect speed',
       RM_FLGN: 'Increase RGB Matrix LED flags',
       RM_FLGP: 'Decrease RGB Matrix LED flags',
-      BOOTLOADER: 'Enter bootloader / system reset mode',
+      BOOTLOADER: 'Enter bootloader mode for flashing',
+      SYSTEM_RESET: 'Reset the keyboard without entering bootloader mode',
       EISU: 'Alphanumeric toggle key for JIS keyboards',
     },
     keycodeTabs: {
@@ -1265,7 +1266,8 @@ export const TRANSLATIONS = {
       RM_SPDD: 'RGB Matrix効果の速度を下げます',
       RM_FLGN: 'RGB MatrixのLEDフラグを進めます',
       RM_FLGP: 'RGB MatrixのLEDフラグを戻します',
-      BOOTLOADER: 'ブートローダーまたはシステムリセットモードに入ります',
+      BOOTLOADER: '書き込み用のブートローダーモードに入ります',
+      SYSTEM_RESET: 'ブートローダーに入らずキーボードを再起動します',
       EISU: 'JISキーボードの英数切り替えキーです',
     },
     keycodeTabs: {

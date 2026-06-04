@@ -297,7 +297,8 @@ export const KEYCODES: Keycode[] = [
 
   { code: 'transparent', label: '▽', category: 'Special', description: 'Passes through the keycode of the layer below (Transparent)' },
   { code: 'none', label: 'None', category: 'Special', description: 'Disables the key (No action)' },
-  { code: 'BOOTLOADER', label: 'Reset', category: 'Special', description: 'Enters bootloader / system reset mode' },
+  { code: 'BOOTLOADER', label: 'Boot', category: 'Special', description: 'Enters bootloader mode for flashing' },
+  { code: 'SYSTEM_RESET', label: 'Reboot', category: 'Special', description: 'Resets the keyboard without entering bootloader mode' },
   ...Array.from({ length: 12 }, (_, i) => ({ code: `F${13 + i}`, label: `F${13 + i}`, category: 'Special' as const })),
   { code: 'EISU', label: '英数', category: 'Special', description: 'Alphanumeric Toggle key for JIS keyboards' },
 ];

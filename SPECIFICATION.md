@@ -132,6 +132,7 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
   - `lt`: レイヤータップ（Holdで対象レイヤー、Tapでキー入力）。
   - `mt`: モッドタップ（Holdで修飾キー、Tapでキー入力）。
 - **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`action: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
+- **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
 
 ### 9.2 デバイス指向の自己適応型 UI (Device-Oriented Self-Adaptive UI)
 - **仕様**: 接続された物理デバイスのケイパビリティフラグ（`DeviceCapability`: `hasMacros`, `hasLighting` など）を監視し、デバイスのサポート状況に応じてエディタの UI を自己適応的に制御します。

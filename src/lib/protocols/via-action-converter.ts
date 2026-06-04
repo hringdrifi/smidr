@@ -223,7 +223,7 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
 
   // System
   "BOOTLOADER": { qmk: "QK_BOOT", hid: 0x7C00 },
-  "SYSTEM_RESET": { qmk: "QK_BOOT", hid: 0x7C00 },
+  "SYSTEM_RESET": { qmk: "QK_REBOOT", hid: 0x7C01 },
   "TRNS": { qmk: "KC_TRNS", hid: 0x0001 },
   "NO": { qmk: "KC_NO", hid: 0x0000 }
 };
@@ -233,6 +233,8 @@ export const QMK_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(KEY
   if (!acc[v.qmk]) acc[v.qmk] = k as UniversalKey;
   return acc;
 }, {} as Record<string, UniversalKey>);
+QMK_TO_UNIVERSAL.QK_BOOTLOADER = "BOOTLOADER";
+QMK_TO_UNIVERSAL.QK_RBT = "SYSTEM_RESET";
 
 export const HID_TO_UNIVERSAL: Record<number, UniversalKey> = Object.entries(KEY_MAP).reduce((acc, [k, v]) => {
   if (!acc[v.hid]) acc[v.hid] = k as UniversalKey;
