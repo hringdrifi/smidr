@@ -37,13 +37,16 @@ export const KeycodePanel = () => {
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const showSupportTargetFilter = appMode === 'design';
 
+  const layerDescription = (key: string, layer: number) =>
+    t(`keycodeDescriptions.${key}`).replace('{layer}', String(layer));
+
   const layersCount = settings.layers || 4;
   let filteredKeycodes: Keycode[] = activeTab === 'Layers' 
     ? [
-        ...Array.from({ length: layersCount }, (_, i) => ({ code: `MO(${i})`, label: `MO(${i})`, category: 'Layers' as const, description: `Momentary layer: switches to layer ${i} while held` })),
-        ...Array.from({ length: layersCount }, (_, i) => ({ code: `TG(${i})`, label: `TG(${i})`, category: 'Layers' as const, description: `Toggle layer: toggles layer ${i} active/inactive on press` })),
-        ...Array.from({ length: layersCount }, (_, i) => ({ code: `TO(${i})`, label: `TO(${i})`, category: 'Layers' as const, description: `Direct layer: switches directly to layer ${i}` })),
-        ...Array.from({ length: layersCount }, (_, i) => ({ code: `LT(${i})`, label: `LT(${i})`, category: 'Layers' as const, description: `Layer Tap: switches to layer ${i} when held, sends transparent keycode when tapped` })),
+        ...Array.from({ length: layersCount }, (_, i) => ({ code: `MO(${i})`, label: `MO(${i})`, category: 'Layers' as const, description: layerDescription('layerMomentary', i) })),
+        ...Array.from({ length: layersCount }, (_, i) => ({ code: `TG(${i})`, label: `TG(${i})`, category: 'Layers' as const, description: layerDescription('layerToggle', i) })),
+        ...Array.from({ length: layersCount }, (_, i) => ({ code: `TO(${i})`, label: `TO(${i})`, category: 'Layers' as const, description: layerDescription('layerDirect', i) })),
+        ...Array.from({ length: layersCount }, (_, i) => ({ code: `LT(${i})`, label: `LT(${i})`, category: 'Layers' as const, description: layerDescription('layerTap', i) })),
       ]
     : KEYCODES.filter(k => k.category === activeTab).map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
 
