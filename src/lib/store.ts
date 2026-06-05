@@ -29,6 +29,7 @@ import {
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
 import { normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
+import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, isDemoModeEnabled } from './demo';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 
@@ -217,6 +218,12 @@ export interface KeyboardState {
   // Parameter Capture
   isCapturingParam: boolean;
   setIsCapturingParam: (capturing: boolean) => void;
+
+  // Demo Mode
+  isDemoMode: boolean;
+  initializeDemoMode: () => void;
+  connectDemoDevice: () => void;
+  disconnectDemoDevice: () => void;
 }
 
 const generateRandomVialUid = (): string => {
@@ -266,7 +273,7 @@ const initialState: Partial<KeyboardState> = {
   selectedKeyIds: [],
   focusedKeyId: null,
   selectionAnchorId: null,
-  appMode: getStoredAppMode(),
+  appMode: isDemoModeEnabled() ? 'remap' : getStoredAppMode(),
   editorMode: getStoredEditorMode(),
   currentLayer: 0,
   connectedDevice: null,
@@ -291,6 +298,7 @@ const initialState: Partial<KeyboardState> = {
   matrixClipboard: [],
   actionClipboard: [],
   isCapturingParam: false,
+  isDemoMode: isDemoModeEnabled(),
   zmkLocked: false,
   zmkUnsavedChanges: false,
   unlockState: {
@@ -484,6 +492,83 @@ export const useKeyboardStore = create<KeyboardState>()(
         setZmkLayerMetadata: (metadata: ZmkLayerMetadata | null) => set({ zmkLayerMetadata: metadata }),
         setZmkLocked: (locked: boolean) => set({ zmkLocked: locked }),
         setZmkUnsavedChanges: (unsaved: boolean) => set({ zmkUnsavedChanges: unsaved }),
+        initializeDemoMode: () => {
+          const project = createDemoProject();
+          const projectSettings = (({ id: _id, updatedAt: _updatedAt, keys: _keys, ...settings }) => settings)(project);
+          const keys = project.keys.map(k => ({
+            ...k,
+            id: crypto.randomUUID(),
+            keymap: k.keymap as Record<number, UniversalAction> | undefined,
+          })) as RuntimeKey[];
+          set((state) => ({
+            isDemoMode: true,
+            appMode: 'remap',
+            editorMode: 'layout',
+            settings: {
+              ...projectSettings,
+              visualLayout: normalizeVisualLayout(state.settings.visualLayout),
+            } as ProjectSettings,
+            keys,
+            baseKeys: keys,
+            currentProjectId: project.id,
+            isProjectOpen: true,
+            selectedKeyIds: [],
+            focusedKeyId: null,
+            selectionAnchorId: null,
+            currentLayer: 0,
+            connectedDevice: DEMO_DEVICE,
+            deviceCapabilities: {
+              hasMacros: true,
+              hasLighting: true,
+              hasRotaryEncoder: true,
+              hasCombos: true,
+              hasTapDance: true,
+              hasMouseKeys: true,
+            },
+            activeTransport: null,
+            remoteKeymap: createDemoRemoteKeymap(keys),
+            isKeymapSyncing: false,
+            remoteMacros: Array(16).fill(null).map(() => []),
+            remoteCombos: [],
+            remoteTapDances: [],
+            zmkLayerMetadata: null,
+            zmkLocked: false,
+            zmkUnsavedChanges: false,
+            transform: getCenteredTransform(keys, project.activeOptions || {}),
+          }));
+        },
+        connectDemoDevice: () => {
+          const state = get();
+          if (!state.isDemoMode) return;
+          if (!state.isProjectOpen || state.keys.length === 0) {
+            get().initializeDemoMode();
+            return;
+          }
+          set({
+            connectedDevice: DEMO_DEVICE,
+            deviceCapabilities: {
+              hasMacros: true,
+              hasLighting: true,
+              hasRotaryEncoder: true,
+              hasCombos: true,
+              hasTapDance: true,
+              hasMouseKeys: true,
+            },
+            activeTransport: null,
+            remoteKeymap: Object.keys(state.remoteKeymap).length > 0
+              ? state.remoteKeymap
+              : createDemoRemoteKeymap(state.keys),
+          });
+        },
+        disconnectDemoDevice: () => {
+          if (!get().isDemoMode) return;
+          set({
+            connectedDevice: null,
+            deviceCapabilities: null,
+            activeTransport: null,
+            selectedKeyIds: [],
+          });
+        },
 
         updateSettings: (sets: Partial<ProjectSettings>) => set((s) => {
           const nextSettings = { ...s.settings, ...sets };
@@ -648,6 +733,15 @@ export const useKeyboardStore = create<KeyboardState>()(
         syncKeymap: async () => {
           const s = get();
           if (!s.connectedDevice) return;
+          if (s.isDemoMode) {
+            set({
+              isKeymapSyncing: false,
+              remoteKeymap: Object.keys(s.remoteKeymap).length > 0
+                ? s.remoteKeymap
+                : createDemoRemoteKeymap(s.keys),
+            });
+            return;
+          }
           
           set({ isKeymapSyncing: true, zmkLocked: false, zmkUnsavedChanges: false, zmkLayerMetadata: null });
 
@@ -1379,7 +1473,11 @@ export const useKeyboardStore = create<KeyboardState>()(
         }),
 
         setAppMode: (m: 'design' | 'remap') => {
-          setStoredAppMode(m);
+          if (!get().isDemoMode) setStoredAppMode(m);
+          if (get().isDemoMode) {
+            set({ appMode: m, selectedKeyIds: [] });
+            return;
+          }
           if (m === 'design') {
             const transport = get().activeTransport || hidTransport;
             transport.disconnect().catch(err => {
@@ -1398,7 +1496,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
         },
         setEditorMode: (m: 'layout' | 'matrix' | 'hardware' | 'keymap') => {
-          setStoredEditorMode(m);
+          if (!get().isDemoMode) setStoredEditorMode(m);
           set({ editorMode: m, selectedKeyIds: [] });
         },
 
@@ -1495,8 +1593,22 @@ export const useKeyboardStore = create<KeyboardState>()(
           return { remoteKeymap: newKm };
         }),
         updateDeviceKeycode: async (layer: number, row: number, col: number, action: UniversalAction) => {
-          const { connectedDevice, updateRemoteKeycode, settings } = get();
+          const { connectedDevice, updateRemoteKeycode, isDemoMode } = get();
           if (!connectedDevice) return;
+          if (isDemoMode) {
+            const remoteIndex = col < 0 ? row : row * 32 + col;
+            updateRemoteKeycode(layer, remoteIndex, action);
+            set((state) => {
+              const updatedKeys = state.keys.map(k => {
+                if ((col < 0 && k.zmkPosition === row) || (k.row === row && k.col === col)) {
+                  return { ...k, keymap: { ...k.keymap, [layer]: action } };
+                }
+                return k;
+              });
+              return { keys: updatedKeys, baseKeys: updatedKeys };
+            });
+            return;
+          }
           try {
             const isZmk = connectedDevice?.protocolType === 'zmk';
             const isVial = connectedDevice?.protocolType === 'vial';
@@ -1632,7 +1744,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             });
 
             // 2. If connected to a device in remap mode, sync to device
-            if (appMode === 'remap' && s.connectedDevice) {
+            if (appMode === 'remap' && s.connectedDevice && !s.isDemoMode) {
               const runDeviceUpdates = async () => {
                 try {
                   const isZmk = s.connectedDevice?.protocolType === 'zmk';
@@ -1708,7 +1820,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         deleteSelectedKeycodes: async () => {
           const s = get();
-          const { appMode, currentLayer, selectedKeyIds, keys, settings, connectedDevice } = s;
+          const { appMode, currentLayer, selectedKeyIds, keys, connectedDevice } = s;
           if (selectedKeyIds.length === 0) return;
 
           const targetKeys = keys.filter(k => selectedKeyIds.includes(k.id));
@@ -1740,7 +1852,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           });
 
           // 2. If connected to a device in remap mode, sync to device sequentially
-          if (appMode === 'remap' && connectedDevice) {
+          if (appMode === 'remap' && connectedDevice && !s.isDemoMode) {
             try {
               const isZmk = connectedDevice?.protocolType === 'zmk';
               const isVial = connectedDevice?.protocolType === 'vial';
@@ -1792,7 +1904,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setSelectedKeycode: async (action: UniversalAction) => {
           const s = get();
-          const { appMode, currentLayer, selectedKeyIds, keys, settings, connectedDevice } = s;
+          const { appMode, currentLayer, selectedKeyIds, keys, connectedDevice } = s;
           if (selectedKeyIds.length === 0) return;
 
           const targetKeys = keys.filter(k => selectedKeyIds.includes(k.id));
@@ -1823,7 +1935,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           });
 
           // 2. If connected to a device in remap mode, sync to device sequentially
-          if (appMode === 'remap' && connectedDevice) {
+          if (appMode === 'remap' && connectedDevice && !s.isDemoMode) {
             try {
               const isZmk = connectedDevice?.protocolType === 'zmk';
               const isVial = connectedDevice?.protocolType === 'vial';

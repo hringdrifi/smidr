@@ -4,6 +4,13 @@
  * Standard Keyboard Layout Definitions in KLE raw format.
  */
 
+const layoutOptionLabel = (label: string, group: number, option: number) => {
+  const parts = label.split('\n');
+  while (parts.length <= 3) parts.push('');
+  parts[3] = `${group},${option}`;
+  return parts.join('\n');
+};
+
 export const PRESET_LAYOUTS = {
   "Blank Layout": [],
   "ANSI 104": [
@@ -59,23 +66,29 @@ export const PRESET_LAYOUTS = {
     [{ w: 2.25 }, "Shift", "Z", "X", "C", "V", "B", "N", "M", ",", ".", "/", { w: 1 }, "ろ", { w: 1.75 }, "Shift"],
     [{ w: 1.25 }, "Ctrl", "Win", { w: 1.25 }, "Alt", "無変換", { w: 4.5 }, "Space", { w: 1.25 }, "変換", { w: 1.25 }, "かな", { w: 1.25 }, "Alt", "Win", { w: 1.25 }, "Ctrl"]
   ],
-  "Corne (42 keys)": [
-    [
-      { "y": 0.375 }, "Tab", "Q", { "y": -0.25 }, "W", { "y": -0.125 }, "E", { "y": 0.125 }, "R", { "y": 0.125 }, "T", { "x": 3 }, "Y", { "y": -0.125 }, "U", { "y": -0.125 }, "I", { "y": 0.125 }, "O", { "y": 0.25 }, "P", "Bksp"
-    ],
-    [
-      "Esc\n\n\n\nCtrl", "A", { "y": -0.25 }, "S", { "y": -0.125 }, "D", { "y": 0.125 }, "F", { "y": 0.125 }, "G", { "x": 3 }, "H", { "y": -0.125 }, "J", { "y": -0.125 }, "K", { "y": 0.125 }, "L", { "y": 0.25 }, ":\n;", "\"\n'"
-    ],
-    [
-      "Shift", "Z", { "y": -0.25 }, "X", { "y": -0.125 }, "C", { "y": 0.125 }, "V", { "y": 0.125 }, "B", { "x": 3 }, "N", { "y": -0.125 }, "M", { "y": -0.125 }, "<\n,", { "y": 0.125 }, ">\n.", { "y": 0.25 }, "?", "Shift"
-    ],
-    [
-      { "rx": 0, "ry": 0, "x": 3.5, "y": 3.25 }, "Alt",
-      { "r": 11.94, "rx": 4.5, "ry": 4.25, "x": 0, "y": -1 }, "Lower",
-      { "r": 23.88, "rx": 5.4, "ry": 4.5, "x": 0.1, "y": -1.5, "h": 1.5 }, "",
-      { "r": -23.88, "rx": 9.6, "ry": 4.5, "x": -1.1, "y": -1.5, "h": 1.5 }, "Enter",
-      { "r": -11.94, "rx": 10.5, "ry": 4.25, "x": -1, "y": -1 }, "Raise",
-      { "r": 0, "rx": 0, "ry": 0, "x": 10.5, "y": 3.25 }, "Super"
-    ]
-  ]
+  "Corne (42 keys)": {
+    name: "Corne (42 keys)",
+    layouts: {
+      labels: [["Columns", "6 columns", "5 columns"]],
+      keymap: [
+        [
+          { "y": 0.375 }, layoutOptionLabel("Tab", 0, 0), "Q", { "y": -0.25 }, "W", { "y": -0.125 }, "E", { "y": 0.125 }, "R", { "y": 0.125 }, "T", { "x": 3 }, "Y", { "y": -0.125 }, "U", { "y": -0.125 }, "I", { "y": 0.125 }, "O", { "y": 0.25 }, "P", layoutOptionLabel("Bksp", 0, 0)
+        ],
+        [
+          layoutOptionLabel("Esc\n\n\n\nCtrl", 0, 0), "A", { "y": -0.25 }, "S", { "y": -0.125 }, "D", { "y": 0.125 }, "F", { "y": 0.125 }, "G", { "x": 3 }, "H", { "y": -0.125 }, "J", { "y": -0.125 }, "K", { "y": 0.125 }, "L", { "y": 0.25 }, ":\n;", layoutOptionLabel("\"\n'", 0, 0)
+        ],
+        [
+          layoutOptionLabel("Shift", 0, 0), "Z", { "y": -0.25 }, "X", { "y": -0.125 }, "C", { "y": 0.125 }, "V", { "y": 0.125 }, "B", { "x": 3 }, "N", { "y": -0.125 }, "M", { "y": -0.125 }, "<\n,", { "y": 0.125 }, ">\n.", { "y": 0.25 }, "?", layoutOptionLabel("Shift", 0, 0)
+        ],
+        [
+          { "rx": 0, "ry": 0, "x": 3.5, "y": 3.25 }, "Alt",
+          { "r": 11.94, "rx": 4.5, "ry": 4.25, "x": 0, "y": -1 }, "Lower",
+          { "r": 23.88, "rx": 5.4, "ry": 4.5, "x": 0.1, "y": -1.5, "h": 1.5 }, "",
+          { "r": -23.88, "rx": 9.6, "ry": 4.5, "x": -1.1, "y": -1.5, "h": 1.5 }, "Enter",
+          { "r": -11.94, "rx": 10.5, "ry": 4.25, "x": -1, "y": -1 }, "Raise",
+          { "r": 0, "rx": 0, "ry": 0, "x": 10.5, "y": 3.25 }, "Super"
+        ]
+      ]
+    }
+  }
 };

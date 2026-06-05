@@ -2,7 +2,9 @@
 
 Smiðr は、直感的な操作でカスタムキーボードの物理レイアウト、マトリクス配線、およびハードウェア構成を設計できる次世代のウェブベース・キーボードエディタです。また、WebHID や WebUSB / WebBLE を用いてキーボード実機と直接通信し、VIA、Vial、または ZMK Studio の代替としてキーマップのリアルタイム書き換えを行うことも可能です。
 
-[🚀 デモページを開く (GitHub Pages)](https://hringdrifi.github.io/smidr/)
+[🚀 ベータ版ページを開く (GitHub Pages)](https://hringdrifi.github.io/smidr/)
+
+[🎛️ デモページを開く (仮想キーボード)](https://hringdrifi.github.io/smidr/?demo=1)
 
 [📚 ドキュメントを読む](https://hringdrifi.github.io/smidr/docs/)
 

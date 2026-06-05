@@ -89,6 +89,10 @@ export default function App() {
   }, [selectedKeyIds, keys, currentLayer]);
 
   const refreshProjectList = () => {
+    if (storeState.isDemoMode) {
+      setSavedProjects([]);
+      return;
+    }
     setSavedProjects(listProjects());
   };
 
@@ -100,8 +104,12 @@ export default function App() {
   };
 
   React.useEffect(() => {
+    if (storeState.isDemoMode && !storeState.isProjectOpen) {
+      storeState.initializeDemoMode();
+      return;
+    }
     refreshProjectList();
-  }, []);
+  }, [storeState.isDemoMode, storeState.isProjectOpen]);
 
   // Update lastSavedHistoryLength when project changes
   React.useEffect(() => {
@@ -121,9 +129,11 @@ export default function App() {
       ...settings,
       keys
     };
-    saveProject(project);
-    loadProject(project, true);
-    refreshProjectList();
+    if (!storeState.isDemoMode) {
+      saveProject(project);
+      loadProject(project, true);
+      refreshProjectList();
+    }
     setLastSavedHistoryLength(pastStates.length);
     
     setIsSaving(false);

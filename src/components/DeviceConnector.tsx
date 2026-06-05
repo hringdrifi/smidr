@@ -20,7 +20,7 @@ type DeviceCandidate =
 const VIA_HID_FILTERS = [{ usagePage: 0xFF60, usage: 0x61 }];
 
 export const DeviceConnector: React.FC = () => {
-  const { connectedDevice, setConnectedDevice, loadProject } = useKeyboardStore();
+  const { connectedDevice, setConnectedDevice, loadProject, isDemoMode, connectDemoDevice, disconnectDemoDevice } = useKeyboardStore();
   const { t } = useTranslation();
   const authorizedSerialDeviceLabel = t('remap.authorizedSerialDevice');
   const [isConnecting, setIsConnecting] = React.useState(false);
@@ -155,10 +155,11 @@ export const DeviceConnector: React.FC = () => {
   }, [authorizedSerialDeviceLabel]);
 
   React.useEffect(() => {
+    if (isDemoMode) return;
     if (showMenu) {
       void loadAvailableDevices();
     }
-  }, [loadAvailableDevices, showMenu]);
+  }, [isDemoMode, loadAvailableDevices, showMenu]);
 
   const connectHid = async (knownDevice?: any) => {
     setIsConnecting(true);
@@ -387,6 +388,10 @@ export const DeviceConnector: React.FC = () => {
   };
 
   const handleDisconnect = async () => {
+    if (isDemoMode) {
+      disconnectDemoDevice();
+      return;
+    }
     const { activeTransport, setActiveTransport } = useKeyboardStore.getState();
     const transport = activeTransport || hidTransport;
     await transport.disconnect();
@@ -404,6 +409,18 @@ export const DeviceConnector: React.FC = () => {
       >
         <Power size={14} />
         {t('remap.disconnect') || 'Disconnect'}
+      </button>
+    );
+  }
+
+  if (isDemoMode) {
+    return (
+      <button
+        onClick={connectDemoDevice}
+        className="flex items-center gap-2 px-3 h-8 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold uppercase tracking-wider transition-all shadow-lg active:scale-95 cursor-pointer"
+      >
+        <Usb size={14} />
+        Virtual Vial
       </button>
     );
   }

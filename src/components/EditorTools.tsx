@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { parseKLE } from '@/lib/kle';
+import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
   Plus, Undo2, Redo2, Layout, ChevronDown, Trash2, Grid2X2
@@ -70,30 +70,20 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
 
     const kleData = PRESET_LAYOUTS[presetName as keyof typeof PRESET_LAYOUTS];
     if (kleData) {
-      const parsed = parseKLE(kleData);
-      const newKeys: PhysicalKey[] = parsed.map(pk => ({
+      const parsed = parseKeyboardDefinition(kleData);
+      const newKeys: PhysicalKey[] = parsed.keys.map(pk => ({
+        ...pk,
         id: crypto.randomUUID(),
-        x: pk.x ?? 0,
-        y: pk.y ?? 0,
-        w: pk.w ?? 1,
-        h: pk.h ?? 1,
-        r: pk.r ?? 0,
-        rx: pk.rx ?? (pk.x ?? 0),
-        ry: pk.ry ?? (pk.y ?? 0),
-        w2: pk.w2,
-        h2: pk.h2,
-        x2: pk.x2,
-        y2: pk.y2,
-        label: pk.label || '',
         keymap: {}
       }));
       loadProject({ 
         id: crypto.randomUUID(),
         updatedAt: Date.now(),
         ...settings,
-        name: presetName,
-        layoutOptions: {},
-        activeOptions: {},
+        name: parsed.name || presetName,
+        layoutOptions: parsed.layoutOptions || {},
+        activeOptions: parsed.activeOptions || {},
+        matrix: parsed.matrix || settings.matrix,
         keys: newKeys
       });
     }
