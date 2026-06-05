@@ -262,9 +262,11 @@ describe('export generation', () => {
       tapDances: [
         {
           id: 0,
-          kind: 'double',
           tapAction: { action: 'tap', keycode: 'ESC' },
+          holdAction: { action: 'tap', keycode: 'LSFT' },
           doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+          tapHoldAction: { action: 'tap', keycode: 'LCTL' },
+          tappingTerm: 175,
         },
       ],
     };
@@ -294,7 +296,11 @@ describe('export generation', () => {
     const rulesMk = await zip.file('tap_dance_board/keymaps/default/rules.mk')!.async('string');
 
     expect(keymapC).toContain('tap_dance_action_t tap_dance_actions[]');
-    expect(keymapC).toContain('[0] = ACTION_TAP_DANCE_DOUBLE(KC_ESC, KC_CAPS)');
+    expect(keymapC).toContain('void smidr_td_0_finished(qk_tap_dance_state_t *state, void *user_data)');
+    expect(keymapC).toContain('register_code16(smidr_td_0_held)');
+    expect(keymapC).toContain('tap_code16(KC_ESC)');
+    expect(keymapC).toContain('tap_code16(KC_CAPS)');
+    expect(keymapC).toContain('[0] = ACTION_TAP_DANCE_FN_ADVANCED_TIME(NULL, smidr_td_0_finished, smidr_td_0_reset, 175)');
     expect(keymapC).toContain('TD(0)');
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
@@ -494,9 +500,11 @@ describe('export generation', () => {
       tapDances: [
         {
           id: 1,
-          kind: 'layerToggle',
           tapAction: { action: 'tap', keycode: 'ESC' },
-          layerId: 1,
+          holdAction: { action: 'tap', keycode: 'LSFT' },
+          doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+          tapHoldAction: { action: 'tap', keycode: 'LCTL' },
+          tappingTerm: 225,
         },
       ],
     };
@@ -525,7 +533,10 @@ describe('export generation', () => {
     const keymapC = await zip.file('vial_tap_dance/keymaps/vial/keymap.c')!.async('string');
     const rulesMk = await zip.file('vial_tap_dance/keymaps/vial/rules.mk')!.async('string');
 
-    expect(keymapC).toContain('[1] = ACTION_TAP_DANCE_LAYER_TOGGLE(KC_ESC, 1)');
+    expect(keymapC).toContain('void smidr_td_1_finished(qk_tap_dance_state_t *state, void *user_data)');
+    expect(keymapC).toContain('tap_code16(KC_ESC)');
+    expect(keymapC).toContain('tap_code16(KC_CAPS)');
+    expect(keymapC).toContain('[1] = ACTION_TAP_DANCE_FN_ADVANCED_TIME(NULL, smidr_td_1_finished, smidr_td_1_reset, 225)');
     expect(keymapC).toContain('TD(1)');
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
@@ -678,6 +689,65 @@ describe('export generation', () => {
     expect(shieldOverlay).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
     expect(readme).toContain('- board: nice_nano');
     expect(readme).toContain('shield: shield_board');
+  });
+
+  it('emits ZMK tap dance behaviors from Vial-style definitions', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'ZMK Tap Dance',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'RP2040',
+        board: 'kb2040',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      tapDances: [
+        {
+          id: 0,
+          tapAction: { action: 'tap', keycode: 'ESC' },
+          holdAction: { action: 'tap', keycode: 'LSFT' },
+          doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+          tapHoldAction: { action: 'tap', keycode: 'LCTL' },
+          tappingTerm: 180,
+        },
+      ],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'td', tapDanceId: 0 },
+        },
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymap = await zip.file('config/zmk_tap_dance.keymap')!.async('string');
+
+    expect(keymap).toContain('compatible = "zmk,behavior-tap-dance"');
+    expect(keymap).toContain('compatible = "zmk,behavior-hold-tap"');
+    expect(keymap).toContain('tapping-term-ms = <180>');
+    expect(keymap).toContain('bindings = <&smidr_td_0_1_ht LSHIFT ESC>, <&smidr_td_0_2_ht LCTRL CLCK>');
+    expect(keymap).toContain('&smidr_td_0');
   });
 
   it('maps shared development board selections to ZMK board ids', async () => {

@@ -27,7 +27,7 @@ export const KeycodePanel = () => {
   const { 
     keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
-    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam, appMode
+    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam, appMode, zmkTapDanceIds
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
@@ -41,6 +41,7 @@ export const KeycodePanel = () => {
     t(`keycodeDescriptions.${key}`).replace('{layer}', String(layer));
 
   const layersCount = settings.layers || 4;
+  const isZmkRemap = appMode === 'remap' && connectedDevice?.protocolType === 'zmk';
   let filteredKeycodes: Keycode[] = activeTab === 'Layers' 
     ? [
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `MO(${i})`, label: `MO(${i})`, category: 'Layers' as const, description: layerDescription('layerMomentary', i) })),
@@ -48,6 +49,8 @@ export const KeycodePanel = () => {
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `TO(${i})`, label: `TO(${i})`, category: 'Layers' as const, description: layerDescription('layerDirect', i) })),
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `LT(${i})`, label: `LT(${i})`, category: 'Layers' as const, description: layerDescription('layerTap', i) })),
       ]
+    : activeTab === 'Tap Dance' && isZmkRemap
+    ? zmkTapDanceIds.map((id) => ({ code: `TD_${id}`, label: `TD${id}`, category: 'Tap Dance' as const, description: `Smiðr Tap Dance ${id}` }))
     : KEYCODES.filter(k => k.category === activeTab).map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
 
 

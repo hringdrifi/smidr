@@ -123,6 +123,8 @@ export interface KeyboardState {
   isKeymapSyncing: boolean;
   zmkLayerMetadata: ZmkLayerMetadata | null;
   setZmkLayerMetadata: (metadata: ZmkLayerMetadata | null) => void;
+  zmkTapDanceIds: number[];
+  setZmkTapDanceIds: (ids: number[]) => void;
   renameZmkLayer: (layerIndex: number, name: string) => Promise<void>;
   addZmkLayer: () => Promise<void>;
   removeLastZmkLayer: () => Promise<void>;
@@ -282,6 +284,7 @@ const initialState: Partial<KeyboardState> = {
   remoteKeymap: {},
   isKeymapSyncing: false,
   zmkLayerMetadata: null,
+  zmkTapDanceIds: [],
   remoteMacros: Array(16).fill(null).map(() => []),
   remoteCombos: [],
   remoteTapDances: [],
@@ -411,7 +414,6 @@ const retargetTapDance = (entry: TapDanceEntry, deletedLayer: number): TapDanceE
   doubleTapAction: entry.doubleTapAction ? retargetLayerAction(entry.doubleTapAction, deletedLayer) : undefined,
   holdAction: entry.holdAction ? retargetLayerAction(entry.holdAction, deletedLayer) : undefined,
   tapHoldAction: entry.tapHoldAction ? retargetLayerAction(entry.tapHoldAction, deletedLayer) : undefined,
-  layerId: entry.layerId === deletedLayer ? 0 : entry.layerId,
 });
 
 const removeLayerFromKeymap = (
@@ -490,6 +492,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setIsCapturingParam: (capturing: boolean) => set({ isCapturingParam: capturing }),
         setZmkLayerMetadata: (metadata: ZmkLayerMetadata | null) => set({ zmkLayerMetadata: metadata }),
+        setZmkTapDanceIds: (ids: number[]) => set({ zmkTapDanceIds: ids }),
         setZmkLocked: (locked: boolean) => set({ zmkLocked: locked }),
         setZmkUnsavedChanges: (unsaved: boolean) => set({ zmkUnsavedChanges: unsaved }),
         initializeDemoMode: () => {
@@ -532,6 +535,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             remoteCombos: [],
             remoteTapDances: [],
             zmkLayerMetadata: null,
+            zmkTapDanceIds: [],
             zmkLocked: false,
             zmkUnsavedChanges: false,
             transform: getCenteredTransform(keys, project.activeOptions || {}),
@@ -567,6 +571,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             deviceCapabilities: null,
             activeTransport: null,
             selectedKeyIds: [],
+            zmkTapDanceIds: [],
           });
         },
 
@@ -743,7 +748,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             return;
           }
           
-          set({ isKeymapSyncing: true, zmkLocked: false, zmkUnsavedChanges: false, zmkLayerMetadata: null });
+          set({ isKeymapSyncing: true, zmkLocked: false, zmkUnsavedChanges: false, zmkLayerMetadata: null, zmkTapDanceIds: [] });
 
           try {
             const isZmk = s.connectedDevice?.protocolType === 'zmk';
@@ -794,6 +799,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               }
               
               const zmkProto = protocol as ZmkProtocol;
+              await zmkProto.fetchBehaviorMetadata();
               const hasPhysicalLayout = zmkProto.selectedLayoutName != null && zmkProto.physicalKeys.length > 0;
               const hasKeymap = zmkProto.keymapAvailable === true;
 
@@ -806,6 +812,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               layerCount = zmkProto.layerCount;
               const selectedLayoutName = zmkProto.selectedLayoutName;
               const zmkLayerMetadata = zmkProto.getLayerMetadata();
+              const zmkTapDanceIds = zmkProto.getSmidrTapDanceIds();
 
               if (isZmkDebugLoggingEnabled()) {
                 console.log('[ZMK sync]', {
@@ -813,6 +820,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   physicalLayout: selectedLayoutName,
                   positionCount: zmkProto.physicalKeys.length,
                   layerMetadata: zmkLayerMetadata,
+                  tapDanceIds: zmkTapDanceIds,
                 });
               }
 
@@ -822,7 +830,8 @@ export const useKeyboardStore = create<KeyboardState>()(
                   layers: layerCount,
                   name: state.keys.length === 0 ? (zmkProto.keyboardName || state.settings.name) : state.settings.name
                 },
-                zmkLayerMetadata
+                zmkLayerMetadata,
+                zmkTapDanceIds
               }));
 
               if (!hasKeymap) {

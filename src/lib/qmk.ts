@@ -1,8 +1,8 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
-import { TapDanceEntry, UniversalAction } from '@/types/actions';
-import { actionToQmkString } from './protocols/via-action-converter';
+import { TapDanceEntry } from '@/types/actions';
+import { generateQmkTapDanceC } from './tap-dance-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
@@ -76,42 +76,10 @@ ${rows}
 `;
 };
 
-const tapDanceActionToQmkKey = (action: UniversalAction | undefined) => {
-  if (!action) return 'KC_NO';
-  const qmk = actionToQmkString(action);
-  return qmk.startsWith('TD(') ? 'KC_NO' : qmk;
-};
-
-const generateTapDanceC = (tapDances: TapDanceEntry[] = []) => {
-  const entries = tapDances
-    .filter(entry => entry.tapAction)
-    .sort((a, b) => a.id - b.id)
-    .map(entry => {
-      const tap = tapDanceActionToQmkKey(entry.tapAction);
-      if (entry.kind === 'layerMove') {
-        return `    [${entry.id}] = ACTION_TAP_DANCE_LAYER_MOVE(${tap}, ${entry.layerId ?? 0}),`;
-      }
-      if (entry.kind === 'layerToggle') {
-        return `    [${entry.id}] = ACTION_TAP_DANCE_LAYER_TOGGLE(${tap}, ${entry.layerId ?? 0}),`;
-      }
-      const doubleTap = tapDanceActionToQmkKey(entry.doubleTapAction);
-      return `    [${entry.id}] = ACTION_TAP_DANCE_DOUBLE(${tap}, ${doubleTap}),`;
-    });
-
-  if (entries.length === 0) return '';
-
-  return `
-tap_dance_action_t tap_dance_actions[] = {
-${entries.join('\n')}
-};
-
-`;
-};
-
 const generateKeymapC = (validKeys: PhysicalKey[], keymapsArray: string[][][], tapDances: TapDanceEntry[] = []) => {
   let keymapC = `#include QMK_KEYBOARD_H
 
-${generateTapDanceC(tapDances)}
+${generateQmkTapDanceC(tapDances)}
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 `;
 

@@ -21,7 +21,7 @@ export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
     settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
-    isCapturingParam, setIsCapturingParam, updateTapDance
+    isCapturingParam, setIsCapturingParam, updateTapDance, remoteTapDances, updateRemoteTapDance
   } = useKeyboardStore();
   const { t } = useTranslation();
   const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
@@ -53,6 +53,8 @@ export const KeycodeConfigPanel = () => {
   const [draftAction, setDraftAction] = useState<UniversalAction>(action);
   const activeAction = draftAction;
   const keyOptions = Object.keys(KEY_MAP).sort();
+  const isVialRemap = appMode === 'remap' && connectedDevice?.protocolType === 'vial';
+  const canEditTapDanceDefinition = appMode === 'design' || isVialRemap;
 
   useEffect(() => {
     setIsCapturingParam(false);
@@ -225,17 +227,21 @@ export const KeycodeConfigPanel = () => {
     }
   };
 
-  const keyToAction = (keycode: string): UniversalAction => ({ action: 'tap', keycode: keycode as UniversalKey });
+  const keyToAction = (keycode: string): UniversalAction => (
+    keycode === 'none' ? { action: 'none' } : { action: 'tap', keycode: keycode as UniversalKey }
+  );
   const actionToKey = (tdAction: UniversalAction | undefined, fallback = 'A') => (
-    tdAction?.action === 'tap' ? tdAction.keycode : fallback
+    tdAction?.action === 'none' ? 'none' : tdAction?.action === 'tap' ? tdAction.keycode : fallback
   );
 
   const getTapDanceEntry = (tapDanceId: number): TapDanceEntry => (
-    settings.tapDances?.find(td => td.id === tapDanceId) || {
+    (isVialRemap ? remoteTapDances : settings.tapDances || []).find(td => td.id === tapDanceId) || {
       id: tapDanceId,
-      kind: 'double',
       tapAction: { action: 'tap', keycode: 'ESC' },
       doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+      holdAction: { action: 'none' },
+      tapHoldAction: { action: 'none' },
+      tappingTerm: 200,
     }
   );
 
@@ -247,13 +253,16 @@ export const KeycodeConfigPanel = () => {
       ...patch,
       id: activeAction.tapDanceId,
     };
-    if (next.kind === 'double' && !next.doubleTapAction) {
+    if (!next.doubleTapAction) {
       next.doubleTapAction = { action: 'tap', keycode: 'CAPS' };
     }
-    if ((next.kind === 'layerMove' || next.kind === 'layerToggle') && next.layerId === undefined) {
-      next.layerId = 1;
+    if (isVialRemap) {
+      void updateRemoteTapDance(next.id, next).catch((err: any) => {
+        console.error(`Failed to update Tap Dance ${next.id}:`, err);
+      });
+    } else {
+      updateTapDance(next.id, next);
     }
-    updateTapDance(next.id, next);
   };
 
   const handleModifierToggle = (mod: Modifier) => {
@@ -381,6 +390,12 @@ export const KeycodeConfigPanel = () => {
   } else if (activeAction.action === 'custom') {
     currentActiveCode = activeAction.rawCode;
   }
+  const tapDanceSelectorIds = isVialRemap && remoteTapDances.length > 0
+    ? remoteTapDances.map(td => td.id)
+    : Array.from({ length: 16 }, (_, idx) => idx);
+  const canEditCurrentTapDance = activeAction.action === 'td' && canEditTapDanceDefinition && (
+    !isVialRemap || remoteTapDances.some(td => td.id === activeAction.tapDanceId)
+  );
 
   const handleApplyRawAction = () => {
     const rawCode = rawDraft.trim();
@@ -529,7 +544,7 @@ export const KeycodeConfigPanel = () => {
               {t('keycodeConfig.tapDance') || 'Tap Dance'}
             </label>
             <div className="grid grid-cols-4 gap-1">
-              {Array.from({ length: 16 }).map((_, idx) => {
+              {tapDanceSelectorIds.map((idx) => {
                 const isActive = activeAction.tapDanceId === idx;
                 return (
                   <button
@@ -550,7 +565,7 @@ export const KeycodeConfigPanel = () => {
           </div>
         )}
 
-        {appMode === 'design' && activeAction.action === 'td' && (() => {
+        {canEditCurrentTapDance && activeAction.action === 'td' && (() => {
           const entry = getTapDanceEntry(activeAction.tapDanceId);
           return (
             <div className="border border-[var(--border-main)] bg-zinc-950/20 rounded-lg p-3 flex flex-col gap-3">
@@ -558,21 +573,6 @@ export const KeycodeConfigPanel = () => {
                 <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
                   TD{entry.id}
                 </span>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                  {t('keycodeConfig.tapDanceAction') || 'Action'}
-                </label>
-                <select
-                  value={entry.kind}
-                  onChange={(e) => updateCurrentTapDance({ kind: e.target.value as TapDanceEntry['kind'] })}
-                  className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                >
-                  <option value="double">{t('keycodeConfig.tapDanceKindDouble') || 'Tap / Double Tap'}</option>
-                  <option value="layerMove">{t('keycodeConfig.tapDanceKindLayerMove') || 'Tap / Move Layer'}</option>
-                  <option value="layerToggle">{t('keycodeConfig.tapDanceKindLayerToggle') || 'Tap / Toggle Layer'}</option>
-                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -585,43 +585,73 @@ export const KeycodeConfigPanel = () => {
                     onChange={(e) => updateCurrentTapDance({ tapAction: keyToAction(e.target.value) })}
                     className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
                   >
+                    <option value="none">NONE</option>
                     {keyOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
                 </div>
 
-                {entry.kind === 'double' ? (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                      {t('keycodeConfig.tapDanceDoubleTap') || 'Double Tap'}
-                    </label>
-                    <select
-                      value={actionToKey(entry.doubleTapAction, 'CAPS')}
-                      onChange={(e) => updateCurrentTapDance({ doubleTapAction: keyToAction(e.target.value) })}
-                      className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                    >
-                      {keyOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                      {t('keycodeConfig.tapDanceLayer') || 'Layer'}
-                    </label>
-                    <select
-                      value={entry.layerId ?? 1}
-                      onChange={(e) => updateCurrentTapDance({ layerId: Number(e.target.value) })}
-                      className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                    >
-                      {Array.from({ length: settings.layers || 4 }).map((_, idx) => (
-                        <option key={idx} value={idx}>{idx}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                    Hold
+                  </label>
+                  <select
+                    value={actionToKey(entry.holdAction, 'none')}
+                    onChange={(e) => updateCurrentTapDance({ holdAction: keyToAction(e.target.value) })}
+                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
+                  >
+                    <option value="none">NONE</option>
+                    {keyOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                    {t('keycodeConfig.tapDanceDoubleTap') || 'Double Tap'}
+                  </label>
+                  <select
+                    value={actionToKey(entry.doubleTapAction, 'none')}
+                    onChange={(e) => updateCurrentTapDance({ doubleTapAction: keyToAction(e.target.value) })}
+                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
+                  >
+                    <option value="none">NONE</option>
+                    {keyOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                    Tap Hold
+                  </label>
+                  <select
+                    value={actionToKey(entry.tapHoldAction, 'none')}
+                    onChange={(e) => updateCurrentTapDance({ tapHoldAction: keyToAction(e.target.value) })}
+                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
+                  >
+                    <option value="none">NONE</option>
+                    {keyOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                  Tapping Term
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={entry.tappingTerm ?? 200}
+                  onChange={(e) => updateCurrentTapDance({ tappingTerm: Number(e.target.value) })}
+                  className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
+                />
               </div>
             </div>
           );

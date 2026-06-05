@@ -469,19 +469,12 @@ export class VialProtocol extends ViaProtocol {
       const doubleTap = view.getUint16(4, true);
       const tapHold = view.getUint16(6, true);
 
-      const holdAction = vialCodeToAction(hold);
-      const tapHoldAction = vialCodeToAction(tapHold);
-      const doubleTapAction = vialCodeToAction(doubleTap);
-      const hasHold = holdAction.action !== 'none';
-      const hasTapHold = tapHoldAction.action !== 'none';
-
       tapDances.push({
         id: i,
-        kind: hasHold || hasTapHold ? 'layerMove' : 'double',
         tapAction: vialCodeToAction(tap),
-        doubleTapAction,
-        holdAction,
-        tapHoldAction,
+        holdAction: vialCodeToAction(hold),
+        doubleTapAction: vialCodeToAction(doubleTap),
+        tapHoldAction: vialCodeToAction(tapHold),
         tappingTerm: view.getUint16(8, true)
       });
     }

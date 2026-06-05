@@ -136,11 +136,13 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
 - **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
 
 ### 9.5 タップダンス定義 (Tap Dance)
-- **プロジェクト定義**: タップダンス定義は `ProjectSettings.tapDances` に保存する。各定義は `id`, `name`, `kind`, `tapAction`, `doubleTapAction`, `layerId` を持つ。
-- **対応種類**: Smiðr UI から登録できる種類は `ACTION_TAP_DANCE_DOUBLE(kc1, kc2)`, `ACTION_TAP_DANCE_LAYER_MOVE(kc, layer)`, `ACTION_TAP_DANCE_LAYER_TOGGLE(kc, layer)` に対応する。
+- **プロジェクト定義**: タップダンス定義は `ProjectSettings.tapDances` に保存する。各定義は Vial の Dynamic Tap Dance 形式を標準モデルとし、`id`, `tapAction`, `holdAction`, `doubleTapAction`, `tapHoldAction`, `tappingTerm` を持つ。
+- **Universal Model**: Smiðr 内部では、タップダンス定義をファームウェア固有の種類ではなく Vial 互換の 4 スロット（Tap / Hold / Double Tap / Tap Hold）と Tapping Term として扱う。QMK / Vial / ZMK それぞれの表現差はエクスポート時のコンバーターで吸収する。
 - **キーマップ割当**: キー上の割当は `UniversalAction` の `action: 'td'` と `tapDanceId` で保持する。
-- **QMK/Vial エクスポート**: `tapDances` が存在する場合、`keymap.c` に `tap_dance_actions[]` を生成し、対象 keymap の `rules.mk` に `TAP_DANCE_ENABLE = yes` を追加する。
-- **制限**: Tap Dance 定義の登録は firmware source export 向けの設計機能であり、WebHID 経由で接続済み VIA/Vial デバイスへ Tap Dance 定義そのものを動的登録する機能ではない。
+- **UI 配置**: Tap Dance 定義編集はキーマップ設定パネルに集約する。Macro / Combo パネルはマクロとコンボの編集専用とし、Tap Dance 定義編集は配置しない。
+- **QMK/Vial エクスポート**: `tapDances` が存在する場合、`keymap.c` に `ACTION_TAP_DANCE_FN_ADVANCED_TIME` ベースの `tap_dance_actions[]` と `finished/reset` コールバックを生成し、対象 keymap の `rules.mk` に `TAP_DANCE_ENABLE = yes` を追加する。Tap / Double Tap は `tap_code16()`、Hold / Tap Hold は `register_code16()` と `unregister_code16()` で表現する。
+- **ZMK エクスポート**: `tapDances` が存在する場合、`.keymap` に `zmk,behavior-tap-dance` を生成する。Hold / Tap Hold が設定されている場合は、必要に応じて `zmk,behavior-hold-tap` を追加生成し、Tap Dance の binding から参照する。キー上の `td` 割当は生成済み behavior ラベル（例: `&smidr_td_0`）を参照する。
+- **リマップ時の制限**: Vial 接続では Dynamic Tap Dance プロトコルにより定義そのものを読み書きできる。ZMK Studio 接続では、既存 behavior のキー位置への割当は可能だが、`zmk,behavior-tap-dance` や `zmk,behavior-hold-tap` のノード定義自体はソース出力・再ビルド対象として扱う。ZMK リマップのキーパレットでは、発見済み behavior のうち Smiðr が生成した命名規則 `smidr_td_N` に一致するものだけを `TDN` 候補として表示し、ユーザー定義の任意 Tap Dance behavior は Any / カスタム入力で扱う。
 
 ### 9.2 デバイス指向の自己適応型 UI (Device-Oriented Self-Adaptive UI)
 - **仕様**: 接続された物理デバイスのケイパビリティフラグ（`DeviceCapability`: `hasMacros`, `hasLighting` など）を監視し、デバイスのサポート状況に応じてエディタの UI を自己適応的に制御します。

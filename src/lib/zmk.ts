@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
-import { actionToZmkString } from './protocols/zmk-action-converter';
+import { actionToZmkSourceString, generateZmkTapDanceBehaviors } from './tap-dance-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
 
@@ -369,6 +369,7 @@ features:
 #include <dt-bindings/zmk/mouse.h>
 
 / {
+${generateZmkTapDanceBehaviors(settings.tapDances || [])}
     keymap {
         compatible = "zmk,keymap";
 `;
@@ -376,7 +377,7 @@ features:
   for (let l = 0; l < layersCount; l++) {
     const layerBindings = sortedKeys.map(key => {
       const action = key.keymap?.[l] || { action: 'trans' };
-      return actionToZmkString(action);
+      return actionToZmkSourceString(action);
     });
 
     let layerBindingsStr = '';

@@ -1532,6 +1532,10 @@ function bindingToZmkString(
     
     return `&mt ${holdKey} ${tapKey}`;
   }
+  const smidrTapDanceMatch = rawName.match(/^smidr_td_(\d+)$/i);
+  if (smidrTapDanceMatch) {
+    return `&smidr_td_${smidrTapDanceMatch[1]}`;
+  }
   if (name === "rgbug") {
     const cmdMap: Record<number, string> = {
       0: "UG_TOGG",
@@ -1910,6 +1914,15 @@ export class ZmkProtocol implements IProtocolDriver {
   public behaviorsAvailable: boolean = false;
   public physicalLayoutsAvailable: boolean = false;
   public keymapAvailable: boolean = false;
+
+  getSmidrTapDanceIds(): number[] {
+    const ids = new Set<number>();
+    for (const name of Object.keys(this.behaviorIds)) {
+      const match = name.match(/^smidr_td_(\d+)$/i);
+      if (match) ids.add(Number(match[1]));
+    }
+    return Array.from(ids).sort((a, b) => a - b);
+  }
 
   resetRuntimeState() {
     this.currentRequestId = 1;
@@ -2630,7 +2643,9 @@ export class ZmkProtocol implements IProtocolDriver {
 
     const keyIndex = this.resolveZmkPosition(row, col);
 
-    const zmkDtsStr = actionToZmkString(action);
+    const zmkDtsStr = action.action === 'td' && this.behaviorIds[`smidr_td_${action.tapDanceId}`] !== undefined
+      ? `&smidr_td_${action.tapDanceId}`
+      : actionToZmkString(action);
     if (this.isDebugLoggingEnabled()) {
       console.log(`[ZMK setKey] Mapping action "${zmkDtsStr}" using behaviorIds:`, JSON.stringify(this.behaviorIds));
     }
