@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
-import { UniversalAction, UniversalKey, Modifier, TapDanceEntry } from '@/types/actions';
-import { KEY_MAP } from '@/lib/protocols/via-action-converter';
-import { Info, Check, Keyboard, Code2 } from 'lucide-react';
+import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
+import { Info, Check, Keyboard, Code2, Settings } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -21,7 +20,7 @@ export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
     settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
-    isCapturingParam, setIsCapturingParam, updateTapDance, remoteTapDances, updateRemoteTapDance
+    isCapturingParam, setIsCapturingParam, remoteTapDances, openTapDanceSettings
   } = useKeyboardStore();
   const { t } = useTranslation();
   const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
@@ -52,9 +51,7 @@ export const KeycodeConfigPanel = () => {
   const actionSignature = JSON.stringify(action);
   const [draftAction, setDraftAction] = useState<UniversalAction>(action);
   const activeAction = draftAction;
-  const keyOptions = Object.keys(KEY_MAP).sort();
   const isVialRemap = appMode === 'remap' && connectedDevice?.protocolType === 'vial';
-  const canEditTapDanceDefinition = appMode === 'design' || isVialRemap;
 
   useEffect(() => {
     setIsCapturingParam(false);
@@ -227,44 +224,6 @@ export const KeycodeConfigPanel = () => {
     }
   };
 
-  const keyToAction = (keycode: string): UniversalAction => (
-    keycode === 'none' ? { action: 'none' } : { action: 'tap', keycode: keycode as UniversalKey }
-  );
-  const actionToKey = (tdAction: UniversalAction | undefined, fallback = 'A') => (
-    tdAction?.action === 'none' ? 'none' : tdAction?.action === 'tap' ? tdAction.keycode : fallback
-  );
-
-  const getTapDanceEntry = (tapDanceId: number): TapDanceEntry => (
-    (isVialRemap ? remoteTapDances : settings.tapDances || []).find(td => td.id === tapDanceId) || {
-      id: tapDanceId,
-      tapAction: { action: 'tap', keycode: 'ESC' },
-      doubleTapAction: { action: 'tap', keycode: 'CAPS' },
-      holdAction: { action: 'none' },
-      tapHoldAction: { action: 'none' },
-      tappingTerm: 200,
-    }
-  );
-
-  const updateCurrentTapDance = (patch: Partial<TapDanceEntry>) => {
-    if (activeAction.action !== 'td') return;
-    const current = getTapDanceEntry(activeAction.tapDanceId);
-    const next: TapDanceEntry = {
-      ...current,
-      ...patch,
-      id: activeAction.tapDanceId,
-    };
-    if (!next.doubleTapAction) {
-      next.doubleTapAction = { action: 'tap', keycode: 'CAPS' };
-    }
-    if (isVialRemap) {
-      void updateRemoteTapDance(next.id, next).catch((err: any) => {
-        console.error(`Failed to update Tap Dance ${next.id}:`, err);
-      });
-    } else {
-      updateTapDance(next.id, next);
-    }
-  };
-
   const handleModifierToggle = (mod: Modifier) => {
     if (activeAction.action === 'mt') {
       const isSelected = activeAction.modifiers.includes(mod);
@@ -393,8 +352,8 @@ export const KeycodeConfigPanel = () => {
   const tapDanceSelectorIds = isVialRemap && remoteTapDances.length > 0
     ? remoteTapDances.map(td => td.id)
     : Array.from({ length: 16 }, (_, idx) => idx);
-  const canEditCurrentTapDance = activeAction.action === 'td' && canEditTapDanceDefinition && (
-    !isVialRemap || remoteTapDances.some(td => td.id === activeAction.tapDanceId)
+  const canOpenTapDanceSettings = activeAction.action === 'td' && isVialRemap && (
+    remoteTapDances.some(td => td.id === activeAction.tapDanceId)
   );
 
   const handleApplyRawAction = () => {
@@ -562,100 +521,17 @@ export const KeycodeConfigPanel = () => {
                 );
               })}
             </div>
+            {canOpenTapDanceSettings && (
+              <button
+                onClick={() => openTapDanceSettings(activeAction.tapDanceId)}
+                className="mt-1 h-9 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+              >
+                <Settings size={13} />
+                Tap Dance設定を開く
+              </button>
+            )}
           </div>
         )}
-
-        {canEditCurrentTapDance && activeAction.action === 'td' && (() => {
-          const entry = getTapDanceEntry(activeAction.tapDanceId);
-          return (
-            <div className="border border-[var(--border-main)] bg-zinc-950/20 rounded-lg p-3 flex flex-col gap-3">
-              <div className="flex items-center justify-between border-b border-[var(--border-main)]/70 pb-2">
-                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                  TD{entry.id}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    {t('keycodeConfig.tapDanceTap') || 'Tap'}
-                  </label>
-                  <select
-                    value={actionToKey(entry.tapAction, 'ESC')}
-                    onChange={(e) => updateCurrentTapDance({ tapAction: keyToAction(e.target.value) })}
-                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                  >
-                    <option value="none">NONE</option>
-                    {keyOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    Hold
-                  </label>
-                  <select
-                    value={actionToKey(entry.holdAction, 'none')}
-                    onChange={(e) => updateCurrentTapDance({ holdAction: keyToAction(e.target.value) })}
-                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                  >
-                    <option value="none">NONE</option>
-                    {keyOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    {t('keycodeConfig.tapDanceDoubleTap') || 'Double Tap'}
-                  </label>
-                  <select
-                    value={actionToKey(entry.doubleTapAction, 'none')}
-                    onChange={(e) => updateCurrentTapDance({ doubleTapAction: keyToAction(e.target.value) })}
-                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                  >
-                    <option value="none">NONE</option>
-                    {keyOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    Tap Hold
-                  </label>
-                  <select
-                    value={actionToKey(entry.tapHoldAction, 'none')}
-                    onChange={(e) => updateCurrentTapDance({ tapHoldAction: keyToAction(e.target.value) })}
-                    className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                  >
-                    <option value="none">NONE</option>
-                    {keyOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                  Tapping Term
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={entry.tappingTerm ?? 200}
-                  onChange={(e) => updateCurrentTapDance({ tappingTerm: Number(e.target.value) })}
-                  className="h-8 bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono"
-                />
-              </div>
-            </div>
-          );
-        })()}
 
         {/* Modifiers Checklist */}
         {(activeAction.action === 'mt' || activeAction.action === 'tap' || activeAction.action === 'trans' || activeAction.action === 'none') && (

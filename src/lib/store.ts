@@ -139,9 +139,15 @@ export interface KeyboardState {
   remoteMacros: MacroAction[][];
   remoteCombos: ComboEntry[];
   remoteTapDances: TapDanceEntry[];
+  macroPanelActiveTab: 'macros' | 'combos' | 'tapDance';
+  selectedTapDanceId: number;
+  tapDanceSettingsOpenRequest: number;
   setRemoteMacros: (macros: MacroAction[][]) => void;
   setRemoteCombos: (combos: ComboEntry[]) => void;
   setRemoteTapDances: (tapDances: TapDanceEntry[]) => void;
+  setMacroPanelActiveTab: (tab: KeyboardState['macroPanelActiveTab']) => void;
+  setSelectedTapDanceId: (id: number) => void;
+  openTapDanceSettings: (id: number) => void;
   updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
   updateRemoteCombo: (index: number, combo: ComboEntry) => Promise<void>;
   updateRemoteTapDance: (index: number, entry: TapDanceEntry) => Promise<void>;
@@ -288,6 +294,9 @@ const initialState: Partial<KeyboardState> = {
   remoteMacros: Array(16).fill(null).map(() => []),
   remoteCombos: [],
   remoteTapDances: [],
+  macroPanelActiveTab: 'macros',
+  selectedTapDanceId: 0,
+  tapDanceSettingsOpenRequest: 0,
   painter: { currentRow: 0, currentCol: 0, autoIncrement: 'matrix' },
   matrixSubMode: 'paint',
   currentProjectId: null,
@@ -1148,6 +1157,13 @@ export const useKeyboardStore = create<KeyboardState>()(
         setRemoteMacros: (macros: MacroAction[][]) => set({ remoteMacros: macros }),
         setRemoteCombos: (combos: ComboEntry[]) => set({ remoteCombos: combos }),
         setRemoteTapDances: (tapDances: TapDanceEntry[]) => set({ remoteTapDances: tapDances }),
+        setMacroPanelActiveTab: (tab: KeyboardState['macroPanelActiveTab']) => set({ macroPanelActiveTab: tab }),
+        setSelectedTapDanceId: (id: number) => set({ selectedTapDanceId: id }),
+        openTapDanceSettings: (id: number) => set((s) => ({
+          macroPanelActiveTab: 'tapDance',
+          selectedTapDanceId: id,
+          tapDanceSettingsOpenRequest: s.tapDanceSettingsOpenRequest + 1,
+        })),
         updateTapDance: (id: number, entry: TapDanceEntry) => set((s) => {
           const current = s.settings.tapDances || [];
           const exists = current.some(td => td.id === id);

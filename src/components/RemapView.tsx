@@ -11,10 +11,18 @@ import { KeycodeConfigPanel } from './KeycodeConfigPanel';
 import { MacrosCombosPanel } from './MacrosCombosPanel';
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked } = useKeyboardStore();
+  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked, tapDanceSettingsOpenRequest } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
   const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
+  const lastTapDanceSettingsOpenRequest = React.useRef(tapDanceSettingsOpenRequest);
+
+  React.useEffect(() => {
+    if (tapDanceSettingsOpenRequest === lastTapDanceSettingsOpenRequest.current) return;
+    lastTapDanceSettingsOpenRequest.current = tapDanceSettingsOpenRequest;
+    setIsLeftPanelOpen(false);
+    setIsMacrosCombosOpen(true);
+  }, [tapDanceSettingsOpenRequest]);
 
   const hasDeletableSelection = React.useMemo(() => {
     if (selectedKeyIds.length === 0) return false;
