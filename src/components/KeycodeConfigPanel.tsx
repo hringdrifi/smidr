@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
-import { Info, Check, Keyboard, Code2, Settings } from 'lucide-react';
+import { Info, Check, Code2, Settings } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -20,7 +20,7 @@ export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
     settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
-    isCapturingParam, setIsCapturingParam, remoteTapDances, openTapDanceSettings
+    remoteTapDances, openTapDanceSettings
   } = useKeyboardStore();
   const { t } = useTranslation();
   const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
@@ -52,10 +52,6 @@ export const KeycodeConfigPanel = () => {
   const [draftAction, setDraftAction] = useState<UniversalAction>(action);
   const activeAction = draftAction;
   const isVialRemap = appMode === 'remap' && connectedDevice?.protocolType === 'vial';
-
-  useEffect(() => {
-    setIsCapturingParam(false);
-  }, [selectedKeyId, setIsCapturingParam]);
 
   useEffect(() => {
     setDraftAction(action);
@@ -296,33 +292,6 @@ export const KeycodeConfigPanel = () => {
         }
       }
       updateDraftAction(nextAction);
-    }
-  };
-
-  const handleKeycodeSelection = (code: string) => {
-    if (activeAction.action === 'lt' || activeAction.action === 'mt') {
-      let tapAction: UniversalAction;
-      if (code === 'transparent') {
-        tapAction = { action: 'trans' };
-      } else if (code === 'none') {
-        tapAction = { action: 'none' };
-      } else {
-        tapAction = { action: 'tap', keycode: code as UniversalKey };
-      }
-      updateDraftAction({ ...activeAction, tapAction });
-    } else {
-      let newAction: UniversalAction;
-      if (code === 'transparent') {
-        newAction = { action: 'trans' };
-      } else if (code === 'none') {
-        newAction = { action: 'none' };
-      } else {
-        newAction = { action: 'tap', keycode: code as UniversalKey };
-        if (activeAction.action === 'tap' && activeAction.mods && activeAction.mods.length > 0) {
-          newAction.mods = activeAction.mods;
-        }
-      }
-      updateDraftAction(newAction);
     }
   };
 
@@ -578,29 +547,13 @@ export const KeycodeConfigPanel = () => {
             </label>
             
             {/* Current Value Pill */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-app)]/20 border border-[var(--border-main)] text-[10px] shrink-0 font-medium">
+            <div className="flex items-center px-3 py-1.5 rounded-lg bg-[var(--bg-app)]/20 border border-[var(--border-main)] text-[10px] shrink-0 font-medium">
               <div className="flex items-center gap-2">
                 <span className="text-[var(--text-muted)] font-bold">{t('keycodeConfig.currentValue') || 'Current Value'}:</span>
                 <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 font-bold border border-amber-500/30 uppercase tracking-wide">
                   {currentActiveCode}
                 </span>
               </div>
-              <button
-                onClick={() => setIsCapturingParam(!isCapturingParam)}
-                className={cn(
-                  "h-[22px] px-2 rounded text-[9px] font-bold transition-all flex items-center gap-1 border cursor-pointer",
-                  isCapturingParam
-                    ? "bg-red-500/20 text-red-500 border-red-500/30"
-                    : "bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500 hover:text-zinc-950"
-                )}
-              >
-                <Keyboard className={cn("w-3 h-3 shrink-0", isCapturingParam ? "animate-bounce" : "")} />
-                <span>
-                  {isCapturingParam
-                    ? (t('keymap.capturingDesc') || 'Selecting...')
-                    : (t('keymap.captureTapKey') || 'Select')}
-                </span>
-              </button>
             </div>
           </div>
         )}

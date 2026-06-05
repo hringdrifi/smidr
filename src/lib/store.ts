@@ -223,10 +223,6 @@ export interface KeyboardState {
   deleteSelectedKeycodes: () => Promise<void>;
   setSelectedKeycode: (action: UniversalAction) => Promise<void>;
 
-  // Parameter Capture
-  isCapturingParam: boolean;
-  setIsCapturingParam: (capturing: boolean) => void;
-
   // Demo Mode
   isDemoMode: boolean;
   initializeDemoMode: () => void;
@@ -309,7 +305,6 @@ const initialState: Partial<KeyboardState> = {
   clipboard: [],
   matrixClipboard: [],
   actionClipboard: [],
-  isCapturingParam: false,
   isDemoMode: isDemoModeEnabled(),
   zmkLocked: false,
   zmkUnsavedChanges: false,
@@ -499,7 +494,6 @@ export const useKeyboardStore = create<KeyboardState>()(
           previewKeys: null
         })),
 
-        setIsCapturingParam: (capturing: boolean) => set({ isCapturingParam: capturing }),
         setZmkLayerMetadata: (metadata: ZmkLayerMetadata | null) => set({ zmkLayerMetadata: metadata }),
         setZmkTapDanceIds: (ids: number[]) => set({ zmkTapDanceIds: ids }),
         setZmkLocked: (locked: boolean) => set({ zmkLocked: locked }),

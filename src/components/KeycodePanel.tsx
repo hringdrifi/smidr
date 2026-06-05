@@ -27,7 +27,7 @@ export const KeycodePanel = () => {
   const { 
     keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
-    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam, appMode, zmkTapDanceIds, remoteTapDances
+    connectedDevice, deviceCapabilities, appMode, zmkTapDanceIds, remoteTapDances
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
@@ -72,8 +72,6 @@ export const KeycodePanel = () => {
     window.addEventListener('resize', checkOverflow);
     return () => window.removeEventListener('resize', checkOverflow);
   }, []);
-
-  // Capture mode useEffect deprecated
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
@@ -149,32 +147,6 @@ export const KeycodePanel = () => {
   const handleKeycodeClick = (code: string) => {
     if (selectedKeyIds.length === 0) return;
     
-    if (isCapturingParam && selectedKey) {
-      let clickedAction: UniversalAction;
-      if (code === 'transparent') {
-        clickedAction = { action: 'trans' };
-      } else if (code === 'none') {
-        clickedAction = { action: 'none' };
-      } else if (code === 'any') {
-        clickedAction = getDefaultAnyAction();
-      } else {
-        clickedAction = { action: 'tap', keycode: code as UniversalKey };
-      }
-
-      if (action.action === 'lt' || action.action === 'mt') {
-        updateSelectedAction({ ...action, tapAction: clickedAction });
-      } else if (action.action === 'tap' && action.mods !== undefined) {
-        const targetKey = clickedAction.action === 'tap' 
-          ? clickedAction.keycode 
-          : (clickedAction.action === 'none' ? 'NO' : 'TRNS');
-        updateSelectedAction({ ...action, keycode: targetKey });
-      } else {
-        updateSelectedAction(clickedAction);
-      }
-      setIsCapturingParam(false);
-      return;
-    }
-
     const isNormalKeycode = !code.startsWith('MO(') && 
                             !code.startsWith('TG(') && 
                             !code.startsWith('TO(') && 
