@@ -10,7 +10,7 @@ import {
 export function vialCodeToAction(value: number): UniversalAction {
   // Vial dynamic Tap Dance range: 0x5800 - 0x581F (TD 0 to 31)
   if (value >= 0x5800 && value <= 0x581F) {
-    return { action: 'custom', protocol: 'qmk', rawCode: `TD(${value - 0x5800})` }; // Tap dance representation
+    return { action: 'td', tapDanceId: value - 0x5800 };
   }
 
   // Fallback to standard QMK/VIA decoder for everything else
@@ -19,6 +19,10 @@ export function vialCodeToAction(value: number): UniversalAction {
 
 // Encodes UniversalAction back into Vial-specific dynamic keycodes
 export function actionToVialCode(action: UniversalAction): number {
+  if (action.action === 'td') {
+    return 0x5800 + (action.tapDanceId & 0x1F);
+  }
+
   if (action.action === 'custom' && (action.protocol === 'qmk' || action.protocol === 'vial')) {
     // Check if it's dynamic Tap Dance TD(n)
     const match = action.rawCode.match(/^TD\((\d+)\)$/);
@@ -45,7 +49,7 @@ export function vialStringToAction(vialStr: string): UniversalAction {
   // Parse dynamic Tap Dance string TD(n)
   const match = trimmed.match(/^TD\((\d+)\)$/);
   if (match) {
-    return { action: 'custom', protocol: 'qmk', rawCode: trimmed };
+    return { action: 'td', tapDanceId: parseInt(match[1]) };
   }
 
   // Fallback to standard QMK/VIA parser

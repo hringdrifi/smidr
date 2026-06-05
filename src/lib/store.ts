@@ -135,10 +135,13 @@ export interface KeyboardState {
   // Macros & Combos
   remoteMacros: MacroAction[][];
   remoteCombos: ComboEntry[];
+  remoteTapDances: TapDanceEntry[];
   setRemoteMacros: (macros: MacroAction[][]) => void;
   setRemoteCombos: (combos: ComboEntry[]) => void;
+  setRemoteTapDances: (tapDances: TapDanceEntry[]) => void;
   updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
   updateRemoteCombo: (index: number, combo: ComboEntry) => Promise<void>;
+  updateRemoteTapDance: (index: number, entry: TapDanceEntry) => Promise<void>;
   updateTapDance: (id: number, entry: TapDanceEntry) => void;
   syncMacrosAndCombos: (existingProtocol?: VialProtocol) => Promise<void>;
 
@@ -274,6 +277,7 @@ const initialState: Partial<KeyboardState> = {
   zmkLayerMetadata: null,
   remoteMacros: Array(16).fill(null).map(() => []),
   remoteCombos: [],
+  remoteTapDances: [],
   painter: { currentRow: 0, currentCol: 0, autoIncrement: 'matrix' },
   matrixSubMode: 'paint',
   currentProjectId: null,
@@ -397,6 +401,8 @@ const retargetTapDance = (entry: TapDanceEntry, deletedLayer: number): TapDanceE
   ...entry,
   tapAction: retargetLayerAction(entry.tapAction, deletedLayer),
   doubleTapAction: entry.doubleTapAction ? retargetLayerAction(entry.doubleTapAction, deletedLayer) : undefined,
+  holdAction: entry.holdAction ? retargetLayerAction(entry.holdAction, deletedLayer) : undefined,
+  tapHoldAction: entry.tapHoldAction ? retargetLayerAction(entry.tapHoldAction, deletedLayer) : undefined,
   layerId: entry.layerId === deletedLayer ? 0 : entry.layerId,
 });
 
@@ -1037,6 +1043,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         setRemoteMacros: (macros: MacroAction[][]) => set({ remoteMacros: macros }),
         setRemoteCombos: (combos: ComboEntry[]) => set({ remoteCombos: combos }),
+        setRemoteTapDances: (tapDances: TapDanceEntry[]) => set({ remoteTapDances: tapDances }),
         updateTapDance: (id: number, entry: TapDanceEntry) => set((s) => {
           const current = s.settings.tapDances || [];
           const exists = current.some(td => td.id === id);
@@ -1075,15 +1082,19 @@ export const useKeyboardStore = create<KeyboardState>()(
             const isAdvanced = (vialVer & 0xFFFF) >= 2;
             const deserialized = deserializeMacros(rawBuffer, macroCount, isAdvanced ? 2 : 1);
             
-            // 2. Fetch Combos
+            // 2. Fetch Vial dynamic entries
             const entriesCount = await protocol.getDynamicEntriesCount();
-            console.log(`Device reported combos count: ${entriesCount.combos}`);
+            console.log(`Device reported tap dances: ${entriesCount.tapDance}, combos: ${entriesCount.combos}`);
             let fetchedCombos: ComboEntry[] = [];
             if (entriesCount.combos > 0) {
               fetchedCombos = await protocol.getCombos(entriesCount.combos);
             }
+            let fetchedTapDances: TapDanceEntry[] = [];
+            if (entriesCount.tapDance > 0) {
+              fetchedTapDances = await protocol.getTapDances(entriesCount.tapDance);
+            }
             
-            set({ remoteMacros: deserialized, remoteCombos: fetchedCombos });
+            set({ remoteMacros: deserialized, remoteCombos: fetchedCombos, remoteTapDances: fetchedTapDances });
             console.log('Macros and combos sync completed successfully.');
           } catch (err) {
             console.error('Failed to sync macros and combos:', err);
@@ -1152,6 +1163,36 @@ export const useKeyboardStore = create<KeyboardState>()(
             console.log(`Combo ${index} updated on device.`);
           } catch (err) {
             console.error(`Failed to update combo ${index}:`, err);
+            throw err;
+          }
+        },
+
+        updateRemoteTapDance: async (index: number, entry: TapDanceEntry) => {
+          const s = get();
+          if (!s.connectedDevice || s.connectedDevice.protocolType !== 'vial') return;
+
+          try {
+            const protocol = new VialProtocol();
+            await protocol.initialize(s.activeTransport || hidTransport);
+
+            const unlockStatus = await protocol.getUnlockStatus();
+            if (unlockStatus === 0) {
+              console.log("Device is locked, starting unlock flow...");
+              const success = await get().performDeviceUnlock(protocol);
+              if (!success) {
+                throw new Error("Unlock cancelled or failed.");
+              }
+            }
+
+            const nextEntry = { ...entry, id: index };
+            await protocol.setTapDance(index, nextEntry);
+
+            const updatedTapDances = [...s.remoteTapDances];
+            updatedTapDances[index] = nextEntry;
+            set({ remoteTapDances: updatedTapDances });
+            console.log(`Tap Dance ${index} updated on device.`);
+          } catch (err) {
+            console.error(`Failed to update Tap Dance ${index}:`, err);
             throw err;
           }
         },

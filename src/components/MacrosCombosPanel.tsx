@@ -34,11 +34,15 @@ export const MacrosCombosPanel: React.FC = () => {
     remoteCombos, 
     updateRemoteMacro, 
     updateRemoteCombo,
+    updateRemoteTapDance,
     syncMacrosAndCombos,
+    remoteTapDances,
+    connectedDevice,
     settings,
     updateTapDance
   } = useKeyboardStore();
 
+  const isVialRemap = connectedDevice?.protocolType === 'vial';
   const [activeTab, setActiveTab] = useState<'macros' | 'combos' | 'tapDance'>('macros');
   const [selectedMacroId, setSelectedMacroId] = useState<number>(0);
   const [selectedTapDanceId, setSelectedTapDanceId] = useState<number>(0);
@@ -65,6 +69,12 @@ export const MacrosCombosPanel: React.FC = () => {
       setMacroEditMode('sequence');
     }
   }, [selectedMacroId, remoteMacros]);
+
+  useEffect(() => {
+    if (activeTab === 'tapDance' && !isVialRemap) {
+      setActiveTab('macros');
+    }
+  }, [activeTab, isVialRemap]);
 
   const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage({ text, type });
@@ -199,20 +209,30 @@ export const MacrosCombosPanel: React.FC = () => {
   };
 
   const keyOptions = Object.keys(KEY_MAP).sort();
-  const keyToAction = (keycode: string): UniversalAction => ({ action: 'tap', keycode: keycode as UniversalKey });
-  const actionToKey = (action: UniversalAction | undefined, fallback = 'A') => (
-    action?.action === 'tap' ? action.keycode : fallback
+  const keyToAction = (keycode: string): UniversalAction => (
+    keycode === 'none' ? { action: 'none' } : { action: 'tap', keycode: keycode as UniversalKey }
   );
-  const selectedTapDance = settings.tapDances?.find(td => td.id === selectedTapDanceId) || {
+  const actionToKey = (action: UniversalAction | undefined, fallback = 'A') => {
+    if (!action || action.action === 'none') return fallback;
+    return action.action === 'tap' ? action.keycode : fallback;
+  };
+  const tapDanceEntries = isVialRemap ? remoteTapDances : (settings.tapDances || []);
+  const selectedTapDance = tapDanceEntries.find(td => td.id === selectedTapDanceId) || {
     id: selectedTapDanceId,
-    name: `TD${selectedTapDanceId}`,
     kind: 'double',
     tapAction: { action: 'tap', keycode: 'ESC' },
     doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+    holdAction: { action: 'none' },
+    tapHoldAction: { action: 'none' },
+    tappingTerm: 200,
   } satisfies TapDanceEntry;
 
-  const saveTapDance = (entry: TapDanceEntry) => {
-    updateTapDance(entry.id, entry);
+  const saveTapDance = async (entry: TapDanceEntry) => {
+    if (isVialRemap) {
+      await updateRemoteTapDance(entry.id, entry);
+    } else {
+      updateTapDance(entry.id, entry);
+    }
   };
 
   const updateSelectedTapDance = (patch: Partial<TapDanceEntry>) => {
@@ -227,7 +247,9 @@ export const MacrosCombosPanel: React.FC = () => {
     if ((next.kind === 'layerMove' || next.kind === 'layerToggle') && next.layerId === undefined) {
       next.layerId = 1;
     }
-    saveTapDance(next);
+    saveTapDance(next).catch((err: any) => {
+      showMessage(err.message || 'Failed to save Tap Dance', 'error');
+    });
   };
 
   return (
@@ -258,18 +280,20 @@ export const MacrosCombosPanel: React.FC = () => {
           <Workflow size={14} />
           {t('macros.combos')}
         </button>
-        <button
-          onClick={() => setActiveTab('tapDance')}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold uppercase tracking-wider transition-all duration-300 rounded-lg",
-            activeTab === 'tapDance' 
-              ? "bg-amber-500 text-zinc-950 shadow-md" 
-              : "text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-hover)]"
-          )}
-        >
-          <Sliders size={14} />
-          Tap Dance
-        </button>
+        {isVialRemap && (
+          <button
+            onClick={() => setActiveTab('tapDance')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold uppercase tracking-wider transition-all duration-300 rounded-lg",
+              activeTab === 'tapDance' 
+                ? "bg-amber-500 text-zinc-950 shadow-md" 
+                : "text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-hover)]"
+            )}
+          >
+            <Sliders size={14} />
+            Tap Dance
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -493,8 +517,18 @@ export const MacrosCombosPanel: React.FC = () => {
           </div>
         ) : activeTab === 'tapDance' ? (
           <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: 16 }).map((_, idx) => (
+            {remoteTapDances.length === 0 ? (
+              <div className="text-center py-12 bg-zinc-950/20 border border-[var(--border-main)] rounded-2xl p-6">
+                <Sliders className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">No Tap Dance entries</h3>
+                <p className="text-[10px] text-zinc-500 max-w-[240px] mx-auto leading-relaxed">
+                  This Vial firmware does not report dynamic Tap Dance entries.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-4 gap-2">
+                  {remoteTapDances.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedTapDanceId(idx)}
@@ -507,82 +541,88 @@ export const MacrosCombosPanel: React.FC = () => {
                 >
                   TD{idx}
                 </button>
-              ))}
-            </div>
-
-            <div className="border border-[var(--border-main)] bg-zinc-950/20 rounded-xl p-4 flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
-                <span className="text-xs font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
-                  <Settings size={14} />
-                  Tap Dance {selectedTapDanceId}
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Name</label>
-                <input
-                  value={selectedTapDance.name}
-                  onChange={(e) => updateSelectedTapDance({ name: e.target.value })}
-                  className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Action</label>
-                <select
-                  value={selectedTapDance.kind}
-                  onChange={(e) => updateSelectedTapDance({ kind: e.target.value as TapDanceEntry['kind'] })}
-                  className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
-                >
-                  <option value="double">Tap / Double Tap</option>
-                  <option value="layerMove">Tap / Move Layer</option>
-                  <option value="layerToggle">Tap / Toggle Layer</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Tap</label>
-                  <select
-                    value={actionToKey(selectedTapDance.tapAction, 'ESC')}
-                    onChange={(e) => updateSelectedTapDance({ tapAction: keyToAction(e.target.value) })}
-                    className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
-                  >
-                    {keyOptions.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  ))}
                 </div>
 
-                {selectedTapDance.kind === 'double' ? (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Double Tap</label>
-                    <select
-                      value={actionToKey(selectedTapDance.doubleTapAction, 'CAPS')}
-                      onChange={(e) => updateSelectedTapDance({ doubleTapAction: keyToAction(e.target.value) })}
-                      className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
-                    >
-                      {keyOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                <div className="border border-[var(--border-main)] bg-zinc-950/20 rounded-xl p-4 flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
+                    <span className="text-xs font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
+                      <Settings size={14} />
+                      Tap Dance {selectedTapDanceId}
+                    </span>
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Layer</label>
-                    <select
-                      value={selectedTapDance.layerId ?? 1}
-                      onChange={(e) => updateSelectedTapDance({ layerId: Number(e.target.value) })}
-                      className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
-                    >
-                      {Array.from({ length: settings.layers || 4 }).map((_, idx) => (
-                        <option key={idx} value={idx}>Layer {idx}</option>
-                      ))}
-                    </select>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Tap</label>
+                      <select
+                        value={actionToKey(selectedTapDance.tapAction, 'none')}
+                        onChange={(e) => updateSelectedTapDance({ tapAction: keyToAction(e.target.value) })}
+                        className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
+                      >
+                        <option value="none">NONE</option>
+                        {keyOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Hold</label>
+                      <select
+                        value={actionToKey(selectedTapDance.holdAction, 'none')}
+                        onChange={(e) => updateSelectedTapDance({ holdAction: keyToAction(e.target.value) })}
+                        className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
+                      >
+                        <option value="none">NONE</option>
+                        {keyOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Double Tap</label>
+                      <select
+                        value={actionToKey(selectedTapDance.doubleTapAction, 'none')}
+                        onChange={(e) => updateSelectedTapDance({ doubleTapAction: keyToAction(e.target.value) })}
+                        className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
+                      >
+                        <option value="none">NONE</option>
+                        {keyOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Tap Hold</label>
+                      <select
+                        value={actionToKey(selectedTapDance.tapHoldAction, 'none')}
+                        onChange={(e) => updateSelectedTapDance({ tapHoldAction: keyToAction(e.target.value) })}
+                        className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
+                      >
+                        <option value="none">NONE</option>
+                        {keyOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Tapping Term</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={selectedTapDance.tappingTerm ?? 200}
+                      onChange={(e) => updateSelectedTapDance({ tappingTerm: Number(e.target.value) })}
+                      className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           /* Combos Panel content */

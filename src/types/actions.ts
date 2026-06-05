@@ -96,9 +96,11 @@ export interface ComboEntry {
 
 export interface TapDanceEntry {
   id: number;
-  name: string;
   kind: 'double' | 'layerMove' | 'layerToggle';
   tapAction: UniversalAction;
   doubleTapAction?: UniversalAction;
+  holdAction?: UniversalAction;
+  tapHoldAction?: UniversalAction;
+  tappingTerm?: number;
   layerId?: number;
 }

@@ -10,7 +10,7 @@
 import { ViaProtocol } from './via';
 import { XzReadableStream } from 'xz-decompress';
 import { ITransport } from '../transport/types';
-import { UniversalAction, ComboEntry, MacroAction } from '@/types/actions';
+import { UniversalAction, ComboEntry, MacroAction, TapDanceEntry } from '@/types/actions';
 import { vialCodeToAction, actionToVialCode } from './vial-action-converter';
 
 export enum VialCommand {
@@ -447,6 +447,61 @@ export class VialProtocol extends ViaProtocol {
     view.setUint16(10, actionToVialCode(combo.inputs[3] || { action: 'none' }), true);
     view.setUint16(12, actionToVialCode(combo.output), true);
     
+    await this.sendReport(data);
+    await this.waitForReport(); // ACK
+  }
+
+  async getTapDances(count: number): Promise<TapDanceEntry[]> {
+    const tapDances: TapDanceEntry[] = [];
+    for (let i = 0; i < count; i++) {
+      const data = new Uint8Array(32);
+      data[0] = 0xFE;
+      data[1] = 0x0D;
+      data[2] = 0x01; // DYNAMIC_VIAL_TAP_DANCE_GET
+      data[3] = i;
+
+      await this.sendReport(data);
+      const resp = await this.waitForReport();
+
+      const view = new DataView(resp.buffer, resp.byteOffset);
+      const tap = view.getUint16(0, true);
+      const hold = view.getUint16(2, true);
+      const doubleTap = view.getUint16(4, true);
+      const tapHold = view.getUint16(6, true);
+
+      const holdAction = vialCodeToAction(hold);
+      const tapHoldAction = vialCodeToAction(tapHold);
+      const doubleTapAction = vialCodeToAction(doubleTap);
+      const hasHold = holdAction.action !== 'none';
+      const hasTapHold = tapHoldAction.action !== 'none';
+
+      tapDances.push({
+        id: i,
+        kind: hasHold || hasTapHold ? 'layerMove' : 'double',
+        tapAction: vialCodeToAction(tap),
+        doubleTapAction,
+        holdAction,
+        tapHoldAction,
+        tappingTerm: view.getUint16(8, true)
+      });
+    }
+    return tapDances;
+  }
+
+  async setTapDance(idx: number, tapDance: TapDanceEntry): Promise<void> {
+    const data = new Uint8Array(32);
+    data[0] = 0xFE;
+    data[1] = 0x0D;
+    data[2] = 0x02; // DYNAMIC_VIAL_TAP_DANCE_SET
+    data[3] = idx;
+
+    const view = new DataView(data.buffer, data.byteOffset);
+    view.setUint16(4, actionToVialCode(tapDance.tapAction || { action: 'none' }), true);
+    view.setUint16(6, actionToVialCode(tapDance.holdAction || { action: 'none' }), true);
+    view.setUint16(8, actionToVialCode(tapDance.doubleTapAction || { action: 'none' }), true);
+    view.setUint16(10, actionToVialCode(tapDance.tapHoldAction || { action: 'none' }), true);
+    view.setUint16(12, tapDance.tappingTerm ?? 200, true);
+
     await this.sendReport(data);
     await this.waitForReport(); // ACK
   }

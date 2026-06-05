@@ -262,7 +262,6 @@ describe('export generation', () => {
       tapDances: [
         {
           id: 0,
-          name: 'Esc Caps',
           kind: 'double',
           tapAction: { action: 'tap', keycode: 'ESC' },
           doubleTapAction: { action: 'tap', keycode: 'CAPS' },
@@ -495,7 +494,6 @@ describe('export generation', () => {
       tapDances: [
         {
           id: 1,
-          name: 'Esc Layer',
           kind: 'layerToggle',
           tapAction: { action: 'tap', keycode: 'ESC' },
           layerId: 1,
