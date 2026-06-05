@@ -23,6 +23,14 @@ export const DEMO_TAP_DANCES: TapDanceEntry[] = [
     tapHoldAction: { action: 'tap', keycode: 'LCTL' },
     tappingTerm: 200,
   },
+  ...Array.from({ length: 7 }, (_, idx) => ({
+    id: idx + 1,
+    tapAction: { action: 'tap', keycode: 'A' },
+    holdAction: { action: 'none' },
+    doubleTapAction: { action: 'tap', keycode: 'B' },
+    tapHoldAction: { action: 'none' },
+    tappingTerm: 200,
+  } satisfies TapDanceEntry)),
 ];
 
 export const isDemoModeEnabled = (): boolean => {

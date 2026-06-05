@@ -27,7 +27,7 @@ export const KeycodePanel = () => {
   const { 
     keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
-    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam, appMode, zmkTapDanceIds
+    connectedDevice, deviceCapabilities, isCapturingParam, setIsCapturingParam, appMode, zmkTapDanceIds, remoteTapDances
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
@@ -42,6 +42,12 @@ export const KeycodePanel = () => {
 
   const layersCount = settings.layers || 4;
   const isZmkRemap = appMode === 'remap' && connectedDevice?.protocolType === 'zmk';
+  const isVialRemap = appMode === 'remap' && connectedDevice?.protocolType === 'vial';
+  const tapDanceKeycodes = isVialRemap
+    ? remoteTapDances.map((td) => ({ code: `TD_${td.id}`, label: `TD${td.id}`, category: 'Tap Dance' as const, description: `Tap Dance ${td.id}` }))
+    : isZmkRemap
+    ? zmkTapDanceIds.map((id) => ({ code: `TD_${id}`, label: `TD${id}`, category: 'Tap Dance' as const, description: `Smiðr Tap Dance ${id}` }))
+    : null;
   let filteredKeycodes: Keycode[] = activeTab === 'Layers' 
     ? [
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `MO(${i})`, label: `MO(${i})`, category: 'Layers' as const, description: layerDescription('layerMomentary', i) })),
@@ -49,8 +55,8 @@ export const KeycodePanel = () => {
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `TO(${i})`, label: `TO(${i})`, category: 'Layers' as const, description: layerDescription('layerDirect', i) })),
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `LT(${i})`, label: `LT(${i})`, category: 'Layers' as const, description: layerDescription('layerTap', i) })),
       ]
-    : activeTab === 'Tap Dance' && isZmkRemap
-    ? zmkTapDanceIds.map((id) => ({ code: `TD_${id}`, label: `TD${id}`, category: 'Tap Dance' as const, description: `Smiðr Tap Dance ${id}` }))
+    : activeTab === 'Tap Dance' && tapDanceKeycodes
+    ? tapDanceKeycodes
     : KEYCODES.filter(k => k.category === activeTab).map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
 
 
