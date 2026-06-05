@@ -1,5 +1,5 @@
 import { PhysicalKey, ProjectSettings, SmidrProject } from '@/types/keyboard';
-import { UniversalAction, UniversalKey } from '@/types/actions';
+import { TapDanceEntry, UniversalAction, UniversalKey } from '@/types/actions';
 import { PRESET_LAYOUTS } from './presets';
 import { sortKeys } from './sorting';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
@@ -13,6 +13,17 @@ export const DEMO_DEVICE = {
   manufacturerName: 'Smiðr',
   protocolType: 'vial' as const,
 };
+
+export const DEMO_TAP_DANCES: TapDanceEntry[] = [
+  {
+    id: 0,
+    tapAction: { action: 'tap', keycode: 'ESC' },
+    holdAction: { action: 'tap', keycode: 'LSFT' },
+    doubleTapAction: { action: 'tap', keycode: 'CAPS' },
+    tapHoldAction: { action: 'tap', keycode: 'LCTL' },
+    tappingTerm: 200,
+  },
+];
 
 export const isDemoModeEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -49,7 +60,7 @@ const getDemoSettings = (
   qmk: { matrixMasked: false, bootmagic: { enabled: true } },
   features: { rgb: true, encoder: true, oled: false, via: true, split: true },
   layers: 4,
-  tapDances: [],
+  tapDances: DEMO_TAP_DANCES,
   layoutOptions,
   activeOptions,
   vial: {},

@@ -29,7 +29,7 @@ import {
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
 import { normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
-import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, isDemoModeEnabled } from './demo';
+import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, DEMO_TAP_DANCES, isDemoModeEnabled } from './demo';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 
@@ -533,7 +533,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             isKeymapSyncing: false,
             remoteMacros: Array(16).fill(null).map(() => []),
             remoteCombos: [],
-            remoteTapDances: [],
+            remoteTapDances: DEMO_TAP_DANCES,
             zmkLayerMetadata: null,
             zmkTapDanceIds: [],
             zmkLocked: false,
@@ -562,6 +562,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             remoteKeymap: Object.keys(state.remoteKeymap).length > 0
               ? state.remoteKeymap
               : createDemoRemoteKeymap(state.keys),
+            remoteTapDances: state.remoteTapDances.length > 0 ? state.remoteTapDances : DEMO_TAP_DANCES,
           });
         },
         disconnectDemoDevice: () => {
@@ -1273,6 +1274,14 @@ export const useKeyboardStore = create<KeyboardState>()(
         updateRemoteTapDance: async (index: number, entry: TapDanceEntry) => {
           const s = get();
           if (!s.connectedDevice || s.connectedDevice.protocolType !== 'vial') return;
+
+          if (s.isDemoMode) {
+            const nextEntry = { ...entry, id: index };
+            const updatedTapDances = [...s.remoteTapDances];
+            updatedTapDances[index] = nextEntry;
+            set({ remoteTapDances: updatedTapDances });
+            return;
+          }
 
           try {
             const protocol = new VialProtocol();
