@@ -11,11 +11,19 @@ import { KeycodeConfigPanel } from './KeycodeConfigPanel';
 import { MacrosCombosPanel } from './MacrosCombosPanel';
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked, tapDanceSettingsOpenRequest } = useKeyboardStore();
+  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked, macroSettingsOpenRequest, tapDanceSettingsOpenRequest } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
   const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
+  const lastMacroSettingsOpenRequest = React.useRef(macroSettingsOpenRequest);
   const lastTapDanceSettingsOpenRequest = React.useRef(tapDanceSettingsOpenRequest);
+
+  React.useEffect(() => {
+    if (macroSettingsOpenRequest === lastMacroSettingsOpenRequest.current) return;
+    lastMacroSettingsOpenRequest.current = macroSettingsOpenRequest;
+    setIsLeftPanelOpen(false);
+    setIsMacrosCombosOpen(true);
+  }, [macroSettingsOpenRequest]);
 
   React.useEffect(() => {
     if (tapDanceSettingsOpenRequest === lastTapDanceSettingsOpenRequest.current) return;

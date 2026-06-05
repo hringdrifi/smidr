@@ -131,7 +131,9 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
   - `to`: レイヤー置換切り替え（Replace）。
   - `lt`: レイヤータップ（Holdで対象レイヤー、Tapでキー入力）。
   - `mt`: モッドタップ（Holdで修飾キー、Tapでキー入力）。
+  - `macro`: マクロ呼び出し。`macroId` でデバイスまたはプロジェクト内のマクロスロットを参照し、QMK/VIA/Vial では `MACRO(n)` / Dynamic Macro キーコード、ZMK では `&macro_n` 相当として扱います。マクロ定義そのものは `MacroAction[]` として別管理します。
   - `td`: タップダンス。`tapDanceId` でプロジェクト内の `tapDances` 定義を参照し、QMK/Vial エクスポート時は `TD(n)` として出力する。
+- **マクロ定義への導線**: キーマップ設定パネルで `macro` を選択中かつ接続デバイスがマクロ編集に対応している場合、選択中の `macroId` を Macro / Combo パネルの Macro タブで開くボタンを表示する。
 - **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`action: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
 - **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
 

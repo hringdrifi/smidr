@@ -20,7 +20,7 @@ export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
     settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
-    remoteTapDances, openTapDanceSettings
+    deviceCapabilities, remoteTapDances, openMacroSettings, openTapDanceSettings
   } = useKeyboardStore();
   const { t } = useTranslation();
   const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
@@ -171,6 +171,9 @@ export const KeycodeConfigPanel = () => {
       case 'td':
         newAction = { action: 'td', tapDanceId: activeAction.action === 'td' ? activeAction.tapDanceId : 0 };
         break;
+      case 'macro':
+        newAction = { action: 'macro', macroId: activeAction.action === 'macro' ? activeAction.macroId : 0 };
+        break;
       case 'custom': {
         const protocol = activeAction.action === 'custom' ? activeAction.protocol : defaultCustomProtocol;
         const rawCode = activeAction.action === 'custom'
@@ -217,6 +220,12 @@ export const KeycodeConfigPanel = () => {
   const handleTapDanceChange = (tapDanceId: number) => {
     if (activeAction.action === 'td') {
       updateDraftAction({ ...activeAction, tapDanceId });
+    }
+  };
+
+  const handleMacroChange = (macroId: number) => {
+    if (activeAction.action === 'macro') {
+      updateDraftAction({ ...activeAction, macroId });
     }
   };
 
@@ -297,7 +306,7 @@ export const KeycodeConfigPanel = () => {
 
   // Determine current active config type string
   let currentType = 'tap';
-  if (['mo', 'tg', 'to', 'lt', 'mt', 'td'].includes(activeAction.action)) {
+  if (['mo', 'tg', 'to', 'lt', 'mt', 'td', 'macro'].includes(activeAction.action)) {
     currentType = activeAction.action;
   } else if (activeAction.action === 'custom') {
     currentType = 'custom';
@@ -317,6 +326,10 @@ export const KeycodeConfigPanel = () => {
     currentActiveCode = activeAction.action;
   } else if (activeAction.action === 'custom') {
     currentActiveCode = activeAction.rawCode;
+  } else if (activeAction.action === 'macro') {
+    currentActiveCode = `M${activeAction.macroId}`;
+  } else if (activeAction.action === 'td') {
+    currentActiveCode = `TD${activeAction.tapDanceId}`;
   }
   const tapDanceSelectorIds = isVialRemap && remoteTapDances.length > 0
     ? remoteTapDances.map(td => td.id)
@@ -324,6 +337,7 @@ export const KeycodeConfigPanel = () => {
   const canOpenTapDanceSettings = activeAction.action === 'td' && isVialRemap && (
     remoteTapDances.some(td => td.id === activeAction.tapDanceId)
   );
+  const canOpenMacroSettings = activeAction.action === 'macro' && appMode === 'remap' && !!deviceCapabilities?.hasMacros;
 
   const handleApplyRawAction = () => {
     const rawCode = rawDraft.trim();
@@ -365,6 +379,10 @@ export const KeycodeConfigPanel = () => {
                   return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Acts as modifiers when held, sends keycode when tapped.';
                 })()}
                 {currentType === 'custom' && 'Passes a protocol-specific raw keycode or behavior through to the connected device.'}
+                {currentType === 'macro' && (() => {
+                  const desc = t('keycodeConfig.macroDescription');
+                  return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Runs the selected macro slot from the keyboard firmware.';
+                })()}
                 {currentType === 'td' && (() => {
                   const desc = t('keycodeConfig.tapDanceDescription');
                   return desc && !desc.startsWith('keycodeConfig.') ? desc : 'Runs the selected Tap Dance definition from the project firmware.';
@@ -387,6 +405,7 @@ export const KeycodeConfigPanel = () => {
             <option value="tg">{t('keycodeConfig.typeToggle') || 'Toggle Layer (TG)'}</option>
             <option value="to">{t('keycodeConfig.typeTo') || 'Direct Layer (TO)'}</option>
             <option value="lt">{t('keycodeConfig.typeTap') || 'Layer Tap (LT)'}</option>
+            <option value="macro">{t('keycodeConfig.typeMacro') || 'Macro'}</option>
             <option value="td">{t('keycodeConfig.typeTapDance') || 'Tap Dance (TD)'}</option>
             <option value="custom">{t('keycodeConfig.customKeycode') || 'Any'}</option>
           </select>
@@ -466,6 +485,42 @@ export const KeycodeConfigPanel = () => {
           </div>
         )}
 
+        {activeAction.action === 'macro' && (
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              {t('keycodeConfig.macro') || 'Macro'}
+            </label>
+            <div className="grid grid-cols-4 gap-1">
+              {Array.from({ length: 16 }, (_, idx) => {
+                const isActive = activeAction.macroId === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleMacroChange(idx)}
+                    className={cn(
+                      "py-1.5 text-xs font-bold rounded transition-all shadow-sm flex items-center justify-center border",
+                      isActive
+                        ? "bg-amber-500 text-zinc-950 border-amber-500 shadow-amber-500/10 scale-105"
+                        : "bg-[var(--bg-app)]/50 border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    )}
+                  >
+                    M{idx}
+                  </button>
+                );
+              })}
+            </div>
+            {canOpenMacroSettings && (
+              <button
+                onClick={() => openMacroSettings(activeAction.macroId)}
+                className="mt-1 h-9 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+              >
+                <Settings size={13} />
+                {t('keycodeConfig.openMacroSettings') || 'Open Macro Settings'}
+              </button>
+            )}
+          </div>
+        )}
+
         {activeAction.action === 'td' && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
@@ -496,7 +551,7 @@ export const KeycodeConfigPanel = () => {
                 className="mt-1 h-9 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
               >
                 <Settings size={13} />
-                Tap Dance設定を開く
+                {t('keycodeConfig.openTapDanceSettings') || 'Open Tap Dance Settings'}
               </button>
             )}
           </div>

@@ -39,13 +39,14 @@ export const MacrosCombosPanel: React.FC = () => {
     connectedDevice,
     macroPanelActiveTab,
     setMacroPanelActiveTab,
+    selectedMacroId,
+    setSelectedMacroId,
     selectedTapDanceId,
     setSelectedTapDanceId,
   } = useKeyboardStore();
 
   const activeTab = macroPanelActiveTab;
   const setActiveTab = setMacroPanelActiveTab;
-  const [selectedMacroId, setSelectedMacroId] = useState<number>(0);
   const [macroEditMode, setMacroEditMode] = useState<'text' | 'sequence'>('text');
   
   // Local edit states to prevent high-frequency write calls to HID

@@ -140,12 +140,16 @@ export interface KeyboardState {
   remoteCombos: ComboEntry[];
   remoteTapDances: TapDanceEntry[];
   macroPanelActiveTab: 'macros' | 'combos' | 'tapDance';
+  selectedMacroId: number;
+  macroSettingsOpenRequest: number;
   selectedTapDanceId: number;
   tapDanceSettingsOpenRequest: number;
   setRemoteMacros: (macros: MacroAction[][]) => void;
   setRemoteCombos: (combos: ComboEntry[]) => void;
   setRemoteTapDances: (tapDances: TapDanceEntry[]) => void;
   setMacroPanelActiveTab: (tab: KeyboardState['macroPanelActiveTab']) => void;
+  setSelectedMacroId: (id: number) => void;
+  openMacroSettings: (id: number) => void;
   setSelectedTapDanceId: (id: number) => void;
   openTapDanceSettings: (id: number) => void;
   updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
@@ -291,6 +295,8 @@ const initialState: Partial<KeyboardState> = {
   remoteCombos: [],
   remoteTapDances: [],
   macroPanelActiveTab: 'macros',
+  selectedMacroId: 0,
+  macroSettingsOpenRequest: 0,
   selectedTapDanceId: 0,
   tapDanceSettingsOpenRequest: 0,
   painter: { currentRow: 0, currentCol: 0, autoIncrement: 'matrix' },
@@ -1152,6 +1158,12 @@ export const useKeyboardStore = create<KeyboardState>()(
         setRemoteCombos: (combos: ComboEntry[]) => set({ remoteCombos: combos }),
         setRemoteTapDances: (tapDances: TapDanceEntry[]) => set({ remoteTapDances: tapDances }),
         setMacroPanelActiveTab: (tab: KeyboardState['macroPanelActiveTab']) => set({ macroPanelActiveTab: tab }),
+        setSelectedMacroId: (id: number) => set({ selectedMacroId: id }),
+        openMacroSettings: (id: number) => set((s) => ({
+          macroPanelActiveTab: 'macros',
+          selectedMacroId: id,
+          macroSettingsOpenRequest: s.macroSettingsOpenRequest + 1,
+        })),
         setSelectedTapDanceId: (id: number) => set({ selectedTapDanceId: id }),
         openTapDanceSettings: (id: number) => set((s) => ({
           macroPanelActiveTab: 'tapDance',
