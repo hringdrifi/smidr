@@ -4,6 +4,7 @@ import { generateViaJson } from './export';
 import { TapDanceEntry } from '@/types/actions';
 import { generateQmkTapDanceC } from './tap-dance-codegen';
 import { actionToQmkSourceString, generateQmkStaticMacroC } from './macro-codegen';
+import { generateQmkComboC, hasConfiguredCombos } from './combo-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
@@ -100,6 +101,7 @@ const generateKeymapC = (validKeys: PhysicalKey[], layersCount: number, settings
 
 ${generateQmkTapDanceC(tapDances)}
 ${generateQmkStaticMacroC(settings.macros || [])}
+${generateQmkComboC(settings.combos || [], settings.macros || [])}
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 `;
 
@@ -273,12 +275,13 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
 
   const keymapC = generateKeymapC(validKeys, settings.layers || 4, settings, settings.tapDances || []);
   const tapDanceRules = (settings.tapDances || []).length > 0 ? `TAP_DANCE_ENABLE = yes\n` : '';
+  const comboRules = hasConfiguredCombos(settings.combos || []) ? `COMBO_ENABLE = yes\n` : '';
 
   // 4. keymaps/default/
   const defaultFolder = kbFolder.folder('keymaps')?.folder('default');
   if (defaultFolder) {
     defaultFolder.file('keymap.c', keymapC);
-    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${tapDanceRules}`);
+    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${tapDanceRules}${comboRules}`);
   }
 
   // 5. keymaps/vial/
@@ -313,6 +316,7 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
 VIAL_ENABLE = yes
 LTO_ENABLE = yes
 ${tapDanceRules}
+${comboRules}
 `;
     vialFolder.file('rules.mk', keymapRulesMk);
   }

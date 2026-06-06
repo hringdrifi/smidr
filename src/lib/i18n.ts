@@ -448,8 +448,6 @@ export const TRANSLATIONS = {
     macros: {
       macros: 'Macros',
       combos: 'Combos',
-      project: 'Project',
-      device: 'Device',
       macroEditor: 'Macro {id} Editor',
       text: 'Text',
       sequence: 'Sequence',
@@ -464,8 +462,10 @@ export const TRANSLATIONS = {
       downKey: 'Down Key',
       upKey: 'Up Key',
       saveSequence: 'Save Sequence',
+      addCombo: 'Add Combo',
       noCombos: 'No Combos Configured',
       noCombosDesc: 'Your keyboard does not declare dynamic combos in its definition, or they have not been synchronized.',
+      noProjectCombosDesc: 'No project combos have been added yet.',
       combo: 'Combo {id}',
       edit: 'Edit',
       triggerInputs: 'Trigger key inputs (Max 4)',
@@ -477,6 +477,11 @@ export const TRANSLATIONS = {
       sequenceSaved: 'Macro sequence updated!',
       comboSaved: 'Combo {id} saved to device!',
       comboSaveFailed: 'Failed to save combo',
+      projectComboSaved: 'Project combo updated.',
+      addTapDance: 'Add Tap Dance',
+      noTapDance: 'No Tap Dance',
+      noTapDanceDesc: 'This Vial device did not report dynamic Tap Dance entries.',
+      noProjectTapDanceDesc: 'No project Tap Dance definitions have been added yet.',
     }
   },
   zh: {
@@ -1523,8 +1528,6 @@ export const TRANSLATIONS = {
     macros: {
       macros: 'マクロ',
       combos: 'コンボ',
-      project: 'プロジェクト',
-      device: 'デバイス',
       macroEditor: 'マクロ {id} エディター',
       text: 'テキスト',
       sequence: 'シーケンス',
@@ -1539,8 +1542,10 @@ export const TRANSLATIONS = {
       downKey: 'キーを押下',
       upKey: 'キーを離す',
       saveSequence: 'シーケンスを保存',
+      addCombo: 'コンボを追加',
       noCombos: 'コンボが設定されていません',
       noCombosDesc: 'このキーボードの定義に動的コンボが含まれていないか、まだ同期されていません。',
+      noProjectCombosDesc: 'プロジェクトコンボはまだ追加されていません。',
       combo: 'コンボ {id}',
       edit: '編集',
       triggerInputs: 'トリガーキー入力 (最大4つ)',
@@ -1552,6 +1557,11 @@ export const TRANSLATIONS = {
       sequenceSaved: 'マクロシーケンスを更新しました。',
       comboSaved: 'コンボ {id} をデバイスに保存しました。',
       comboSaveFailed: 'コンボの保存に失敗しました',
+      projectComboSaved: 'プロジェクトコンボを更新しました。',
+      addTapDance: 'タップダンスを追加',
+      noTapDance: 'タップダンスが設定されていません',
+      noTapDanceDesc: 'この Vial デバイスは動的タップダンスエントリを報告していません。',
+      noProjectTapDanceDesc: 'プロジェクトタップダンス定義はまだ追加されていません。',
     }
   },
   es: {

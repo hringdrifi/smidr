@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { actionToZmkSourceString, generateZmkTapDanceBehaviors } from './tap-dance-codegen';
 import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './macro-codegen';
+import { generateZmkComboBehaviors } from './combo-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
 
@@ -372,6 +373,7 @@ features:
 / {
 ${generateZmkTapDanceBehaviors(settings.tapDances || [])}
 ${generateZmkMacroBehaviors(settings.macros || [])}
+${generateZmkComboBehaviors(settings.combos || [], sortedKeys, settings.macros || [])}
     keymap {
         compatible = "zmk,keymap";
 `;

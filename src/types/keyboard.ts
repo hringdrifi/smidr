@@ -1,5 +1,5 @@
 // src/types/keyboard.ts
-import { UniversalAction, MacroAction, TapDanceEntry } from './actions';
+import { UniversalAction, MacroAction, ComboEntry, TapDanceEntry } from './actions';
 import type { QmkMcu } from '@/lib/mcu-presets';
 import type { VisualLayoutId } from '@/lib/visual-layouts';
 
@@ -86,6 +86,7 @@ export interface ProjectSettings {
   };
   layers: number;
   macros?: MacroAction[][];
+  combos?: ComboEntry[];
   tapDances?: TapDanceEntry[];
   visualLayout?: VisualLayoutId;
   layoutOptions: {

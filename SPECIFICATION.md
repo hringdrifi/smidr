@@ -134,8 +134,8 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
   - `macro`: マクロ呼び出し。`macroId` でデバイスまたはプロジェクト内のマクロスロットを参照し、QMK/VIA/Vial では `MACRO(n)` / Dynamic Macro キーコード、ZMK では `&macro_n` 相当として扱います。マクロ定義そのものは `MacroAction[]` として別管理します。
   - `td`: タップダンス。`tapDanceId` でプロジェクト内の `tapDances` 定義を参照し、QMK/Vial エクスポート時は `TD(n)` として出力する。
 - **マクロ定義への導線**: キーマップ設定パネルで `macro` を選択中かつ接続デバイスがマクロ編集に対応している場合、選択中の `macroId` を Macro パネルで開くボタンを表示する。
-- **Project Macro**: `ProjectSettings.macros` に保存されるマクロ定義を Smiðr の標準マクロとして扱う。未接続の設計モードでも編集でき、`.smidr` 保存および QMK / Vial / ZMK ソース出力に反映する。QMK / Vial では `process_record_user()` と `SMIDR_MACRO_N` カスタムキーコード、ZMK では `zmk,behavior-macro` として生成する。
-- **Device Dynamic Macro**: VIA / Vial 接続中に読み書きする Dynamic Macro は実機側の現在値として扱い、Project Macro とは別スコープで編集する。Device Dynamic Macro の編集内容は接続中デバイスへ書き込むが、ソース出力には直接反映しない。
+- **設計モードの定義編集**: 設計モードの Macro / Combo / Tap Dance パネルは `ProjectSettings.macros`, `ProjectSettings.combos`, `ProjectSettings.tapDances` を編集する。これらは `.smidr` 保存および QMK / Vial / ZMK ソース出力に反映する。Macro は QMK / Vial では `process_record_user()` と `SMIDR_MACRO_N` カスタムキーコード、ZMK では `zmk,behavior-macro` として生成する。Combo は QMK / Vial では QMK Combo、ZMK では `zmk,combos` として生成する。
+- **リマップモードの実機編集**: リマップモードの Macro / Combo / Tap Dance パネルは接続中デバイスの Dynamic Macro / Dynamic Combo / Dynamic Tap Dance を編集する。実機編集内容は接続中デバイスへ書き込むが、ProjectSettings には反映せず、ソース出力にも直接反映しない。Dynamic 定義の初期値流し込みは行わない。
 - **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`action: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
 - **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
 

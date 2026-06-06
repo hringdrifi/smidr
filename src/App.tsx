@@ -14,7 +14,10 @@ import { DeviceConnector } from '@/components/DeviceConnector';
 import { HardwareSettingsPanel } from '@/components/HardwareSettingsPanel';
 import { MatrixPropertyPanel } from '@/components/MatrixPropertyPanel';
 import { KeycodeConfigPanel } from '@/components/KeycodeConfigPanel';
-import { MacroPanelKind, MacrosCombosPanel } from '@/components/MacrosCombosPanel';
+import { AdvancedPanelKind } from '@/components/advanced-panel-types';
+import { MacroPanel } from '@/components/MacroPanel';
+import { ComboPanel } from '@/components/ComboPanel';
+import { TapDancePanel } from '@/components/TapDancePanel';
 import { UnlockModal } from '@/components/UnlockModal';
 import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { useKeyboardStore } from '@/lib/store';
@@ -53,7 +56,7 @@ export default function App() {
   const [savedProjects, setSavedProjects] = React.useState<any[]>([]);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
-  const [openMacroPanel, setOpenMacroPanel] = React.useState<MacroPanelKind | null>(null);
+  const [openMacroPanel, setOpenMacroPanel] = React.useState<AdvancedPanelKind | null>(null);
 
   const [lastSavedHistoryLength, setLastSavedHistoryLength] = React.useState(0);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -62,19 +65,30 @@ export default function App() {
   const [isRestoring, setIsRestoring] = React.useState(false);
   const remapFileInputRef = React.useRef<HTMLInputElement>(null);
   const keyboardFileInputRef = React.useRef<HTMLInputElement>(null);
-  const isAdvancedPanelAvailable = connectedDevice?.protocolType === 'vial' || !!storeState.deviceCapabilities;
+  const lastMacroSettingsOpenRequest = React.useRef(storeState.macroSettingsOpenRequest);
+  const lastTapDanceSettingsOpenRequest = React.useRef(storeState.tapDanceSettingsOpenRequest);
   const macroPanelMeta = {
     macros: { title: t('macros.macros'), icon: Sparkles },
     combos: { title: t('macros.combos'), icon: Workflow },
     tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: Sliders },
-  } satisfies Record<MacroPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
+  } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
   const openMacroPanelMeta = openMacroPanel ? macroPanelMeta[openMacroPanel] : null;
 
   React.useEffect(() => {
-    if (openMacroPanel === 'tapDance' && connectedDevice?.protocolType !== 'vial') {
-      setOpenMacroPanel(null);
-    }
-  }, [connectedDevice?.protocolType, openMacroPanel]);
+    if (storeState.appMode !== 'design') return;
+    if (storeState.macroSettingsOpenRequest === lastMacroSettingsOpenRequest.current) return;
+    lastMacroSettingsOpenRequest.current = storeState.macroSettingsOpenRequest;
+    setIsLeftPanelOpen(false);
+    setOpenMacroPanel('macros');
+  }, [storeState.appMode, storeState.macroSettingsOpenRequest]);
+
+  React.useEffect(() => {
+    if (storeState.appMode !== 'design') return;
+    if (storeState.tapDanceSettingsOpenRequest === lastTapDanceSettingsOpenRequest.current) return;
+    lastTapDanceSettingsOpenRequest.current = storeState.tapDanceSettingsOpenRequest;
+    setIsLeftPanelOpen(false);
+    setOpenMacroPanel('tapDance');
+  }, [storeState.appMode, storeState.tapDanceSettingsOpenRequest]);
 
   const connectedDeviceLabel = React.useMemo(() => {
     if (!connectedDevice) return '';
@@ -880,14 +894,12 @@ export default function App() {
                         </div>
                       </button>
 
-                      {isAdvancedPanelAvailable && (
-                        <>
-                          <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
-                          {([
-                            ['macros', Sparkles],
-                            ['combos', Workflow],
-                            ...(connectedDevice?.protocolType === 'vial' ? [['tapDance', Sliders] as const] : []),
-                          ] as const).map(([panel, Icon]) => (
+                      <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
+                      {([
+                        ['macros', Sparkles],
+                        ['combos', Workflow],
+                        ['tapDance', Sliders],
+                      ] as const).map(([panel, Icon]) => (
                             <button
                               key={panel}
                               onClick={() => {
@@ -907,9 +919,7 @@ export default function App() {
                                 {macroPanelMeta[panel].title}
                               </div>
                             </button>
-                          ))}
-                        </>
-                      )}
+                      ))}
                     </div>
                   </div>
 
@@ -954,7 +964,9 @@ export default function App() {
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        <MacrosCombosPanel panel={openMacroPanel} />
+                        {openMacroPanel === 'macros' && <MacroPanel scope="project" />}
+                        {openMacroPanel === 'combos' && <ComboPanel scope="project" />}
+                        {openMacroPanel === 'tapDance' && <TapDancePanel scope="project" />}
                       </div>
                     </div>
                   )}

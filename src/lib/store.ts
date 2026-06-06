@@ -159,10 +159,14 @@ export interface KeyboardState {
   setSelectedTapDanceId: (id: number) => void;
   openTapDanceSettings: (id: number) => void;
   updateProjectMacro: (id: number, actions: MacroAction[]) => void;
+  addProjectCombo: () => void;
+  updateProjectCombo: (index: number, combo: ComboEntry) => void;
+  removeProjectCombo: (index: number) => void;
   updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
   updateRemoteCombo: (index: number, combo: ComboEntry) => Promise<void>;
   updateRemoteTapDance: (index: number, entry: TapDanceEntry) => Promise<void>;
   updateTapDance: (id: number, entry: TapDanceEntry) => void;
+  removeTapDance: (id: number) => void;
   syncMacrosAndCombos: (existingProtocol?: VialProtocol) => Promise<void>;
 
   // Matrix Painting
@@ -267,6 +271,7 @@ const initialState: Partial<KeyboardState> = {
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
     macros: createEmptyMacros(),
+    combos: [],
     tapDances: [],
     visualLayout: getStoredVisualLayout(),
     layoutOptions: {},
@@ -527,6 +532,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             settings: {
               ...projectSettings,
               macros: normalizeMacros(projectSettings.macros),
+              combos: projectSettings.combos || [],
               visualLayout: normalizeVisualLayout(state.settings.visualLayout),
             } as ProjectSettings,
             keys,
@@ -1189,6 +1195,34 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
           };
         }),
+        addProjectCombo: () => set((s) => ({
+          settings: {
+            ...s.settings,
+            combos: [
+              ...(s.settings.combos || []),
+              {
+                inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
+                output: { action: 'tap', keycode: 'ESC' },
+              },
+            ],
+          }
+        })),
+        updateProjectCombo: (index: number, combo: ComboEntry) => set((s) => {
+          const combos = [...(s.settings.combos || [])];
+          combos[index] = combo;
+          return {
+            settings: {
+              ...s.settings,
+              combos,
+            }
+          };
+        }),
+        removeProjectCombo: (index: number) => set((s) => ({
+          settings: {
+            ...s.settings,
+            combos: (s.settings.combos || []).filter((_, idx) => idx !== index),
+          }
+        })),
         updateTapDance: (id: number, entry: TapDanceEntry) => set((s) => {
           const current = s.settings.tapDances || [];
           const exists = current.some(td => td.id === id);
@@ -1202,6 +1236,12 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
           };
         }),
+        removeTapDance: (id: number) => set((s) => ({
+          settings: {
+            ...s.settings,
+            tapDances: (s.settings.tapDances || []).filter(td => td.id !== id),
+          }
+        })),
 
         syncMacrosAndCombos: async (existingProtocol?: VialProtocol) => {
           const s = get();
@@ -2279,6 +2319,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             },
             vial: settings.vial || {},
             macros: normalizeMacros(settings.macros),
+            combos: settings.combos || [],
             tapDances: settings.tapDances || [],
             matrix: settings.matrix || {
               rows: settings.pins?.rows?.length || 0,
@@ -2459,6 +2500,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             ...initialState.settings,
             vialUid: generateRandomVialUid(),
             macros: createEmptyMacros(),
+            combos: [],
             tapDances: [],
             visualLayout: normalizeVisualLayout(s.settings.visualLayout)
           } as ProjectSettings,

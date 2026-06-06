@@ -8,21 +8,25 @@ import { cn } from '@/lib/utils';
 import { KeycodePanel } from './KeycodePanel';
 import { LayoutOptionsPanel } from './LayoutOptionsPanel';
 import { KeycodeConfigPanel } from './KeycodeConfigPanel';
-import { MacroPanelKind, MacrosCombosPanel } from './MacrosCombosPanel';
+import { AdvancedPanelKind } from './advanced-panel-types';
+import { MacroPanel } from './MacroPanel';
+import { ComboPanel } from './ComboPanel';
+import { TapDancePanel } from './TapDancePanel';
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
   const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked, macroSettingsOpenRequest, tapDanceSettingsOpenRequest } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
-  const [openMacroPanel, setOpenMacroPanel] = React.useState<MacroPanelKind | null>(null);
+  const [openMacroPanel, setOpenMacroPanel] = React.useState<AdvancedPanelKind | null>(null);
   const lastMacroSettingsOpenRequest = React.useRef(macroSettingsOpenRequest);
   const lastTapDanceSettingsOpenRequest = React.useRef(tapDanceSettingsOpenRequest);
-  const isAdvancedPanelAvailable = connectedDevice?.protocolType === 'vial' || !!deviceCapabilities;
+  const isMacroPanelAvailable = connectedDevice?.protocolType === 'vial' || !!deviceCapabilities?.hasMacros;
+  const isVialDynamicPanelAvailable = connectedDevice?.protocolType === 'vial';
   const macroPanelMeta = {
     macros: { title: t('macros.macros'), icon: WandSparkles },
     combos: { title: t('macros.combos'), icon: Workflow },
     tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: Sliders },
-  } satisfies Record<MacroPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
+  } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
   const openMacroPanelMeta = openMacroPanel ? macroPanelMeta[openMacroPanel] : null;
 
   React.useEffect(() => {
@@ -40,7 +44,7 @@ export const RemapView: React.FC = () => {
   }, [tapDanceSettingsOpenRequest]);
 
   React.useEffect(() => {
-    if (openMacroPanel === 'tapDance' && connectedDevice?.protocolType !== 'vial') {
+    if ((openMacroPanel === 'tapDance' || openMacroPanel === 'combos') && connectedDevice?.protocolType !== 'vial') {
       setOpenMacroPanel(null);
     }
   }, [connectedDevice?.protocolType, openMacroPanel]);
@@ -104,13 +108,12 @@ export const RemapView: React.FC = () => {
                       </div>
                     </button>
 
-                    {isAdvancedPanelAvailable && (
+                    {(isMacroPanelAvailable || isVialDynamicPanelAvailable) && (
                       <>
                         <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
                         {([
-                          ['macros', WandSparkles],
-                          ['combos', Workflow],
-                          ...(connectedDevice?.protocolType === 'vial' ? [['tapDance', Sliders] as const] : []),
+                          ...(isMacroPanelAvailable ? [['macros', WandSparkles] as const] : []),
+                          ...(isVialDynamicPanelAvailable ? [['combos', Workflow] as const, ['tapDance', Sliders] as const] : []),
                         ] as const).map(([panel, Icon]) => (
                           <button
                             key={panel}
@@ -186,7 +189,9 @@ export const RemapView: React.FC = () => {
                       </button>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
-                      <MacrosCombosPanel panel={openMacroPanel} />
+                      {openMacroPanel === 'macros' && <MacroPanel scope="device" />}
+                      {openMacroPanel === 'combos' && <ComboPanel scope="device" />}
+                      {openMacroPanel === 'tapDance' && <TapDancePanel scope="device" />}
                     </div>
                   </div>
                 )}

@@ -76,6 +76,23 @@ describe('export generation', () => {
     expect(project.macros?.[0]).toEqual([{ action: 'text', text: 'Hello' }]);
   });
 
+  it('keeps project combos in saved projects', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      combos: [{
+        inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
+        output: { action: 'tap', keycode: 'ESC' },
+      }],
+    };
+
+    const project = generateSmidrProjectJson({ settings, keys: [] });
+
+    expect(project.combos?.[0]).toEqual({
+      inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
+      output: { action: 'tap', keycode: 'ESC' },
+    });
+  });
+
   it('keeps split pin settings in saved projects when split is enabled', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -365,6 +382,63 @@ describe('export generation', () => {
     expect(keymapC).toContain('SMIDR_MACRO_0');
   });
 
+  it('emits QMK project combos when configured', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Combo Board',
+      matrix: { rows: 1, cols: 2 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1', 'GP2'],
+        splitRows: [],
+        splitCols: [],
+      },
+      combos: [{
+        inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
+        output: { action: 'tap', keycode: 'ESC' },
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'A' } },
+      },
+      {
+        row: 0,
+        col: 1,
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'B' } },
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymapC = await zip.file('combo_board/keymaps/default/keymap.c')!.async('string');
+    const rulesMk = await zip.file('combo_board/keymaps/default/rules.mk')!.async('string');
+
+    expect(keymapC).toContain('const uint16_t PROGMEM smidr_combo_0[] = { KC_A, KC_B, COMBO_END };');
+    expect(keymapC).toContain('COMBO(smidr_combo_0, KC_ESC)');
+    expect(rulesMk).toContain('COMBO_ENABLE = yes');
+  });
+
   it('emits explicit QMK bootmagic settings', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -643,6 +717,62 @@ describe('export generation', () => {
     expect(keymapC).toContain('SMIDR_MACRO_0');
   });
 
+  it('emits Vial project combos when configured', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Vial Combo',
+      matrix: { rows: 1, cols: 2 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1', 'GP2'],
+        splitRows: [],
+        splitCols: [],
+      },
+      combos: [{
+        inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
+        output: { action: 'tap', keycode: 'ESC' },
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'A' } },
+      },
+      {
+        row: 0,
+        col: 1,
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'B' } },
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymapC = await zip.file('vial_combo/keymaps/vial/keymap.c')!.async('string');
+    const rulesMk = await zip.file('vial_combo/keymaps/vial/rules.mk')!.async('string');
+
+    expect(keymapC).toContain('COMBO(smidr_combo_0, KC_ESC)');
+    expect(rulesMk).toContain('COMBO_ENABLE = yes');
+  });
+
   it('emits configured Vial unlock combo positions', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -905,6 +1035,68 @@ describe('export generation', () => {
     expect(keymap).toContain('&macro_wait_time 30');
     expect(keymap).toContain('&macro_tap &kp RET');
     expect(keymap).toContain('&smidr_macro_0');
+  });
+
+  it('emits ZMK combos from project combos', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'ZMK Combo',
+      matrix: { rows: 1, cols: 2 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08', 'P0.09'],
+        splitRows: [],
+        splitCols: [],
+      },
+      hardware: {
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano_v2',
+        diodeDirection: 'COL2ROW',
+      },
+      combos: [{
+        inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
+        output: { action: 'tap', keycode: 'ESC' },
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'A' } },
+      },
+      {
+        row: 0,
+        col: 1,
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'B' } },
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymap = await zip.file('config/zmk_combo.keymap')!.async('string');
+
+    expect(keymap).toContain('compatible = "zmk,combos"');
+    expect(keymap).toContain('key-positions = <0 1>');
+    expect(keymap).toContain('bindings = <&kp ESC>');
   });
 
   it('maps shared development board selections to ZMK board ids', async () => {
