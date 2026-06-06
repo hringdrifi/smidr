@@ -144,13 +144,6 @@ export const validateFirmwareExport = (
   if (settings.features.split) {
     if (target === 'zmk') {
       const zmkSplitTransport = settings.zmk?.splitTransport || 'ble';
-      if ((settings.hardware.controllerType || 'development_board') === 'mcu') {
-        issues.push({
-          severity: 'error',
-          code: 'zmk-split-custom-board-unsupported',
-          message: 'ZMK split source export currently supports development-board shield projects only.',
-        });
-      }
       if (zmkSplitTransport === 'ble' && getZmkTarget(settings.hardware.mcu) !== 'nrf52840') {
         issues.push({
           severity: 'error',

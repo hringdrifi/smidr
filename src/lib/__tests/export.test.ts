@@ -829,7 +829,7 @@ describe('export generation', () => {
     }));
   });
 
-  it('blocks ZMK custom-board split source export during validation', () => {
+  it('allows ZMK custom-board split source export during validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       matrix: { rows: 1, cols: 1 },
@@ -867,10 +867,7 @@ describe('export generation', () => {
     ];
 
     const issues = validateFirmwareExport(settings, keys, 'zmk');
-    expect(issues).toContainEqual(expect.objectContaining({
-      severity: 'error',
-      code: 'zmk-split-custom-board-unsupported',
-    }));
+    expect(issues.filter(issue => issue.severity === 'error')).toEqual([]);
   });
 
   it('allows ZMK nRF52840 development-board split source export during validation', () => {
@@ -1277,6 +1274,92 @@ describe('export generation', () => {
     expect(boardDts).toContain('#include <nordic/nrf52840_qiaa.dtsi>');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
+  });
+
+  it('emits ZMK split custom boards for MCU projects', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Split MCU Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'mcu',
+        mcu: 'RP2040',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: ['GP3'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+      zmk: {
+        splitTransport: 'wired',
+        wiredSplitDevice: '&uart0',
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'A' } },
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 4,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'B' } },
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const leftDts = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.dts')!.async('string');
+    const rightDts = await zip.file('boards/arm/split_mcu_board_right/split_mcu_board_right.dts')!.async('string');
+    const leftKconfig = await zip.file('boards/arm/split_mcu_board_left/Kconfig.defconfig')!.async('string');
+    const rightKconfig = await zip.file('boards/arm/split_mcu_board_right/Kconfig.defconfig')!.async('string');
+    const leftConf = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.conf')!.async('string');
+    const keymap = await zip.file('config/split_mcu_board.keymap')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(leftDts).toContain('model = "Split MCU Board left"');
+    expect(leftDts).toContain('RC(0,0) RC(0,1)');
+    expect(leftDts).toContain('compatible = "zmk,wired-split"');
+    expect(leftDts).toContain('device = <&uart0>;');
+    expect(rightDts).toContain('model = "Split MCU Board right"');
+    expect(rightDts).toContain('col-offset = <1>');
+    expect(rightDts).toContain('&gpio0 2 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
+    expect(rightDts).toContain('&gpio0 3 GPIO_ACTIVE_HIGH');
+    expect(leftKconfig).toContain('config ZMK_SPLIT_ROLE_CENTRAL');
+    expect(leftKconfig).toContain('config ZMK_SPLIT');
+    expect(rightKconfig).not.toContain('config ZMK_SPLIT_ROLE_CENTRAL');
+    expect(rightKconfig).toContain('config ZMK_SPLIT');
+    expect(leftConf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
+    expect(keymap).toContain('&kp A &kp B');
+    expect(readme).toContain('- board: split_mcu_board_left');
+    expect(readme).toContain('- board: split_mcu_board_right');
   });
 
   it('emits ZMK as an existing board plus shield when development board is selected', async () => {

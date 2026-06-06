@@ -355,6 +355,277 @@ ${splitTransport === 'wired' ? `\n## Wired Split\nThe shared \`${kbName}.dtsi\` 
   return true;
 };
 
+const generateSplitCustomBoardFiles = (
+  zip: JSZip,
+  settings: ProjectSettings,
+  keys: PhysicalKey[],
+  sortedKeys: PhysicalKey[],
+  kbName: string,
+  vendorName: string,
+  zmkTarget: ZmkTarget,
+) => {
+  const arch = 'arm';
+  const leftBoard = `${kbName}_left`;
+  const rightBoard = `${kbName}_right`;
+  const matrix = getZmkMatrixDimensions(settings);
+  const leftPins = getSidePins(settings, 'left');
+  const rightPins = getSidePins(settings, 'right');
+  const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
+  const splitTransport = getZmkSplitTransport(settings);
+  const wiredSplitDevice = getWiredSplitDevice(settings);
+  const processorSelect = zmkTarget === 'nrf52840' ? 'NRF52840_QIAA' : 'RP2040';
+  const dtsInclude = zmkTarget === 'nrf52840'
+    ? '#include <nordic/nrf52840_qiaa.dtsi>'
+    : `#include <arm/rpi_pico/rp2040.dtsi>
+#include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>`;
+  const dtsChosen = zmkTarget === 'nrf52840'
+    ? `        zephyr,sram = &sram0;
+        zephyr,flash = &flash0;
+        zephyr,code-partition = &code_partition;
+        zmk,kscan = &kscan0;
+        zmk,matrix-transform = &default_transform;`
+    : `        zephyr,sram = &sram0;
+        zephyr,flash = &flash0;
+        zephyr,flash-controller = &ssi;
+        zephyr,code-partition = &code_partition;
+        zmk,kscan = &kscan0;
+        zmk,matrix-transform = &default_transform;`;
+  const peripheralDts = zmkTarget === 'nrf52840' ? `
+&gpio0 {
+    status = "okay";
+};
+
+&gpio1 {
+    status = "okay";
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        code_partition: partition@26000 {
+            label = "code_partition";
+            reg = <0x00026000 0x000d2000>;
+        };
+
+        storage_partition: partition@f8000 {
+            label = "storage";
+            reg = <0x000f8000 0x00008000>;
+        };
+    };
+};
+` : `
+&gpio0 {
+    status = "okay";
+};
+
+&ssi {
+    status = "okay";
+};
+
+&flash0 {
+    status = "okay";
+    reg = <0x10000000 0x1000000>;
+
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        code_partition: partition@100 {
+            label = "code_partition";
+            reg = <0x100 0xf7f000>;
+            read-only;
+        };
+
+        storage_partition: partition@f80000 {
+            label = "storage";
+            reg = <0xf80000 0x80000>;
+        };
+    };
+};
+`;
+
+  const makeBoard = (side: MatrixSide, boardName: string, sidePins: ReturnType<typeof getSidePins>) => {
+    const boardFolder = zip.folder('boards')?.folder(arch)?.folder(boardName);
+    if (!boardFolder) return;
+
+    const rowGpios = formatGpios(sidePins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', `${side} row`);
+    const colGpios = formatGpios(sidePins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', `${side} col`);
+    const colOffset = side === 'right' ? `
+
+&default_transform {
+    col-offset = <${leftPins.cols.length}>;
+};
+` : '';
+    const wiredSplitNode = splitTransport === 'wired' ? `
+    wired_split {
+        compatible = "zmk,wired-split";
+        device = <${wiredSplitDevice}>;
+    };
+` : '';
+
+    const kconfigBoard = `# Copyright (c) 2026 ${settings.manufacturer || 'Smidr User'}
+# SPDX-License-Identifier: MIT
+
+config BOARD_${boardName.toUpperCase()}
+    bool "${settings.name} ${side}"
+    select SOC_${processorSelect}
+`;
+    boardFolder.file('Kconfig.board', kconfigBoard);
+
+    const kconfigDefconfig = `# Copyright (c) 2026 ${settings.manufacturer || 'Smidr User'}
+# SPDX-License-Identifier: MIT
+
+if BOARD_${boardName.toUpperCase()}
+
+config BOARD
+    default "${boardName}"
+
+${side === 'left' ? `config ZMK_KEYBOARD_NAME
+    default "${settings.name}"
+
+config ZMK_SPLIT_ROLE_CENTRAL
+    default y
+` : ''}
+config ZMK_SPLIT
+    default y
+
+${zmkTarget === 'nrf52840' ? `config ZMK_BLE
+    default y
+
+config ZMK_USB
+    default y
+` : `config RP2_FLASH_W25Q080
+    default y
+`}
+endif
+`;
+    boardFolder.file('Kconfig.defconfig', kconfigDefconfig);
+
+    const boardDefconfig = `CONFIG_GPIO=y
+CONFIG_ZMK=y
+CONFIG_USB=y
+${zmkTarget === 'nrf52840' ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}
+CONFIG_FLASH=y
+CONFIG_SETTINGS=y
+CONFIG_SETTINGS_NVS=y
+CONFIG_BUILD_OUTPUT_UF2=y
+CONFIG_PINCTRL=y
+CONFIG_CLOCK_CONTROL=y
+CONFIG_FLASH_PAGE_LAYOUT=y
+${zmkTarget === 'nrf52840' ? 'CONFIG_NVS=y\nCONFIG_MPU_ALLOW_FLASH_WRITE=y\n' : ''}
+CONFIG_RETAINED_MEM=y
+CONFIG_RETENTION=y
+CONFIG_RETENTION_BOOT_MODE=y
+`;
+    boardFolder.file(`${boardName}_defconfig`, boardDefconfig);
+
+    const boardConf = `# Copyright (c) 2026 ${settings.manufacturer || 'Smidr User'}
+# SPDX-License-Identifier: MIT
+
+# Enable deep sleep support (uncomment to activate)
+# CONFIG_ZMK_SLEEP=y
+
+# RGB features
+${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
+`;
+    boardFolder.file(`${boardName}.conf`, boardConf);
+
+    const boardDts = `/dts-v1/;
+${dtsInclude}
+#include <dt-bindings/zmk/matrix_transform.h>
+
+/ {
+    model = "${settings.name} ${side}";
+    compatible = "${vendorName},${boardName}";
+
+    chosen {
+${dtsChosen}
+    };
+
+    default_transform: keymap_transform_0 {
+        compatible = "zmk,matrix-transform";
+        columns = <${matrix.cols}>;
+        rows = <${matrix.rows}>;
+        map = <
+            ${transformMapStr}
+        >;
+    };
+
+    kscan0: kscan {
+        compatible = "zmk,kscan-gpio-matrix";
+        diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
+        wakeup-source;
+
+        row-gpios
+            = ${rowGpios}
+            ;
+
+        col-gpios
+            = ${colGpios}
+            ;
+    };
+${wiredSplitNode}
+};
+${colOffset}
+
+${peripheralDts}
+`;
+    boardFolder.file(`${boardName}.dts`, boardDts);
+
+    const zmkYml = `file_format: "1"
+id: ${boardName}
+name: "${settings.name} ${side}"
+type: board
+features:
+  - keys
+`;
+    boardFolder.file(`${boardName}.zmk.yml`, zmkYml);
+  };
+
+  makeBoard('left', leftBoard, leftPins);
+  makeBoard('right', rightBoard, rightPins);
+
+  const configFolder = zip.folder('config');
+  if (configFolder) {
+    const keymap = generateKeymapDts(settings, sortedKeys, kbName);
+    configFolder.file(keymap.filename, keymap.content);
+  }
+
+  const readmeContent = `# ZMK Config for ${settings.name}
+
+This directory structure has been automatically generated by **Smidr** to compile ZMK ${splitTransport} split firmware for your custom keyboard.
+
+## Directory Structure
+- \`config/${kbName}.keymap\`: Contains all keymap layers defined in Smidr.
+- \`boards/arm/${leftBoard}/\`: Contains the left custom board definition files.
+- \`boards/arm/${rightBoard}/\`: Contains the right custom board definition files.
+
+## Setup and Compilation
+To build ZMK firmware using this configuration:
+1. Initialize or open your \`zmk-config\` repository.
+2. Copy the \`config/\` and \`boards/\` directories from this exported folder directly into your \`zmk-config\` repository.
+3. Configure your GitHub Actions \`build.yaml\` file:
+   \`\`\`yaml
+   include:
+     - board: ${leftBoard}
+     - board: ${rightBoard}
+   \`\`\`
+4. Push the changes to GitHub and download the compiled firmware binaries from the GitHub Actions tab.
+
+## Split Matrix
+Both custom board DTS files define the full matrix transform. The right board applies \`col-offset = <${leftPins.cols.length}>\` so local right-side matrix events map into the right side of the shared transform.
+${splitTransport === 'wired' ? `\n## Wired Split\nBoth board DTS files enable ZMK wired split using \`${wiredSplitDevice}\`. Verify this UART device exists on both generated boards before building.\n` : ''}
+`;
+  zip.file('README.md', readmeContent);
+
+  return true;
+};
+
 /**
  * Generates a full standard ZMK config source code ZIP as a custom Board definition (architecture-based).
  */
@@ -379,7 +650,11 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
 
   if (settings.features.split) {
     if (settings.hardware.controllerType === 'mcu') {
-      throw new Error('ZMK split export currently supports development-board shield projects only.');
+      if (getZmkSplitTransport(settings) === 'ble' && zmkTarget !== 'nrf52840') {
+        throw new Error('ZMK BLE split export currently requires an nRF52840 MCU.');
+      }
+      generateSplitCustomBoardFiles(zip, settings, keys, sortedKeys, kbName, vendorName, zmkTarget);
+      return await zip.generateAsync({ type: 'blob' });
     }
     if (getZmkSplitTransport(settings) === 'ble' && zmkTarget !== 'nrf52840') {
       throw new Error('ZMK split export currently requires an nRF52840 BLE-capable development board.');
