@@ -4,7 +4,7 @@ import React from 'react';
 import { Check, Hash, Trash2, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useKeyboardStore } from '@/lib/store';
+import { getMatrixFromPins, useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
   getDefaultDevelopmentBoard,
@@ -214,6 +214,7 @@ export const MatrixPinSettingsPanel = () => {
   const pinPool = controllerType === 'development_board'
     ? getDevelopmentBoardPins(selectedDevelopmentBoard, selectedMcu)
     : getMcuPins(selectedMcu);
+  const effectiveMatrix = getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
 
   const getPinGroupLabel = (box: PinTarget | null, feature: string | null) => {
     if (box === 'row') return settings.features.split ? t('hardware.leftRowPins') : t('hardware.rowPins');
@@ -288,11 +289,11 @@ export const MatrixPinSettingsPanel = () => {
           <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('hardware.pins')}</span>
         </div>
         <div className="ml-4 flex items-center gap-2 text-xs text-[var(--text-highlight)] font-mono font-bold">
-          <span>{settings.pins.rows.length}</span>
+          <span>{effectiveMatrix.rows}</span>
           <span className="text-[var(--text-dim)] font-sans font-normal">x</span>
-          <span>{settings.pins.cols.length}</span>
+          <span>{effectiveMatrix.cols}</span>
           <span className="text-[10px] text-[var(--text-muted)] font-sans font-normal">
-            {format('hardware.keyCount', { count: settings.pins.rows.length * settings.pins.cols.length })}
+            {format('hardware.keyCount', { count: effectiveMatrix.rows * effectiveMatrix.cols })}
           </span>
         </div>
         <div className="ml-4 hidden min-w-0 flex-1 text-[10px] text-[var(--text-muted)] md:block">

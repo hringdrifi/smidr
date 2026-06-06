@@ -2,7 +2,7 @@
 
 import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Group, Rect, Line, Circle, Path as KonvaPath } from 'react-konva';
-import { useKeyboardStore, RuntimeKey } from '@/lib/store';
+import { getMatrixFromPins, useKeyboardStore, RuntimeKey } from '@/lib/store';
 import { PhysicalKey } from '@/types/keyboard';
 import { sortKeys } from '@/lib/sorting';
 import { keysIntersect } from '@/lib/collision';
@@ -279,15 +279,16 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
   const invalidMatrixIds = useMemo(() => {
     if (editorMode !== 'matrix' || readonlyGeometry) return [];
-    const rowCount = settings.pins.rows.length;
-    const colCount = settings.pins.cols.length;
+    const matrix = getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
+    const rowCount = matrix.rows;
+    const colCount = matrix.cols;
     return visKeys
       .filter(key => (
         (key.row !== undefined && key.row >= rowCount) ||
         (key.col !== undefined && key.col >= colCount)
       ))
       .map(key => key.id);
-  }, [visKeys, editorMode, readonlyGeometry, settings.pins.rows.length, settings.pins.cols.length]);
+  }, [visKeys, editorMode, readonlyGeometry, settings.features.split, settings.matrix, settings.pins]);
 
   const warningKeyIds = useMemo(
     () => Array.from(new Set([...collidingIds, ...invalidMatrixIds])),

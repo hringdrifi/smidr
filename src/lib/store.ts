@@ -383,13 +383,18 @@ const getProjectVendorProductId = (project: SmidrProject): number | undefined =>
   return (vid << 16) | pid;
 };
 
-const getMatrixFromPins = (
-  pins: ProjectSettings['pins']
+export const getMatrixFromPins = (
+  pins: ProjectSettings['pins'],
+  split = false
 ): ProjectSettings['matrix'] | undefined => {
   const rows = pins.rows?.length ?? 0;
   const cols = pins.cols?.length ?? 0;
-  if (rows === 0 && cols === 0) return undefined;
-  return { rows, cols };
+  const splitRows = split ? pins.splitRows?.length ?? 0 : 0;
+  const splitCols = split ? pins.splitCols?.length ?? 0 : 0;
+  const effectiveRows = Math.max(rows, splitRows);
+  const effectiveCols = cols + splitCols;
+  if (effectiveRows === 0 && effectiveCols === 0) return undefined;
+  return { rows: effectiveRows, cols: effectiveCols };
 };
 
 const getGeneratedZmkProjectSettings = (
@@ -606,8 +611,8 @@ export const useKeyboardStore = create<KeyboardState>()(
             nextSettings.visualLayout = normalizeVisualLayout(sets.visualLayout);
             setStoredVisualLayout(nextSettings.visualLayout);
           }
-          if (sets.pins) {
-            const pinMatrix = getMatrixFromPins(nextSettings.pins);
+          if (sets.pins || sets.features?.split !== undefined) {
+            const pinMatrix = getMatrixFromPins(nextSettings.pins, nextSettings.features.split);
             if (pinMatrix) {
               nextSettings.matrix = pinMatrix;
             }
@@ -2127,7 +2132,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         
         paintKey: (id: string) => set((s) => {
           const { currentRow: r, currentCol: c, autoIncrement: a } = s.painter;
-          const matrixColCount = s.settings.pins.cols.length || s.settings.matrix.cols || 1;
+          const matrixColCount = getMatrixFromPins(s.settings.pins, s.settings.features.split)?.cols || s.settings.matrix.cols || 1;
           const matrixNextCol = c + 1;
           const nextRow = a === 'row' || (a === 'matrix' && matrixNextCol >= matrixColCount) ? r + 1 : r;
           const nextCol = a === 'col' ? c + 1 : a === 'matrix' ? matrixNextCol % matrixColCount : c;
@@ -2152,7 +2157,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             (p.splitCols as any)[idx as number] = pin;
           }
           if (type === 'feature') (p as any)[idx as string] = pin;
-          const pinMatrix = getMatrixFromPins(p);
+          const pinMatrix = getMatrixFromPins(p, s.settings.features.split);
           return {
             settings: { ...s.settings, pins: p, ...(pinMatrix ? { matrix: pinMatrix } : {}) }
           };
@@ -2417,9 +2422,9 @@ export const useKeyboardStore = create<KeyboardState>()(
             const hasMatrix = keys.some(k => k.row !== undefined);
 
             set((s: KeyboardState) => {
-              const existingPinMatrix = getMatrixFromPins(s.settings.pins);
+              const existingPinMatrix = getMatrixFromPins(s.settings.pins, s.settings.features.split);
               const importedPins = pins ? { ...s.settings.pins, ...pins } : s.settings.pins;
-              const importedPinMatrix = getMatrixFromPins(importedPins);
+              const importedPinMatrix = getMatrixFromPins(importedPins, s.settings.features.split);
               const pinMatrix = importedPinMatrix ?? existingPinMatrix;
               const inferredMatrix = hasMatrix
                 ? { rows: maxRow + 1, cols: maxCol + 1 }
