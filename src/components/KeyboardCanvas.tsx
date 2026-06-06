@@ -826,7 +826,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           ))}
 
           {/* Layer 2: Matrix Lines (In middle) */}
-          {editorMode === 'matrix' && editorSettings.showMatrixLines && !readonlyGeometry && (
+          {appMode === 'design' && editorMode === 'matrix' && editorSettings.showMatrixLines && !readonlyGeometry && (
             <Group listening={false}>
               {(() => {
                 const rowLines: { id: string, points: number[] }[] = [];

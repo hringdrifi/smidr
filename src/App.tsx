@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, Sliders, Workflow } from 'lucide-react';
+import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
@@ -68,9 +68,9 @@ export default function App() {
   const lastMacroSettingsOpenRequest = React.useRef(storeState.macroSettingsOpenRequest);
   const lastTapDanceSettingsOpenRequest = React.useRef(storeState.tapDanceSettingsOpenRequest);
   const macroPanelMeta = {
-    macros: { title: t('macros.macros'), icon: Sparkles },
+    macros: { title: t('macros.macros'), icon: ScrollText },
     combos: { title: t('macros.combos'), icon: Workflow },
-    tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: Sliders },
+    tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: WandSparkles },
   } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
   const openMacroPanelMeta = openMacroPanel ? macroPanelMeta[openMacroPanel] : null;
 
@@ -896,9 +896,9 @@ export default function App() {
 
                       <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
                       {([
-                        ['macros', Sparkles],
+                        ['macros', ScrollText],
                         ['combos', Workflow],
-                        ['tapDance', Sliders],
+                        ['tapDance', WandSparkles],
                       ] as const).map(([panel, Icon]) => (
                             <button
                               key={panel}

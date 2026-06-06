@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles, Trash2, Workflow } from 'lucide-react';
+import { Cpu, Usb, SlidersHorizontal, X, Wrench, ScrollText, WandSparkles, Trash2, Workflow } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { KeyboardCanvas } from './KeyboardCanvas';
@@ -23,9 +23,9 @@ export const RemapView: React.FC = () => {
   const isMacroPanelAvailable = connectedDevice?.protocolType === 'vial' || !!deviceCapabilities?.hasMacros;
   const isVialDynamicPanelAvailable = connectedDevice?.protocolType === 'vial';
   const macroPanelMeta = {
-    macros: { title: t('macros.macros'), icon: WandSparkles },
+    macros: { title: t('macros.macros'), icon: ScrollText },
     combos: { title: t('macros.combos'), icon: Workflow },
-    tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: Sliders },
+    tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: WandSparkles },
   } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
   const openMacroPanelMeta = openMacroPanel ? macroPanelMeta[openMacroPanel] : null;
 
@@ -112,8 +112,8 @@ export const RemapView: React.FC = () => {
                       <>
                         <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
                         {([
-                          ...(isMacroPanelAvailable ? [['macros', WandSparkles] as const] : []),
-                          ...(isVialDynamicPanelAvailable ? [['combos', Workflow] as const, ['tapDance', Sliders] as const] : []),
+                          ...(isMacroPanelAvailable ? [['macros', ScrollText] as const] : []),
+                          ...(isVialDynamicPanelAvailable ? [['combos', Workflow] as const, ['tapDance', WandSparkles] as const] : []),
                         ] as const).map(([panel, Icon]) => (
                           <button
                             key={panel}

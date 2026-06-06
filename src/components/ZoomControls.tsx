@@ -502,7 +502,7 @@ export const ZoomControls = () => {
           </>
         )}
 
-        {editorMode === 'matrix' && (
+        {appMode === 'design' && editorMode === 'matrix' && (
           <button 
             onClick={() => updateEditorSettings({ showMatrixLines: !editorSettings.showMatrixLines })}
             className={cn(
