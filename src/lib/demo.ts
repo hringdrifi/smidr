@@ -4,6 +4,7 @@ import { PRESET_LAYOUTS } from './presets';
 import { sortKeys } from './sorting';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { parseKeyboardDefinition } from './parser';
+import { getQmkMatrixPosition, inferMatrixSideFromGeometry } from './matrix-utils';
 
 export const DEMO_PROJECT_ID = 'smidr-demo-project';
 export const DEMO_DEVICE = {
@@ -50,13 +51,15 @@ const getDemoSettings = (
   description: 'Virtual keyboard project for demo mode',
   vendorProductId: (DEMO_DEVICE.vid << 16) | DEMO_DEVICE.pid,
   vialUid: '0x534D49445244454D',
-  matrix: { rows: 4, cols: 12 },
+  matrix: { rows: 4, cols: 6 },
   pins: {
     rows: ['GP4', 'GP5', 'GP6', 'GP7'],
-    cols: ['GP8', 'GP9', 'GP10', 'GP11', 'GP12', 'GP13', 'GP14', 'GP15', 'GP16', 'GP17', 'GP18', 'GP19'],
-    splitRows: [],
-    splitCols: [],
+    cols: ['GP8', 'GP9', 'GP10', 'GP11', 'GP12', 'GP13'],
+    splitRows: ['GP4', 'GP5', 'GP6', 'GP7'],
+    splitCols: ['GP8', 'GP9', 'GP10', 'GP11', 'GP12', 'GP13'],
     splitSerial: 'GP1',
+    encoderA: 'GP3',
+    encoderB: 'GP14',
   },
   hardware: {
     controllerType: 'development_board',
@@ -106,14 +109,33 @@ const getDemoActionForLabel = (label: string): UniversalAction => {
 export const createDemoProject = (): SmidrProject => {
   const parsed = parseKeyboardDefinition(PRESET_LAYOUTS['Corne (42 keys)']);
   const parsedKeys = parsed.keys;
-  const sortedKeys = sortKeys(parsedKeys, 0.25);
-  const indexByKey = new Map<PhysicalKey, number>();
-  sortedKeys.forEach((key, index) => indexByKey.set(key, index));
+  const matrixByKey = new Map<PhysicalKey, { row: number; col: number; matrixSide: 'left' | 'right' }>();
+  (['left', 'right'] as const).forEach((matrixSide) => {
+    const sideKeys = parsedKeys.filter(key => inferMatrixSideFromGeometry(key, parsedKeys) === matrixSide);
+    const sortedKeys = sortKeys(sideKeys, 0.25);
+    sortedKeys.forEach((key, index) => {
+      matrixByKey.set(key, {
+        row: Math.floor(index / 6),
+        col: index % 6,
+        matrixSide,
+      });
+    });
+  });
+  const leftThumbKeys = parsedKeys
+    .filter(key => inferMatrixSideFromGeometry(key, parsedKeys) === 'left')
+    .sort((a, b) => b.y - a.y || a.x - b.x)
+    .slice(0, 3)
+    .sort((a, b) => a.x - b.x);
+  leftThumbKeys.forEach((key, idx) => {
+    matrixByKey.set(key, {
+      row: 3,
+      col: idx + 3,
+      matrixSide: 'left',
+    });
+  });
 
   const keys = parsedKeys.map((key) => {
-    const index = indexByKey.get(key) ?? 0;
-    const row = Math.floor(index / 12);
-    const col = index % 12;
+    const matrix = matrixByKey.get(key) || { row: 0, col: 0, matrixSide: 'left' as const };
     const keymap: Record<number, UniversalAction> = {
       0: getDemoActionForLabel(key.label),
       1: { action: 'trans' },
@@ -123,8 +145,7 @@ export const createDemoProject = (): SmidrProject => {
 
     return {
       ...key,
-      row,
-      col,
+      ...matrix,
       keymap,
     };
   });
@@ -139,9 +160,12 @@ export const createDemoProject = (): SmidrProject => {
 
 export const createDemoRemoteKeymap = (keys: PhysicalKey[]): Record<number, UniversalAction[]> => {
   const remoteKeymap: Record<number, UniversalAction[]> = {};
+  const settings = getDemoSettings();
   keys.forEach((key) => {
     if (key.row === undefined || key.col === undefined) return;
-    const index = key.row * 32 + key.col;
+    const pos = getQmkMatrixPosition(settings, key, keys);
+    if (!pos) return;
+    const index = pos.row * 32 + pos.col;
     for (let layer = 0; layer < 4; layer++) {
       if (!remoteKeymap[layer]) remoteKeymap[layer] = [];
       remoteKeymap[layer][index] = key.keymap?.[layer] || { action: 'trans' };

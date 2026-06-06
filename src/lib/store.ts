@@ -30,6 +30,14 @@ import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
 import { normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
 import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, DEMO_TAP_DANCES, isDemoModeEnabled } from './demo';
+import {
+  getLocalMatrixPosition,
+  getMatrixFromPins,
+  inferMatrixSideFromGeometry,
+  MatrixSide,
+} from './matrix-utils';
+
+export { getMatrixFromPins } from './matrix-utils';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 
@@ -170,8 +178,8 @@ export interface KeyboardState {
   syncMacrosAndCombos: (existingProtocol?: VialProtocol) => Promise<void>;
 
   // Matrix Painting
-  setMatrixPosition: (id: string, row: number | undefined, col: number | undefined) => void;
-  painter: { currentRow: number; currentCol: number; autoIncrement: 'matrix' | 'col' | 'row'; };
+  setMatrixPosition: (id: string, row: number | undefined, col: number | undefined, side?: MatrixSide) => void;
+  painter: { currentRow: number; currentCol: number; currentSide: MatrixSide; autoIncrement: 'matrix' | 'col' | 'row'; };
   setPainter: (painter: Partial<KeyboardState['painter']>) => void;
   paintKey: (id: string) => void;
   matrixSubMode: 'paint' | 'manual';
@@ -231,7 +239,7 @@ export interface KeyboardState {
 
   // Clipboard
   clipboard: RuntimeKey[];
-  matrixClipboard: { row?: number; col?: number }[];
+  matrixClipboard: { row?: number; col?: number; matrixSide?: MatrixSide }[];
   actionClipboard: UniversalAction[];
   copyKeys: () => void;
   pasteKeys: () => void;
@@ -312,7 +320,7 @@ const initialState: Partial<KeyboardState> = {
   macroSettingsOpenRequest: 0,
   selectedTapDanceId: 0,
   tapDanceSettingsOpenRequest: 0,
-  painter: { currentRow: 0, currentCol: 0, autoIncrement: 'matrix' },
+  painter: { currentRow: 0, currentCol: 0, currentSide: 'left', autoIncrement: 'matrix' },
   matrixSubMode: 'paint',
   currentProjectId: null,
   isProjectOpen: false,
@@ -381,20 +389,6 @@ const getProjectVendorProductId = (project: SmidrProject): number | undefined =>
   const pid = parseProjectUsbId(project.productId);
   if (vid === undefined || pid === undefined) return undefined;
   return (vid << 16) | pid;
-};
-
-export const getMatrixFromPins = (
-  pins: ProjectSettings['pins'],
-  split = false
-): ProjectSettings['matrix'] | undefined => {
-  const rows = pins.rows?.length ?? 0;
-  const cols = pins.cols?.length ?? 0;
-  const splitRows = split ? pins.splitRows?.length ?? 0 : 0;
-  const splitCols = split ? pins.splitCols?.length ?? 0 : 0;
-  const effectiveRows = Math.max(rows, splitRows);
-  const effectiveCols = cols + splitCols;
-  if (effectiveRows === 0 && effectiveCols === 0) return undefined;
-  return { rows: effectiveRows, cols: effectiveCols };
 };
 
 const getGeneratedZmkProjectSettings = (
@@ -1762,7 +1756,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
           if (s.editorMode === 'matrix') {
             return {
-              matrixClipboard: sortedSelectedKeys.map(k => ({ row: k.row, col: k.col }))
+                matrixClipboard: sortedSelectedKeys.map(k => ({ row: k.row, col: k.col, matrixSide: k.matrixSide }))
             };
           } else if (s.editorMode === 'keymap') {
             return {
@@ -1801,7 +1795,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 if (targetIdx !== -1) {
                   const clipItem = matrixClipboard.length === 1 ? matrixClipboard[0] : matrixClipboard[targetIdx];
                   if (clipItem) {
-                    return { ...k, row: clipItem.row, col: clipItem.col };
+                    return { ...k, row: clipItem.row, col: clipItem.col, matrixSide: clipItem.matrixSide };
                   }
                 }
                 return k;
@@ -2124,20 +2118,31 @@ export const useKeyboardStore = create<KeyboardState>()(
           keys: s.keys.map(k => k.id === id ? { ...k, keymap: { ...k.keymap, [l]: action } } : k)
         })),
 
-        setMatrixPosition: (id: string, row: number | undefined, col: number | undefined) => set((s) => ({
-          keys: s.keys.map(k => k.id === id ? { ...k, row, col } : k)
+        setMatrixPosition: (id: string, row: number | undefined, col: number | undefined, side?: MatrixSide) => set((s) => ({
+          keys: s.keys.map(k => {
+            if (k.id !== id) return k;
+            const matrixSide = s.settings.features.split
+              ? side || k.matrixSide || inferMatrixSideFromGeometry(k, s.keys)
+              : undefined;
+            return { ...k, row, col, matrixSide: row === undefined || col === undefined ? undefined : matrixSide };
+          })
         })),
 
         setPainter: (p: Partial<KeyboardState['painter']>) => set((s) => ({ painter: { ...s.painter, ...p } })),
         
         paintKey: (id: string) => set((s) => {
-          const { currentRow: r, currentCol: c, autoIncrement: a } = s.painter;
+          const { currentRow: r, currentCol: c, currentSide, autoIncrement: a } = s.painter;
           const matrixColCount = getMatrixFromPins(s.settings.pins, s.settings.features.split)?.cols || s.settings.matrix.cols || 1;
           const matrixNextCol = c + 1;
           const nextRow = a === 'row' || (a === 'matrix' && matrixNextCol >= matrixColCount) ? r + 1 : r;
           const nextCol = a === 'col' ? c + 1 : a === 'matrix' ? matrixNextCol % matrixColCount : c;
           return {
-            keys: s.keys.map(k => k.id === id ? { ...k, row: r, col: c } : k),
+            keys: s.keys.map(k => k.id === id ? {
+              ...k,
+              row: r,
+              col: c,
+              matrixSide: s.settings.features.split ? currentSide : undefined,
+            } : k),
             painter: { ...s.painter, currentRow: nextRow, currentCol: nextCol }
           };
         }),
@@ -2519,7 +2524,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         })),
 
         clearMatrixMap: () => set((s: KeyboardState) => ({
-          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined }))
+          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined, matrixSide: undefined }))
         })),
 
         generateMatrix: (rows: number, cols: number) => {
@@ -2534,22 +2539,30 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         autoAssignMatrix: () => set((s: KeyboardState) => {
           const visKeys = s.keys.filter(k => !k.group || s.settings.activeOptions[k.group] === k.option);
-          const sorted = sortKeys(visKeys, s.editorSettings.sortThresholdY);
-          let currentRow = 0;
-          let currentCol = 0;
-          const idToMatrix: Record<string, { row: number, col: number }> = {};
-          sorted.forEach((k: PhysicalKey, i: number) => {
-            if (i > 0) {
-              const prev = sorted[i-1];
-              if (Math.abs(k.y - prev.y) > s.editorSettings.sortThresholdY) {
-                currentRow++;
-                currentCol = 0;
-              } else {
-                currentCol++;
+          const idToMatrix: Record<string, { row: number, col: number, matrixSide?: MatrixSide }> = {};
+          const assignGroup = (groupKeys: RuntimeKey[], matrixSide?: MatrixSide) => {
+            const sorted = sortKeys(groupKeys, s.editorSettings.sortThresholdY);
+            let currentRow = 0;
+            let currentCol = 0;
+            sorted.forEach((k: PhysicalKey, i: number) => {
+              if (i > 0) {
+                const prev = sorted[i - 1];
+                if (Math.abs(k.y - prev.y) > s.editorSettings.sortThresholdY) {
+                  currentRow++;
+                  currentCol = 0;
+                } else {
+                  currentCol++;
+                }
               }
-            }
-            idToMatrix[k.id!] = { row: currentRow, col: currentCol };
-          });
+              idToMatrix[k.id!] = { row: currentRow, col: currentCol, matrixSide };
+            });
+          };
+          if (s.settings.features.split) {
+            assignGroup(visKeys.filter(k => inferMatrixSideFromGeometry(k, visKeys) === 'left'), 'left');
+            assignGroup(visKeys.filter(k => inferMatrixSideFromGeometry(k, visKeys) === 'right'), 'right');
+          } else {
+            assignGroup(visKeys);
+          }
           return {
             keys: s.keys.map(k => idToMatrix[k.id!] ? { ...k, ...idToMatrix[k.id!] } : k),
             painter: { ...s.painter, currentRow: 0, currentCol: 0 }

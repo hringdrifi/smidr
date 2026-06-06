@@ -5,6 +5,7 @@ import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './
 import { generateZmkComboBehaviors } from './combo-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
+import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
@@ -53,8 +54,13 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
   const validKeys = keys.filter((key, idx) => {
     if (key.row === undefined || key.col === undefined) return false;
-    if (key.row >= settings.pins.rows.length || key.col >= settings.pins.cols.length) return false;
-    const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
+    const matrix = getQmkMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
+    const pos = getQmkMatrixPosition(settings, key, keys);
+    if (!pos || pos.row >= matrix.rows || pos.col >= matrix.cols) return false;
+    const firstIdx = keys.findIndex(k => {
+      const other = getQmkMatrixPosition(settings, k, keys);
+      return other?.row === pos.row && other?.col === pos.col;
+    });
     return firstIdx === idx;
   });
 
@@ -77,8 +83,12 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
 
   let transformMapStr = '';
   for (let i = 0; i < sortedKeys.length; i += 10) {
-    transformMapStr += (i > 0 ? '\n            ' : '') + sortedKeys.slice(i, i + 10).map(key => `RC(${key.row},${key.col})`).join(' ');
+    transformMapStr += (i > 0 ? '\n            ' : '') + sortedKeys.slice(i, i + 10).map(key => {
+      const pos = getQmkMatrixPosition(settings, key, keys);
+      return `RC(${pos?.row ?? 0},${pos?.col ?? 0})`;
+    }).join(' ');
   }
+  const matrix = getQmkMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
 
   const rowPins = settings.pins.rows || [];
   const rowGpiosStr = formatGpios(rowPins, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Row');
@@ -242,8 +252,8 @@ ${dtsChosen}
 
     default_transform: keymap_transform_0 {
         compatible = "zmk,matrix-transform";
-        columns = <${settings.pins.cols.length}>;
-        rows = <${settings.pins.rows.length}>;
+        columns = <${matrix.cols}>;
+        rows = <${matrix.rows}>;
         map = <
             ${transformMapStr}
         >;
@@ -292,8 +302,8 @@ features:
 
     default_transform: keymap_transform_0 {
         compatible = "zmk,matrix-transform";
-        columns = <${settings.pins.cols.length}>;
-        rows = <${settings.pins.rows.length}>;
+        columns = <${matrix.cols}>;
+        rows = <${matrix.rows}>;
         map = <
             ${transformMapStr}
         >;

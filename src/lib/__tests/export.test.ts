@@ -4,6 +4,7 @@ import { generateSmidrProjectJson, generateViaJson } from '../export';
 import { generateQmkZip } from '../qmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
+import { validateFirmwareExport } from '../export-validation';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
 const baseSettings: ProjectSettings = {
@@ -374,11 +375,11 @@ describe('export generation', () => {
     const rulesMk = await zip.file('tap_dance_board/keymaps/default/rules.mk')!.async('string');
 
     expect(keymapC).toContain('tap_dance_action_t tap_dance_actions[]');
-    expect(keymapC).toContain('void smidr_td_0_finished(qk_tap_dance_state_t *state, void *user_data)');
+    expect(keymapC).toContain('void smidr_td_0_finished(tap_dance_state_t *state, void *user_data)');
     expect(keymapC).toContain('register_code16(smidr_td_0_held)');
     expect(keymapC).toContain('tap_code16(KC_ESC)');
     expect(keymapC).toContain('tap_code16(KC_CAPS)');
-    expect(keymapC).toContain('[0] = ACTION_TAP_DANCE_FN_ADVANCED_TIME(NULL, smidr_td_0_finished, smidr_td_0_reset, 175)');
+    expect(keymapC).toContain('[0] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, smidr_td_0_finished, smidr_td_0_reset)');
     expect(keymapC).toContain('TD(0)');
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
@@ -621,6 +622,196 @@ describe('export generation', () => {
     expect(keyboardC).toContain('(matrix_row_t)0x1ULL');
   });
 
+  it('exports split Vial matrix positions as per-half rows and columns', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Split Vial Board',
+      matrix: { rows: 4, cols: 6 },
+      pins: {
+        rows: ['GP0', 'GP1', 'GP2', 'GP3'],
+        cols: ['GP4', 'GP5', 'GP6', 'GP7', 'GP8', 'GP9'],
+        splitRows: ['GP10', 'GP11', 'GP12', 'GP13'],
+        splitCols: ['GP14', 'GP15', 'GP16', 'GP17', 'GP18', 'GP19'],
+        encoderA: 'GP20',
+        encoderB: 'GP21',
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+        encoder: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 8,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('split_vial_board/keyboard.json')!.async('string'));
+    const configH = await zip.file('split_vial_board/config.h')!.async('string');
+    const vialJson = JSON.parse(await zip.file('split_vial_board/keymaps/vial/vial.json')!.async('string'));
+
+    expect(keyboardJson.layouts.LAYOUT.layout.map((key: any) => key.matrix)).toEqual([[0, 0], [4, 0]]);
+    expect(keyboardJson.encoder.rotary).toEqual([{ pin_a: 'GP20', pin_b: 'GP21' }]);
+    expect(configH).not.toContain('ENCODERS_PAD_A');
+    expect(configH).not.toContain('ENCODERS_PAD_B');
+    expect(vialJson.matrix).toEqual({ rows: 8, cols: 6 });
+  });
+
+  it('keeps encoder output enabled when encoder pins are missing', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Encoder Missing Pins',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('encoder_missing_pins/keyboard.json')!.async('string'));
+    expect(keyboardJson.features.encoder).toBe(true);
+    expect(keyboardJson.encoder.rotary).toEqual([{ pin_a: 'B0', pin_b: 'B1' }]);
+  });
+
+  it('warns when encoder pins are missing during export validation', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'vial');
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'encoder-pins-missing',
+    }));
+  });
+
+  it('warns about unknown pins and missing split transport during export validation', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        encoderA: 'B0',
+        encoderB: 'GP2',
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'qmk');
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'unknown-pin',
+      message: expect.stringContaining('Encoder A'),
+    }));
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'split-serial-missing',
+    }));
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'split-matrix-pins-missing',
+    }));
+  });
+
   it('emits Vial MATRIX_MASKED through rules.mk instead of keyboard.json', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -717,10 +908,10 @@ describe('export generation', () => {
     const keymapC = await zip.file('vial_tap_dance/keymaps/vial/keymap.c')!.async('string');
     const rulesMk = await zip.file('vial_tap_dance/keymaps/vial/rules.mk')!.async('string');
 
-    expect(keymapC).toContain('void smidr_td_1_finished(qk_tap_dance_state_t *state, void *user_data)');
+    expect(keymapC).toContain('void smidr_td_1_finished(tap_dance_state_t *state, void *user_data)');
     expect(keymapC).toContain('tap_code16(KC_ESC)');
     expect(keymapC).toContain('tap_code16(KC_CAPS)');
-    expect(keymapC).toContain('[1] = ACTION_TAP_DANCE_FN_ADVANCED_TIME(NULL, smidr_td_1_finished, smidr_td_1_reset, 225)');
+    expect(keymapC).toContain('[1] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, smidr_td_1_finished, smidr_td_1_reset)');
     expect(keymapC).toContain('TD(1)');
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });

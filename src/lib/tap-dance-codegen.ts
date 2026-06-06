@@ -37,7 +37,7 @@ export const generateQmkTapDanceC = (tapDances: TapDanceEntry[] = []) => {
 
     return `static uint16_t ${holdVar} = KC_NO;
 
-void ${finished}(qk_tap_dance_state_t *state, void *user_data) {
+void ${finished}(tap_dance_state_t *state, void *user_data) {
     ${holdVar} = KC_NO;
     if (state->count == 1) {
         if (state->pressed) {
@@ -54,7 +54,7 @@ ${qmkTapCode(entry.doubleTapAction)}
     }
 }
 
-void ${reset}(qk_tap_dance_state_t *state, void *user_data) {
+void ${reset}(tap_dance_state_t *state, void *user_data) {
     if (${holdVar} != KC_NO) {
         unregister_code16(${holdVar});
         ${holdVar} = KC_NO;
@@ -64,7 +64,7 @@ void ${reset}(qk_tap_dance_state_t *state, void *user_data) {
   }).join('\n');
 
   const tableEntries = entries.map(entry => (
-    `    [${entry.id}] = ACTION_TAP_DANCE_FN_ADVANCED_TIME(NULL, smidr_td_${entry.id}_finished, smidr_td_${entry.id}_reset, ${entry.tappingTerm ?? 200}),`
+    `    [${entry.id}] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, smidr_td_${entry.id}_finished, smidr_td_${entry.id}_reset),`
   ));
 
   return `

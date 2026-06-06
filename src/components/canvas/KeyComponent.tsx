@@ -24,6 +24,7 @@ interface KeyComponentProps {
   appMode: 'design' | 'remap';
   showKeycap?: boolean;
   showLabel?: boolean;
+  matrixLabelFill?: string;
   draggable?: boolean;
   onDragStart?: (e: any) => void;
   onDragMove?: (e: any) => void;
@@ -44,6 +45,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   appMode,
   showKeycap = true,
   showLabel = true,
+  matrixLabelFill,
   draggable = false,
   onDragStart,
   onDragMove,
@@ -285,7 +287,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
             fontSize={11}
             lineHeight={1.18}
             fontStyle="bold"
-            fill={editorMode === 'matrix' ? colors.accent : colors.text}
+            fill={editorMode === 'matrix' ? (matrixLabelFill || colors.accent) : colors.text}
             align="center"
             verticalAlign="middle"
             listening={false}

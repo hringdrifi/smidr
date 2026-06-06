@@ -155,16 +155,16 @@ describe('useKeyboardStore', () => {
     }
   });
 
-  it('should derive split matrix columns from left and right column pins', () => {
+  it('should derive split matrix dimensions per half', () => {
     expect(getMatrixFromPins({
       rows: ['R0', 'R1', 'R2', 'R3'],
       cols: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'],
       splitRows: ['RR0', 'RR1', 'RR2', 'RR3'],
       splitCols: ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'],
-    }, true)).toEqual({ rows: 4, cols: 12 });
+    }, true)).toEqual({ rows: 4, cols: 6 });
   });
 
-  it('should paint through the full split matrix width before wrapping', () => {
+  it('should paint split keys with local matrix columns before wrapping', () => {
     const store = useKeyboardStore.getState();
     store.resetProject();
     store.updateSettings({
@@ -180,7 +180,7 @@ describe('useKeyboardStore', () => {
       },
     } as any);
     store.addKey({ x: 0, y: 0, w: 1, h: 1 });
-    store.setPainter({ currentRow: 0, currentCol: 5, autoIncrement: 'matrix' });
+    store.setPainter({ currentRow: 0, currentCol: 5, currentSide: 'right', autoIncrement: 'matrix' });
 
     const keyId = useKeyboardStore.getState().keys[0].id;
     useKeyboardStore.getState().paintKey(keyId);
@@ -188,8 +188,9 @@ describe('useKeyboardStore', () => {
     const state = useKeyboardStore.getState();
     expect(state.keys[0].row).toBe(0);
     expect(state.keys[0].col).toBe(5);
-    expect(state.painter.currentRow).toBe(0);
-    expect(state.painter.currentCol).toBe(6);
+    expect(state.keys[0].matrixSide).toBe('right');
+    expect(state.painter.currentRow).toBe(1);
+    expect(state.painter.currentCol).toBe(0);
   });
 
   it('should load .smidr vendorId/productId into internal vendorProductId', () => {

@@ -1,6 +1,7 @@
 import { PhysicalKey, SmidrProject, ProjectSettings } from '@/types/keyboard';
 import { exportKLE } from './kle';
 import { actionToQmkString } from './protocols/via-action-converter';
+import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
 
 const sortLayoutGroupIds = (ids: string[]) => {
   return [...ids].sort((a, b) => {
@@ -59,12 +60,16 @@ const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => 
     key.col >= 0
   ));
 
-  const keyRows = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.row ?? 0)) + 1 : 0;
-  const keyCols = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.col ?? 0)) + 1 : 0;
+  const positions = matrixKeys
+    .map(key => getQmkMatrixPosition(settings, key, keys))
+    .filter((pos): pos is { row: number; col: number } => !!pos);
+  const keyRows = positions.length > 0 ? Math.max(...positions.map(pos => pos.row)) + 1 : 0;
+  const keyCols = positions.length > 0 ? Math.max(...positions.map(pos => pos.col)) + 1 : 0;
+  const pinMatrix = getQmkMatrixFromPins(settings.pins, settings.features.split);
 
   return {
-    rows: Math.max(settings.matrix?.rows || 0, keyRows),
-    cols: Math.max(settings.matrix?.cols || 0, keyCols),
+    rows: Math.max(pinMatrix?.rows || settings.matrix?.rows || 0, keyRows),
+    cols: Math.max(pinMatrix?.cols || settings.matrix?.cols || 0, keyCols),
   };
 };
 
@@ -174,8 +179,9 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
   // Prepare keys with correct matrix and layout option labels for KLE export
   const viaKeys = allKeysToExport.map(key => {
     let label = '';
-    if (!key.decal && key.row !== undefined && key.col !== undefined) {
-      label = `${key.row},${key.col}`;
+    const pos = getQmkMatrixPosition(settings, key, keys);
+    if (!key.decal && pos) {
+      label = `${pos.row},${pos.col}`;
     }
     if (key.group !== undefined && key.option !== undefined) {
       const exportGroup = exportGroupByInternalId.get(key.group);
@@ -201,13 +207,14 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
   );
 
   keys.forEach(key => {
-    if (key.row !== undefined && key.col !== undefined &&
-        key.row >= 0 && key.col >= 0 &&
-        key.row < matrix.rows && key.col < matrix.cols) {
+    const pos = getQmkMatrixPosition(settings, key, keys);
+    if (pos &&
+        pos.row >= 0 && pos.col >= 0 &&
+        pos.row < matrix.rows && pos.col < matrix.cols) {
       Object.entries(key.keymap || {}).forEach(([layer, action]) => {
         const l = parseInt(layer);
         if (l < layersCount) {
-          keymaps[l][key.row!][key.col!] = actionToQmkString(action);
+          keymaps[l][pos.row][pos.col] = actionToQmkString(action);
         }
       });
     }

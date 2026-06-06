@@ -6,6 +6,7 @@ import { generateQmkTapDanceC } from './tap-dance-codegen';
 import { actionToQmkSourceString, generateQmkStaticMacroC } from './macro-codegen';
 import { generateQmkComboC, hasConfiguredCombos } from './combo-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
+import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const matrixKeys = keys.filter(key => (
@@ -15,12 +16,16 @@ const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => 
     key.col >= 0
   ));
 
-  const keyRows = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.row ?? 0)) + 1 : 0;
-  const keyCols = matrixKeys.length > 0 ? Math.max(...matrixKeys.map(key => key.col ?? 0)) + 1 : 0;
+  const positions = matrixKeys
+    .map(key => getQmkMatrixPosition(settings, key, keys))
+    .filter((pos): pos is { row: number; col: number } => !!pos);
+  const keyRows = positions.length > 0 ? Math.max(...positions.map(pos => pos.row)) + 1 : 0;
+  const keyCols = positions.length > 0 ? Math.max(...positions.map(pos => pos.col)) + 1 : 0;
+  const pinMatrix = getQmkMatrixFromPins(settings.pins, settings.features.split);
 
   return {
-    rows: Math.max(settings.matrix?.rows || 0, keyRows),
-    cols: Math.max(settings.matrix?.cols || 0, keyCols),
+    rows: Math.max(pinMatrix?.rows || settings.matrix?.rows || 0, keyRows),
+    cols: Math.max(pinMatrix?.cols || settings.matrix?.cols || 0, keyCols),
   };
 };
 
@@ -29,9 +34,13 @@ const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
 
   return keys.filter((key, idx) => {
     if (key.row === undefined || key.col === undefined) return false;
-    if (key.row < 0 || key.col < 0) return false;
-    if (key.row >= matrix.rows || key.col >= matrix.cols) return false;
-    const firstIdx = keys.findIndex(k => k.row === key.row && k.col === key.col);
+    const pos = getQmkMatrixPosition(settings, key, keys);
+    if (!pos || pos.row < 0 || pos.col < 0) return false;
+    if (pos.row >= matrix.rows || pos.col >= matrix.cols) return false;
+    const firstIdx = keys.findIndex(k => {
+      const other = getQmkMatrixPosition(settings, k, keys);
+      return other?.row === pos.row && other?.col === pos.col;
+    });
     return firstIdx === idx;
   });
 };
@@ -46,12 +55,13 @@ const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[])
   }
 
   const firstKey = validKeys[0];
+  const firstPos = firstKey ? getQmkMatrixPosition(settings, firstKey, validKeys) : undefined;
   const row = Number.isInteger(settings.qmk?.bootmagic?.row)
     ? settings.qmk!.bootmagic!.row!
-    : firstKey?.row ?? 0;
+    : firstPos?.row ?? firstKey?.row ?? 0;
   const col = Number.isInteger(settings.qmk?.bootmagic?.col)
     ? settings.qmk!.bootmagic!.col!
-    : firstKey?.col ?? 0;
+    : firstPos?.col ?? firstKey?.col ?? 0;
 
   return {
     enabled: true,
@@ -62,17 +72,19 @@ const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[])
 const getVialUnlockCombo = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
   const firstKey = validKeys[0];
   const lastKey = validKeys[validKeys.length - 1] || firstKey;
+  const firstPos = firstKey ? getQmkMatrixPosition(settings, firstKey, validKeys) : undefined;
+  const lastPos = lastKey ? getQmkMatrixPosition(settings, lastKey, validKeys) : undefined;
   const configuredKey1 = settings.vial?.unlockCombo?.key1;
   const configuredKey2 = settings.vial?.unlockCombo?.key2;
 
   return {
     key1: {
-      row: Number.isInteger(configuredKey1?.row) ? configuredKey1!.row! : firstKey?.row ?? 0,
-      col: Number.isInteger(configuredKey1?.col) ? configuredKey1!.col! : firstKey?.col ?? 0,
+      row: Number.isInteger(configuredKey1?.row) ? configuredKey1!.row! : firstPos?.row ?? firstKey?.row ?? 0,
+      col: Number.isInteger(configuredKey1?.col) ? configuredKey1!.col! : firstPos?.col ?? firstKey?.col ?? 0,
     },
     key2: {
-      row: Number.isInteger(configuredKey2?.row) ? configuredKey2!.row! : lastKey?.row ?? 0,
-      col: Number.isInteger(configuredKey2?.col) ? configuredKey2!.col! : lastKey?.col ?? 0,
+      row: Number.isInteger(configuredKey2?.row) ? configuredKey2!.row! : lastPos?.row ?? lastKey?.row ?? 0,
+      col: Number.isInteger(configuredKey2?.col) ? configuredKey2!.col! : lastPos?.col ?? lastKey?.col ?? 0,
     },
   };
 };
@@ -82,8 +94,9 @@ const generateMatrixMaskC = (settings: ProjectSettings, validKeys: PhysicalKey[]
   const rowMasks = Array.from({ length: matrix.rows }, () => BigInt(0));
 
   validKeys.forEach(key => {
-    if (key.row === undefined || key.col === undefined) return;
-    rowMasks[key.row] |= BigInt(1) << BigInt(key.col);
+    const pos = getQmkMatrixPosition(settings, key, validKeys);
+    if (!pos) return;
+    rowMasks[pos.row] |= BigInt(1) << BigInt(pos.col);
   });
 
   const rows = rowMasks.map(mask => `    (matrix_row_t)0x${mask.toString(16).toUpperCase()}ULL`).join(',\n');
@@ -200,6 +213,14 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
       cols: settings.pins.cols,
       rows: settings.pins.rows
     },
+    ...(settings.features.encoder ? {
+      encoder: {
+        rotary: [{
+          pin_a: settings.pins.encoderA || 'B0',
+          pin_b: settings.pins.encoderB || 'B1',
+        }],
+      },
+    } : {}),
     usb: {
       device_version: '1.0.0',
       vid: `0x${((settings.vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
@@ -208,8 +229,9 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
     layouts: {
       LAYOUT: {
         layout: validKeys.map(key => {
+          const pos = getQmkMatrixPosition(settings, key, keys);
           return {
-            matrix: (key.row !== undefined && key.col !== undefined) ? [key.row, key.col] : [0, 0],
+            matrix: pos ? [pos.row, pos.col] : [0, 0],
             x: key.x,
             y: key.y,
             w: key.w,
@@ -250,12 +272,6 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
   const configH = `/* Copyright 2026 Smidr User */
 #pragma once
 ${useMatrixMask ? '\n#define MATRIX_MASKED\n' : ''}
-
-/* Encoder pins */
-${settings.features.encoder ? `
-#define ENCODERS_PAD_A { ${settings.pins.encoderA || 'B0'} }
-#define ENCODERS_PAD_B { ${settings.pins.encoderB || 'B1'} }
-` : ''}
 
 /* RGB settings */
 ${settings.features.rgb ? `

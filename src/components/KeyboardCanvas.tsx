@@ -2,7 +2,8 @@
 
 import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Group, Rect, Line, Circle, Path as KonvaPath } from 'react-konva';
-import { getMatrixFromPins, useKeyboardStore, RuntimeKey } from '@/lib/store';
+import { getLocalMatrixPosition, getMatrixFromPins } from '@/lib/matrix-utils';
+import { useKeyboardStore, RuntimeKey } from '@/lib/store';
 import { PhysicalKey } from '@/types/keyboard';
 import { sortKeys } from '@/lib/sorting';
 import { keysIntersect } from '@/lib/collision';
@@ -283,10 +284,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     const rowCount = matrix.rows;
     const colCount = matrix.cols;
     return visKeys
-      .filter(key => (
-        (key.row !== undefined && key.row >= rowCount) ||
-        (key.col !== undefined && key.col >= colCount)
-      ))
+      .filter(key => {
+        const local = getLocalMatrixPosition(settings, key, visKeys);
+        return !!local && (local.row >= rowCount || local.col >= colCount);
+      })
       .map(key => key.id);
   }, [visKeys, editorMode, readonlyGeometry, settings.features.split, settings.matrix, settings.pins]);
 
@@ -830,23 +831,26 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           {appMode === 'design' && editorMode === 'matrix' && editorSettings.showMatrixLines && !readonlyGeometry && (
             <Group listening={false}>
               {(() => {
-                const rowLines: { id: string, points: number[] }[] = [];
-                const colLines: { id: string, points: number[] }[] = [];
+                const rowLines: { id: string, points: number[], side: 'left' | 'right' }[] = [];
+                const colLines: { id: string, points: number[], side: 'left' | 'right' }[] = [];
                 
-                const rows: Record<number, { key: PhysicalKey, center: { x: number, y: number } }[]> = {};
-                const cols: Record<number, { key: PhysicalKey, center: { x: number, y: number } }[]> = {};
+                const rows: Record<string, { key: PhysicalKey, center: { x: number, y: number }, side: 'left' | 'right' }[]> = {};
+                const cols: Record<string, { key: PhysicalKey, center: { x: number, y: number }, side: 'left' | 'right' }[]> = {};
                 
                 visKeys.forEach(key => {
                   if (key.row === undefined || key.col === undefined) return;
+                  const side = settings.features.split && key.matrixSide === 'right' ? 'right' : 'left';
                   
                   const center = getVisualCenter(key);
                   const centerPx = { x: center.x, y: center.y };
+                  const rowKey = `${side}-${key.row}`;
+                  const colKey = `${side}-${key.col}`;
                   
-                  if (!rows[key.row]) rows[key.row] = [];
-                  rows[key.row].push({ key, center: centerPx });
+                  if (!rows[rowKey]) rows[rowKey] = [];
+                  rows[rowKey].push({ key, center: centerPx, side });
                   
-                  if (!cols[key.col]) cols[key.col] = [];
-                  cols[key.col].push({ key, center: centerPx });
+                  if (!cols[colKey]) cols[colKey] = [];
+                  cols[colKey].push({ key, center: centerPx, side });
                 });
                 
                 // Sort by X for row lines
@@ -855,7 +859,8 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   if (keys.length > 1) {
                     rowLines.push({
                       id: `row-${row}`,
-                      points: keys.flatMap(k => [k.center.x, k.center.y])
+                      points: keys.flatMap(k => [k.center.x, k.center.y]),
+                      side: keys[0].side,
                     });
                   }
                 });
@@ -866,7 +871,8 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   if (keys.length > 1) {
                     colLines.push({
                       id: `col-${col}`,
-                      points: keys.flatMap(k => [k.center.x, k.center.y])
+                      points: keys.flatMap(k => [k.center.x, k.center.y]),
+                      side: keys[0].side,
                     });
                   }
                 });
@@ -910,12 +916,17 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           )}
 
           {/* Layer 3: Labels (On top) */}
-          {visKeys.map(key => (
-            <KeyComponent
-              key={`${key.id}-label`} id={`${key.id}-label`} keyData={key}
-              isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
-              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout)}
-              showKeycap={false}
+          {visKeys.map(key => {
+            const matrixSide = getLocalMatrixPosition(settings, key, visKeys)?.side || key.matrixSide;
+            return (
+              <KeyComponent
+                key={`${key.id}-label`} id={`${key.id}-label`} keyData={key}
+                isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
+                editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout)}
+                matrixLabelFill={editorMode === 'matrix' && settings.features.split
+                  ? matrixSide === 'right' ? '#06b6d4' : '#f59e0b'
+                  : undefined}
+                showKeycap={false}
               onMouseDown={(e) => {
                 if (e.evt && e.evt.button !== 0) return;
                 if (isMatrixPaintEvent(e)) {
@@ -966,8 +977,9 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   setSelectionAnchorId(key.id);
                 }
               }}
-            />
-          ))}
+              />
+            );
+          })}
 
           {/* Smiðr Professional Handles */}
           {!readonlyGeometry && editorMode === 'layout' && focusedKey && selectedKeyIds.length > 0 && (

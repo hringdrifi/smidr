@@ -27,6 +27,7 @@ import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson }
 import { generateQmkZip } from '@/lib/qmk';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
+import { FirmwareExportTarget, formatExportValidationIssues, validateFirmwareExport } from '@/lib/export-validation';
 import { isQmkSourceExportSupported, isZmkSourceExportSupported } from '@/lib/mcu-presets';
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
 import { UniversalAction } from '@/types/actions';
@@ -190,15 +191,22 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
-  const warnIfQmkPinsMissing = () => {
-    if ((settings.pins.rows?.length ?? 0) === 0 || (settings.pins.cols?.length ?? 0) === 0) {
-      alert('QMK/VIA/Vial firmware export has no row or column pin assignments. The generated source may fail to compile until pins are configured in Hardware Settings.');
+  const confirmFirmwareExportValidation = (target: FirmwareExportTarget) => {
+    const issues = validateFirmwareExport(settings, keys, target);
+    if (issues.length === 0) return true;
+
+    const message = formatExportValidationIssues(target, issues);
+    if (issues.some(issue => issue.severity === 'error')) {
+      alert(message);
+      return false;
     }
+
+    return confirm(`${message}\n\nContinue export?`);
   };
 
   const handleExportViaZip = async () => {
     if (!isQmkSourceExportSupported(settings.hardware)) return;
-    warnIfQmkPinsMissing();
+    if (!confirmFirmwareExportValidation('qmk')) return;
     const zipBlob = await generateQmkZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_qmk.zip`, zipBlob);
@@ -209,7 +217,7 @@ export default function App() {
 
   const handleExportVialZip = async () => {
     if (!isQmkSourceExportSupported(settings.hardware)) return;
-    warnIfQmkPinsMissing();
+    if (!confirmFirmwareExportValidation('vial')) return;
     const zipBlob = await generateVialZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_vial.zip`, zipBlob);
@@ -220,6 +228,7 @@ export default function App() {
 
   const handleExportZmkZip = async () => {
     if (!isZmkSourceExportSupported(settings.hardware)) return;
+    if (!confirmFirmwareExportValidation('zmk')) return;
     const zipBlob = await generateZmkZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_zmk.zip`, zipBlob);

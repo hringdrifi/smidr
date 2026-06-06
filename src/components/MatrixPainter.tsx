@@ -5,17 +5,23 @@ import { useKeyboardStore } from '@/lib/store';
 import { MousePointer2, Trash2, Edit2, LayoutGrid } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
+import { getLocalMatrixPosition, MatrixSide } from '@/lib/matrix-utils';
 
 export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) => {
   const { 
-    painter, setPainter, clearMatrixMap, editorSettings, updateEditorSettings,
+    painter, setPainter, clearMatrixMap, editorSettings, updateEditorSettings, settings,
     matrixSubMode, setMatrixSubMode, selectedKeyIds, keys, setMatrixPosition
   } = useKeyboardStore();
   const { t } = useTranslation();
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = selectedKeyId ? keys.find(k => k.id === selectedKeyId) : null;
-  const selectedMatrixPos = selectedKey?.row !== undefined ? { row: selectedKey.row, col: selectedKey.col! } : null;
+  const selectedMatrixPos = selectedKey ? getLocalMatrixPosition(settings, selectedKey, keys) : null;
+  const selectedMatrixSide = selectedMatrixPos?.side || selectedKey?.matrixSide || 'left';
+  const setSelectedSide = (side: MatrixSide) => {
+    if (!selectedKeyId) return;
+    setMatrixPosition(selectedKeyId, selectedMatrixPos?.row ?? 0, selectedMatrixPos?.col ?? 0, side);
+  };
 
   if (horizontal) {
     return (
@@ -53,6 +59,25 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
         {matrixSubMode === 'paint' ? (
           <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-1">
             <div className="flex items-center gap-1.5">
+              {settings.features.split && (
+                <div className="flex bg-[var(--bg-app)] p-0.5 rounded border border-[var(--border-main)]/50">
+                  {(['left', 'right'] as const).map(side => (
+                    <button
+                      key={side}
+                      type="button"
+                      onClick={() => setPainter({ currentSide: side })}
+                      className={cn(
+                        "px-2 h-7 rounded-[3px] text-[9px] font-bold uppercase transition-all",
+                        painter.currentSide === side
+                          ? "bg-amber-500 text-zinc-950"
+                          : "text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                      )}
+                    >
+                      {side}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center bg-[var(--bg-app)] border border-[var(--border-main)] rounded-md px-1.5 h-8">
                 <span className="text-[9px] font-bold text-amber-500/70 mr-1.5 uppercase tracking-tighter">R</span>
                 <input 
@@ -119,6 +144,25 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
                     />
                   </div>
                 </div>
+                {settings.features.split && (
+                  <div className="flex bg-[var(--bg-app)] p-0.5 rounded border border-[var(--border-main)]/50">
+                    {(['left', 'right'] as const).map(side => (
+                      <button
+                        key={side}
+                        type="button"
+                        onClick={() => setSelectedSide(side)}
+                        className={cn(
+                          "px-2 h-7 rounded-[3px] text-[9px] font-bold uppercase transition-all",
+                          selectedMatrixSide === side
+                            ? "bg-amber-500 text-zinc-950"
+                            : "text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                        )}
+                      >
+                        {side}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button onClick={() => setMatrixPosition(selectedKeyId, undefined, undefined)} className="w-8 h-8 flex items-center justify-center rounded bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all shadow-sm" title={t('matrix.clearMatrix')}>
                   <Trash2 size={12} />
                 </button>
@@ -184,6 +228,28 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
       {matrixSubMode === 'paint' ? (
         <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-200">
           <div className="space-y-4">
+            {settings.features.split && (
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">Side</label>
+                <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]/50">
+                  {(['left', 'right'] as const).map(side => (
+                    <button
+                      key={side}
+                      type="button"
+                      onClick={() => setPainter({ currentSide: side })}
+                      className={cn(
+                        "flex-1 py-1.5 rounded text-[10px] font-bold uppercase transition-all",
+                        painter.currentSide === side
+                          ? "bg-amber-500 text-zinc-950"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                      )}
+                    >
+                      {side}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex gap-4">
               <div className="flex-1 space-y-1">
                 <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('matrix.currentRow')}</label>
@@ -269,6 +335,25 @@ export const MatrixPainter = ({ horizontal = false }: { horizontal?: boolean }) 
                     />
                   </div>
                 </div>
+                {settings.features.split && (
+                  <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]/50">
+                    {(['left', 'right'] as const).map(side => (
+                      <button
+                        key={side}
+                        type="button"
+                        onClick={() => setSelectedSide(side)}
+                        className={cn(
+                          "flex-1 py-1.5 rounded text-[10px] font-bold uppercase transition-all",
+                          selectedMatrixSide === side
+                            ? "bg-amber-500 text-zinc-950"
+                            : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                        )}
+                      >
+                        {side}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {!selectedMatrixPos && (
                   <p className="text-[10px] text-amber-500/70 italic">
