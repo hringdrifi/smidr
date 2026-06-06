@@ -105,6 +105,10 @@ export interface ProjectSettings {
       key2?: { row?: number; col?: number };
     };
   };
+  zmk?: {
+    splitTransport?: 'ble' | 'wired';
+    wiredSplitDevice?: string;
+  };
 }
 
 export interface SmidrProjectData {

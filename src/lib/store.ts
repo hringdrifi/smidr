@@ -285,6 +285,7 @@ const initialState: Partial<KeyboardState> = {
     layoutOptions: {},
     activeOptions: {},
     vial: {},
+    zmk: {},
   },
   editorSettings: { 
     gridSnap: 0.25, 
@@ -2328,6 +2329,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               bootmagic: { enabled: true, ...(settings.qmk?.bootmagic || {}) },
             },
             vial: settings.vial || {},
+            zmk: settings.zmk || {},
             macros: normalizeMacros(settings.macros),
             combos: settings.combos || [],
             tapDances: settings.tapDances || [],

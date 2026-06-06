@@ -94,6 +94,23 @@ describe('export generation', () => {
     });
   });
 
+  it('keeps project ZMK settings in saved projects', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      zmk: {
+        splitTransport: 'wired',
+        wiredSplitDevice: '&uart0',
+      },
+    };
+
+    const project = generateSmidrProjectJson({ settings, keys: [] });
+
+    expect(project.zmk).toEqual({
+      splitTransport: 'wired',
+      wiredSplitDevice: '&uart0',
+    });
+  });
+
   it('keeps split pin settings in saved projects when split is enabled', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -910,6 +927,54 @@ describe('export generation', () => {
     expect(issues.filter(issue => issue.severity === 'error')).toEqual([]);
   });
 
+  it('warns when ZMK wired split has no UART device configured', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'RP2040',
+        board: 'kb2040',
+      },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: ['GP3'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+      zmk: {
+        splitTransport: 'wired',
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'zmk');
+    expect(issues.filter(issue => issue.severity === 'error')).toEqual([]);
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'zmk-wired-split-device-missing',
+    }));
+  });
+
   it('emits Vial MATRIX_MASKED through rules.mk instead of keyboard.json', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -1348,6 +1413,80 @@ describe('export generation', () => {
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('shield: split_zmk_board_left');
     expect(readme).toContain('shield: split_zmk_board_right');
+  });
+
+  it('emits ZMK wired split transport settings', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Wired ZMK Split',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'RP2040',
+        board: 'kb2040',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: ['GP3'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+      zmk: {
+        splitTransport: 'wired',
+        wiredSplitDevice: '&uart0',
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 4,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const dtsi = await zip.file('boards/shields/wired_zmk_split/wired_zmk_split.dtsi')!.async('string');
+    const conf = await zip.file('boards/shields/wired_zmk_split/wired_zmk_split.conf')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(dtsi).toContain('compatible = "zmk,wired-split"');
+    expect(dtsi).toContain('device = <&uart0>;');
+    expect(conf).toContain('CONFIG_ZMK_SPLIT_BLE=n');
+    expect(conf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
+    expect(readme).toContain('ZMK wired split firmware');
+    expect(readme).toContain('using `&uart0`');
+    expect(readme).toContain('- board: adafruit_kb2040');
+    expect(readme).toContain('shield: wired_zmk_split_left');
+    expect(readme).toContain('shield: wired_zmk_split_right');
   });
 
   it('emits ZMK tap dance behaviors from Vial-style definitions', async () => {

@@ -114,6 +114,15 @@ export const HardwareSettingsPanel = () => {
     });
   };
 
+  const updateZmkSettings = (zmkUpdates: NonNullable<typeof settings.zmk>) => {
+    updateSettings({
+      zmk: {
+        ...(settings.zmk || {}),
+        ...zmkUpdates,
+      },
+    });
+  };
+
   const updateHardware = (updates: Partial<typeof settings.hardware>) => {
     updateSettings({ hardware: { ...settings.hardware, ...updates } });
   };
@@ -267,6 +276,49 @@ export const HardwareSettingsPanel = () => {
           </div>
         </div>
       </Section>
+
+      {settings.features.split && (
+        <Section title={t('hardware.zmkDetails')} icon={Cpu}>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.zmkSplitTransport')}</label>
+              <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
+                {(['ble', 'wired'] as const).map(transport => (
+                  <button
+                    key={transport}
+                    type="button"
+                    onClick={() => updateZmkSettings({ splitTransport: transport })}
+                    className={cn(
+                      "flex-1 py-1 text-[10px] font-bold rounded transition-all uppercase",
+                      (settings.zmk?.splitTransport || 'ble') === transport
+                        ? "bg-amber-500 text-[var(--bg-button)]"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    )}
+                  >
+                    {transport === 'ble' ? t('hardware.zmkSplitBle') : t('hardware.zmkSplitWired')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {(settings.zmk?.splitTransport || 'ble') === 'wired' && (
+              <div className="space-y-1">
+                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.zmkWiredSplitDevice')}</label>
+                <input
+                  type="text"
+                  value={settings.zmk?.wiredSplitDevice || ''}
+                  onChange={(e) => updateZmkSettings({ wiredSplitDevice: e.target.value })}
+                  placeholder="&pro_micro_serial"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
+                />
+                <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
+                  {t('hardware.zmkWiredSplitDeviceDesc')}
+                </p>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       {/* QMK Details */}
       <Section title={t('hardware.qmkDetails')} icon={Settings}>

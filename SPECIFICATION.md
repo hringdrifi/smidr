@@ -119,7 +119,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **内部表現**: 分割キーボードでは `matrixSide` (`left` / `right`) と、各半分ごとのローカル `row`, `col` を保持する。左右どちらも `0,0` から始まる。
 - **編集 UI**: マトリクスエディタは左右を別マトリクスとして扱い、右側キーも右側内のローカル座標で編集する。分割時のペイントモードでは、割り当て先の `left` / `right` をユーザーが明示選択する。
 - **QMK/Vial 出力**: QMK/Vial の split matrix では右側を行方向に連結するため、右側キーは `row + leftRows`, `col` に変換して出力する。例: 左右各 `4x6` の場合、内部は左右とも `0..3 x 0..5`、QMK/Vial 出力は `8x6`。
-- **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。ZMK split source export は nRF52840 系 development board shield を対象とし、custom board split および BLE split 非対応ターゲットは validation error とする。
+- **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。ZMK split source export は development board shield を対象とし、custom board split は validation error とする。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52840 系 development board を要求する。`wired` は共有 `.dtsi` に `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
 ## 9. デバイス通信 & プロトコル統合仕様 (Device Protocol & ZMK Studio Integration)

@@ -143,6 +143,7 @@ export const validateFirmwareExport = (
 
   if (settings.features.split) {
     if (target === 'zmk') {
+      const zmkSplitTransport = settings.zmk?.splitTransport || 'ble';
       if ((settings.hardware.controllerType || 'development_board') === 'mcu') {
         issues.push({
           severity: 'error',
@@ -150,11 +151,18 @@ export const validateFirmwareExport = (
           message: 'ZMK split source export currently supports development-board shield projects only.',
         });
       }
-      if (getZmkTarget(settings.hardware.mcu) !== 'nrf52840') {
+      if (zmkSplitTransport === 'ble' && getZmkTarget(settings.hardware.mcu) !== 'nrf52840') {
         issues.push({
           severity: 'error',
           code: 'zmk-split-ble-target-required',
           message: 'ZMK split source export currently requires an nRF52840 BLE-capable development board.',
+        });
+      }
+      if (zmkSplitTransport === 'wired' && !settings.zmk?.wiredSplitDevice?.trim()) {
+        issues.push({
+          severity: 'warning',
+          code: 'zmk-wired-split-device-missing',
+          message: 'ZMK wired split is enabled, but no UART device is configured. The generated source will use &pro_micro_serial.',
         });
       }
     }
