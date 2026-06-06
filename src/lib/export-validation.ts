@@ -142,6 +142,13 @@ export const validateFirmwareExport = (
   }
 
   if (settings.features.split) {
+    if (target === 'zmk') {
+      issues.push({
+        severity: 'error',
+        code: 'zmk-split-export-unsupported',
+        message: 'ZMK split source export is not supported yet. Use QMK/Vial export for split keyboards, or disable split before exporting ZMK source.',
+      });
+    }
     if (!settings.pins.splitSerial) {
       issues.push({
         severity: 'warning',

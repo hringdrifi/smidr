@@ -812,6 +812,45 @@ describe('export generation', () => {
     }));
   });
 
+  it('blocks ZMK split source export during validation', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: ['GP3'],
+        splitSerial: 'GP4',
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'zmk');
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'error',
+      code: 'zmk-split-export-unsupported',
+    }));
+  });
+
   it('emits Vial MATRIX_MASKED through rules.mk instead of keyboard.json', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
