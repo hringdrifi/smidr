@@ -202,7 +202,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     };
   }, [setSelectedKeyIds, setFocusedKeyId, setSelectionAnchorId, selectedKeyIds, removeKey, visKeys, focusedKeyId, undo, redo, copyKeys, pasteKeys, editorSettings.gridSnap, batchUpdateKeys, readonlyGeometry]);
 
-  const lastCenteredRef = useRef<{ deviceId: string | null, projectId: string | null }>({ deviceId: null, projectId: null });
+  const lastCenteredRef = useRef<{ deviceId: string | null, projectId: string | null, width: number }>({ deviceId: null, projectId: null, width: 0 });
 
   useEffect(() => {
     const state = useKeyboardStore.getState();
@@ -215,15 +215,17 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
     // Only attempt centering if we have an active context AND the layout geometry has been loaded
     if ((currentDeviceId || currentProjId) && currentKeys.length > 0) {
+      const currentWidth = container?.clientWidth || dimensions.width;
       const needsCenterForDevice = currentDeviceId && currentDeviceId !== lastCenteredRef.current.deviceId;
       const needsCenterForProject = currentProjId && currentProjId !== lastCenteredRef.current.projectId;
+      const needsCenterForWidth = currentWidth > 0 && currentWidth !== lastCenteredRef.current.width;
 
-      if (needsCenterForDevice || needsCenterForProject) {
+      if (needsCenterForDevice || needsCenterForProject || needsCenterForWidth) {
         if (container) {
           // Read synchronous dimensions from the DOM element.
           // Since the canvas is now a full-screen absolute overlay, we mathematically offset
           // the visual center to account for UI panels floating on top (e.g., KeycodePanel).
-          const w = container.clientWidth;
+          const w = currentWidth;
           const h = container.clientHeight;
 
           if (w > 0 && h > 0) {
@@ -242,9 +244,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
             if (activeVisKeys.length > 0) {
               const keyboardWidth = maxX - minX;
-              const keyboardHeight = maxY - minY;
               const keyboardCenterX = minX + keyboardWidth / 2;
-              const keyboardCenterY = minY + keyboardHeight / 2;
 
               // Center horizontally, but fix vertically to exactly the same initial coordinate (resetY = 0)
               const resetX = w / 2 - PADDING_X - keyboardCenterX;
@@ -254,15 +254,15 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
             }
 
             // Mark this specific context as successfully centered so it doesn't run on every edit
-            lastCenteredRef.current = { deviceId: currentDeviceId, projectId: currentProjId };
+            lastCenteredRef.current = { deviceId: currentDeviceId, projectId: currentProjId, width: w };
           }
         }
       }
     } else if (!currentDeviceId && !currentProjId) {
       // Reset memory when disconnected so it can fire again upon next connection
-      lastCenteredRef.current = { deviceId: null, projectId: null };
+      lastCenteredRef.current = { deviceId: null, projectId: null, width: 0 };
     }
-  }, [connectedDevice, currentProjectId, keys.length]);
+  }, [connectedDevice, currentProjectId, dimensions.width, keys.length]);
 
   const collidingIds = useMemo(() => {
     if (editorMode !== 'layout' || readonlyGeometry) return [];
