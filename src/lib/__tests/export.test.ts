@@ -1063,7 +1063,7 @@ describe('export generation', () => {
     expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
   });
 
-  it('emits Vial tap dance definitions and rules when configured', async () => {
+  it('omits Vial static tap dance definitions and warns when configured', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       name: 'Vial Tap Dance',
@@ -1109,13 +1109,16 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const keymapC = await zip.file('vial_tap_dance/keymaps/vial/keymap.c')!.async('string');
     const rulesMk = await zip.file('vial_tap_dance/keymaps/vial/rules.mk')!.async('string');
+    const issues = validateFirmwareExport(settings, keys, 'vial');
 
-    expect(keymapC).toContain('void smidr_td_1_finished(tap_dance_state_t *state, void *user_data)');
-    expect(keymapC).toContain('tap_code16(KC_ESC)');
-    expect(keymapC).toContain('tap_code16(KC_CAPS)');
-    expect(keymapC).toContain('[1] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, smidr_td_1_finished, smidr_td_1_reset)');
+    expect(keymapC).not.toContain('tap_dance_action_t tap_dance_actions');
+    expect(keymapC).not.toContain('void smidr_td_1_finished(tap_dance_state_t *state, void *user_data)');
     expect(keymapC).toContain('TD(1)');
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'vial-tap-dance-source-not-emitted',
+    }));
   });
 
   it('emits Vial static project macros when configured', async () => {

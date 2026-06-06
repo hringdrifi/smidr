@@ -123,6 +123,14 @@ export const validateFirmwareExport = (
     ]);
   }
 
+  if (target === 'vial' && (settings.tapDances || []).length > 0) {
+    issues.push({
+      severity: 'warning',
+      code: 'vial-tap-dance-source-not-emitted',
+      message: 'Vial source export does not emit static project tap dance definitions. Configure tap dances through Vial dynamic tap dance after flashing.',
+    });
+  }
+
   if (settings.features.rgb) {
     if (!settings.pins.rgb) {
       issues.push({

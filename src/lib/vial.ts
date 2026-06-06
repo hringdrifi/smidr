@@ -289,6 +289,7 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
   // No [kbName].h is generated, allowing QMK to auto-generate the LAYOUT macro from keyboard.json.
 
   const keymapC = generateKeymapC(validKeys, settings.layers || 4, settings, settings.tapDances || []);
+  const vialKeymapC = generateKeymapC(validKeys, settings.layers || 4, settings, []);
   const tapDanceRules = (settings.tapDances || []).length > 0 ? `TAP_DANCE_ENABLE = yes\n` : '';
   const comboRules = hasConfiguredCombos(settings.combos || []) ? `COMBO_ENABLE = yes\n` : '';
 
@@ -324,7 +325,7 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
 `;
     vialFolder.file('config.h', vialConfigH);
 
-    vialFolder.file('keymap.c', keymapC);
+    vialFolder.file('keymap.c', vialKeymapC);
 
     // keymaps/vial/rules.mk (Enable Vial features specifically at the keymap level)
     const keymapRulesMk = `VIA_ENABLE = yes
