@@ -246,6 +246,7 @@ export const MatrixPinSettingsPanel = () => {
 
   const handleAssignPin = (pinName: string) => {
     const applyPinList = (key: 'rows' | 'cols' | 'splitRows' | 'splitCols', currentPins: string[] = []) => {
+      if (preventDuplicates && currentPins.includes(pinName)) return;
       if (preventDuplicates && assignedPins.has(pinName) && !currentPins.includes(pinName)) return;
       updateSettings({ pins: { ...settings.pins, [key]: [...currentPins, pinName] } });
     };
@@ -512,7 +513,8 @@ export const MatrixPinSettingsPanel = () => {
                   (activeBox === 'splitRow' && (settings.pins.splitRows || []).includes(pinName)) ||
                   (activeBox === 'splitCol' && (settings.pins.splitCols || []).includes(pinName)) ||
                   (activeBox === 'feature' && !!focusedFeature && (settings.pins as any)[focusedFeature] === pinName);
-                const isClickable = !isAssigned || !preventDuplicates || isCurrentSlotPin;
+                const isListTarget = activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol';
+                const isClickable = !isAssigned || !preventDuplicates || (isCurrentSlotPin && !isListTarget);
 
                 return (
                   <button
