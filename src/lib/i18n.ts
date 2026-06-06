@@ -179,6 +179,8 @@ export const TRANSLATIONS = {
     },
     keycode: {
       palette: 'Keycode Palette',
+      selectKeyPrompt: 'Select a key',
+      selectKeyDesc: 'Select a key on the canvas to assign a keycode.',
       layerTapLayer: 'Layer',
       layerTapTap: 'Tap',
       layerHold: 'Mom',
@@ -656,6 +658,8 @@ export const TRANSLATIONS = {
     },
     keycode: {
       palette: '键码调色板',
+      selectKeyPrompt: '请选择按键',
+      selectKeyDesc: '在画布上选择按键后，即可分配键码。',
       layerTapLayer: '层级',
       layerTapTap: '点击',
       layerHold: '临时',
@@ -959,6 +963,8 @@ export const TRANSLATIONS = {
     },
     keycode: {
       palette: '키코드 팔레트',
+      selectKeyPrompt: '키를 선택하세요',
+      selectKeyDesc: '캔버스에서 키를 선택하면 키코드를 할당할 수 있습니다.',
       layerTapLayer: '레이어',
       layerTapTap: '탭',
       layerHold: '일시',
@@ -1265,6 +1271,8 @@ export const TRANSLATIONS = {
     },
     keycode: {
       palette: 'キーパレット',
+      selectKeyPrompt: 'キーを選択してください',
+      selectKeyDesc: 'キャンバス上のキーを選ぶと、キーコードを割り当てられます。',
       layerTapLayer: 'レイヤー',
       layerTapTap: 'タップ',
       layerHold: '一時',
@@ -1742,6 +1750,8 @@ export const TRANSLATIONS = {
     },
     keycode: {
       palette: 'Paleta de Códigos',
+      selectKeyPrompt: 'Seleccione una tecla',
+      selectKeyDesc: 'Seleccione una tecla en el lienzo para asignarle un código.',
       layerTapLayer: 'Capa',
       layerTapTap: 'Pulsar',
       layerHold: 'Mom',
@@ -2045,6 +2055,8 @@ export const TRANSLATIONS = {
     },
     keycode: {
       palette: 'Keycode-Palette',
+      selectKeyPrompt: 'Taste auswählen',
+      selectKeyDesc: 'Wählen Sie eine Taste auf der Fläche aus, um einen Tastencode zuzuweisen.',
       layerTapLayer: 'Ebene',
       layerTapTap: 'Tippen',
       layerHold: 'Mom',

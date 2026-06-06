@@ -6,7 +6,7 @@ import { sortKeys } from '@/lib/sorting';
 import { KEYCODES, Keycode, VIAL_TABS, KeycodeCategory } from '@/lib/keycodes';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Keyboard, ChevronLeft, ChevronRight, Layers2 as LayersIcon } from 'lucide-react';
+import { Keyboard, ChevronLeft, ChevronRight, Layers2 as LayersIcon, MousePointer2 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey } from '@/types/actions';
 import { applyVisualLayoutToKeycode } from '@/lib/visual-layouts';
@@ -75,6 +75,7 @@ export const KeycodePanel = () => {
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
+  const hasSelectedKey = selectedKeyIds.length > 0;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
     selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
   );
@@ -145,7 +146,7 @@ export const KeycodePanel = () => {
   };
 
   const handleKeycodeClick = (code: string) => {
-    if (selectedKeyIds.length === 0) return;
+    if (!hasSelectedKey) return;
     
     const isNormalKeycode = !code.startsWith('MO(') && 
                             !code.startsWith('TG(') && 
@@ -340,6 +341,22 @@ export const KeycodePanel = () => {
 
         {/* Grid Area */}
         <div className="flex-1 overflow-auto p-4 custom-scrollbar bg-[var(--bg-app)]/20">
+          {!hasSelectedKey && (
+            <div className="sticky left-0 z-10 mb-3 flex w-fit max-w-[calc(100vw-2rem)] items-center gap-3 rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-left shadow-sm">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-amber-500/15 text-amber-400">
+                <MousePointer2 size={15} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-[var(--text-main)]">
+                  {t('keycode.selectKeyPrompt')}
+                </div>
+                <div className="mt-0.5 text-[11px] font-medium leading-snug text-[var(--text-muted)]">
+                  {t('keycode.selectKeyDesc')}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className={cn(
             "mx-auto w-fit min-w-max pb-4 flex flex-col gap-1",
             !isPhysicalTab && "grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-14 gap-1 justify-start"
@@ -358,7 +375,7 @@ export const KeycodePanel = () => {
                       const w = calcWidth(k.width ?? 1.0);
                       const h = isIsoEnter ? (2 * 48 + G) : 48;
                       const support = getKeycodeSupport(k.code, showSupportTargetFilter ? supportTarget : 'all');
-                      const isKeyDisabled = selectedKeyIds.length === 0 || !support.supported;
+                      const isKeyDisabled = !hasSelectedKey || !support.supported;
                       const title = getKeycodeTitle(k, support);
 
                       return (
@@ -395,7 +412,7 @@ export const KeycodePanel = () => {
                                 `}
                                 className={cn(
                                   "fill-[var(--bg-panel)] stroke-[var(--border-main)] transition-colors",
-                                  selectedKeyIds.length > 0 && "group-hover:fill-[var(--bg-hover)]"
+                                  hasSelectedKey && "group-hover:fill-[var(--bg-hover)]"
                                 )}
                                 strokeWidth="1"
                               />
@@ -439,7 +456,7 @@ export const KeycodePanel = () => {
             ) : (
             filteredKeycodes.map(k => {
                 const support = getKeycodeSupport(k.code, showSupportTargetFilter ? supportTarget : 'all');
-                const isKeyDisabled = selectedKeyIds.length === 0 || !support.supported;
+                const isKeyDisabled = !hasSelectedKey || !support.supported;
                 const isLayersTab = activeTab === 'Layers';
 
                 // Layers tab: determine action type and layer number for JSX rendering
