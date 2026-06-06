@@ -334,10 +334,14 @@ export const KeycodeConfigPanel = () => {
   const tapDanceSelectorIds = isVialRemap && remoteTapDances.length > 0
     ? remoteTapDances.map(td => td.id)
     : Array.from({ length: 16 }, (_, idx) => idx);
-  const canOpenTapDanceSettings = activeAction.action === 'td' && isVialRemap && (
+  const canOpenDeviceTapDanceSettings = activeAction.action === 'td' && isVialRemap && (
     remoteTapDances.some(td => td.id === activeAction.tapDanceId)
   );
-  const canOpenMacroSettings = activeAction.action === 'macro' && appMode === 'remap' && !!deviceCapabilities?.hasMacros;
+  const canOpenProjectMacroSettings = activeAction.action === 'macro' && appMode === 'design';
+  const canOpenDeviceMacroSettings = activeAction.action === 'macro' && appMode === 'remap' && !!deviceCapabilities?.hasMacros;
+  const canOpenProjectTapDanceSettings = activeAction.action === 'td' && appMode === 'design';
+  const canOpenMacroSettings = canOpenProjectMacroSettings || canOpenDeviceMacroSettings;
+  const canOpenTapDanceSettingsButton = canOpenProjectTapDanceSettings || canOpenDeviceTapDanceSettings;
 
   const handleApplyRawAction = () => {
     const rawCode = rawDraft.trim();
@@ -545,7 +549,7 @@ export const KeycodeConfigPanel = () => {
                 );
               })}
             </div>
-            {canOpenTapDanceSettings && (
+            {canOpenTapDanceSettingsButton && (
               <button
                 onClick={() => openTapDanceSettings(activeAction.tapDanceId)}
                 className="mt-1 h-9 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
