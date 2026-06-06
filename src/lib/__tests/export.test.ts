@@ -234,6 +234,56 @@ describe('export generation', () => {
     expect(keyboardJson.bootloader).toBeUndefined();
   });
 
+  it('emits current QMK RGB pin settings without deprecated config defines', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'RGB Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+        rgb: 'GP2',
+      },
+      features: {
+        ...baseSettings.features,
+        rgb: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const qmkBlob = await generateQmkZip({ settings, keys });
+    const vialBlob = await generateVialZip({ settings, keys });
+    expect(qmkBlob).toBeTruthy();
+    expect(vialBlob).toBeTruthy();
+
+    const qmkZip = await JSZip.loadAsync(await qmkBlob!.arrayBuffer());
+    const vialZip = await JSZip.loadAsync(await vialBlob!.arrayBuffer());
+    const qmkConfigH = await qmkZip.file('rgb_board/config.h')!.async('string');
+    const vialConfigH = await vialZip.file('rgb_board/config.h')!.async('string');
+
+    for (const configH of [qmkConfigH, vialConfigH]) {
+      expect(configH).toContain('#define WS2812_DI_PIN GP2');
+      expect(configH).toContain('#define RGBLED_NUM 1');
+      expect(configH).not.toContain('RGB_DI_PIN');
+      expect(configH).not.toContain('RGBLIGHT_ANIMATIONS');
+    }
+  });
+
   it('emits QMK new-keyboard style processor and bootloader defaults when MCU is selected', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,

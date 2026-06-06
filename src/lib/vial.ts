@@ -259,9 +259,8 @@ ${settings.features.encoder ? `
 
 /* RGB settings */
 ${settings.features.rgb ? `
-#define RGB_DI_PIN ${settings.pins.rgb || 'D3'}
+#define WS2812_DI_PIN ${settings.pins.rgb || 'D3'}
 #define RGBLED_NUM ${validKeys.length}
-#define RGBLIGHT_ANIMATIONS
 ` : ''}
 `;
   kbFolder.file('config.h', configH);
