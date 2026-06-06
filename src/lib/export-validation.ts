@@ -1,5 +1,5 @@
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
-import { getDevelopmentBoardPins, getMcuPins } from './mcu-presets';
+import { getDevelopmentBoardPins, getMcuPins, getZmkTarget } from './mcu-presets';
 import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
 
 export type FirmwareExportTarget = 'qmk' | 'vial' | 'zmk';
@@ -143,13 +143,22 @@ export const validateFirmwareExport = (
 
   if (settings.features.split) {
     if (target === 'zmk') {
-      issues.push({
-        severity: 'error',
-        code: 'zmk-split-export-unsupported',
-        message: 'ZMK split source export is not supported yet. Use QMK/Vial export for split keyboards, or disable split before exporting ZMK source.',
-      });
+      if ((settings.hardware.controllerType || 'development_board') === 'mcu') {
+        issues.push({
+          severity: 'error',
+          code: 'zmk-split-custom-board-unsupported',
+          message: 'ZMK split source export currently supports development-board shield projects only.',
+        });
+      }
+      if (getZmkTarget(settings.hardware.mcu) !== 'nrf52840') {
+        issues.push({
+          severity: 'error',
+          code: 'zmk-split-ble-target-required',
+          message: 'ZMK split source export currently requires an nRF52840 BLE-capable development board.',
+        });
+      }
     }
-    if (!settings.pins.splitSerial) {
+    if (target !== 'zmk' && !settings.pins.splitSerial) {
       issues.push({
         severity: 'warning',
         code: 'split-serial-missing',

@@ -812,10 +812,15 @@ describe('export generation', () => {
     }));
   });
 
-  it('blocks ZMK split source export during validation', () => {
+  it('blocks ZMK custom-board split source export during validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       matrix: { rows: 1, cols: 1 },
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'mcu',
+        mcu: 'nRF52840',
+      },
       pins: {
         rows: ['GP0'],
         cols: ['GP1'],
@@ -847,8 +852,62 @@ describe('export generation', () => {
     const issues = validateFirmwareExport(settings, keys, 'zmk');
     expect(issues).toContainEqual(expect.objectContaining({
       severity: 'error',
-      code: 'zmk-split-export-unsupported',
+      code: 'zmk-split-custom-board-unsupported',
     }));
+  });
+
+  it('allows ZMK nRF52840 development-board split source export during validation', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08'],
+        splitRows: ['P1.06'],
+        splitCols: ['P1.08'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 4,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'zmk');
+    expect(issues.filter(issue => issue.severity === 'error')).toEqual([]);
   });
 
   it('emits Vial MATRIX_MASKED through rules.mk instead of keyboard.json', async () => {
@@ -1201,6 +1260,94 @@ describe('export generation', () => {
     expect(shieldOverlay).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
     expect(readme).toContain('- board: nice_nano');
     expect(readme).toContain('shield: shield_board');
+  });
+
+  it('emits ZMK split as left and right shield siblings', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Split ZMK Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 2, cols: 2 },
+      pins: {
+        rows: ['P0.06', 'P0.07'],
+        cols: ['P0.08', 'P0.09'],
+        splitRows: ['P1.06', 'P1.07'],
+        splitCols: ['P1.08', 'P1.09'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'A' } },
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 5,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'B' } },
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const dtsi = await zip.file('boards/shields/split_zmk_board/split_zmk_board.dtsi')!.async('string');
+    const leftOverlay = await zip.file('boards/shields/split_zmk_board/split_zmk_board_left.overlay')!.async('string');
+    const rightOverlay = await zip.file('boards/shields/split_zmk_board/split_zmk_board_right.overlay')!.async('string');
+    const kconfigShield = await zip.file('boards/shields/split_zmk_board/Kconfig.shield')!.async('string');
+    const kconfigDefconfig = await zip.file('boards/shields/split_zmk_board/Kconfig.defconfig')!.async('string');
+    const zmkYml = await zip.file('boards/shields/split_zmk_board/split_zmk_board.zmk.yml')!.async('string');
+    const keymap = await zip.file('boards/shields/split_zmk_board/split_zmk_board.keymap')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(zip.file('config/split_zmk_board.keymap')).toBeNull();
+    expect(dtsi).toContain('columns = <4>');
+    expect(dtsi).toContain('rows = <2>');
+    expect(dtsi).toContain('RC(0,0) RC(0,2)');
+    expect(leftOverlay).toContain('#include "split_zmk_board.dtsi"');
+    expect(leftOverlay).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
+    expect(leftOverlay).toContain('&gpio0 8 GPIO_ACTIVE_HIGH');
+    expect(rightOverlay).toContain('col-offset = <2>');
+    expect(rightOverlay).toContain('&gpio1 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
+    expect(rightOverlay).toContain('&gpio1 8 GPIO_ACTIVE_HIGH');
+    expect(kconfigShield).toContain('config SHIELD_SPLIT_ZMK_BOARD_LEFT');
+    expect(kconfigShield).toContain('config SHIELD_SPLIT_ZMK_BOARD_RIGHT');
+    expect(kconfigDefconfig).toContain('config ZMK_SPLIT_ROLE_CENTRAL');
+    expect(kconfigDefconfig).toContain('config ZMK_SPLIT');
+    expect(zmkYml).toContain('siblings:');
+    expect(zmkYml).toContain('  - split_zmk_board_left');
+    expect(zmkYml).toContain('  - split_zmk_board_right');
+    expect(keymap).toContain('&kp A &kp B');
+    expect(readme).toContain('shield: split_zmk_board_left');
+    expect(readme).toContain('shield: split_zmk_board_right');
   });
 
   it('emits ZMK tap dance behaviors from Vial-style definitions', async () => {
