@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles, Trash2 } from 'lucide-react';
+import { Cpu, Usb, SlidersHorizontal, X, Sliders, Wrench, WandSparkles, Trash2, Workflow } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { KeyboardCanvas } from './KeyboardCanvas';
@@ -8,29 +8,42 @@ import { cn } from '@/lib/utils';
 import { KeycodePanel } from './KeycodePanel';
 import { LayoutOptionsPanel } from './LayoutOptionsPanel';
 import { KeycodeConfigPanel } from './KeycodeConfigPanel';
-import { MacrosCombosPanel } from './MacrosCombosPanel';
+import { MacroPanelKind, MacrosCombosPanel } from './MacrosCombosPanel';
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
   const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked, macroSettingsOpenRequest, tapDanceSettingsOpenRequest } = useKeyboardStore();
   const [isLeftPanelOpen, setIsLeftPanelOpen] = React.useState(false);
   const [isKeycodeConfigOpen, setIsKeycodeConfigOpen] = React.useState(false);
-  const [isMacrosCombosOpen, setIsMacrosCombosOpen] = React.useState(false);
+  const [openMacroPanel, setOpenMacroPanel] = React.useState<MacroPanelKind | null>(null);
   const lastMacroSettingsOpenRequest = React.useRef(macroSettingsOpenRequest);
   const lastTapDanceSettingsOpenRequest = React.useRef(tapDanceSettingsOpenRequest);
+  const isAdvancedPanelAvailable = connectedDevice?.protocolType === 'vial' || !!deviceCapabilities;
+  const macroPanelMeta = {
+    macros: { title: t('macros.macros'), icon: WandSparkles },
+    combos: { title: t('macros.combos'), icon: Workflow },
+    tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: Sliders },
+  } satisfies Record<MacroPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
+  const openMacroPanelMeta = openMacroPanel ? macroPanelMeta[openMacroPanel] : null;
 
   React.useEffect(() => {
     if (macroSettingsOpenRequest === lastMacroSettingsOpenRequest.current) return;
     lastMacroSettingsOpenRequest.current = macroSettingsOpenRequest;
     setIsLeftPanelOpen(false);
-    setIsMacrosCombosOpen(true);
+    setOpenMacroPanel('macros');
   }, [macroSettingsOpenRequest]);
 
   React.useEffect(() => {
     if (tapDanceSettingsOpenRequest === lastTapDanceSettingsOpenRequest.current) return;
     lastTapDanceSettingsOpenRequest.current = tapDanceSettingsOpenRequest;
     setIsLeftPanelOpen(false);
-    setIsMacrosCombosOpen(true);
+    setOpenMacroPanel('tapDance');
   }, [tapDanceSettingsOpenRequest]);
+
+  React.useEffect(() => {
+    if (openMacroPanel === 'tapDance' && connectedDevice?.protocolType !== 'vial') {
+      setOpenMacroPanel(null);
+    }
+  }, [connectedDevice?.protocolType, openMacroPanel]);
 
   const hasDeletableSelection = React.useMemo(() => {
     if (selectedKeyIds.length === 0) return false;
@@ -75,7 +88,7 @@ export const RemapView: React.FC = () => {
                     <button
                       onClick={() => {
                         setIsLeftPanelOpen(!isLeftPanelOpen);
-                        if (isMacrosCombosOpen) setIsMacrosCombosOpen(false);
+                        if (openMacroPanel) setOpenMacroPanel(null);
                       }}
                       className={cn(
                         "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
@@ -91,27 +104,34 @@ export const RemapView: React.FC = () => {
                       </div>
                     </button>
 
-                    {(connectedDevice?.protocolType === 'vial' || !!deviceCapabilities) && (
+                    {isAdvancedPanelAvailable && (
                       <>
                         <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
-                        <button 
-                          onClick={() => {
-                            setIsMacrosCombosOpen(!isMacrosCombosOpen);
-                            if (isLeftPanelOpen) setIsLeftPanelOpen(false);
-                          }}
-                          className={cn(
-                            "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
-                            isMacrosCombosOpen 
-                              ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10" 
-                              : "text-[var(--text-dim)] hover:text-white hover:bg-[var(--bg-hover)]"
-                          )}
-                          title="Macros & Combos"
-                        >
-                          <WandSparkles size={18} className={cn("transition-transform duration-500", isMacrosCombosOpen && "scale-110")} />
-                          <div className="absolute right-full mr-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                            Macros & Combos
-                          </div>
-                        </button>
+                        {([
+                          ['macros', WandSparkles],
+                          ['combos', Workflow],
+                          ...(connectedDevice?.protocolType === 'vial' ? [['tapDance', Sliders] as const] : []),
+                        ] as const).map(([panel, Icon]) => (
+                          <button
+                            key={panel}
+                            onClick={() => {
+                              setOpenMacroPanel(openMacroPanel === panel ? null : panel);
+                              if (isLeftPanelOpen) setIsLeftPanelOpen(false);
+                            }}
+                            className={cn(
+                              "w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group",
+                              openMacroPanel === panel
+                                ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20 scale-110 z-10"
+                                : "text-[var(--text-dim)] hover:text-white hover:bg-[var(--bg-hover)]"
+                            )}
+                            title={macroPanelMeta[panel].title}
+                          >
+                            <Icon size={18} className={cn("transition-transform duration-500", openMacroPanel === panel && "scale-110")} />
+                            <div className="absolute right-full mr-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
+                              {macroPanelMeta[panel].title}
+                            </div>
+                          </button>
+                        ))}
                       </>
                     )}
                   </div>
@@ -153,20 +173,20 @@ export const RemapView: React.FC = () => {
                   </div>
                 )}
 
-                {/* Right Side Floating Panel (Macros & Combos) */}
-                {isMacrosCombosOpen && (
+                {/* Right Side Floating Panel (Macros / Combos / Tap Dance) */}
+                {openMacroPanel && openMacroPanelMeta && (
                   <div className="absolute top-4 right-20 bottom-[416px] w-80 z-[130] bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
                     <div className="p-4 border-b border-[var(--border-main)] bg-amber-500/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <WandSparkles size={16} className="text-amber-500" />
-                        <span className="text-xs font-black uppercase tracking-widest text-amber-500">Macros & Combos</span>
+                        <openMacroPanelMeta.icon size={16} className="text-amber-500" />
+                        <span className="text-xs font-black uppercase tracking-widest text-amber-500">{openMacroPanelMeta.title}</span>
                       </div>
-                      <button onClick={() => setIsMacrosCombosOpen(false)} className="p-1 hover:bg-amber-500/20 rounded transition-colors text-amber-500">
+                      <button onClick={() => setOpenMacroPanel(null)} className="p-1 hover:bg-amber-500/20 rounded transition-colors text-amber-500">
                         <X size={14} />
                       </button>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
-                      <MacrosCombosPanel />
+                      <MacrosCombosPanel panel={openMacroPanel} />
                     </div>
                   </div>
                 )}

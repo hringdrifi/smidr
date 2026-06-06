@@ -21,7 +21,13 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export const MacrosCombosPanel: React.FC = () => {
+export type MacroPanelKind = 'macros' | 'combos' | 'tapDance';
+
+type MacrosCombosPanelProps = {
+  panel?: MacroPanelKind;
+};
+
+export const MacrosCombosPanel: React.FC<MacrosCombosPanelProps> = ({ panel }) => {
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
     Object.entries(values).reduce(
@@ -31,7 +37,9 @@ export const MacrosCombosPanel: React.FC = () => {
   const { 
     remoteMacros, 
     remoteCombos, 
+    settings,
     updateRemoteMacro, 
+    updateProjectMacro,
     updateRemoteCombo,
     syncMacrosAndCombos,
     updateRemoteTapDance,
@@ -45,8 +53,12 @@ export const MacrosCombosPanel: React.FC = () => {
     setSelectedTapDanceId,
   } = useKeyboardStore();
 
-  const activeTab = macroPanelActiveTab;
-  const setActiveTab = setMacroPanelActiveTab;
+  const activeTab = panel || macroPanelActiveTab;
+  const setActiveTab = panel ? (() => {}) : setMacroPanelActiveTab;
+  const showTabs = !panel;
+  const hasDeviceMacros = connectedDevice?.protocolType === 'vial';
+  const [macroScope, setMacroScope] = useState<'project' | 'device'>('project');
+  const activeMacros = macroScope === 'device' ? remoteMacros : (settings.macros || []);
   const [macroEditMode, setMacroEditMode] = useState<'text' | 'sequence'>('text');
   
   // Local edit states to prevent high-frequency write calls to HID
@@ -57,7 +69,7 @@ export const MacrosCombosPanel: React.FC = () => {
 
   // Auto-fill local edits when macro changes
   useEffect(() => {
-    const macro = remoteMacros[selectedMacroId] || [];
+    const macro = activeMacros[selectedMacroId] || [];
     setLocalMacroActions(macro);
     
     // If it's a text-only macro, construct text value
@@ -69,7 +81,13 @@ export const MacrosCombosPanel: React.FC = () => {
       setTextValue('');
       setMacroEditMode('sequence');
     }
-  }, [selectedMacroId, remoteMacros]);
+  }, [selectedMacroId, activeMacros]);
+
+  useEffect(() => {
+    if (macroScope === 'device' && !hasDeviceMacros) {
+      setMacroScope('project');
+    }
+  }, [hasDeviceMacros, macroScope]);
 
   const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage({ text, type });
@@ -81,8 +99,13 @@ export const MacrosCombosPanel: React.FC = () => {
     setIsSaving(true);
     try {
       const actions: MacroAction[] = [{ action: 'text', text: textValue }];
-      await updateRemoteMacro(selectedMacroId, actions);
-      showMessage(t('macros.macroSaved'), 'success');
+      if (macroScope === 'device') {
+        await updateRemoteMacro(selectedMacroId, actions);
+        showMessage(t('macros.macroSaved'), 'success');
+      } else {
+        updateProjectMacro(selectedMacroId, actions);
+        showMessage(t('macros.projectMacroSaved') || 'Project macro updated.', 'success');
+      }
     } catch (err: any) {
       showMessage(err.message || t('macros.macroSaveFailed'), 'error');
     } finally {
@@ -93,8 +116,13 @@ export const MacrosCombosPanel: React.FC = () => {
   const handleSaveSequenceMacro = async (actions: MacroAction[]) => {
     setIsSaving(true);
     try {
-      await updateRemoteMacro(selectedMacroId, actions);
-      showMessage(t('macros.sequenceSaved'), 'success');
+      if (macroScope === 'device') {
+        await updateRemoteMacro(selectedMacroId, actions);
+        showMessage(t('macros.sequenceSaved'), 'success');
+      } else {
+        updateProjectMacro(selectedMacroId, actions);
+        showMessage(t('macros.projectMacroSaved') || 'Project macro updated.', 'success');
+      }
     } catch (err: any) {
       showMessage(err.message || t('macros.macroSaveFailed'), 'error');
     } finally {
@@ -225,10 +253,11 @@ export const MacrosCombosPanel: React.FC = () => {
   };
 
   useEffect(() => {
+    if (panel) return;
     if (activeTab === 'tapDance' && !isVialRemap) {
       setActiveTab('macros');
     }
-  }, [activeTab, isVialRemap, setActiveTab]);
+  }, [activeTab, isVialRemap, panel, setActiveTab]);
 
   useEffect(() => {
     if (
@@ -245,6 +274,7 @@ export const MacrosCombosPanel: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-zinc-200">
       {/* Tabs */}
+      {showTabs && (
       <div className="flex border-b border-[var(--border-main)] bg-zinc-950/40 p-1">
         <button
           onClick={() => setActiveTab('macros')}
@@ -285,6 +315,7 @@ export const MacrosCombosPanel: React.FC = () => {
           </button>
         )}
       </div>
+      )}
 
       {/* Messages */}
       {message && (
@@ -300,6 +331,32 @@ export const MacrosCombosPanel: React.FC = () => {
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
         {activeTab === 'macros' ? (
           <div className="flex flex-col gap-4">
+            <div className="flex bg-zinc-950/60 border border-[var(--border-main)] p-0.5 rounded-lg">
+              <button
+                onClick={() => setMacroScope('project')}
+                className={cn(
+                  "flex-1 h-8 text-[10px] font-bold rounded-md uppercase tracking-wider transition-colors",
+                  macroScope === 'project' ? "bg-amber-500 text-zinc-950" : "text-zinc-400 hover:text-white"
+                )}
+              >
+                {t('macros.project') || 'Project'}
+              </button>
+              <button
+                onClick={() => setMacroScope('device')}
+                disabled={!hasDeviceMacros}
+                className={cn(
+                  "flex-1 h-8 text-[10px] font-bold rounded-md uppercase tracking-wider transition-colors",
+                  macroScope === 'device'
+                    ? "bg-amber-500 text-zinc-950"
+                    : hasDeviceMacros
+                      ? "text-zinc-400 hover:text-white"
+                      : "text-zinc-700 cursor-not-allowed"
+                )}
+              >
+                {t('macros.device') || 'Device'}
+              </button>
+            </div>
+
             {/* Macro Selector */}
             <div className="grid grid-cols-4 gap-2">
               {Array.from({ length: 16 }).map((_, idx) => (

@@ -3,6 +3,7 @@ import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
 import { TapDanceEntry } from '@/types/actions';
 import { generateQmkTapDanceC } from './tap-dance-codegen';
+import { actionToQmkSourceString, generateQmkStaticMacroC } from './macro-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
@@ -94,23 +95,22 @@ ${rows}
 `;
 };
 
-const generateKeymapC = (validKeys: PhysicalKey[], keymapsArray: string[][][], tapDances: TapDanceEntry[] = []) => {
+const generateKeymapC = (validKeys: PhysicalKey[], layersCount: number, settings: ProjectSettings, tapDances: TapDanceEntry[] = []) => {
   let keymapC = `#include QMK_KEYBOARD_H
 
 ${generateQmkTapDanceC(tapDances)}
+${generateQmkStaticMacroC(settings.macros || [])}
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 `;
 
-  keymapsArray.forEach((layer, i) => {
+  for (let i = 0; i < layersCount; i++) {
     keymapC += `  [${i}] = LAYOUT(\n    `;
     keymapC += validKeys.map(key => {
-      if (key.row !== undefined && key.col !== undefined) {
-        return layer[key.row][key.col] || 'KC_TRNS';
-      }
-      return 'KC_TRNS';
+      const action = key.keymap?.[i] || { action: 'trans' as const };
+      return actionToQmkSourceString(action, settings.macros || []);
     }).join(', ');
     keymapC += `\n  ),\n`;
-  });
+  }
   keymapC += `};\n`;
 
   return keymapC;
@@ -271,8 +271,7 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
 
   // No [kbName].h is generated, allowing QMK to auto-generate the LAYOUT macro from keyboard.json.
 
-  const firmwareViaJson = generateViaJson({ settings, keys: validKeys });
-  const keymapC = generateKeymapC(validKeys, firmwareViaJson.keymaps, settings.tapDances || []);
+  const keymapC = generateKeymapC(validKeys, settings.layers || 4, settings, settings.tapDances || []);
   const tapDanceRules = (settings.tapDances || []).length > 0 ? `TAP_DANCE_ENABLE = yes\n` : '';
 
   // 4. keymaps/default/

@@ -133,7 +133,9 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
   - `mt`: モッドタップ（Holdで修飾キー、Tapでキー入力）。
   - `macro`: マクロ呼び出し。`macroId` でデバイスまたはプロジェクト内のマクロスロットを参照し、QMK/VIA/Vial では `MACRO(n)` / Dynamic Macro キーコード、ZMK では `&macro_n` 相当として扱います。マクロ定義そのものは `MacroAction[]` として別管理します。
   - `td`: タップダンス。`tapDanceId` でプロジェクト内の `tapDances` 定義を参照し、QMK/Vial エクスポート時は `TD(n)` として出力する。
-- **マクロ定義への導線**: キーマップ設定パネルで `macro` を選択中かつ接続デバイスがマクロ編集に対応している場合、選択中の `macroId` を Macro / Combo パネルの Macro タブで開くボタンを表示する。
+- **マクロ定義への導線**: キーマップ設定パネルで `macro` を選択中かつ接続デバイスがマクロ編集に対応している場合、選択中の `macroId` を Macro パネルで開くボタンを表示する。
+- **Project Macro**: `ProjectSettings.macros` に保存されるマクロ定義を Smiðr の標準マクロとして扱う。未接続の設計モードでも編集でき、`.smidr` 保存および QMK / Vial / ZMK ソース出力に反映する。QMK / Vial では `process_record_user()` と `SMIDR_MACRO_N` カスタムキーコード、ZMK では `zmk,behavior-macro` として生成する。
+- **Device Dynamic Macro**: VIA / Vial 接続中に読み書きする Dynamic Macro は実機側の現在値として扱い、Project Macro とは別スコープで編集する。Device Dynamic Macro の編集内容は接続中デバイスへ書き込むが、ソース出力には直接反映しない。
 - **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`action: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
 - **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
 
@@ -141,7 +143,7 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
 - **プロジェクト定義**: タップダンス定義は `ProjectSettings.tapDances` に保存する。各定義は Vial の Dynamic Tap Dance 形式を標準モデルとし、`id`, `tapAction`, `holdAction`, `doubleTapAction`, `tapHoldAction`, `tappingTerm` を持つ。
 - **Universal Model**: Smiðr 内部では、タップダンス定義をファームウェア固有の種類ではなく Vial 互換の 4 スロット（Tap / Hold / Double Tap / Tap Hold）と Tapping Term として扱う。QMK / Vial / ZMK それぞれの表現差はエクスポート時のコンバーターで吸収する。
 - **キーマップ割当**: キー上の割当は `UniversalAction` の `action: 'td'` と `tapDanceId` で保持する。
-- **UI 配置**: Tap Dance 定義編集は Macro / Combo パネル内の Tap Dance タブに配置する。キーマップ設定パネルはキーへの `TD(n)` 割当と、選択中の Tap Dance 定義を開く導線のみを持つ。
+- **UI 配置**: Macro、Combo、Tap Dance 定義編集はリマップ画面および設計画面右側の個別パネルに分けて配置する。キーマップ設定パネルはキーへの `TD(n)` 割当と、選択中の Tap Dance 定義を開く導線のみを持つ。
 - **QMK/Vial エクスポート**: `tapDances` が存在する場合、`keymap.c` に `ACTION_TAP_DANCE_FN_ADVANCED_TIME` ベースの `tap_dance_actions[]` と `finished/reset` コールバックを生成し、対象 keymap の `rules.mk` に `TAP_DANCE_ENABLE = yes` を追加する。Tap / Double Tap は `tap_code16()`、Hold / Tap Hold は `register_code16()` と `unregister_code16()` で表現する。
 - **ZMK エクスポート**: `tapDances` が存在する場合、`.keymap` に `zmk,behavior-tap-dance` を生成する。Hold / Tap Hold が設定されている場合は、必要に応じて `zmk,behavior-hold-tap` を追加生成し、Tap Dance の binding から参照する。キー上の `td` 割当は生成済み behavior ラベル（例: `&smidr_td_0`）を参照する。
 - **リマップ時の制限**: Vial 接続では Dynamic Tap Dance プロトコルにより定義そのものを読み書きできる。ZMK Studio 接続では、既存 behavior のキー位置への割当は可能だが、`zmk,behavior-tap-dance` や `zmk,behavior-hold-tap` のノード定義自体はソース出力・再ビルド対象として扱う。ZMK リマップのキーパレットでは、発見済み behavior のうち Smiðr が生成した命名規則 `smidr_td_N` に一致するものだけを `TDN` 候補として表示し、ユーザー定義の任意 Tap Dance behavior は Any / カスタム入力で扱う。

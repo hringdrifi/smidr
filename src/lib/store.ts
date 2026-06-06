@@ -33,6 +33,12 @@ import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, DEMO_TAP_DANCES
 
 export type RuntimeKey = PhysicalKey & { id: string };
 
+const createEmptyMacros = (count = 16): MacroAction[][] => Array.from({ length: count }, () => []);
+
+const normalizeMacros = (macros?: MacroAction[][], count = 16): MacroAction[][] => (
+  Array.from({ length: Math.max(count, macros?.length || 0) }, (_, idx) => macros?.[idx] || [])
+);
+
 export const getCenteredTransform = (keys: PhysicalKey[], activeOptions: Record<string, number> = {}) => {
   const visKeys = keys.filter(k => !k.group || (activeOptions[k.group] ?? 0) === k.option);
   
@@ -152,6 +158,7 @@ export interface KeyboardState {
   openMacroSettings: (id: number) => void;
   setSelectedTapDanceId: (id: number) => void;
   openTapDanceSettings: (id: number) => void;
+  updateProjectMacro: (id: number, actions: MacroAction[]) => void;
   updateRemoteMacro: (id: number, actions: MacroAction[]) => Promise<void>;
   updateRemoteCombo: (index: number, combo: ComboEntry) => Promise<void>;
   updateRemoteTapDance: (index: number, entry: TapDanceEntry) => Promise<void>;
@@ -259,6 +266,7 @@ const initialState: Partial<KeyboardState> = {
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
+    macros: createEmptyMacros(),
     tapDances: [],
     visualLayout: getStoredVisualLayout(),
     layoutOptions: {},
@@ -291,7 +299,7 @@ const initialState: Partial<KeyboardState> = {
   isKeymapSyncing: false,
   zmkLayerMetadata: null,
   zmkTapDanceIds: [],
-  remoteMacros: Array(16).fill(null).map(() => []),
+  remoteMacros: createEmptyMacros(),
   remoteCombos: [],
   remoteTapDances: [],
   macroPanelActiveTab: 'macros',
@@ -518,6 +526,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             editorMode: 'layout',
             settings: {
               ...projectSettings,
+              macros: normalizeMacros(projectSettings.macros),
               visualLayout: normalizeVisualLayout(state.settings.visualLayout),
             } as ProjectSettings,
             keys,
@@ -540,7 +549,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             activeTransport: null,
             remoteKeymap: createDemoRemoteKeymap(keys),
             isKeymapSyncing: false,
-            remoteMacros: Array(16).fill(null).map(() => []),
+            remoteMacros: createEmptyMacros(),
             remoteCombos: [],
             remoteTapDances: DEMO_TAP_DANCES,
             zmkLayerMetadata: null,
@@ -1170,6 +1179,16 @@ export const useKeyboardStore = create<KeyboardState>()(
           selectedTapDanceId: id,
           tapDanceSettingsOpenRequest: s.tapDanceSettingsOpenRequest + 1,
         })),
+        updateProjectMacro: (id: number, actions: MacroAction[]) => set((s) => {
+          const macros = normalizeMacros(s.settings.macros);
+          macros[id] = actions;
+          return {
+            settings: {
+              ...s.settings,
+              macros,
+            }
+          };
+        }),
         updateTapDance: (id: number, entry: TapDanceEntry) => set((s) => {
           const current = s.settings.tapDances || [];
           const exists = current.some(td => td.id === id);
@@ -2259,6 +2278,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               bootmagic: { enabled: true, ...(settings.qmk?.bootmagic || {}) },
             },
             vial: settings.vial || {},
+            macros: normalizeMacros(settings.macros),
             tapDances: settings.tapDances || [],
             matrix: settings.matrix || {
               rows: settings.pins?.rows?.length || 0,
@@ -2438,6 +2458,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           settings: {
             ...initialState.settings,
             vialUid: generateRandomVialUid(),
+            macros: createEmptyMacros(),
             tapDances: [],
             visualLayout: normalizeVisualLayout(s.settings.visualLayout)
           } as ProjectSettings,

@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { actionToZmkSourceString, generateZmkTapDanceBehaviors } from './tap-dance-codegen';
+import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './macro-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
 
@@ -370,6 +371,7 @@ features:
 
 / {
 ${generateZmkTapDanceBehaviors(settings.tapDances || [])}
+${generateZmkMacroBehaviors(settings.macros || [])}
     keymap {
         compatible = "zmk,keymap";
 `;
@@ -377,7 +379,9 @@ ${generateZmkTapDanceBehaviors(settings.tapDances || [])}
   for (let l = 0; l < layersCount; l++) {
     const layerBindings = sortedKeys.map(key => {
       const action = key.keymap?.[l] || { action: 'trans' };
-      return actionToZmkSourceString(action);
+      return action.action === 'td'
+        ? actionToZmkSourceString(action)
+        : actionToZmkSourceStringWithMacros(action, settings.macros || []);
     });
 
     let layerBindingsStr = '';

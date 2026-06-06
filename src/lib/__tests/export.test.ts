@@ -65,6 +65,17 @@ describe('export generation', () => {
     expect(project).not.toHaveProperty('vendorProductId');
   });
 
+  it('keeps project macros in saved projects', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      macros: [[{ action: 'text', text: 'Hello' }]],
+    };
+
+    const project = generateSmidrProjectJson({ settings, keys: [] });
+
+    expect(project.macros?.[0]).toEqual([{ action: 'text', text: 'Hello' }]);
+  });
+
   it('keeps split pin settings in saved projects when split is enabled', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -305,6 +316,55 @@ describe('export generation', () => {
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
 
+  it('emits QMK static project macros when configured', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Macro Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      macros: [[
+        { action: 'text', text: 'Hi' },
+        { action: 'delay', duration: 25 },
+        { action: 'tap', keycodes: ['ENT'] },
+      ]],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'macro', macroId: 0 },
+        },
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymapC = await zip.file('macro_board/keymaps/default/keymap.c')!.async('string');
+
+    expect(keymapC).toContain('SMIDR_MACRO_0 = SAFE_RANGE');
+    expect(keymapC).toContain('process_record_user');
+    expect(keymapC).toContain('SEND_STRING("Hi")');
+    expect(keymapC).toContain('wait_ms(25)');
+    expect(keymapC).toContain('tap_code16(KC_ENT)');
+    expect(keymapC).toContain('SMIDR_MACRO_0');
+  });
+
   it('emits explicit QMK bootmagic settings', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -541,6 +601,48 @@ describe('export generation', () => {
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
 
+  it('emits Vial static project macros when configured', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Vial Macro',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      macros: [[{ action: 'text', text: 'Vial' }]],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'macro', macroId: 0 },
+        },
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymapC = await zip.file('vial_macro/keymaps/vial/keymap.c')!.async('string');
+
+    expect(keymapC).toContain('SMIDR_MACRO_0 = SAFE_RANGE');
+    expect(keymapC).toContain('SEND_STRING("Vial")');
+    expect(keymapC).toContain('SMIDR_MACRO_0');
+  });
+
   it('emits configured Vial unlock combo positions', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -748,6 +850,61 @@ describe('export generation', () => {
     expect(keymap).toContain('tapping-term-ms = <180>');
     expect(keymap).toContain('bindings = <&smidr_td_0_1_ht LSHIFT ESC>, <&smidr_td_0_2_ht LCTRL CLCK>');
     expect(keymap).toContain('&smidr_td_0');
+  });
+
+  it('emits ZMK macro behaviors from project macros', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'ZMK Macro',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08'],
+        splitRows: [],
+        splitCols: [],
+      },
+      hardware: {
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano_v2',
+        diodeDirection: 'COL2ROW',
+      },
+      macros: [[
+        { action: 'text', text: 'Az' },
+        { action: 'delay', duration: 30 },
+        { action: 'tap', keycodes: ['ENT'] },
+      ]],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'macro', macroId: 0 },
+        },
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymap = await zip.file('config/zmk_macro.keymap')!.async('string');
+
+    expect(keymap).toContain('compatible = "zmk,behavior-macro"');
+    expect(keymap).toContain('smidr_macro_0: smidr_macro_0');
+    expect(keymap).toContain('&macro_press &kp LSHIFT');
+    expect(keymap).toContain('&macro_wait_time 30');
+    expect(keymap).toContain('&macro_tap &kp RET');
+    expect(keymap).toContain('&smidr_macro_0');
   });
 
   it('maps shared development board selections to ZMK board ids', async () => {

@@ -448,6 +448,8 @@ export const TRANSLATIONS = {
     macros: {
       macros: 'Macros',
       combos: 'Combos',
+      project: 'Project',
+      device: 'Device',
       macroEditor: 'Macro {id} Editor',
       text: 'Text',
       sequence: 'Sequence',
@@ -471,6 +473,7 @@ export const TRANSLATIONS = {
       noneOption: '- None -',
       macroSaved: 'Macro updated on keyboard!',
       macroSaveFailed: 'Failed to save macro',
+      projectMacroSaved: 'Project macro updated.',
       sequenceSaved: 'Macro sequence updated!',
       comboSaved: 'Combo {id} saved to device!',
       comboSaveFailed: 'Failed to save combo',
@@ -1520,6 +1523,8 @@ export const TRANSLATIONS = {
     macros: {
       macros: 'マクロ',
       combos: 'コンボ',
+      project: 'プロジェクト',
+      device: 'デバイス',
       macroEditor: 'マクロ {id} エディター',
       text: 'テキスト',
       sequence: 'シーケンス',
@@ -1543,6 +1548,7 @@ export const TRANSLATIONS = {
       noneOption: '- なし -',
       macroSaved: 'マクロをキーボードに保存しました。',
       macroSaveFailed: 'マクロの保存に失敗しました',
+      projectMacroSaved: 'プロジェクトマクロを更新しました。',
       sequenceSaved: 'マクロシーケンスを更新しました。',
       comboSaved: 'コンボ {id} をデバイスに保存しました。',
       comboSaveFailed: 'コンボの保存に失敗しました',
