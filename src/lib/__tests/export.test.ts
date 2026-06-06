@@ -742,7 +742,7 @@ describe('export generation', () => {
     expect(keyboardJson.encoder.rotary).toEqual([{ pin_a: 'B0', pin_b: 'B1' }]);
   });
 
-  it('warns when encoder pins are missing during export validation', () => {
+  it('warns when encoder pins are missing during QMK and Vial export validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       matrix: { rows: 1, cols: 1 },
@@ -772,10 +772,52 @@ describe('export generation', () => {
       },
     ];
 
+    for (const target of ['qmk', 'vial'] as const) {
+      const issues = validateFirmwareExport(settings, keys, target);
+      expect(issues).toContainEqual(expect.objectContaining({
+        severity: 'warning',
+        code: 'encoder-pins-missing',
+        message: expect.stringContaining('may fail to compile'),
+      }));
+    }
+  });
+
+  it('warns when encoder is enabled without a layout encoder assignment', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        encoderA: 'GP2',
+        encoderB: 'GP3',
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
     const issues = validateFirmwareExport(settings, keys, 'vial');
     expect(issues).toContainEqual(expect.objectContaining({
       severity: 'warning',
-      code: 'encoder-pins-missing',
+      code: 'encoder-layout-missing',
     }));
   });
 

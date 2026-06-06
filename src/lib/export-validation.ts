@@ -107,7 +107,14 @@ export const validateFirmwareExport = (
       issues.push({
         severity: 'warning',
         code: 'encoder-pins-missing',
-        message: 'Encoder is enabled, but encoder A/B pins are not fully assigned. Encoder output will still be generated with fallback pins.',
+        message: 'Encoder is enabled, but encoder A/B pins are not fully assigned. The generated source may fail to compile until encoder pins are configured.',
+      });
+    }
+    if (!keys.some(key => key.encoderIndex !== undefined)) {
+      issues.push({
+        severity: 'warning',
+        code: 'encoder-layout-missing',
+        message: 'Encoder is enabled, but no encoder is assigned in the layout. The generated source may not define any encoder instances.',
       });
     }
     pushInvalidPins(issues, settings, [
