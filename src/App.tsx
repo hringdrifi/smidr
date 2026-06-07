@@ -257,9 +257,6 @@ export default function App() {
     | { type: 'tab'; id: RightPanelKind; title: string; icon: React.ComponentType<{ size?: number; className?: string }> }
     | { type: 'separator'; id: string }
   > = [
-    { type: 'tab', id: 'settings', title: t('hardware.title') || t('header.setupTooltip'), icon: Settings },
-    { type: 'tab', id: 'options', title: t('sidebar.layoutOptions'), icon: SlidersHorizontal },
-    { type: 'separator', id: 'editor-specific' },
     ...(editorMode === 'layout'
       ? [{ type: 'tab' as const, id: 'properties' as RightPanelKind, title: t('properties.title'), icon: SquarePen }]
       : []),
@@ -279,6 +276,9 @@ export default function App() {
           { type: 'tab' as const, id: 'tapDance' as RightPanelKind, title: macroPanelMeta.tapDance.title, icon: macroPanelMeta.tapDance.icon },
         ]
       : []),
+    { type: 'separator', id: 'global-settings' },
+    { type: 'tab', id: 'options', title: t('sidebar.layoutOptions'), icon: SlidersHorizontal },
+    { type: 'tab', id: 'settings', title: t('hardware.title') || t('header.setupTooltip'), icon: Settings },
   ];
   const activeRightPanelTab = rightPanelTabs.find(
     (item): item is Extract<(typeof rightPanelTabs)[number], { type: 'tab' }> => item.type === 'tab' && item.id === activeRightPanel

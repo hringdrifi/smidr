@@ -27,7 +27,6 @@ export const RemapView: React.FC = () => {
     tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: WandSparkles },
   } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
   const rightPanelTabs: Array<{ id: RemapRightPanelKind; title: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
-    { id: 'options', title: t('sidebar.layoutOptions'), icon: SlidersHorizontal },
     { id: 'keymap', title: t('keycodeConfig.title') || 'Keymap Config', icon: Wrench },
     ...(isMacroPanelAvailable ? [{ id: 'macros' as RemapRightPanelKind, title: macroPanelMeta.macros.title, icon: macroPanelMeta.macros.icon }] : []),
     ...(isVialDynamicPanelAvailable
@@ -36,6 +35,7 @@ export const RemapView: React.FC = () => {
           { id: 'tapDance' as RemapRightPanelKind, title: macroPanelMeta.tapDance.title, icon: macroPanelMeta.tapDance.icon },
         ]
       : []),
+    { id: 'options', title: t('sidebar.layoutOptions'), icon: SlidersHorizontal },
   ];
   const activeRightPanelTab = rightPanelTabs.find(tab => tab.id === activeRightPanel);
 
