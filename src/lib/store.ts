@@ -243,7 +243,6 @@ export interface KeyboardState {
   actionClipboard: UniversalAction[];
   copyKeys: () => void;
   pasteKeys: () => void;
-  deleteSelectedKeycodes: () => Promise<void>;
   setSelectedKeycode: (action: UniversalAction) => Promise<void>;
 
   // Demo Mode
@@ -1913,90 +1912,6 @@ export const useKeyboardStore = create<KeyboardState>()(
                 ry: roundCoord((k.ry ?? 0) + offset),
               }));
               addKeys(newKeys as Partial<PhysicalKey>[], { skipCollision: true });
-            }
-          }
-        },
-
-        deleteSelectedKeycodes: async () => {
-          const s = get();
-          const { appMode, currentLayer, selectedKeyIds, keys, connectedDevice } = s;
-          if (selectedKeyIds.length === 0) return;
-
-          const targetKeys = keys.filter(k => selectedKeyIds.includes(k.id));
-          const newAction: UniversalAction = { action: 'trans' };
-
-          // 1. Update local state instantly
-          set((state) => {
-            const updatedKeys = state.keys.map(k => {
-              if (selectedKeyIds.includes(k.id)) {
-                return { ...k, keymap: { ...k.keymap, [currentLayer]: newAction } };
-              }
-              return k;
-            });
-
-            let newRemoteKeymap = { ...state.remoteKeymap };
-            if (appMode === 'remap') {
-              if (!newRemoteKeymap[currentLayer]) newRemoteKeymap[currentLayer] = [];
-              const newLayer = [...newRemoteKeymap[currentLayer]];
-              targetKeys.forEach(tk => {
-                const remoteIndex = getRemoteKeymapIndex(tk);
-                if (remoteIndex !== undefined) {
-                  newLayer[remoteIndex] = newAction;
-                }
-              });
-              newRemoteKeymap[currentLayer] = newLayer;
-            }
-
-            return { keys: updatedKeys, baseKeys: updatedKeys, remoteKeymap: newRemoteKeymap };
-          });
-
-          // 2. If connected to a device in remap mode, sync to device sequentially
-          if (appMode === 'remap' && connectedDevice && !s.isDemoMode) {
-            try {
-              const isZmk = connectedDevice?.protocolType === 'zmk';
-              const isVial = connectedDevice?.protocolType === 'vial';
-              const protocol = isZmk
-                ? zmkProtocol
-                : (isVial ? new VialProtocol() : new ViaProtocol());
-              await protocol.initialize(s.activeTransport || hidTransport);
-
-              // Set each key sequentially
-              for (const tk of targetKeys) {
-                const targetRow = isZmk && tk.zmkPosition !== undefined ? tk.zmkPosition : tk.row;
-                const targetCol = isZmk && tk.zmkPosition !== undefined ? -1 : tk.col;
-                if (targetRow !== undefined && targetCol !== undefined) {
-                  console.log(`[ZMK/VIA/Vial Delete Write] Layer:${currentLayer} Row:${targetRow} Col:${targetCol}`, newAction);
-                  await protocol.setKey(currentLayer, targetRow, targetCol, newAction);
-                }
-              }
-
-              if (isZmk) {
-                const zmkProto = protocol as ZmkProtocol;
-                console.log('[ZMK Sync] Syncing local UI store state after delete...');
-                const newRemoteKeymap = { ...get().remoteKeymap };
-                const updatedKeys = await Promise.all(get().keys.map(async (k) => {
-                  const remoteIndex = getRemoteKeymapIndex(k);
-                  const targetRow = k.zmkPosition !== undefined ? k.zmkPosition : k.row;
-                  const targetCol = k.zmkPosition !== undefined ? -1 : k.col;
-                  if (remoteIndex === undefined || targetRow === undefined || targetCol === undefined) return k;
-                  const keymap = { ...k.keymap };
-                  for (let l = 0; l < zmkProto.layerCount; l++) {
-                    const actionVal = await zmkProto.getKey(l, targetRow, targetCol);
-                    keymap[l] = actionVal;
-                    if (!newRemoteKeymap[l]) newRemoteKeymap[l] = [];
-                    newRemoteKeymap[l][remoteIndex] = actionVal;
-                  }
-                  return { ...k, keymap };
-                }));
-                set({
-                  remoteKeymap: newRemoteKeymap,
-                  keys: updatedKeys,
-                  baseKeys: updatedKeys
-                });
-                console.log('[ZMK Sync SUCCESS] Local UI store state synchronized after delete.');
-              }
-            } catch (err) {
-              console.error('Failed to delete keycodes on device:', err);
             }
           }
         },

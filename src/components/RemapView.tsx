@@ -1,5 +1,5 @@
 import React from 'react';
-import { Usb, SlidersHorizontal, Wrench, ScrollText, WandSparkles, Trash2, Workflow } from 'lucide-react';
+import { Usb, SlidersHorizontal, Wrench, ScrollText, WandSparkles, Workflow } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { KeyboardCanvas } from './KeyboardCanvas';
@@ -14,7 +14,7 @@ import { ComboPanel } from './ComboPanel';
 import { TapDancePanel } from './TapDancePanel';
 export const RemapView: React.FC = () => {
   const { t } = useTranslation();
-  const { connectedDevice, currentLayer, setCurrentLayer, selectedKeyIds, deleteSelectedKeycodes, keys, remoteKeymap, deviceCapabilities, zmkLocked, macroSettingsOpenRequest, tapDanceSettingsOpenRequest, editorSettings } = useKeyboardStore();
+  const { connectedDevice, keys, deviceCapabilities, zmkLocked, macroSettingsOpenRequest, tapDanceSettingsOpenRequest, editorSettings } = useKeyboardStore();
   type RemapRightPanelKind = 'options' | 'keymap' | AdvancedPanelKind;
   const [activeRightPanel, setActiveRightPanel] = React.useState<RemapRightPanelKind>('keymap');
   const lastMacroSettingsOpenRequest = React.useRef(macroSettingsOpenRequest);
@@ -59,21 +59,6 @@ export const RemapView: React.FC = () => {
       setActiveRightPanel('keymap');
     }
   }, [activeRightPanel, connectedDevice?.protocolType, isMacroPanelAvailable]);
-
-  const hasDeletableSelection = React.useMemo(() => {
-    if (selectedKeyIds.length === 0) return false;
-    return keys.some(k => {
-      if (!selectedKeyIds.includes(k.id)) return false;
-      const remoteIndex = k.zmkPosition ?? (
-        k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
-      );
-      if (remoteIndex !== undefined) {
-        const action = remoteKeymap[currentLayer]?.[remoteIndex];
-        return action && action.action !== 'trans';
-      }
-      return false;
-    });
-  }, [selectedKeyIds, keys, currentLayer, remoteKeymap]);
 
   const shouldShowZoomControls = !(keys.length === 0 && !zmkLocked);
   const rightPanelWidth = connectedDevice ? 380 : 0;
@@ -151,23 +136,6 @@ export const RemapView: React.FC = () => {
                 </div>
               </aside>
 
-              <div className="absolute top-4 left-4 z-[100] flex flex-col gap-4">
-                {hasDeletableSelection && (
-                  <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
-                    <button 
-                      onClick={deleteSelectedKeycodes}
-                      className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group text-red-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 animate-in fade-in zoom-in duration-200"
-                      title={t('remap.deleteAssignment') || 'Delete Keymap'}
-                    >
-                      <Trash2 size={18} className="transition-transform duration-300 group-hover:scale-110" />
-                      <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                        {t('remap.deleteAssignment') || 'Delete Keymap'}
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-              
               <div className="absolute bottom-0 left-0 h-[400px] bg-[var(--bg-panel)] border-t border-[var(--border-main)] z-[150] flex flex-col overflow-hidden" style={{ right: canvasRight }}>
                 <KeycodePanel />
               </div>

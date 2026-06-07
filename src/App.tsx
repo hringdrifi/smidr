@@ -45,9 +45,8 @@ export default function App() {
   const storeState = useKeyboardStore();
   const { 
     editorMode, setEditorMode, settings, updateSettings, keys,
-    currentLayer, setCurrentLayer, currentProjectId, loadProject,
-    editorSettings, updateEditorSettings, connectedDevice,
-    selectedKeyIds, deleteSelectedKeycodes
+    currentProjectId, loadProject,
+    editorSettings, updateEditorSettings, connectedDevice
   } = storeState;
 
   // Use zundo temporal store for reactive undo/redo states
@@ -106,15 +105,6 @@ export default function App() {
 
     return `${protocolLabel}: ${deviceName}`;
   }, [connectedDevice, settings.name, t]);
-
-  const hasDeletableSelection = React.useMemo(() => {
-    if (selectedKeyIds.length === 0) return false;
-    return keys.some(k => {
-      if (!selectedKeyIds.includes(k.id)) return false;
-      const action = k.keymap?.[currentLayer];
-      return action && action.action !== 'trans';
-    });
-  }, [selectedKeyIds, keys, currentLayer]);
 
   const refreshProjectList = () => {
     if (storeState.isDemoMode) {
@@ -992,21 +982,6 @@ export default function App() {
 
                   {/* Left Side Floating Widgets */}
                   <div className="absolute top-4 left-4 z-[100] flex flex-col gap-4">
-                    {editorMode === 'keymap' && hasDeletableSelection && (
-                      <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
-                        <button 
-                          onClick={deleteSelectedKeycodes}
-                          className="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 relative group text-red-500 hover:text-red-400 hover:bg-red-500/10 active:scale-95 animate-in fade-in zoom-in duration-200"
-                          title={t('remap.deleteAssignment') || 'Delete Keymap'}
-                        >
-                          <Trash2 size={18} className="transition-transform duration-300 group-hover:scale-110" />
-                          <div className="absolute left-full ml-4 px-2.5 py-1.5 bg-zinc-900/95 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap border border-white/10 uppercase tracking-[0.2em] shadow-2xl backdrop-blur-sm z-50">
-                            {t('remap.deleteAssignment') || 'Delete Keymap'}
-                          </div>
-                        </button>
-                      </div>
-                    )}
-                    
                     <EditorTools floating />
                   </div>
                 </>
