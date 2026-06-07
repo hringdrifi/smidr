@@ -5,18 +5,19 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Undo2, Redo2, Layout, ChevronDown, Trash2, Grid2X2
+  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
-import { MatrixPainter } from './MatrixPainter';
 
 export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
   const { 
     settings, keys, editorMode,
     addKeys, loadProject, resetProject,
-    selectedKeyIds, removeKey, generateMatrix
+    selectedKeyIds, removeKey, generateMatrix,
+    matrixPaintMode, setMatrixPaintMode,
+    painter, setPainter, clearMatrixMap
   } = useKeyboardStore();
   
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
@@ -211,8 +212,112 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
         )}
         
         {editorMode === 'matrix' && (
-          <div className="w-72 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl shadow-2xl p-4 animate-in fade-in slide-in-from-left-4 duration-500">
-            <MatrixPainter />
+          <div className="flex flex-col gap-2 bg-[var(--bg-panel)]/90 backdrop-blur-md border border-[var(--border-main)] rounded-full p-1.5 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-500">
+            <div className="relative">
+              <FloatingButton
+                icon={MousePointer2}
+                label={t('matrix.paintMode')}
+                onClick={() => setMatrixPaintMode(!matrixPaintMode)}
+                className={cn(
+                  "active:scale-90",
+                  matrixPaintMode && "bg-amber-500 text-zinc-950 shadow-sm hover:bg-amber-500 hover:text-zinc-950"
+                )}
+              />
+
+              {matrixPaintMode && (
+                <div className="absolute left-full top-0 z-50 ml-4 w-56 overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-2xl animate-in fade-in zoom-in-95 slide-in-from-left-2 duration-200">
+                  <div className="border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-3">
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">
+                      {t('matrix.paintModeActive')}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 p-3">
+                    {settings.features.split && (
+                      <div>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Side</div>
+                        <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+                          {(['left', 'right'] as const).map(side => (
+                            <button
+                              key={side}
+                              type="button"
+                              onClick={() => setPainter({ currentSide: side })}
+                              className={cn(
+                                "h-7 rounded text-[9px] font-bold uppercase transition-all",
+                                painter.currentSide === side
+                                  ? "bg-amber-500 text-zinc-950"
+                                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                              )}
+                            >
+                              {side}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.currentRow')}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={painter.currentRow}
+                          onChange={(e) => setPainter({ currentRow: parseInt(e.target.value) || 0 })}
+                          className="h-8 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-2 text-xs font-bold text-[var(--text-highlight)] outline-none focus:border-amber-500"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.currentCol')}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={painter.currentCol}
+                          onChange={(e) => setPainter({ currentCol: parseInt(e.target.value) || 0 })}
+                          className="h-8 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-2 text-xs font-bold text-[var(--text-highlight)] outline-none focus:border-amber-500"
+                        />
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.autoIncrement')}</div>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['matrix', 'col', 'row'] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => setPainter({ autoIncrement: mode })}
+                            className={cn(
+                              "h-7 rounded border text-[9px] font-bold uppercase transition-all",
+                              painter.autoIncrement === mode
+                                ? "border-amber-500 bg-amber-500 text-zinc-950"
+                                : "border-[var(--border-main)] bg-[var(--bg-app)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                            )}
+                          >
+                            {t('matrix.inc' + mode.charAt(0).toUpperCase() + mode.slice(1))}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="w-6 h-px bg-[var(--border-main)] mx-auto my-0.5" />
+
+            <FloatingButton
+              icon={LayoutGrid}
+              label={t('matrix.autoAssign')}
+              onClick={() => confirm(t('matrix.autoAssign') + "?") && useKeyboardStore.getState().autoAssignMatrix()}
+              className="active:scale-90"
+            />
+
+            <FloatingButton
+              icon={Trash2}
+              label={t('matrix.clearMatrix')}
+              onClick={() => confirm(t('matrix.confirmClearMatrix')) && clearMatrixMap()}
+              className="text-red-500 hover:bg-red-500/10 hover:text-red-400 active:scale-90"
+            />
           </div>
         )}
       </div>

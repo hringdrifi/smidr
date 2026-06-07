@@ -29,18 +29,18 @@ const getSupportBadge = (supportsQmk: boolean, supportsZmk: boolean) => {
 };
 
 const Section = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-  <div className="bg-[var(--bg-panel)]/50 border border-[var(--border-main)] rounded-lg overflow-hidden">
-    <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-main)] bg-[var(--bg-panel)]/80">
-      <Icon size={16} className="text-amber-500" />
-      <h2 className="text-xs font-bold text-[var(--text-highlight)] uppercase tracking-wider">{title}</h2>
+  <section className="border-t border-[var(--border-main)] pt-5 first:border-t-0 first:pt-0">
+    <div className="mb-3 flex items-center gap-2">
+      <Icon size={14} className="text-amber-500" />
+      <h2 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{title}</h2>
     </div>
-    <div className="p-4 space-y-4">{children}</div>
-  </div>
+    <div className="space-y-4">{children}</div>
+  </section>
 );
 
 const PinInput = ({ label, value, onChange, placeholder }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string }) => (
   <div className="space-y-1">
-    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{label}</label>
+    <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{label}</label>
     <input 
       type="text"
       placeholder={placeholder}
@@ -148,18 +148,18 @@ export const HardwareSettingsPanel = () => {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-24">
+    <div className="space-y-5 p-4 pb-24">
       {/* General & USB */}
       <Section title={t('hardware.identity')} icon={Settings}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.kbName')}</label>
-              <input type="text" value={settings.name} onChange={(e) => updateSettings({ name: e.target.value })} className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]" />
+              <input type="text" value={settings.name} onChange={(e) => updateSettings({ name: e.target.value })} className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]" />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.manufacturer')}</label>
-              <input type="text" value={settings.manufacturer} onChange={(e) => updateSettings({ manufacturer: e.target.value })} className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]" />
+              <input type="text" value={settings.manufacturer} onChange={(e) => updateSettings({ manufacturer: e.target.value })} className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -218,7 +218,7 @@ export const HardwareSettingsPanel = () => {
             <select 
               value={selectedMcu}
               onChange={(e) => updateMcu(e.target.value)}
-              className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]"
+              className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]"
             >
               {QMK_MCU_PRESETS.map(preset => {
                 const badge = getSupportBadge(
@@ -230,7 +230,7 @@ export const HardwareSettingsPanel = () => {
                 );
               })}
             </select>
-            <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
+            <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
               {t('hardware.mcuExportDesc')}
             </p>
           </div>
@@ -240,7 +240,7 @@ export const HardwareSettingsPanel = () => {
             <select
               value={selectedDevelopmentBoard}
               onChange={(e) => updateHardware({ board: e.target.value.trim() })}
-              className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)] font-mono"
+              className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)] font-mono"
             >
               {developmentBoardOptions.map(board => {
                 const badge = getSupportBadge(
@@ -252,7 +252,7 @@ export const HardwareSettingsPanel = () => {
                 );
               })}
             </select>
-            <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
+            <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
               {t('hardware.boardExportDesc')}
             </p>
           </div>
@@ -281,7 +281,7 @@ export const HardwareSettingsPanel = () => {
         <Section title={t('hardware.zmkDetails')} icon={Cpu}>
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.zmkSplitTransport')}</label>
+              <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('hardware.zmkSplitTransport')}</label>
               <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
                 {(['ble', 'wired'] as const).map(transport => (
                   <button
@@ -303,7 +303,7 @@ export const HardwareSettingsPanel = () => {
 
             {(settings.zmk?.splitTransport || 'ble') === 'wired' && (
               <div className="space-y-1">
-                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.zmkWiredSplitDevice')}</label>
+                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('hardware.zmkWiredSplitDevice')}</label>
                 <input
                   type="text"
                   value={settings.zmk?.wiredSplitDevice || ''}
@@ -311,7 +311,7 @@ export const HardwareSettingsPanel = () => {
                   placeholder="&pro_micro_serial"
                   className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
                 />
-                <p className="text-[9px] text-[var(--text-dim)] leading-relaxed">
+                <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
                   {t('hardware.zmkWiredSplitDeviceDesc')}
                 </p>
               </div>
@@ -323,10 +323,10 @@ export const HardwareSettingsPanel = () => {
       {/* QMK Details */}
       <Section title={t('hardware.qmkDetails')} icon={Settings}>
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-4 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+          <div className="flex items-center justify-between gap-4 py-2">
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-bold text-[var(--text-main)] leading-none">MATRIX_MASKED</span>
-              <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
+              <span className="text-[10px] text-[var(--text-dim)] font-medium mt-1">
                 {t('hardware.matrixMaskedDesc')}
               </span>
             </div>
@@ -355,11 +355,11 @@ export const HardwareSettingsPanel = () => {
             </div>
           )}
 
-          <div className="space-y-3 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+          <div className="space-y-3 border-t border-[var(--border-main)] pt-3">
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-[var(--text-main)] leading-none">BOOTMAGIC</span>
-                <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
+                <span className="text-[10px] text-[var(--text-dim)] font-medium mt-1">
                   {t('hardware.bootmagicDesc')}
                 </span>
               </div>
@@ -381,7 +381,7 @@ export const HardwareSettingsPanel = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.bootmagicRow')}</label>
+                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('hardware.bootmagicRow')}</label>
                 <input
                   type="number"
                   min={0}
@@ -398,7 +398,7 @@ export const HardwareSettingsPanel = () => {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('hardware.bootmagicCol')}</label>
+                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('hardware.bootmagicCol')}</label>
                 <input
                   type="number"
                   min={0}
@@ -433,10 +433,10 @@ export const HardwareSettingsPanel = () => {
               <button
                 onClick={() => toggleFeature(feat.id as any)}
                 className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
+                  "flex items-center gap-3 rounded-md p-3 text-left transition-all",
                   settings.features[feat.id as keyof typeof settings.features]
-                    ? "bg-amber-500/10 border-amber-500/50 text-amber-500"
-                    : "bg-[var(--bg-app)] border-[var(--border-main)] text-[var(--text-muted)] grayscale opacity-60"
+                    ? "bg-amber-500/10 text-amber-500"
+                    : "text-[var(--text-muted)] grayscale opacity-60 hover:bg-[var(--bg-app)]/50"
                 )}
               >
                 <feat.icon size={18} />
@@ -458,7 +458,7 @@ export const HardwareSettingsPanel = () => {
                 const p2 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
                 updateSettings({ vialUid: `0x${p1}${p2}` });
               }}
-              className="text-[9px] text-[var(--text-muted)] hover:text-amber-500 transition-colors"
+              className="text-[10px] text-[var(--text-muted)] hover:text-amber-500 transition-colors"
             >
               {t('hardware.genId')}
             </button>
@@ -472,14 +472,14 @@ export const HardwareSettingsPanel = () => {
             }} 
             placeholder="e.g. 0xFB23... (Automatically derived)"
           />
-          <p className="text-[9px] text-[var(--text-muted)] leading-relaxed italic">
+          <p className="text-[10px] text-[var(--text-muted)] leading-relaxed italic">
             {t('hardware.vialDesc')}
           </p>
 
-          <div className="space-y-3 p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+          <div className="space-y-3 border-t border-[var(--border-main)] pt-3">
             <div className="flex flex-col">
               <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('hardware.vialUnlockCombo')}</span>
-              <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">
+              <span className="text-[10px] text-[var(--text-dim)] font-medium mt-1">
                 {t('hardware.vialUnlockComboDesc')}
               </span>
             </div>
@@ -492,7 +492,7 @@ export const HardwareSettingsPanel = () => {
                     {format('hardware.keyNumber', { id: idx + 1 })}
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('matrix.row')}</label>
+                    <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('matrix.row')}</label>
                     <input
                       type="number"
                       min={0}
@@ -506,7 +506,7 @@ export const HardwareSettingsPanel = () => {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{t('matrix.col')}</label>
+                    <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('matrix.col')}</label>
                     <input
                       type="number"
                       min={0}
@@ -528,10 +528,10 @@ export const HardwareSettingsPanel = () => {
 
       {/* Developer Settings */}
       <Section title={t('hardware.developer')} icon={Settings}>
-        <div className="flex items-center justify-between p-3 bg-[var(--bg-app)]/50 rounded-lg border border-[var(--border-main)]/50">
+        <div className="flex items-center justify-between py-2">
           <div className="flex flex-col">
             <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('hardware.debugMode')}</span>
-            <span className="text-[9px] text-[var(--text-dim)] font-medium mt-1">{t('hardware.debugModeDesc')}</span>
+            <span className="text-[10px] text-[var(--text-dim)] font-medium mt-1">{t('hardware.debugModeDesc')}</span>
           </div>
           <div 
             className={cn(

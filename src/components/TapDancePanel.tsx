@@ -6,6 +6,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 import { AdvancedPanelScope } from './advanced-panel-types';
+import { RightPanelEmptyState } from './RightPanelEmptyState';
 
 type TapDancePanelProps = {
   scope: AdvancedPanelScope;
@@ -71,10 +72,32 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
     setSelectedTapDanceId(nextId);
   };
 
+  if (tapDances.length === 0) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-panel)]">
+        {scope === 'project' && (
+          <div className="shrink-0 p-4 pb-0">
+            <button
+              onClick={addProjectTapDance}
+              className="h-9 w-full rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={13} />
+              {t('macros.addTapDance') || 'Add Tap Dance'}
+            </button>
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1">
+          <RightPanelEmptyState message={t('macros.noTapDance') || 'No Tap Dance'} icon={Sliders} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-zinc-200">
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-        <div className="flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex min-h-full flex-col gap-4 p-4">
           {scope === 'project' && (
             <button
               onClick={addProjectTapDance}
@@ -85,17 +108,6 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
             </button>
           )}
 
-          {tapDances.length === 0 ? (
-            <div className="text-center py-12 bg-zinc-950/20 border border-[var(--border-main)] rounded-2xl p-6">
-              <Sliders className="w-10 h-10 text-zinc-600 mx-auto mb-3 animate-pulse" />
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">{t('macros.noTapDance') || 'No Tap Dance'}</h3>
-              <p className="text-[10px] text-zinc-500 max-w-[240px] mx-auto leading-relaxed">
-                {scope === 'device'
-                  ? (t('macros.noTapDanceDesc') || 'This Vial device did not report dynamic Tap Dance entries.')
-                  : (t('macros.noProjectTapDanceDesc') || 'No project Tap Dance definitions have been added yet.')}
-              </p>
-            </div>
-          ) : (
             <>
               <div className="grid grid-cols-4 gap-2">
                 {tapDances.map((entry) => (
@@ -167,7 +179,6 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
                 </div>
               )}
             </>
-          )}
         </div>
       </div>
     </div>

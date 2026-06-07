@@ -2,14 +2,13 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Plus, Trash2, Check, Settings2, List, ToggleLeft, Edit2, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Check, List, ToggleLeft, Edit2, ChevronDown } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 
 export const LayoutOptionsPanel = () => {
   const { 
     settings, 
-    editorMode,
     addLayoutOptionGroup, 
     removeLayoutOptionGroup, 
     addLayoutOptionChoice, 
@@ -22,22 +21,22 @@ export const LayoutOptionsPanel = () => {
   const { t } = useTranslation();
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
 
-  const isLayoutMode = appMode === 'design' && editorMode === 'layout';
+  const isDesignMode = appMode === 'design';
 
   const handleAddGroup = () => {
-    if (!isLayoutMode) return;
+    if (!isDesignMode) return;
     const name = prompt(t('options.groupNamePrompt'));
     if (name) addLayoutOptionGroup(name);
   };
 
   const handleAddChoice = (groupId: string) => {
-    if (!isLayoutMode) return;
+    if (!isDesignMode) return;
     const name = prompt(t('options.choiceNamePrompt'));
     if (name) addLayoutOptionChoice(groupId, name);
   };
 
   const handleRenameChoice = (groupId: string, index: number, currentName: string) => {
-    if (!isLayoutMode) return;
+    if (!isDesignMode) return;
     const newName = prompt(t('options.newNamePrompt'), currentName);
     if (newName && newName !== currentName) {
       renameLayoutOptionChoice(groupId, index, newName);
@@ -48,24 +47,19 @@ export const LayoutOptionsPanel = () => {
 
   return (
     <div className="flex flex-col animate-in fade-in slide-in-from-right-1 duration-200">
-      {/* Header - Sticky and Full Width */}
-      <div className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b border-[var(--border-main)] bg-[var(--bg-panel)]/95 backdrop-blur-sm shrink-0 mb-4">
-        <div className="flex items-center gap-2">
-          <Settings2 size={14} className="text-amber-500" />
-          <h2 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('options.title')}</h2>
-        </div>
-        {isLayoutMode && (
-          <button 
-            onClick={handleAddGroup}
-            className="p-1 hover:bg-[var(--bg-hover)] rounded text-[var(--text-main)] hover:text-amber-500 transition-colors"
-            title={t('options.addGroup')}
-          >
-            <Plus size={16} />
-          </button>
+      <div className="space-y-4 px-4 pb-4 pt-4">
+        {isDesignMode && (
+          <div>
+            <button 
+              onClick={handleAddGroup}
+              className="h-9 w-full rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+              title={t('options.addGroup')}
+            >
+              <Plus size={13} />
+              {t('options.addGroup')}
+            </button>
+          </div>
         )}
-      </div>
-
-      <div className="px-4 pb-4 space-y-6">
 
       {groups.length === 0 ? (
         <div className="bg-[var(--bg-button)]/50 border border-[var(--border-main)] rounded-md p-3">
@@ -77,7 +71,7 @@ export const LayoutOptionsPanel = () => {
             const isToggle = group.type === 'toggle';
             const activeIndex = settings.activeOptions[id] ?? 0;
 
-            if (!isLayoutMode) {
+            if (!isDesignMode) {
               // MINIMAL UI (Remap mode or non-layout Design mode)
               return (
                 <div key={id} className={cn(

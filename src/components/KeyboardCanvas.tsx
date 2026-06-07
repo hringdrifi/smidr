@@ -15,11 +15,23 @@ import { UNIT, num, round, roundCoord, roundRot, getVisualCenter, getKeyVertices
 
 const ROTATE_ICON_PATH = "M3 2v6h6 M3 13a9 9 0 1 0 3-7.7L3 8";
 
+const getRotatedWorldPoint = (k: PhysicalKey, x: number, y: number) => {
+  const theta = (num(k.r) * Math.PI) / 180;
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  const dx = x - num(k.rx);
+  const dy = y - num(k.ry);
+  return {
+    x: num(k.rx) + dx * cos - dy * sin,
+    y: num(k.ry) + dx * sin + dy * cos
+  };
+};
+
 export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?: boolean }) => {
   const { 
     keys, previewKeys, settings, editorSettings, selectedKeyIds, focusedKeyId, selectionAnchorId,
     transform, editorMode, currentLayer, appMode, remoteKeymap,
-    matrixSubMode, painter,
+    matrixPaintMode, painter,
     setSelectedKeyIds, toggleKeySelection, setFocusedKeyId, setSelectionAnchorId,
     batchUpdateKeys, removeKey, undo, redo, setTransform, paintKey,
     setPreviewKeys, commitPreviewKeys, copyKeys, pasteKeys,
@@ -48,6 +60,12 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     startTransform: typeof transform;
     hasMoved: boolean;
   } | null>(null);
+  const keyDragRef = useRef<{
+    draggedId: string;
+    selectedIds: string[];
+    startPointer: { x: number; y: number };
+    initialKeys: RuntimeKey[];
+  } | null>(null);
 
   const displayKeys = previewKeys || keys;
   const visKeys = useMemo(() => (displayKeys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option)) as RuntimeKey[], [displayKeys, settings.activeOptions]);
@@ -56,33 +74,34 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
   const isMatrixPaintEvent = useCallback((e: any) => {
     if (readonlyGeometry || appMode !== 'design') return false;
-    if (editorMode !== 'matrix' || matrixSubMode !== 'paint') return false;
+    if (editorMode !== 'matrix' || !matrixPaintMode) return false;
     const evt = e.evt;
     return !(evt?.ctrlKey || evt?.metaKey || evt?.shiftKey || evt?.altKey);
-  }, [appMode, editorMode, matrixSubMode, readonlyGeometry]);
+  }, [appMode, editorMode, matrixPaintMode, readonlyGeometry]);
 
   const handleMatrixPaintClick = useCallback((e: any, key: RuntimeKey) => {
     if (!isMatrixPaintEvent(e)) return false;
     e.cancelBubble = true;
     paintKey(key.id);
+    setSelectedKeyIds([key.id]);
     setFocusedKeyId(key.id);
     setSelectionAnchorId(key.id);
     return true;
-  }, [isMatrixPaintEvent, paintKey, setFocusedKeyId, setSelectionAnchorId]);
+  }, [isMatrixPaintEvent, paintKey, setFocusedKeyId, setSelectedKeyIds, setSelectionAnchorId]);
 
   const updatePaintHintPosition = useCallback((e: any) => {
-    if (readonlyGeometry || appMode !== 'design' || editorMode !== 'matrix' || matrixSubMode !== 'paint') return;
+    if (readonlyGeometry || appMode !== 'design' || editorMode !== 'matrix' || !matrixPaintMode) return;
     const stage = e.target?.getStage?.();
     const pointer = stage?.getPointerPosition?.();
     if (!pointer) return;
     setPaintHintPos({ x: pointer.x, y: pointer.y });
-  }, [appMode, editorMode, matrixSubMode, readonlyGeometry]);
+  }, [appMode, editorMode, matrixPaintMode, readonlyGeometry]);
 
   useEffect(() => {
-    if (readonlyGeometry || appMode !== 'design' || editorMode !== 'matrix' || matrixSubMode !== 'paint') {
+    if (readonlyGeometry || appMode !== 'design' || editorMode !== 'matrix' || !matrixPaintMode) {
       setPaintHintPos(null);
     }
-  }, [appMode, editorMode, matrixSubMode, readonlyGeometry]);
+  }, [appMode, editorMode, matrixPaintMode, readonlyGeometry]);
 
   useEffect(() => {
     transformRef.current = transform;
@@ -132,6 +151,15 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
     window.addEventListener('resize', updateSize);
 
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      window.removeEventListener('resize', updateSize);
+    };
+  }, [setCanvasDimensions, setTransform]);
+
+  useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -185,8 +213,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
           batchUpdateKeys(selectedKeyIds, (k) => ({
             x: roundCoord(num(k.x) + dx),
             y: roundCoord(num(k.y) + dy),
-            rx: roundCoord(num(k.rx) + dx),
-            ry: roundCoord(num(k.ry) + dy)
+            ...(editorSettings.syncOrigin ? {
+              rx: roundCoord(num(k.rx) + dx),
+              ry: roundCoord(num(k.ry) + dy)
+            } : {})
           }), true);
         }
       }
@@ -194,13 +224,9 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     window.addEventListener('keydown', handleGlobalKeyDown);
 
     return () => {
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-      window.removeEventListener('resize', updateSize);
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [setSelectedKeyIds, setFocusedKeyId, setSelectionAnchorId, selectedKeyIds, removeKey, visKeys, focusedKeyId, undo, redo, copyKeys, pasteKeys, editorSettings.gridSnap, batchUpdateKeys, readonlyGeometry]);
+  }, [setSelectedKeyIds, setFocusedKeyId, setSelectionAnchorId, selectedKeyIds, removeKey, visKeys, focusedKeyId, undo, redo, copyKeys, pasteKeys, editorSettings.gridSnap, editorSettings.syncOrigin, batchUpdateKeys, readonlyGeometry, appMode]);
 
   const lastCenteredRef = useRef<{ deviceId: string | null, projectId: string | null, width: number }>({ deviceId: null, projectId: null, width: 0 });
 
@@ -566,37 +592,53 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
   const handleKeyDragMove = (e: any, id: string) => {
     if (readonlyGeometry) return;
-    const pos = e.target.position(); // This is the PIVOT point
-    const currentKey = visKeys.find(k => k.id === id);
-    if (!currentKey) return;
+    const stage = e.target.getStage?.();
+    const pointer = stage?.getRelativePointerPosition?.();
+    const dragState = keyDragRef.current;
+    if (!pointer || !dragState || dragState.draggedId !== id) return;
+
+    const draggedInitialKey = dragState.initialKeys.find(k => k.id === id);
+    if (!draggedInitialKey) return;
     
-    // Convert current node's pivot back to key units
-    const nRX = pos.x / UNIT;
-    const nRY = pos.y / UNIT;
+    const rawDX = (pointer.x - dragState.startPointer.x) / UNIT;
+    const rawDY = (pointer.y - dragState.startPointer.y) / UNIT;
+    const snapAnchor = editorSettings.syncOrigin
+      ? { x: num(draggedInitialKey.rx), y: num(draggedInitialKey.ry) }
+      : getRotatedWorldPoint(draggedInitialKey, num(draggedInitialKey.x), num(draggedInitialKey.y));
     
-    // Snap the pivot
-    const snappedRX = e.evt.altKey ? nRX : Math.round(nRX / editorSettings.gridSnap) * editorSettings.gridSnap;
-    const snappedRY = e.evt.altKey ? nRY : Math.round(nRY / editorSettings.gridSnap) * editorSettings.gridSnap;
+    const targetAnchorX = snapAnchor.x + rawDX;
+    const targetAnchorY = snapAnchor.y + rawDY;
+    const snappedAnchorX = e.evt.altKey ? targetAnchorX : Math.round(targetAnchorX / editorSettings.gridSnap) * editorSettings.gridSnap;
+    const snappedAnchorY = e.evt.altKey ? targetAnchorY : Math.round(targetAnchorY / editorSettings.gridSnap) * editorSettings.gridSnap;
 
-    // Force visual snap
-    e.target.x(snappedRX * UNIT);
-    e.target.y(snappedRY * UNIT);
+    const dX = snappedAnchorX - snapAnchor.x;
+    const dY = snappedAnchorY - snapAnchor.y;
 
-    const dRX = snappedRX - num(currentKey.rx);
-    const dRY = snappedRY - num(currentKey.ry);
-
-    if (dRX === 0 && dRY === 0) return;
+    const nextNodeX = editorSettings.syncOrigin ? num(draggedInitialKey.rx) + dX : num(draggedInitialKey.rx);
+    const nextNodeY = editorSettings.syncOrigin ? num(draggedInitialKey.ry) + dY : num(draggedInitialKey.ry);
+    e.target.x(nextNodeX * UNIT);
+    e.target.y(nextNodeY * UNIT);
 
     const updatedKeys = displayKeys.map(k => {
-      if (!selectedKeyIds.includes(k.id)) return k;
+      if (!dragState.selectedIds.includes(k.id)) return k;
+      const initialKey = dragState.initialKeys.find(initial => initial.id === k.id);
+      if (!initialKey) return k;
+      const theta = (num(initialKey.r) * Math.PI) / 180;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const localDX = editorSettings.syncOrigin ? dX : dX * cos + dY * sin;
+      const localDY = editorSettings.syncOrigin ? dY : -dX * sin + dY * cos;
       return {
         ...k,
-        x: roundCoord(num(k.x) + dRX),
-        y: roundCoord(num(k.y) + dRY),
-        rx: roundCoord(num(k.rx) + dRX),
-        ry: roundCoord(num(k.ry) + dRY)
+        x: roundCoord(num(initialKey.x) + localDX),
+        y: roundCoord(num(initialKey.y) + localDY),
+        ...(editorSettings.syncOrigin ? {
+          rx: roundCoord(num(initialKey.rx) + dX),
+          ry: roundCoord(num(initialKey.ry) + dY)
+        } : {})
       };
     });
+
     setPreviewKeys(updatedKeys);
   };
 
@@ -685,9 +727,21 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
       updateRotation(point, false);
     };
 
-    const onMouseUp = () => {
+    const onMouseUp = (event: MouseEvent | TouchEvent) => {
       const container = stageRef.current ? stageRef.current.container() : document.body;
       container.style.cursor = 'default';
+      if (event instanceof MouseEvent) {
+        updateRotation(stage.getRelativePointerPosition(), event.altKey);
+      } else {
+        const touch = event.changedTouches[0];
+        if (touch) {
+          const rect = stage.container().getBoundingClientRect();
+          updateRotation({
+            x: (touch.clientX - rect.left - stage.x()) / stage.scaleX(),
+            y: (touch.clientY - rect.top - stage.y()) / stage.scaleY()
+          }, false);
+        }
+      }
       commitPreviewKeys();
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
@@ -760,19 +814,31 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
             <KeyComponent
               key={`${key.id}-body`} id={key.id} keyData={key}
               isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
-              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout)}
+              editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout, settings, visKeys)}
               showLabel={false} draggable={!readonlyGeometry && appMode === 'design'}
-              onDragStart={() => {
+              onDragStart={(e) => {
                 if (readonlyGeometry || appMode !== 'design') return;
-                setSelectedKeyIds(selectedKeyIds.includes(key.id) ? selectedKeyIds : [key.id]);
+                const nextSelectedIds = selectedKeyIds.includes(key.id) ? selectedKeyIds : [key.id];
+                const pointer = e.target.getStage?.()?.getRelativePointerPosition?.();
+                if (pointer) {
+                  keyDragRef.current = {
+                    draggedId: key.id,
+                    selectedIds: nextSelectedIds,
+                    startPointer: pointer,
+                    initialKeys: displayKeys.filter(k => nextSelectedIds.includes(k.id)) as RuntimeKey[]
+                  };
+                }
+                setSelectedKeyIds(nextSelectedIds);
               }}
               onDragMove={(e) => {
                 if (readonlyGeometry || appMode !== 'design') return;
                 handleKeyDragMove(e, key.id);
               }} 
-              onDragEnd={() => {
+              onDragEnd={(e) => {
                 if (readonlyGeometry || appMode !== 'design') return;
+                handleKeyDragMove(e, key.id);
                 commitPreviewKeys();
+                keyDragRef.current = null;
               }}
               onMouseDown={(e) => {
                 if (e.evt && e.evt.button !== 0) return;
@@ -922,8 +988,8 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
               <KeyComponent
                 key={`${key.id}-label`} id={`${key.id}-label`} keyData={key}
                 isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
-                editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout)}
-                matrixLabelFill={editorMode === 'matrix' && settings.features.split
+                editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout, settings, visKeys)}
+                matrixLabelFill={appMode === 'design' && editorMode === 'matrix' && settings.features.split
                   ? matrixSide === 'right' ? '#06b6d4' : '#f59e0b'
                   : undefined}
                 showKeycap={false}
@@ -1043,6 +1109,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                 onDragEnd={(e: any) => {
                   const container = e.target.getStage()?.container();
                   if (container) container.style.cursor = 'crosshair';
+                  handlePivotDragMove(e, focusedKey);
                   commitPreviewKeys();
                 }}
               />
@@ -1061,7 +1128,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
         </Layer>
       </Stage>
 
-      {appMode === 'design' && editorMode === 'matrix' && matrixSubMode === 'paint' && !readonlyGeometry && paintHintPos && (
+      {appMode === 'design' && editorMode === 'matrix' && matrixPaintMode && !readonlyGeometry && paintHintPos && (
         <div
           className="absolute z-[120] pointer-events-none rounded-full border border-amber-500/30 bg-[var(--bg-panel)]/90 px-2.5 py-1 shadow-2xl backdrop-blur-md"
           style={{
