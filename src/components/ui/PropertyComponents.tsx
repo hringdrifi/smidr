@@ -94,4 +94,11 @@ export const PropertySection = ({ title, icon: Icon, summary, children, classNam
   );
 };
 
-export const Divider = () => <div className="w-px bg-[var(--border-main)]/50 shrink-0 my-2" />;
+export const Divider = ({ orientation = 'vertical' }: { orientation?: 'vertical' | 'horizontal' }) => (
+  <div
+    className={cn(
+      "bg-[var(--border-main)]/50 shrink-0",
+      orientation === 'vertical' ? "w-px my-2" : "h-px mx-2"
+    )}
+  />
+);

@@ -1,7 +1,8 @@
-import { PhysicalKey } from '../types/keyboard';
+import { PhysicalKey, ProjectSettings } from '../types/keyboard';
 import { UniversalAction, Modifier } from '../types/actions';
 import { actionToQmkString } from './protocols/via-action-converter';
 import { DEFAULT_VISUAL_LAYOUT, getKeycodeLegend, VisualLayoutId } from './visual-layouts';
+import { getQmkMatrixPosition } from './matrix-utils';
 
 export const UNIT = 48;
 export const TOP_INSET = 0.08;
@@ -231,11 +232,16 @@ export const getKeyLabel = (
   currentLayer: number, 
   appMode?: string,
   remoteKeymap?: Record<number, UniversalAction[]>,
-  visualLayout: VisualLayoutId = DEFAULT_VISUAL_LAYOUT
+  visualLayout: VisualLayoutId = DEFAULT_VISUAL_LAYOUT,
+  settings?: ProjectSettings,
+  keys: Array<Pick<PhysicalKey, 'x' | 'w'>> = []
 ): LabelNode => {
   if (appMode === 'remap') {
+    const qmkPosition = settings ? getQmkMatrixPosition(settings, k, keys) : undefined;
     const flatIndex = k.zmkPosition ?? (
-      k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
+      qmkPosition
+        ? qmkPosition.row * 32 + qmkPosition.col
+        : k.row !== undefined && k.col !== undefined ? k.row * 32 + k.col : undefined
     );
     if (flatIndex === undefined) return { type: 'empty' };
     const action = remoteKeymap?.[currentLayer]?.[flatIndex];

@@ -133,6 +133,18 @@ export const createDemoProject = (): SmidrProject => {
       matrixSide: 'left',
     });
   });
+  const rightThumbKeys = parsedKeys
+    .filter(key => inferMatrixSideFromGeometry(key, parsedKeys) === 'right')
+    .sort((a, b) => b.y - a.y || a.x - b.x)
+    .slice(0, 3)
+    .sort((a, b) => a.x - b.x);
+  rightThumbKeys.forEach((key, idx) => {
+    matrixByKey.set(key, {
+      row: 3,
+      col: idx,
+      matrixSide: 'right',
+    });
+  });
 
   const keys = parsedKeys.map((key) => {
     const matrix = matrixByKey.get(key) || { row: 0, col: 0, matrixSide: 'left' as const };

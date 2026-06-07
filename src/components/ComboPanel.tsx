@@ -6,6 +6,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 import { AdvancedPanelScope } from './advanced-panel-types';
+import { RightPanelEmptyState } from './RightPanelEmptyState';
 
 type ComboPanelProps = {
   scope: AdvancedPanelScope;
@@ -84,6 +85,37 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
     setComboInputs(inputs);
   };
 
+  if (combos.length === 0) {
+    return (
+      <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-panel)]">
+        {message && (
+          <div className={cn(
+            "px-4 py-2 text-xs font-semibold text-center border-b animate-in slide-in-from-top-4 duration-300",
+            message.type === 'success' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+          )}>
+            {message.text}
+          </div>
+        )}
+
+        {scope === 'project' && (
+          <div className="shrink-0 p-4 pb-0">
+            <button
+              onClick={addProjectCombo}
+              className="h-9 w-full rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={13} />
+              {t('macros.addCombo') || 'Add Combo'}
+            </button>
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1">
+          <RightPanelEmptyState message={t('macros.noCombos')} icon={Workflow} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-zinc-200">
       {message && (
@@ -95,8 +127,8 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-        <div className="flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex min-h-full flex-col gap-4 p-4">
           {scope === 'project' && (
             <button
               onClick={addProjectCombo}
@@ -107,15 +139,6 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
             </button>
           )}
 
-          {combos.length === 0 ? (
-            <div className="text-center py-12 bg-zinc-950/20 border border-[var(--border-main)] rounded-2xl p-6">
-              <Workflow className="w-10 h-10 text-zinc-600 mx-auto mb-3 animate-pulse" />
-              <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-1">{t('macros.noCombos')}</h3>
-              <p className="text-[10px] text-zinc-500 max-w-[240px] mx-auto leading-relaxed">
-                {scope === 'device' ? t('macros.noCombosDesc') : (t('macros.noProjectCombosDesc') || 'No project combos have been added yet.')}
-              </p>
-            </div>
-          ) : (
             <div className="flex flex-col gap-3">
               {combos.map((combo, idx) => (
                 <div
@@ -223,7 +246,6 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                 </div>
               ))}
             </div>
-          )}
         </div>
       </div>
     </div>

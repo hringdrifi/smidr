@@ -287,7 +287,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
             fontSize={11}
             lineHeight={1.18}
             fontStyle="bold"
-            fill={editorMode === 'matrix' ? (matrixLabelFill || colors.accent) : colors.text}
+            fill={appMode === 'design' && editorMode === 'matrix' ? (matrixLabelFill || colors.accent) : colors.text}
             align="center"
             verticalAlign="middle"
             listening={false}

@@ -5,7 +5,6 @@ import { useKeyboardStore } from '@/lib/store';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
 import { 
-  Settings, 
   Trash2, 
   AlignStartVertical as AlignLeft, 
   AlignEndVertical as AlignRight, 
@@ -25,7 +24,6 @@ import {
   Box,
   Eye,
   Type,
-  MousePointer2,
   ArrowLeftRight,
   ArrowUpDown,
   ArrowRight,
@@ -36,6 +34,7 @@ import {
 import { useTranslation } from '@/hooks/useTranslation';
 
 import { PropertyInput, PropertySection, Divider } from './ui/PropertyComponents';
+import { RightPanelEmptyState } from './RightPanelEmptyState';
 
 export const PropertyPanel = () => {
   const { 
@@ -50,23 +49,7 @@ export const PropertyPanel = () => {
 
   if (selectedKeyIds.length === 0) {
     return (
-      <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 pr-4 shrink-0">
-          <div className="flex items-center gap-2 px-4 py-3 border-r border-[var(--border-main)] shrink-0">
-            <Settings size={16} className="text-amber-500" />
-            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('properties.title')}</span>
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-50 bg-[var(--bg-app)]/20 p-8">
-          <div className="w-12 h-12 rounded-full bg-[var(--bg-button)]/50 flex items-center justify-center text-[var(--text-dim)]">
-            <MousePointer2 size={24} />
-          </div>
-          <p className="text-xs text-[var(--text-dim)] leading-relaxed max-w-[160px]">
-            {t('common.selectKeysDesc')}
-          </p>
-        </div>
-      </div>
+      <RightPanelEmptyState message={t('common.selectKeysDesc')} />
     );
   }
 
@@ -75,20 +58,12 @@ export const PropertyPanel = () => {
     const firstKey = keys.find(k => selectedKeyIds.includes(k.id));
     return (
       <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden animate-in fade-in duration-200" key={selectedKeyIds.join(',')}>
-        {/* Header */}
-        <div className="flex items-center border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 pr-4 shrink-0">
-          <div className="flex items-center gap-2 px-4 py-3 border-r border-[var(--border-main)] shrink-0">
-            <Settings size={16} className="text-amber-500" />
-            <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('properties.batchTitle')}</span>
-          </div>
-          <div className="ml-4 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-bold">
-            {selectedKeyIds.length} {t('properties.keysUnit')}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-x-auto custom-scrollbar bg-[var(--bg-app)]/20 py-4">
-          <div className="flex items-stretch w-fit min-w-max h-full">
-            <PropertySection title={t('properties.alignment')} icon={AlignLeft} className="w-[300px]">
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-app)]/20 p-4">
+          <div className="flex flex-col gap-4">
+            <div className="w-fit px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-bold">
+              {selectedKeyIds.length} {t('properties.keysUnit')}
+            </div>
+            <PropertySection title={t('properties.alignment')} icon={AlignLeft} className="w-full">
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { type: 'left', icon: AlignLeft, label: 'left' },
@@ -111,9 +86,9 @@ export const PropertyPanel = () => {
               </div>
             </PropertySection>
 
-            <Divider />
+            <Divider orientation="horizontal" />
 
-            <PropertySection title={t('properties.distribution')} icon={DistributeHorizontal} className="w-[220px]">
+            <PropertySection title={t('properties.distribution')} icon={DistributeHorizontal} className="w-full">
               <div className="grid grid-cols-2 gap-2 h-full min-h-[100px]">
                 <button 
                   onClick={() => distributeSelectedKeys('horizontal')} 
@@ -136,9 +111,9 @@ export const PropertyPanel = () => {
               </div>
             </PropertySection>
 
-            <Divider />
+            <Divider orientation="horizontal" />
 
-            <PropertySection title={t('properties.visibility')} icon={Eye} className="w-[300px]">
+            <PropertySection title={t('properties.visibility')} icon={Eye} className="w-full">
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <label className="text-[9px] uppercase text-[var(--text-muted)] font-bold tracking-wider ml-1">{t('properties.group')}</label>
@@ -265,22 +240,14 @@ export const PropertyPanel = () => {
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden animate-in fade-in duration-200" onMouseLeave={() => setFocusedField(null)}>
-      {/* Header */}
-      <div className="flex items-center border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 pr-4 shrink-0">
-        <div className="flex items-center gap-2 px-4 py-3 border-r border-[var(--border-main)] shrink-0">
-          <Settings size={16} className="text-amber-500" />
-          <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('properties.title')}</span>
-        </div>
-      </div>
-
       {/* Content */}
-      <div className="flex-1 overflow-x-auto custom-scrollbar bg-[var(--bg-app)]/20 py-4" key={selectedKey.id}>
-        <div className="flex items-stretch w-fit min-w-max h-full">
+      <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-app)]/20 p-4" key={selectedKey.id}>
+        <div className="flex flex-col gap-4">
           {/* Placement */}
           <PropertySection 
             title={t('properties.placement')} 
             icon={Move}
-            className="w-[300px]"
+            className="w-full"
           >
             <div className="space-y-4">
               <div className="flex gap-3">
@@ -298,13 +265,13 @@ export const PropertyPanel = () => {
             </div>
           </PropertySection>
 
-          <Divider />
+          <Divider orientation="horizontal" />
 
           {/* Dimension */}
           <PropertySection 
             title={t('properties.dimension')} 
             icon={Box}
-            className="w-[300px]"
+            className="w-full"
           >
             <div className="space-y-4">
               {/* SVG Visual Guide moved here */}
@@ -376,13 +343,13 @@ export const PropertyPanel = () => {
             </div>
           </PropertySection>
 
-          <Divider />
+          <Divider orientation="horizontal" />
 
           {/* Visual Guide */}
           <PropertySection 
             title={t('properties.specialShapes')} 
             icon={Maximize}
-            className="w-[300px]"
+            className="w-full"
           >
             <div className="flex flex-col h-full space-y-4">
               <div className="space-y-3">
@@ -419,13 +386,13 @@ export const PropertyPanel = () => {
             </div>
           </PropertySection>
 
-          <Divider />
+          <Divider orientation="horizontal" />
 
           {/* Visibility */}
           <PropertySection 
             title={t('properties.visibility')} 
             icon={Eye}
-            className="w-[300px]"
+            className="w-full"
           >
             <div className="space-y-3">
               <div className="space-y-1.5">

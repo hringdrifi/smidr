@@ -182,8 +182,8 @@ export interface KeyboardState {
   painter: { currentRow: number; currentCol: number; currentSide: MatrixSide; autoIncrement: 'matrix' | 'col' | 'row'; };
   setPainter: (painter: Partial<KeyboardState['painter']>) => void;
   paintKey: (id: string) => void;
-  matrixSubMode: 'paint' | 'manual';
-  setMatrixSubMode: (mode: 'paint' | 'manual') => void;
+  matrixPaintMode: boolean;
+  setMatrixPaintMode: (enabled: boolean) => void;
   
   // Hardware/Pins
   setPin: (type: 'row' | 'col' | 'splitRow' | 'splitCol' | 'feature', index: number | string, pin: string) => void;
@@ -322,7 +322,7 @@ const initialState: Partial<KeyboardState> = {
   selectedTapDanceId: 0,
   tapDanceSettingsOpenRequest: 0,
   painter: { currentRow: 0, currentCol: 0, currentSide: 'left', autoIncrement: 'matrix' },
-  matrixSubMode: 'paint',
+  matrixPaintMode: false,
   currentProjectId: null,
   isProjectOpen: false,
   isHardwareModalOpen: false,
@@ -2148,7 +2148,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           };
         }),
 
-        setMatrixSubMode: (m: 'paint' | 'manual') => set({ matrixSubMode: m, selectedKeyIds: [] }),
+        setMatrixPaintMode: (enabled: boolean) => set({ matrixPaintMode: enabled }),
 
         setPin: (type: 'row' | 'col' | 'splitRow' | 'splitCol' | 'feature', idx: number | string, pin: string) => set((s) => {
           const p = { ...s.settings.pins };

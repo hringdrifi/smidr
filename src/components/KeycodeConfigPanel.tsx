@@ -7,6 +7,7 @@ import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
 import { Info, Check, Code2, Settings } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { RightPanelEmptyState } from './RightPanelEmptyState';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -69,12 +70,7 @@ export const KeycodeConfigPanel = () => {
 
   if (selectedKeyIds.length !== 1 || !selectedKey) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <Info className="w-8 h-8 text-[var(--text-muted)] mb-3 animate-pulse" />
-        <p className="text-xs text-[var(--text-muted)] leading-relaxed font-medium">
-          {t('keycodeConfig.selectKey') || 'Select a single key to configure advanced actions.'}
-        </p>
-      </div>
+      <RightPanelEmptyState message={t('keycodeConfig.selectKey') || 'Select a single key to configure advanced actions.'} />
     );
   }
 
