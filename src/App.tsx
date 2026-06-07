@@ -24,7 +24,7 @@ import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { useKeyboardStore } from '@/lib/store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson } from '@/lib/export';
+import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson, generateKleJson } from '@/lib/export';
 import { generateQmkZip } from '@/lib/qmk';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
@@ -46,7 +46,8 @@ export default function App() {
   const { 
     editorMode, setEditorMode, settings, updateSettings, keys,
     currentProjectId, loadProject,
-    editorSettings, updateEditorSettings, connectedDevice
+    editorSettings, updateEditorSettings, connectedDevice,
+    appMode, currentLayer
   } = storeState;
 
   // Use zundo temporal store for reactive undo/redo states
@@ -175,6 +176,16 @@ export default function App() {
   const handleExportJson = () => {
     const projectJson = generateSmidrProjectJson({ settings, keys });
     downloadJson(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'project'}.smidr`, projectJson);
+    setIsProjectMenuOpen(false);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportKleJson = () => {
+    const kleJson = generateKleJson(
+      { settings, keys },
+      { editorMode, currentLayer, appMode, remoteKeymap: storeState.remoteKeymap }
+    );
+    downloadJson(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_kle.json`, kleJson);
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
   };
@@ -803,6 +814,14 @@ export default function App() {
                       >
                         <FileDown size={14} className="text-amber-500" />
                         <span>{t('header.exportProject')}</span>
+                      </button>
+
+                      <button
+                        onClick={handleExportKleJson}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                      >
+                        <FileDown size={14} className="text-amber-500" />
+                        <span>{t('header.exportKle')}</span>
                       </button>
 
                       <button

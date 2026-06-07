@@ -2,6 +2,18 @@ import { PhysicalKey, SmidrProject, ProjectSettings } from '@/types/keyboard';
 import { exportKLE } from './kle';
 import { actionToQmkString } from './protocols/via-action-converter';
 import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
+import { getKeyLabel, labelNodeToText, roundCoord } from './canvas-utils';
+import { UniversalAction } from '@/types/actions';
+
+type KleExportEditorMode = 'layout' | 'matrix' | 'keymap' | 'hardware';
+type KleExportAppMode = 'design' | 'remap';
+
+interface KleJsonExportOptions {
+  editorMode: KleExportEditorMode;
+  currentLayer: number;
+  appMode?: KleExportAppMode;
+  remoteKeymap?: Record<number, UniversalAction[]>;
+}
 
 const sortLayoutGroupIds = (ids: string[]) => {
   return [...ids].sort((a, b) => {
@@ -71,6 +83,61 @@ const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => 
     rows: Math.max(pinMatrix?.rows || settings.matrix?.rows || 0, keyRows),
     cols: Math.max(pinMatrix?.cols || settings.matrix?.cols || 0, keyCols),
   };
+};
+
+const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
+  keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
+);
+
+const normalizeKeysForKle = (keys: PhysicalKey[]) => {
+  if (keys.length === 0) return [];
+
+  const minX = Math.min(...keys.flatMap(key => [key.x, key.rx ?? key.x]));
+  const minY = Math.min(...keys.flatMap(key => [key.y, key.ry ?? key.y]));
+
+  if (minX === 0 && minY === 0) return keys.map(key => ({ ...key }));
+
+  return keys.map(key => ({
+    ...key,
+    x: roundCoord(key.x - minX),
+    y: roundCoord(key.y - minY),
+    rx: roundCoord((key.rx ?? key.x) - minX),
+    ry: roundCoord((key.ry ?? key.y) - minY),
+  }));
+};
+
+const getKleExportLabel = (
+  key: PhysicalKey,
+  settings: ProjectSettings,
+  visibleKeys: PhysicalKey[],
+  options: KleJsonExportOptions
+) => {
+  const appMode = options.appMode ?? 'design';
+  if (appMode === 'design' && options.editorMode === 'layout') return key.label || '';
+
+  return labelNodeToText(getKeyLabel(
+    key,
+    options.editorMode,
+    options.currentLayer,
+    appMode,
+    options.remoteKeymap,
+    settings.visualLayout,
+    settings,
+    visibleKeys
+  ));
+};
+
+export const generateKleJson = (
+  state: { settings: ProjectSettings, keys: PhysicalKey[] },
+  options: KleJsonExportOptions
+) => {
+  const visibleKeys = getVisibleKeys(state.settings, state.keys);
+  const labeledKeys = visibleKeys.map(key => ({
+    ...key,
+    label: getKleExportLabel(key, state.settings, visibleKeys, options),
+  }));
+
+  return exportKLE(normalizeKeysForKle(labeledKeys));
 };
 
 /**

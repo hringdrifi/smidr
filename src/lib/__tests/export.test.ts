@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { generateSmidrProjectJson, generateViaJson } from '../export';
+import { generateKleJson, generateSmidrProjectJson, generateViaJson } from '../export';
 import { generateQmkZip } from '../qmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
@@ -34,6 +34,87 @@ const baseSettings: ProjectSettings = {
 };
 
 describe('export generation', () => {
+  it('exports KLE JSON for only the currently visible layout option', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      layoutOptions: {
+        thumb: { name: 'Thumb', type: 'list', choices: ['1u', '15u'] },
+      },
+      activeOptions: {
+        thumb: 1,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        x: -4,
+        y: -2,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: -4,
+        ry: -2,
+        label: 'Hidden',
+        group: 'thumb',
+        option: 0,
+      },
+      {
+        x: 2,
+        y: 3,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 2,
+        ry: 3,
+        label: 'Visible',
+        group: 'thumb',
+        option: 1,
+      },
+    ];
+
+    const kleJson = generateKleJson(
+      { settings, keys },
+      { editorMode: 'layout', currentLayer: 0, appMode: 'design' }
+    );
+    const serialized = JSON.stringify(kleJson);
+
+    expect(serialized).toContain('Visible');
+    expect(serialized).not.toContain('Hidden');
+    expect(kleJson).toEqual([['Visible']]);
+  });
+
+  it('exports KLE labels from the current editor mode', () => {
+    const keys: PhysicalKey[] = [
+      {
+        row: 1,
+        col: 2,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: 'Layout Label',
+        keymap: {
+          0: { action: 'tap', keycode: 'A' },
+        },
+      },
+    ];
+
+    expect(generateKleJson(
+      { settings: baseSettings, keys },
+      { editorMode: 'layout', currentLayer: 0, appMode: 'design' }
+    )).toEqual([['Layout Label']]);
+    expect(generateKleJson(
+      { settings: baseSettings, keys },
+      { editorMode: 'matrix', currentLayer: 0, appMode: 'design' }
+    )).toEqual([['R1:C2']]);
+    expect(generateKleJson(
+      { settings: baseSettings, keys },
+      { editorMode: 'keymap', currentLayer: 0, appMode: 'design' }
+    )).toEqual([['A']]);
+  });
+
   it('omits split pin settings from saved projects when split is disabled', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
