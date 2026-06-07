@@ -277,6 +277,34 @@ export const HardwareSettingsPanel = () => {
         </div>
       </Section>
 
+      {/* Features Toggles */}
+      <Section title={t('hardware.features')} icon={ShieldCheck}>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { id: 'rgb', label: t('hardware.rgb'), icon: Lightbulb },
+            { id: 'encoder', label: t('hardware.encoder'), icon: Gauge },
+            { id: 'oled', label: t('hardware.oled'), icon: Monitor },
+            { id: 'via', label: t('hardware.via'), icon: Database },
+            { id: 'split', label: t('hardware.split'), icon: HardDrive },
+          ].map(feat => (
+            <React.Fragment key={feat.id}>
+              <button
+                onClick={() => toggleFeature(feat.id as any)}
+                className={cn(
+                  "flex items-center gap-3 rounded-md p-3 text-left transition-all",
+                  settings.features[feat.id as keyof typeof settings.features]
+                    ? "bg-amber-500/10 text-amber-500"
+                    : "text-[var(--text-muted)] grayscale opacity-60 hover:bg-[var(--bg-app)]/50"
+                )}
+              >
+                <feat.icon size={18} />
+                <span className="text-xs font-bold leading-none">{feat.label}</span>
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+      </Section>
+
       {settings.features.split && (
         <Section title={t('hardware.zmkDetails')} icon={Cpu}>
           <div className="space-y-3">
@@ -416,34 +444,6 @@ export const HardwareSettingsPanel = () => {
               </div>
             </div>
           </div>
-        </div>
-      </Section>
-
-      {/* Features Toggles */}
-      <Section title={t('hardware.features')} icon={ShieldCheck}>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { id: 'rgb', label: t('hardware.rgb'), icon: Lightbulb },
-            { id: 'encoder', label: t('hardware.encoder'), icon: Gauge },
-            { id: 'oled', label: t('hardware.oled'), icon: Monitor },
-            { id: 'via', label: t('hardware.via'), icon: Database },
-            { id: 'split', label: t('hardware.split'), icon: HardDrive },
-          ].map(feat => (
-            <React.Fragment key={feat.id}>
-              <button
-                onClick={() => toggleFeature(feat.id as any)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md p-3 text-left transition-all",
-                  settings.features[feat.id as keyof typeof settings.features]
-                    ? "bg-amber-500/10 text-amber-500"
-                    : "text-[var(--text-muted)] grayscale opacity-60 hover:bg-[var(--bg-app)]/50"
-                )}
-              >
-                <feat.icon size={18} />
-                <span className="text-xs font-bold leading-none">{feat.label}</span>
-              </button>
-            </React.Fragment>
-          ))}
         </div>
       </Section>
 
