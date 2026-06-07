@@ -1,6 +1,6 @@
 [package]
 name = "smidr"
-version = "0.2.6"
+version = "0.2.8"
 description = "Smidr desktop shell"
 authors = ["Smidr"]
 edition = "2021"

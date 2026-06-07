@@ -36,6 +36,14 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { PropertyInput, PropertySection, Divider } from './ui/PropertyComponents';
 import { RightPanelEmptyState } from './RightPanelEmptyState';
 
+type MenuPosition = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+  placement: 'top' | 'bottom';
+};
+
 export const PropertyPanel = () => {
   const { 
     keys, settings, editorSettings, selectedKeyIds, 
@@ -46,6 +54,42 @@ export const PropertyPanel = () => {
 
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+
+  const toggleMenu = (id: string, event: React.MouseEvent<HTMLButtonElement>) => {
+    if (openMenuId === id) {
+      setOpenMenuId(null);
+      setMenuPosition(null);
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const margin = 8;
+    const gap = 4;
+    const desiredHeight = 192;
+    const spaceBelow = viewportHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const placement = spaceBelow >= 160 || spaceBelow >= spaceAbove ? 'bottom' : 'top';
+    const availableHeight = placement === 'bottom' ? spaceBelow : spaceAbove;
+    const maxHeight = Math.max(96, Math.min(desiredHeight, availableHeight));
+
+    setMenuPosition({
+      top: placement === 'bottom'
+        ? rect.bottom + gap
+        : Math.max(margin, rect.top - maxHeight - gap),
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+      placement,
+    });
+    setOpenMenuId(id);
+  };
+
+  const closeMenu = () => {
+    setOpenMenuId(null);
+    setMenuPosition(null);
+  };
 
   if (selectedKeyIds.length === 0) {
     return (
@@ -119,22 +163,28 @@ export const PropertyPanel = () => {
                   <label className="text-[9px] uppercase text-[var(--text-muted)] font-bold tracking-wider ml-1">{t('properties.group')}</label>
                   <div className="relative">
                     <button
-                      onClick={() => setOpenMenuId(openMenuId === 'batch-group' ? null : 'batch-group')}
+                      onClick={(e) => toggleMenu('batch-group', e)}
                       className="w-full flex items-center justify-between bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-3 py-1.5 text-xs font-bold text-[var(--text-highlight)] hover:bg-[var(--bg-hover)] transition-all group/btn"
                     >
                       <span className="truncate">{firstKey?.group ? (settings.layoutOptions[firstKey.group]?.name || firstKey.group) : t('properties.alwaysVisible')}</span>
                       <ChevronDown size={12} className={cn("text-[var(--text-dim)] transition-transform duration-300", openMenuId === 'batch-group' && "rotate-180")} />
                     </button>
 
-                    {openMenuId === 'batch-group' && (
+                    {openMenuId === 'batch-group' && menuPosition && (
                       <>
-                        <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                        <div className="absolute top-auto bottom-full mb-1 left-0 right-0 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in slide-in-from-bottom-1">
-                          <div className="p-1 flex flex-col gap-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                        <div className="fixed inset-0 z-[100]" onClick={closeMenu} />
+                        <div
+                          className={cn(
+                            "fixed bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in",
+                            menuPosition.placement === 'bottom' ? "slide-in-from-top-1" : "slide-in-from-bottom-1"
+                          )}
+                          style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
+                        >
+                          <div className="p-1 flex flex-col gap-0.5 overflow-y-auto custom-scrollbar" style={{ maxHeight: menuPosition.maxHeight }}>
                             <button
                               onClick={() => {
                                 batchUpdateKeys(selectedKeyIds, { group: undefined, option: 0 });
-                                setOpenMenuId(null);
+                                closeMenu();
                               }}
                               className={cn(
                                 "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -148,7 +198,7 @@ export const PropertyPanel = () => {
                                 key={id}
                                 onClick={() => {
                                   batchUpdateKeys(selectedKeyIds, { group: id, option: 0 });
-                                  setOpenMenuId(null);
+                                  closeMenu();
                                 }}
                                 className={cn(
                                   "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -170,7 +220,7 @@ export const PropertyPanel = () => {
                     <label className="text-[9px] uppercase text-[var(--text-muted)] font-bold tracking-wider ml-1">{t('properties.choice')}</label>
                     <div className="relative">
                       <button
-                        onClick={() => setOpenMenuId(openMenuId === 'batch-choice' ? null : 'batch-choice')}
+                        onClick={(e) => toggleMenu('batch-choice', e)}
                         className="w-full flex items-center justify-between bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-3 py-1.5 text-xs font-bold text-[var(--text-highlight)] hover:bg-[var(--bg-hover)] transition-all group/btn"
                       >
                         <span className="truncate">
@@ -181,18 +231,24 @@ export const PropertyPanel = () => {
                         <ChevronDown size={12} className={cn("text-[var(--text-dim)] transition-transform duration-300", openMenuId === 'batch-choice' && "rotate-180")} />
                       </button>
 
-                      {openMenuId === 'batch-choice' && (
+                      {openMenuId === 'batch-choice' && menuPosition && (
                         <>
-                          <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                          <div className="absolute top-auto bottom-full mb-1 left-0 right-0 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in slide-in-from-bottom-1">
-                            <div className="p-1 flex flex-col gap-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                          <div className="fixed inset-0 z-[100]" onClick={closeMenu} />
+                          <div
+                            className={cn(
+                              "fixed bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in",
+                              menuPosition.placement === 'bottom' ? "slide-in-from-top-1" : "slide-in-from-bottom-1"
+                            )}
+                            style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
+                          >
+                            <div className="p-1 flex flex-col gap-0.5 overflow-y-auto custom-scrollbar" style={{ maxHeight: menuPosition.maxHeight }}>
                               {settings.layoutOptions[firstKey.group].type === 'toggle' ? (
                                 [0, 1].map(val => (
                                   <button
                                     key={val}
                                     onClick={() => {
                                       batchUpdateKeys(selectedKeyIds, { option: val });
-                                      setOpenMenuId(null);
+                                      closeMenu();
                                     }}
                                     className={cn(
                                       "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -208,7 +264,7 @@ export const PropertyPanel = () => {
                                     key={i}
                                     onClick={() => {
                                       batchUpdateKeys(selectedKeyIds, { option: i });
-                                      setOpenMenuId(null);
+                                      closeMenu();
                                     }}
                                     className={cn(
                                       "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -399,22 +455,28 @@ export const PropertyPanel = () => {
                 <label className="text-[9px] uppercase text-[var(--text-muted)] font-bold tracking-wider ml-1">{t('properties.group')}</label>
                 <div className="relative">
                   <button
-                    onClick={() => setOpenMenuId(openMenuId === 'single-group' ? null : 'single-group')}
+                    onClick={(e) => toggleMenu('single-group', e)}
                     className="w-full flex items-center justify-between bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-3 py-1.5 text-xs font-bold text-[var(--text-highlight)] hover:bg-[var(--bg-hover)] transition-all group/btn"
                   >
                     <span className="truncate">{selectedKey.group ? (settings.layoutOptions[selectedKey.group]?.name || selectedKey.group) : t('properties.alwaysVisible')}</span>
                     <ChevronDown size={12} className={cn("text-[var(--text-dim)] transition-transform duration-300", openMenuId === 'single-group' && "rotate-180")} />
                   </button>
 
-                  {openMenuId === 'single-group' && (
+                  {openMenuId === 'single-group' && menuPosition && (
                     <>
-                      <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                      <div className="absolute top-auto bottom-full mb-1 left-0 right-0 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in slide-in-from-bottom-1">
-                        <div className="p-1 flex flex-col gap-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                      <div className="fixed inset-0 z-[100]" onClick={closeMenu} />
+                      <div
+                        className={cn(
+                          "fixed bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in",
+                          menuPosition.placement === 'bottom' ? "slide-in-from-top-1" : "slide-in-from-bottom-1"
+                        )}
+                        style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
+                      >
+                        <div className="p-1 flex flex-col gap-0.5 overflow-y-auto custom-scrollbar" style={{ maxHeight: menuPosition.maxHeight }}>
                           <button
                             onClick={() => {
                               updateKey(selectedKey.id, { group: undefined, option: 0 });
-                              setOpenMenuId(null);
+                              closeMenu();
                             }}
                             className={cn(
                               "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -428,7 +490,7 @@ export const PropertyPanel = () => {
                               key={id}
                               onClick={() => {
                                 updateKey(selectedKey.id, { group: id, option: 0 });
-                                setOpenMenuId(null);
+                                closeMenu();
                               }}
                               className={cn(
                                 "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -450,7 +512,7 @@ export const PropertyPanel = () => {
                   <label className="text-[9px] uppercase text-[var(--text-muted)] font-bold tracking-wider ml-1">{t('properties.choice')}</label>
                   <div className="relative">
                     <button
-                      onClick={() => setOpenMenuId(openMenuId === 'single-choice' ? null : 'single-choice')}
+                      onClick={(e) => toggleMenu('single-choice', e)}
                       className="w-full flex items-center justify-between bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-3 py-1.5 text-xs font-bold text-[var(--text-highlight)] hover:bg-[var(--bg-hover)] transition-all group/btn"
                     >
                       <span className="truncate">
@@ -461,18 +523,24 @@ export const PropertyPanel = () => {
                       <ChevronDown size={12} className={cn("text-[var(--text-dim)] transition-transform duration-300", openMenuId === 'single-choice' && "rotate-180")} />
                     </button>
 
-                    {openMenuId === 'single-choice' && (
+                    {openMenuId === 'single-choice' && menuPosition && (
                       <>
-                        <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                        <div className="absolute top-auto bottom-full mb-1 left-0 right-0 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in slide-in-from-bottom-1">
-                          <div className="p-1 flex flex-col gap-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                        <div className="fixed inset-0 z-[100]" onClick={closeMenu} />
+                        <div
+                          className={cn(
+                            "fixed bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-md shadow-2xl z-[110] overflow-hidden animate-in fade-in",
+                            menuPosition.placement === 'bottom' ? "slide-in-from-top-1" : "slide-in-from-bottom-1"
+                          )}
+                          style={{ top: menuPosition.top, left: menuPosition.left, width: menuPosition.width }}
+                        >
+                          <div className="p-1 flex flex-col gap-0.5 overflow-y-auto custom-scrollbar" style={{ maxHeight: menuPosition.maxHeight }}>
                             {settings.layoutOptions[selectedKey.group].type === 'toggle' ? (
                               [0, 1].map(val => (
                                 <button
                                   key={val}
                                   onClick={() => {
                                     updateKey(selectedKey.id, { option: val });
-                                    setOpenMenuId(null);
+                                    closeMenu();
                                   }}
                                   className={cn(
                                     "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
@@ -488,7 +556,7 @@ export const PropertyPanel = () => {
                                   key={i}
                                   onClick={() => {
                                     updateKey(selectedKey.id, { option: i });
-                                    setOpenMenuId(null);
+                                    closeMenu();
                                   }}
                                   className={cn(
                                     "w-full text-left px-3 py-2 rounded text-[10px] font-bold uppercase transition-all flex items-center justify-between group",
