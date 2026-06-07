@@ -191,7 +191,7 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
             </div>
 
             {/* Generate Matrix */}
-            <FloatingButton icon={Grid2X2} label={t('tools.generateMatrix')} onClick={() => { const r = prompt('Rows:', '4'); const c = prompt('Columns:', '12'); if (r && c) generateMatrix(parseInt(r), parseInt(c)); }} />
+            <FloatingButton icon={Grid2X2} label={t('tools.generateMatrix')} onClick={() => { const r = prompt(t('tools.rowsPrompt'), '4'); const c = prompt(t('tools.columnsPrompt'), '12'); if (r && c) generateMatrix(parseInt(r), parseInt(c)); }} />
             
             {/* Delete Selected */}
             {selectedKeyIds.length > 0 && (
@@ -235,7 +235,7 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                   <div className="space-y-3 p-3">
                     {settings.features.split && (
                       <div>
-                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Side</div>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.side')}</div>
                         <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
                           {(['left', 'right'] as const).map(side => (
                             <button

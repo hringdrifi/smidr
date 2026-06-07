@@ -242,7 +242,7 @@ export const ZoomControls = () => {
                   >
                     <Plus size={12} />
                     <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
-                      Layer +
+                      {t('zoom.addLayer')}
                     </div>
                   </button>
                   <button 
@@ -251,7 +251,7 @@ export const ZoomControls = () => {
                   >
                     <span className="text-sm font-bold leading-none -translate-y-px">-</span>
                     <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-900/95 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-all translate-y-1 group-hover:translate-y-0 whitespace-nowrap border border-white/10 uppercase tracking-wider shadow-2xl backdrop-blur-sm z-50">
-                      Layer -
+                      {t('zoom.removeLayer')}
                     </div>
                   </button>
                 </>
@@ -421,7 +421,7 @@ export const ZoomControls = () => {
               <div className="absolute bottom-full left-0 mb-2 w-64 bg-[var(--bg-panel)]/95 backdrop-blur-xl border border-[var(--border-main)] p-2 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <div className="flex items-center gap-2 px-2 py-2 text-[var(--text-muted)] border-b border-[var(--border-main)]">
                   <Languages size={12} />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Visual Layout</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider">{t('zoom.visualLayout')}</span>
                 </div>
                 <div className="pt-1 max-h-72 overflow-y-auto custom-scrollbar">
                   {VISUAL_LAYOUTS.map(layout => {
@@ -464,7 +464,7 @@ export const ZoomControls = () => {
                 "p-2 rounded transition-all relative",
                 activeMenu === 'visual' ? "bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20" : "bg-[var(--bg-app)] border border-[var(--border-main)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
               )}
-              title="Visual Layout"
+              title={t('zoom.visualLayout')}
             >
               <Languages size={14} />
               <span className="absolute -right-1 -bottom-1 min-w-5 h-4 px-1 rounded-full bg-amber-500 text-zinc-950 text-[8px] font-black leading-4 border border-zinc-950">

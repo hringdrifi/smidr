@@ -200,7 +200,7 @@ export default function App() {
       return false;
     }
 
-    return confirm(`${message}\n\nContinue export?`);
+    return confirm(`${message}\n\n${t('common.continueExport')}`);
   };
 
   const handleExportViaZip = async () => {
@@ -1080,6 +1080,7 @@ if (typeof window !== 'undefined') {
 }
 
 function DebugOverlay() {
+  const { t } = useTranslation();
   const [importData, setImportData] = React.useState<any>(null);
   const [liveData, setLiveData] = React.useState<any>(null);
   const [isVisible, setIsVisible] = React.useState(true);
@@ -1104,7 +1105,7 @@ function DebugOverlay() {
       onClick={() => setIsVisible(true)}
       className="fixed bottom-4 right-4 px-3 py-1 bg-zinc-800 text-zinc-500 rounded text-[10px] border border-zinc-700 hover:text-white z-[999]"
     >
-      Open Debug Console
+      {t('debug.openConsole')}
     </button>
   );
 
@@ -1115,7 +1116,7 @@ function DebugOverlay() {
     const btn = document.activeElement as HTMLElement;
     if (btn) {
       const original = btn.innerText;
-      btn.innerText = 'Copied!';
+      btn.innerText = t('common.copied');
       setTimeout(() => { btn.innerText = original; }, 2000);
     }
   };
@@ -1125,11 +1126,11 @@ function DebugOverlay() {
       <div className="flex items-center justify-between p-3 bg-zinc-800 border-b border-zinc-700">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-zinc-300 uppercase font-bold tracking-widest">VIAL / VIA DEBUG CONSOLE</span>
+          <span className="text-zinc-300 uppercase font-bold tracking-widest">{t('debug.consoleTitle')}</span>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => { setImportData(null); setLiveData(null); }} className="text-zinc-500 hover:text-white transition-colors">Clear All</button>
-          <button onClick={() => setIsVisible(false)} className="text-zinc-500 hover:text-white transition-colors">Minimize</button>
+          <button onClick={() => { setImportData(null); setLiveData(null); }} className="text-zinc-500 hover:text-white transition-colors">{t('debug.clearAll')}</button>
+          <button onClick={() => setIsVisible(false)} className="text-zinc-500 hover:text-white transition-colors">{t('debug.minimize')}</button>
         </div>
       </div>
 
@@ -1137,23 +1138,23 @@ function DebugOverlay() {
         {/* Import Section */}
         <section className="border border-zinc-800 rounded-md bg-black/20 p-3">
           <div className="flex items-center justify-between mb-2 border-b border-zinc-800 pb-2">
-            <h3 className="text-amber-500 font-bold uppercase tracking-wider">📁 Last Imported JSON</h3>
+            <h3 className="text-amber-500 font-bold uppercase tracking-wider">📁 {t('debug.lastImportedJson')}</h3>
             {importData && (
               <button 
                 onClick={() => handleCopy(importData)}
                 className="px-2 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded hover:bg-amber-500/20 transition-all font-bold"
               >
-                COPY FULL JSON
+                {t('debug.copyFullJson')}
               </button>
             )}
           </div>
           {!importData ? (
-            <div className="text-zinc-600 italic py-2">No file imported yet this session.</div>
+            <div className="text-zinc-600 italic py-2">{t('debug.noFileImported')}</div>
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2 text-[9px]">
-                <div className="text-zinc-500">Name: <span className="text-zinc-300">{importData.parsed?.name || 'Unknown'}</span></div>
-                <div className="text-zinc-500">Keys: <span className="text-zinc-300">{importData.parsed?.keys}</span></div>
+                <div className="text-zinc-500">{t('debug.name')}: <span className="text-zinc-300">{importData.parsed?.name || t('common.unknown')}</span></div>
+                <div className="text-zinc-500">{t('debug.keys')}: <span className="text-zinc-300">{importData.parsed?.keys}</span></div>
               </div>
               <pre className="text-zinc-400 bg-black/60 p-2 rounded max-h-[300px] overflow-auto border border-zinc-800 leading-relaxed">
                 {JSON.stringify(importData.raw, null, 2)}
@@ -1165,35 +1166,35 @@ function DebugOverlay() {
         {/* Live Data Section */}
         <section className="border border-zinc-800 rounded-md bg-black/20 p-3">
           <div className="flex items-center justify-between mb-2 border-b border-zinc-800 pb-2">
-            <h3 className="text-cyan-500 font-bold uppercase tracking-wider">🔌 Live Device Status</h3>
+            <h3 className="text-cyan-500 font-bold uppercase tracking-wider">🔌 {t('debug.liveDeviceStatus')}</h3>
             {liveData && (
               <button 
                 onClick={() => handleCopy(liveData)}
                 className="px-2 py-0.5 bg-cyan-500/10 text-cyan-500 border border-cyan-500/30 rounded hover:bg-cyan-500/20 transition-all font-bold"
               >
-                COPY LIVE DATA
+                {t('debug.copyLiveData')}
               </button>
             )}
           </div>
           {!liveData ? (
-            <div className="text-zinc-600 italic py-2 animate-pulse">Waiting for device communication...</div>
+            <div className="text-zinc-600 italic py-2 animate-pulse">{t('debug.waitingForDevice')}</div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-1">
-                <div className="text-cyan-500 font-bold">Layout Bitmask:</div>
+                <div className="text-cyan-500 font-bold">{t('debug.layoutBitmask')}:</div>
                 <div className="text-white bg-black/60 p-2 rounded border border-zinc-800">{liveData.layoutOptions}</div>
                 <div className="text-[8px] text-zinc-600 break-all px-1">{liveData.layoutOptions?.toString(2).padStart(32, '0')}</div>
               </div>
               
               <div>
-                <div className="text-cyan-500 font-bold mb-1">Decoded Options:</div>
+                <div className="text-cyan-500 font-bold mb-1">{t('debug.decodedOptions')}:</div>
                 <pre className="text-cyan-400/80 bg-black/60 p-2 rounded border border-zinc-800 max-h-40 overflow-auto">
                   {JSON.stringify(liveData.decodedOptions, null, 2)}
                 </pre>
               </div>
 
               <div>
-                <div className="text-cyan-500 font-bold mb-1">Layout Labels:</div>
+                <div className="text-cyan-500 font-bold mb-1">{t('debug.layoutLabels')}:</div>
                 <pre className="text-zinc-500 bg-black/60 p-2 rounded border border-zinc-800 max-h-40 overflow-auto">
                   {JSON.stringify(liveData.vialLabels || [], null, 2)}
                 </pre>

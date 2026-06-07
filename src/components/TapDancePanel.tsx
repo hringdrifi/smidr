@@ -145,10 +145,10 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
 
                   <div className="grid grid-cols-2 gap-3">
                     {([
-                      ['tapAction', 'Tap', 'ESC'],
-                      ['holdAction', 'Hold', 'none'],
-                      ['doubleTapAction', 'Double Tap', 'none'],
-                      ['tapHoldAction', 'Tap Hold', 'none'],
+                      ['tapAction', t('keycodeConfig.tapDanceTap'), 'ESC'],
+                      ['holdAction', t('keycodeConfig.tapDanceHold'), 'none'],
+                      ['doubleTapAction', t('keycodeConfig.tapDanceDoubleTap'), 'none'],
+                      ['tapHoldAction', t('keycodeConfig.tapDanceTapHold'), 'none'],
                     ] as const).map(([field, label, fallback]) => (
                       <div key={field} className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{label}</label>
@@ -167,7 +167,7 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Tapping Term</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{t('keycodeConfig.tappingTerm')}</label>
                     <input
                       type="number"
                       min={1}
