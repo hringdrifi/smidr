@@ -124,7 +124,8 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 
 ### 7.6 ロータリーエンコーダー (Rotary Encoders)
 - **内部表現**: アプリ実行中は `ProjectSettings.encoders[]` の各要素に runtime-only の `id` を付与し、物理配置上の `PhysicalKey.encoderId` から参照する。`.smidr` 保存時は runtime `id` を保存せず、`encoders[]` の配列添字を `keys[].encoderIndex` として保存する。読み込み時は `encoderIndex` から新しい `encoderId` を復元する。
-- **物理位置**: ボタン付きエンコーダーは通常キーと同じ `PhysicalKey` に `row` / `col` / `keymap` と `encoderId` を併せ持つ。ボタン無しエンコーダーは `row` / `col` を持たず、物理位置と `encoderId` のみを持つ `PhysicalKey` として扱う。
+- **物理位置**: ボタン付きエンコーダーは通常キーと同じ `PhysicalKey` に `row` / `col` / `keymap` と `encoderId` を併せ持つ。ボタン無しエンコーダーは `row` / `col` を持たず、物理位置と `encoderId` のみを持つ `PhysicalKey` として扱う。エンコーダー物理位置は `kind: "encoder"` で明示できる。
+- **レイアウト表示**: `kind: "encoder"` またはエンコーダー参照を持つ `PhysicalKey` は、`w` / `h` だけでサイズを指定し、中心に短辺サイズの円として描画する。`w2` / `h2` / `x2` / `y2` / `stepped` はエンコーダーには適用せず、保存・KLE/VIA 出力時にも除外する。
 - **ピン設定**: エンコーダーの A/B ピンはグローバルな row / col ピン設定ではなく、選択中のエンコーダー物理位置に紐付く `ProjectSettings.encoders[]` で管理する。複数エンコーダーでは各 encoder 定義が独立した `pinA` / `pinB` を持つ。
 - **KLE/VIA ラベル**: VIA/Vial 互換 JSON へ出力する際は、エンコーダー位置の KLE ラベルに `e{index}` を埋め込む。`row,col` がある場合は押し込みスイッチのマトリクス位置として同じキーに保持し、`e{index}` は回転部の位置メタデータとして併記する。
 - **QMK/Vial 出力**: エンコーダーの物理ピンは `keyboard.json` の `encoder.rotary` に配列で出力する。回転時のレイヤー別アクションは `keymap.c` の `encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]` として生成し、対象 keymap の `rules.mk` に `ENCODER_MAP_ENABLE = yes` を出力する。

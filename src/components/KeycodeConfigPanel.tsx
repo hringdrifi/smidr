@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
-import { Info, Check, Code2, Settings } from 'lucide-react';
+import { Info, Check, Code2, Settings, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { RightPanelEmptyState } from './RightPanelEmptyState';
@@ -14,6 +14,31 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const MODIFIERS: Modifier[] = ['LCTL', 'LSFT', 'LALT', 'LGUI', 'RCTL', 'RSFT', 'RALT', 'RGUI'];
+
+const describeAction = (action?: UniversalAction) => {
+  if (!action) return 'TRNS';
+  if (action.action === 'tap') {
+    const mods = action.mods && action.mods.length > 0 ? `${action.mods.join('+')}+` : '';
+    return `${mods}${action.keycode}`;
+  }
+  if (action.action === 'trans') return 'TRNS';
+  if (action.action === 'none') return 'NO';
+  if (action.action === 'mo') return `MO(${action.layerId})`;
+  if (action.action === 'tg') return `TG(${action.layerId})`;
+  if (action.action === 'to') return `TO(${action.layerId})`;
+  if (action.action === 'lt') {
+    const tap = action.tapAction.action === 'tap' ? action.tapAction.keycode : action.tapAction.action.toUpperCase();
+    return `LT(${action.layerId}, ${tap})`;
+  }
+  if (action.action === 'mt') {
+    const tap = action.tapAction.action === 'tap' ? action.tapAction.keycode : action.tapAction.action.toUpperCase();
+    return `MT(${action.modifiers.join('+')}, ${tap})`;
+  }
+  if (action.action === 'td') return `TD${action.tapDanceId}`;
+  if (action.action === 'macro') return `M${action.macroId}`;
+  if (action.action === 'custom') return action.label || action.rawCode;
+  return action.action.toUpperCase();
+};
 
 
 
@@ -41,13 +66,19 @@ export const KeycodeConfigPanel = () => {
     ? (settings.encoders || []).find(encoder => encoder.id === selectedKey.encoderId)
     : null;
   const isEncoderActionMode = appMode === 'design' && !!selectedEncoder;
+  const hasEncoderButtonMatrix = selectedKey?.row !== undefined && selectedKey?.col !== undefined;
+  const effectiveEncoderActionDirection = isEncoderActionMode && encoderActionDirection === 'button' && !hasEncoderButtonMatrix
+    ? 'clockwise'
+    : encoderActionDirection;
+  const encoderRotationDirection = effectiveEncoderActionDirection === 'button' ? null : effectiveEncoderActionDirection;
+  const isEncoderRotationTarget = isEncoderActionMode && !!encoderRotationDirection;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
     selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
   );
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
-    if (isEncoderActionMode) {
-      action = selectedEncoder?.keymap?.[currentLayer]?.[encoderActionDirection] || { action: 'trans' };
+    if (isEncoderRotationTarget) {
+      action = selectedEncoder?.keymap?.[currentLayer]?.[encoderRotationDirection] || { action: 'trans' };
     } else if (appMode === 'remap') {
       if (selectedRemoteIndex !== undefined) {
         action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
@@ -63,7 +94,7 @@ export const KeycodeConfigPanel = () => {
 
   useEffect(() => {
     setDraftAction(action);
-  }, [selectedKeyId, currentLayer, appMode, encoderActionDirection, actionSignature]);
+  }, [selectedKeyId, currentLayer, appMode, effectiveEncoderActionDirection, actionSignature]);
 
   useEffect(() => {
     if (activeAction.action === 'custom') {
@@ -95,13 +126,13 @@ export const KeycodeConfigPanel = () => {
   };
 
   const commitSelectedAction = (newAction: UniversalAction) => {
-    if (isEncoderActionMode && selectedEncoder) {
+    if (isEncoderRotationTarget && selectedEncoder) {
       updateEncoder(selectedEncoder.id!, {
         keymap: {
           ...(selectedEncoder.keymap || {}),
           [currentLayer]: {
             ...(selectedEncoder.keymap?.[currentLayer] || {}),
-            [encoderActionDirection]: newAction,
+            [encoderRotationDirection]: newAction,
           },
         },
       });
@@ -356,6 +387,24 @@ export const KeycodeConfigPanel = () => {
   const canOpenMacroSettings = canOpenProjectMacroSettings || canOpenDeviceMacroSettings;
   const canOpenTapDanceSettingsButton = canOpenProjectTapDanceSettings || canOpenDeviceTapDanceSettings;
 
+  const clearEncoderTargetAction = (target: 'counterClockwise' | 'clockwise' | 'button') => {
+    if (!selectedKey) return;
+    if (target === 'button') {
+      setKeycode(selectedKey.id!, currentLayer, { action: 'trans' });
+      return;
+    }
+    if (!selectedEncoder) return;
+    updateEncoder(selectedEncoder.id!, {
+      keymap: {
+        ...(selectedEncoder.keymap || {}),
+        [currentLayer]: {
+          ...(selectedEncoder.keymap?.[currentLayer] || {}),
+          [target]: { action: 'trans' },
+        },
+      },
+    });
+  };
+
   const handleApplyRawAction = () => {
     const rawCode = rawDraft.trim();
     if (!rawCode) return;
@@ -369,37 +418,67 @@ export const KeycodeConfigPanel = () => {
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden">
-      <div className="p-4 flex flex-col gap-4 border-b border-[var(--border-main)] shrink-0 bg-[var(--bg-app)]/30">
+      <div className="p-4 flex flex-col gap-4 shrink-0 bg-[#151518]">
         {isEncoderActionMode && selectedEncoder && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {t('keycodeConfig.encoderDirection')}
+              {t('keycodeConfig.encoderTargets')}
             </label>
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
+            <div className="flex flex-col gap-2">
               {([
-                ['counterClockwise', t('keycodeConfig.encoderCounterClockwise')],
-                ['clockwise', t('keycodeConfig.encoderClockwise')],
-              ] as const).map(([direction, label]) => (
-                <button
-                  key={direction}
-                  type="button"
-                  onClick={() => setEncoderActionDirection(direction)}
-                  className={cn(
-                    "h-8 rounded text-[10px] font-bold uppercase transition-all",
-                    encoderActionDirection === direction
-                      ? "bg-amber-500 text-zinc-950"
-                      : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+                ...(hasEncoderButtonMatrix
+                  ? [['button', t('keycodeConfig.encoderButton'), selectedKey.keymap?.[currentLayer]] as const]
+                  : []),
+                ['clockwise', t('keycodeConfig.encoderClockwise'), selectedEncoder.keymap?.[currentLayer]?.clockwise],
+                ['counterClockwise', t('keycodeConfig.encoderCounterClockwise'), selectedEncoder.keymap?.[currentLayer]?.counterClockwise],
+              ] as const).map(([direction, label, targetAction]) => {
+                const isFocused = effectiveEncoderActionDirection === direction;
+                const value = describeAction(targetAction);
+                const hasValue = value !== 'TRNS';
+                return (
+                  <div key={direction} className="space-y-1">
+                    <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{label}</label>
+                    <div
+                      onClick={() => setEncoderActionDirection(direction)}
+                      className={cn(
+                        "flex min-h-9 w-full cursor-pointer items-center justify-between gap-2 rounded border bg-[var(--bg-app)] px-2 text-xs font-mono transition-all duration-200",
+                        isFocused
+                          ? "border-amber-500 ring-1 ring-amber-500 text-amber-500"
+                          : hasValue
+                          ? "border-[var(--border-main)] text-[var(--text-highlight)] hover:border-amber-500/50"
+                          : "border-[var(--border-main)] text-[var(--text-muted)] hover:border-amber-500/50 hover:text-[var(--text-main)]"
+                      )}
+                    >
+                      <span className="min-w-0 truncate">{hasValue ? value : t('keycodeConfig.assignAction')}</span>
+                      {hasValue && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearEncoderTargetAction(direction);
+                          }}
+                          className="rounded p-0.5 text-[var(--text-muted)] transition-colors hover:bg-zinc-700/50 hover:text-red-400"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Action Type Dropdown */}
-        <div className="flex flex-col gap-1.5">
+        <div
+          className={cn(
+            "flex flex-col gap-1.5",
+            isEncoderActionMode && selectedEncoder
+              ? "-mx-4 -mb-4 bg-[var(--bg-panel)] border-t border-[var(--border-main)] px-4 py-4"
+              : ""
+          )}
+        >
           <div className="flex items-center justify-between">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
               {t('keycodeConfig.actionType') || 'Action Type'}
@@ -456,6 +535,8 @@ export const KeycodeConfigPanel = () => {
           </select>
         </div>
       </div>
+
+      <div className="mx-4 h-px shrink-0 bg-[var(--border-main)]" />
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4">
         {/* Layer Selector Grid */}

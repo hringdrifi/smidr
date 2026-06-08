@@ -97,16 +97,26 @@ const getEncoderIndex = (settings: ProjectSettings, key: PhysicalKey) => {
   return key.encoderIndex;
 };
 
+const isEncoderKey = (key: PhysicalKey) => (
+  key.kind === 'encoder' || !!key.encoderId || key.encoderIndex !== undefined
+);
+
+const stripEncoderSecondaryShape = (key: PhysicalKey): PhysicalKey => {
+  if (!isEncoderKey(key)) return { ...key };
+  const { w2, h2, x2, y2, stepped, ...rest } = key;
+  return rest;
+};
+
 const normalizeKeysForKle = (keys: PhysicalKey[]) => {
   if (keys.length === 0) return [];
 
   const minX = Math.min(...keys.flatMap(key => [key.x, key.rx ?? key.x]));
   const minY = Math.min(...keys.flatMap(key => [key.y, key.ry ?? key.y]));
 
-  if (minX === 0 && minY === 0) return keys.map(key => ({ ...key }));
+  if (minX === 0 && minY === 0) return keys.map(stripEncoderSecondaryShape);
 
   return keys.map(key => ({
-    ...key,
+    ...stripEncoderSecondaryShape(key),
     x: roundCoord(key.x - minX),
     y: roundCoord(key.y - minY),
     rx: roundCoord((key.rx ?? key.x) - minX),
@@ -141,7 +151,7 @@ export const generateKleJson = (
 ) => {
   const visibleKeys = getVisibleKeys(state.settings, state.keys);
   const labeledKeys = visibleKeys.map(key => ({
-    ...key,
+    ...stripEncoderSecondaryShape(key),
     label: getKleExportLabel(key, state.settings, visibleKeys, options),
   }));
 
@@ -272,7 +282,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
       label = parts.join('\n');
     }
     return {
-      ...key,
+      ...stripEncoderSecondaryShape(key),
       label
     };
   });
@@ -348,7 +358,8 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     pins: savedPins,
     encoders: savedEncoders,
     // Strip runtime-only 'id' field before persisting
-    keys: keys.map(({ id, encoderId, encoderIndex, ...keyData }) => {
+    keys: keys.map((key) => {
+      const { id, encoderId, encoderIndex, ...keyData } = stripEncoderSecondaryShape(key);
       const savedKey = { ...keyData } as PhysicalKey;
       if (encoderId && encoderIndexById.has(encoderId)) {
         savedKey.encoderIndex = encoderIndexById.get(encoderId);

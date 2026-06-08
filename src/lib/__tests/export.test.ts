@@ -844,11 +844,17 @@ describe('export generation', () => {
     const keys: PhysicalKey[] = [
       {
         id: 'runtime-key',
+        kind: 'encoder',
         encoderId: 'runtime-encoder-0',
         x: 0,
         y: 0,
         w: 1,
         h: 1,
+        w2: 2,
+        h2: 2,
+        x2: 0.5,
+        y2: 0.5,
+        stepped: true,
         r: 0,
         rx: 0,
         ry: 0,
@@ -869,8 +875,52 @@ describe('export generation', () => {
       },
     });
     expect((saved.encoders?.[0] as any).id).toBeUndefined();
+    expect(saved.keys[0].kind).toBe('encoder');
     expect(saved.keys[0].encoderIndex).toBe(0);
     expect((saved.keys[0] as any).encoderId).toBeUndefined();
+    expect(saved.keys[0].w2).toBeUndefined();
+    expect(saved.keys[0].h2).toBeUndefined();
+    expect(saved.keys[0].x2).toBeUndefined();
+    expect(saved.keys[0].y2).toBeUndefined();
+    expect(saved.keys[0].stepped).toBeUndefined();
+  });
+
+  it('omits secondary shape properties from VIA encoder layout entries', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: { ...baseSettings.features, encoder: true },
+      encoders: [{ pinA: 'GP2', pinB: 'GP3' }],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        kind: 'encoder',
+        encoderIndex: 0,
+        x: 0,
+        y: 0,
+        w: 2,
+        h: 1,
+        w2: 1,
+        h2: 2,
+        x2: 0.25,
+        y2: 0.25,
+        stepped: true,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const via = generateViaJson({ settings, keys });
+    const keymapJson = JSON.stringify(via.layouts.keymap);
+
+    expect(keymapJson).toContain('e0');
+    expect(keymapJson).toContain('"w":2');
+    expect(keymapJson).not.toContain('"w2"');
+    expect(keymapJson).not.toContain('"h2"');
+    expect(keymapJson).not.toContain('"x2"');
+    expect(keymapJson).not.toContain('"y2"');
+    expect(keymapJson).not.toContain('"l"');
   });
 
   it('exports multiple encoder pins and encoder_map for QMK', async () => {

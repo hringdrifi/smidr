@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Check, Hash, Trash2, X } from 'lucide-react';
+import { Hash, Trash2, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { getMatrixFromPins, useKeyboardStore } from '@/lib/store';
@@ -12,12 +12,35 @@ import {
   getDevelopmentBoardPins,
   getMcuPins,
 } from '@/lib/mcu-presets';
+import { AvailablePinPool } from './AvailablePinPool';
+import { getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide } from '@/lib/matrix-utils';
+import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 type PinTarget = 'row' | 'col' | 'splitRow' | 'splitCol' | 'feature';
+
+const getEncoderAssignedPins = (
+  settings: ProjectSettings,
+  keys: PhysicalKey[],
+  side?: MatrixSide
+) => {
+  const pins = new Set<string>();
+  keys.forEach(key => {
+    if (!key.encoderId) return;
+    if (settings.features.split && side) {
+      const encoderSide = getLocalMatrixPosition(settings, key, keys)?.side || key.matrixSide || inferMatrixSideFromGeometry(key, keys);
+      if (encoderSide !== side) return;
+    }
+    const encoder = (settings.encoders || []).find(item => item.id === key.encoderId);
+    if (!encoder) return;
+    if (encoder.pinA) pins.add(encoder.pinA);
+    if (encoder.pinB) pins.add(encoder.pinB);
+  });
+  return pins;
+};
 
 const InteractivePinSlot = ({
   label,
@@ -192,7 +215,7 @@ const PinTagInput = ({
 };
 
 export const MatrixPinInspectorPanel = () => {
-  const { settings, updateSettings, setPin } = useKeyboardStore();
+  const { settings, updateSettings, setPin, keys } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
     Object.entries(values).reduce(
@@ -229,6 +252,7 @@ export const MatrixPinInspectorPanel = () => {
     if (activeBox === 'splitRow' || activeBox === 'splitCol') {
       settings.pins.splitRows?.forEach(p => p && pins.add(p));
       settings.pins.splitCols?.forEach(p => p && pins.add(p));
+      getEncoderAssignedPins(settings, keys, 'right').forEach(pin => pins.add(pin));
       return pins;
     }
 
@@ -237,10 +261,8 @@ export const MatrixPinInspectorPanel = () => {
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
-    settings.encoders?.forEach(encoder => {
-      if (encoder.pinA) pins.add(encoder.pinA);
-      if (encoder.pinB) pins.add(encoder.pinB);
-    });
+    getEncoderAssignedPins(settings, keys, settings.features.split && (activeBox === 'row' || activeBox === 'col') ? 'left' : undefined)
+      .forEach(pin => pins.add(pin));
     if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
     return pins;
   };
@@ -439,108 +461,34 @@ export const MatrixPinInspectorPanel = () => {
 
       </div>
 
-      <section className="shrink-0 space-y-3 border-t border-[var(--border-main)] bg-[var(--bg-panel)] px-4 py-3">
-        <div className="space-y-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                {format('hardware.availablePinsPool', { label: pinPoolLabel })}
-              </div>
-              {activeBox && (
-                <div className="mt-1 truncate rounded border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[9px] text-[var(--text-muted)]">
-                  {t('hardware.settingPinGroup')} <span className="font-mono text-amber-500 font-bold uppercase">
-                    {getPinGroupLabel(activeBox, focusedFeature)}
-                  </span>
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => setPreventDuplicates(!preventDuplicates)}
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--bg-app)] border border-[var(--border-main)] text-[9px] font-bold text-[var(--text-main)] hover:border-amber-500/50 cursor-pointer transition-all active:scale-95 shrink-0"
-            >
-              <div className={cn(
-                "w-3 h-3 flex items-center justify-center border rounded-sm transition-colors",
-                preventDuplicates ? "bg-amber-500 border-amber-500 text-zinc-950" : "border-[var(--border-main)]"
-              )}>
-                {preventDuplicates && <Check size={8} strokeWidth={3} />}
-              </div>
-              <span>{t('hardware.preventDuplicatePins')}</span>
-            </button>
-          </div>
-
-          <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto rounded border border-[var(--border-main)]/30 bg-[var(--bg-app)]/50 p-2 custom-scrollbar">
-            {pinPool.map((pinName: string) => {
-              const isAssigned = assignedPins.has(pinName);
-              const isCurrentSlotPin =
-                (activeBox === 'row' && settings.pins.rows.includes(pinName)) ||
-                (activeBox === 'col' && settings.pins.cols.includes(pinName)) ||
-                (activeBox === 'splitRow' && (settings.pins.splitRows || []).includes(pinName)) ||
-                (activeBox === 'splitCol' && (settings.pins.splitCols || []).includes(pinName)) ||
-                (activeBox === 'feature' && !!focusedFeature && (settings.pins as any)[focusedFeature] === pinName);
-              const isListTarget = activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol';
-              const isClickable = !isAssigned || !preventDuplicates || (isCurrentSlotPin && !isListTarget);
-
-              return (
-                <button
-                  key={pinName}
-                  type="button"
-                  disabled={!activeBox || !isClickable}
-                  onClick={() => handleAssignPin(pinName)}
-                  className={cn(
-                    "px-2 py-1 rounded text-[10px] font-mono font-bold transition-all relative",
-                    !activeBox
-                      ? "bg-[var(--bg-button)]/60 border border-[var(--border-main)] text-[var(--text-muted)] cursor-not-allowed opacity-50"
-                      : isCurrentSlotPin
-                      ? "bg-amber-500 text-zinc-950 border border-amber-500"
-                      : isAssigned
-                      ? preventDuplicates
-                        ? "bg-[var(--bg-button)]/50 border border-[var(--border-main)] text-[var(--text-dim)] cursor-not-allowed line-through"
-                        : "bg-[var(--bg-button)] text-[var(--text-main)] border border-[var(--border-main)] pl-4.5"
-                      : "bg-[var(--bg-button)] hover:bg-[var(--bg-hover)] hover:border-amber-500/50 text-[var(--text-highlight)] border border-[var(--border-main)] active:scale-95 cursor-pointer"
-                  )}
-                >
-                  {!preventDuplicates && isAssigned && !isCurrentSlotPin && (
-                    <span className="absolute left-1.5 top-[7px] w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  )}
-                  {pinName}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="text-[9px] text-[var(--text-muted)] font-mono">{t('hardware.customPinOverride')}</div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={customPinText}
-              onChange={(e) => setCustomPinText(e.target.value.toUpperCase())}
-              placeholder="e.g. GP99"
-              disabled={!activeBox}
-              className="min-w-0 flex-1 bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all disabled:opacity-50"
-            />
-            <button
-              type="button"
-              disabled={!activeBox || !customPinText}
-              onClick={() => {
-                handleAssignPin(customPinText);
-                setCustomPinText('');
-              }}
-              className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:bg-[var(--bg-button)] disabled:text-[var(--text-dim)] disabled:border disabled:border-[var(--border-main)] text-zinc-950 text-[10px] font-bold transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {t('hardware.assign')}
-            </button>
-          </div>
-        </div>
-      </section>
+      <AvailablePinPool
+        title={format('hardware.availablePinsPool', { label: pinPoolLabel })}
+        activeLabel={activeBox ? getPinGroupLabel(activeBox, focusedFeature) : null}
+        pins={pinPool}
+        assignedPins={assignedPins}
+        preventDuplicates={preventDuplicates}
+        onPreventDuplicatesChange={setPreventDuplicates}
+        onAssignPin={handleAssignPin}
+        isCurrentPin={(pinName) => (
+          (activeBox === 'row' && settings.pins.rows.includes(pinName)) ||
+          (activeBox === 'col' && settings.pins.cols.includes(pinName)) ||
+          (activeBox === 'splitRow' && (settings.pins.splitRows || []).includes(pinName)) ||
+          (activeBox === 'splitCol' && (settings.pins.splitCols || []).includes(pinName)) ||
+          (activeBox === 'feature' && !!focusedFeature && (settings.pins as any)[focusedFeature] === pinName)
+        )}
+        isActive={!!activeBox}
+        isListTarget={activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol'}
+        customPinText={customPinText}
+        onCustomPinTextChange={(value) => setCustomPinText(value.toUpperCase())}
+        showCustomPinInput
+        pinListClassName="max-h-36 p-2"
+      />
     </div>
   );
 };
 
 export const MatrixPinSettingsPanel = () => {
-  const { settings, updateSettings, setPin } = useKeyboardStore();
+  const { settings, updateSettings, setPin, keys } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
     Object.entries(values).reduce(
@@ -577,6 +525,7 @@ export const MatrixPinSettingsPanel = () => {
     if (activeBox === 'splitRow' || activeBox === 'splitCol') {
       settings.pins.splitRows?.forEach(p => p && pins.add(p));
       settings.pins.splitCols?.forEach(p => p && pins.add(p));
+      getEncoderAssignedPins(settings, keys, 'right').forEach(pin => pins.add(pin));
       return pins;
     }
 
@@ -585,10 +534,8 @@ export const MatrixPinSettingsPanel = () => {
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
-    settings.encoders?.forEach(encoder => {
-      if (encoder.pinA) pins.add(encoder.pinA);
-      if (encoder.pinB) pins.add(encoder.pinB);
-    });
+    getEncoderAssignedPins(settings, keys, settings.features.split && (activeBox === 'row' || activeBox === 'col') ? 'left' : undefined)
+      .forEach(pin => pins.add(pin));
     if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
     return pins;
   };
@@ -798,102 +745,27 @@ export const MatrixPinSettingsPanel = () => {
         </div>
       </div>
 
-      <div className="shrink-0 space-y-3 border-t border-[var(--border-main)] bg-[var(--bg-panel)] px-4 py-3">
-            <div className="flex w-full flex-col gap-2">
-              <span className="block w-full text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                {format('hardware.availablePinsPool', { label: pinPoolLabel })}
-              </span>
-              <div className="flex min-h-6 w-full items-center justify-between gap-2">
-                <div className="min-w-0">
-                  {activeBox && (
-                    <span className="block max-w-full truncate rounded border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[9px] text-[var(--text-muted)]">
-                      {t('hardware.settingPinGroup')} <span className="font-mono text-amber-500 font-bold uppercase">
-                        {getPinGroupLabel(activeBox, focusedFeature)}
-                      </span>
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPreventDuplicates(!preventDuplicates)}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--bg-panel)] border border-[var(--border-main)] text-[9px] font-bold text-[var(--text-main)] hover:border-amber-500/50 cursor-pointer transition-all active:scale-95 shrink-0"
-                >
-                  <div className={cn(
-                    "w-3 h-3 flex items-center justify-center border rounded-sm transition-colors",
-                    preventDuplicates ? "bg-amber-500 border-amber-500 text-zinc-950" : "border-[var(--border-main)]"
-                  )}>
-                    {preventDuplicates && <Check size={8} strokeWidth={3} />}
-                  </div>
-                  <span>{t('hardware.preventDuplicatePins')}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5 max-h-[82px] overflow-y-auto p-1 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/30">
-              {pinPool.map((pinName: string) => {
-                const isAssigned = assignedPins.has(pinName);
-                const isCurrentSlotPin =
-                  (activeBox === 'row' && settings.pins.rows.includes(pinName)) ||
-                  (activeBox === 'col' && settings.pins.cols.includes(pinName)) ||
-                  (activeBox === 'splitRow' && (settings.pins.splitRows || []).includes(pinName)) ||
-                  (activeBox === 'splitCol' && (settings.pins.splitCols || []).includes(pinName)) ||
-                  (activeBox === 'feature' && !!focusedFeature && (settings.pins as any)[focusedFeature] === pinName);
-                const isListTarget = activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol';
-                const isClickable = !isAssigned || !preventDuplicates || (isCurrentSlotPin && !isListTarget);
-
-                return (
-                  <button
-                    key={pinName}
-                    type="button"
-                    disabled={!activeBox || !isClickable}
-                    onClick={() => handleAssignPin(pinName)}
-                    className={cn(
-                      "px-2 py-1 rounded text-[10px] font-mono font-bold transition-all relative",
-                      !activeBox
-                        ? "bg-[var(--bg-button)]/60 border border-[var(--border-main)] text-[var(--text-muted)] cursor-not-allowed opacity-50"
-                        : isCurrentSlotPin
-                        ? "bg-amber-500 text-zinc-950 border border-amber-500"
-                        : isAssigned
-                        ? preventDuplicates
-                          ? "bg-[var(--bg-button)]/50 border border-[var(--border-main)] text-[var(--text-dim)] cursor-not-allowed line-through"
-                          : "bg-[var(--bg-button)] text-[var(--text-main)] border border-[var(--border-main)] pl-4.5"
-                        : "bg-[var(--bg-button)] hover:bg-[var(--bg-hover)] hover:border-amber-500/50 text-[var(--text-highlight)] border border-[var(--border-main)] active:scale-95 cursor-pointer"
-                    )}
-                  >
-                    {!preventDuplicates && isAssigned && !isCurrentSlotPin && (
-                      <span className="absolute left-1.5 top-[7px] w-1.5 h-1.5 rounded-full bg-amber-500" />
-                    )}
-                    {pinName}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-2 items-center justify-between border-t border-[var(--border-main)]/30 pt-2">
-              <span className="text-[9px] text-[var(--text-muted)] font-mono">{t('hardware.customPinOverride')}</span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customPinText}
-                  onChange={(e) => setCustomPinText(e.target.value.toUpperCase())}
-                  placeholder="e.g. GP99"
-                  disabled={!activeBox}
-                  className="w-20 bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  disabled={!activeBox || !customPinText}
-                  onClick={() => {
-                    handleAssignPin(customPinText);
-                    setCustomPinText('');
-                  }}
-                  className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:bg-[var(--bg-button)] disabled:text-[var(--text-dim)] disabled:border disabled:border-[var(--border-main)] text-zinc-950 text-[10px] font-bold transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {t('hardware.assign')}
-                </button>
-              </div>
-            </div>
-      </div>
+      <AvailablePinPool
+        title={format('hardware.availablePinsPool', { label: pinPoolLabel })}
+        activeLabel={activeBox ? getPinGroupLabel(activeBox, focusedFeature) : null}
+        pins={pinPool}
+        assignedPins={assignedPins}
+        preventDuplicates={preventDuplicates}
+        onPreventDuplicatesChange={setPreventDuplicates}
+        onAssignPin={handleAssignPin}
+        isCurrentPin={(pinName) => (
+          (activeBox === 'row' && settings.pins.rows.includes(pinName)) ||
+          (activeBox === 'col' && settings.pins.cols.includes(pinName)) ||
+          (activeBox === 'splitRow' && (settings.pins.splitRows || []).includes(pinName)) ||
+          (activeBox === 'splitCol' && (settings.pins.splitCols || []).includes(pinName)) ||
+          (activeBox === 'feature' && !!focusedFeature && (settings.pins as any)[focusedFeature] === pinName)
+        )}
+        isActive={!!activeBox}
+        isListTarget={activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol'}
+        customPinText={customPinText}
+        onCustomPinTextChange={(value) => setCustomPinText(value.toUpperCase())}
+        showCustomPinInput
+      />
     </div>
   );
 };

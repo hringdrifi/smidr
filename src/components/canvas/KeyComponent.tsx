@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { Group, Path, Text, Rect } from 'react-konva';
+import { Group, Path, Text, Rect, Circle } from 'react-konva';
 import { PhysicalKey } from '../../types/keyboard';
 import { UNIT, TOP_INSET, num, round, getUnionVertices, generatePath, offsetPolygon, getVisualCenter, generateFocusBrackets, isLayoutMode, LabelNode, labelNodeToText } from '../../lib/canvas-utils';
 import { useKeyboardStore } from '../../lib/store';
@@ -12,6 +12,7 @@ const LAYERS_P2 = 'M13 13.74a2 2 0 0 1-2 0L2.5 8.87a1 1 0 0 1 0-1.74l8.5-4.87a2 
 const ICON_DISPLAY_SIZE = 8; // px displayed
 const ICON_SCALE = ICON_DISPLAY_SIZE / 24;
 const ICON_SW = 1.0 / ICON_SCALE; // strokeWidth in original coordinate space
+const KEY_SHAPE_GAP = 2.5;
 
 interface KeyComponentProps {
   id: string;
@@ -57,6 +58,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   const { x, y, w, h, r, rx, ry, x2, y2, w2, h2, stepped } = keyData;
   const isDebug = useKeyboardStore(s => s.editorSettings.debugMode);
   const { t } = useTranslation();
+  const isEncoder = keyData.kind === 'encoder' || !!keyData.encoderId || keyData.encoderIndex !== undefined;
   
   if (isDebug && (x2 !== undefined || y2 !== undefined || w2 !== undefined || h2 !== undefined)) {
     console.log(`[KeyComponent] Rendering secondary shape for "${keyData.label}":`, { x2, y2, w2, h2 });
@@ -81,11 +83,10 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
     const maxH = round(Math.max(num(h), num(y2) + num(h2 || h))) - minY;
 
     const rawV_units = getUnionVertices(r1, r2);
-    const gapOffset = 2.5; 
     const rawV = offsetPolygon(rawV_units.map(v => ({ 
       x: (v.x - minX) * UNIT, 
       y: (v.y - minY) * UNIT 
-    })), gapOffset);
+    })), KEY_SHAPE_GAP);
     
     let topV;
     const inset = TOP_INSET * UNIT;
@@ -94,7 +95,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
         x: (v.x - minX) * UNIT, 
         y: (v.y - minY) * UNIT 
       }));
-      topV = offsetPolygon(rawPrimaryV, gapOffset + inset);
+      topV = offsetPolygon(rawPrimaryV, KEY_SHAPE_GAP + inset);
     } else {
       topV = offsetPolygon(rawV, inset);
     }
@@ -125,6 +126,9 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   const centerX = (-num(mX) + num(w) / 2) * UNIT;
   const centerY = (-num(mY) + num(h) / 2) * UNIT;
   const textWidth = num(w) * UNIT;
+  const encoderRadius = Math.max(0, Math.min(num(w), num(h)) * UNIT / 2 - KEY_SHAPE_GAP);
+  const encoderTopRadius = Math.max(0, encoderRadius - TOP_INSET * UNIT);
+  const encoderFocusRadius = Math.max(0, encoderRadius - 4);
 
   // Pill (tap keycode) shared styles
   const pillFill = theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)';
@@ -381,31 +385,67 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
     >
       {showKeycap && (
         <>
-          {/* Base Shape */}
-          <Path
-            data={pathData}
-            fill={fillColor}
-            stroke={strokeColor}
-            strokeWidth={strokeWidth}
-            shadowColor="black"
-            shadowBlur={isSelected ? 10 : 4}
-            shadowOpacity={0.4}
-            shadowOffset={{ x: 0, y: 2 }}
-          />
-          {/* Top Surface */}
-          <Path
-            data={topPathData}
-            fill={isColliding ? 'rgba(239, 68, 68, 0.4)' : colors.bgKeyTop}
-            listening={false}
-          />
-          {/* Focus Brackets */}
-          {isFocused && layoutMode && (
-            <Path
-              data={generateFocusBrackets(rawV)}
-              stroke={colors.accent}
-              strokeWidth={2}
-              listening={false}
-            />
+          {isEncoder ? (
+            <>
+              <Circle
+                x={centerX}
+                y={centerY}
+                radius={encoderRadius}
+                fill={fillColor}
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                shadowColor="black"
+                shadowBlur={isSelected ? 10 : 4}
+                shadowOpacity={0.4}
+                shadowOffset={{ x: 0, y: 2 }}
+              />
+              <Circle
+                x={centerX}
+                y={centerY}
+                radius={encoderTopRadius}
+                fill={isColliding ? 'rgba(239, 68, 68, 0.4)' : colors.bgKeyTop}
+                listening={false}
+              />
+              {isFocused && layoutMode && (
+                <Circle
+                  x={centerX}
+                  y={centerY}
+                  radius={encoderFocusRadius}
+                  stroke={colors.accent}
+                  strokeWidth={2}
+                  listening={false}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {/* Base Shape */}
+              <Path
+                data={pathData}
+                fill={fillColor}
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                shadowColor="black"
+                shadowBlur={isSelected ? 10 : 4}
+                shadowOpacity={0.4}
+                shadowOffset={{ x: 0, y: 2 }}
+              />
+              {/* Top Surface */}
+              <Path
+                data={topPathData}
+                fill={isColliding ? 'rgba(239, 68, 68, 0.4)' : colors.bgKeyTop}
+                listening={false}
+              />
+              {/* Focus Brackets */}
+              {isFocused && layoutMode && (
+                <Path
+                  data={generateFocusBrackets(rawV)}
+                  stroke={colors.accent}
+                  strokeWidth={2}
+                  listening={false}
+                />
+              )}
+            </>
           )}
         </>
       )}

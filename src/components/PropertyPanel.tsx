@@ -293,6 +293,7 @@ export const PropertyPanel = () => {
   // Single Edit Mode
   const selectedKey = keys.find(k => k.id === selectedKeyIds[0]);
   if (!selectedKey) return null;
+  const selectedKeyIsEncoder = selectedKey.kind === 'encoder' || !!selectedKey.encoderId || selectedKey.encoderIndex !== undefined;
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden animate-in fade-in duration-200" onMouseLeave={() => setFocusedField(null)}>
@@ -354,18 +355,29 @@ export const PropertyPanel = () => {
                             <line x1={startX + mainW} y1={startY} x2={startX + mainW} y2={startY + mainH} stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="2 1" />
                           </g>
 
-                          {/* Main Rectangle */}
-                          <rect 
-                            x={startX} y={startY} width={mainW} height={mainH} 
-                            fill="none" 
-                            stroke={focusedField === 'w' || focusedField === 'h' ? "#f59e0b" : "currentColor"} 
-                            strokeWidth={focusedField === 'w' || focusedField === 'h' ? "2" : "1"} 
-                            className="text-[var(--border-main)] transition-all"
-                            rx="2" 
-                          />
+                          {selectedKeyIsEncoder ? (
+                            <circle
+                              cx={80}
+                              cy={40}
+                              r={Math.min(mainW, mainH) / 2}
+                              fill="none"
+                              stroke={focusedField === 'w' || focusedField === 'h' ? "#f59e0b" : "currentColor"}
+                              strokeWidth={focusedField === 'w' || focusedField === 'h' ? "2" : "1"}
+                              className="text-[var(--border-main)] transition-all"
+                            />
+                          ) : (
+                            <rect
+                              x={startX} y={startY} width={mainW} height={mainH}
+                              fill="none"
+                              stroke={focusedField === 'w' || focusedField === 'h' ? "#f59e0b" : "currentColor"}
+                              strokeWidth={focusedField === 'w' || focusedField === 'h' ? "2" : "1"}
+                              className="text-[var(--border-main)] transition-all"
+                              rx="2"
+                            />
+                          )}
 
                           {/* Polygonal Part */}
-                          {(selectedKey.w2 !== undefined || selectedKey.h2 !== undefined || selectedKey.x2 || selectedKey.y2) && (
+                          {!selectedKeyIsEncoder && (selectedKey.w2 !== undefined || selectedKey.h2 !== undefined || selectedKey.x2 || selectedKey.y2) && (
                             <g className="transition-all">
                               <rect 
                                 x={startX + (selectedKey.x2 || 0) * scale} 
@@ -401,48 +413,52 @@ export const PropertyPanel = () => {
 
           <Divider orientation="horizontal" />
 
-          {/* Visual Guide */}
-          <PropertySection 
-            title={t('properties.specialShapes')} 
-            icon={Maximize}
-            className="w-full"
-          >
-            <div className="flex flex-col h-full space-y-4">
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <PropertyInput label={t('properties.widthSub')} value={selectedKey.w2 ?? selectedKey.w} step="0.25" min="0.5" icon={ArrowLeftRight} onFocus={() => setFocusedField('w2')} onChange={(val: number) => updateKey(selectedKey.id, { w2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w2: val }, true); }} />
-                  <PropertyInput label={t('properties.heightSub')} value={selectedKey.h2 ?? selectedKey.h} step="0.25" min="0.5" icon={ArrowUpDown} onFocus={() => setFocusedField('h2')} onChange={(val: number) => updateKey(selectedKey.id, { h2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h2: val }, true); }} />
-                </div>
-                <div className="flex gap-3">
-                  <PropertyInput label={t('properties.offsetXSub')} value={selectedKey.x2 ?? 0} step={editorSettings.gridSnap.toString()} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: val }, true); }} />
-                  <PropertyInput label={t('properties.offsetYSub')} value={selectedKey.y2 ?? 0} step={editorSettings.gridSnap.toString()} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: val }, true); }} />
-                </div>
-              </div>
+          {!selectedKeyIsEncoder && (
+            <>
+              {/* Visual Guide */}
+              <PropertySection
+                title={t('properties.specialShapes')}
+                icon={Maximize}
+                className="w-full"
+              >
+                <div className="flex flex-col h-full space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <PropertyInput label={t('properties.widthSub')} value={selectedKey.w2 ?? selectedKey.w} step="0.25" min="0.5" icon={ArrowLeftRight} onFocus={() => setFocusedField('w2')} onChange={(val: number) => updateKey(selectedKey.id, { w2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w2: val }, true); }} />
+                      <PropertyInput label={t('properties.heightSub')} value={selectedKey.h2 ?? selectedKey.h} step="0.25" min="0.5" icon={ArrowUpDown} onFocus={() => setFocusedField('h2')} onChange={(val: number) => updateKey(selectedKey.id, { h2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h2: val }, true); }} />
+                    </div>
+                    <div className="flex gap-3">
+                      <PropertyInput label={t('properties.offsetXSub')} value={selectedKey.x2 ?? 0} step={editorSettings.gridSnap.toString()} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: val }, true); }} />
+                      <PropertyInput label={t('properties.offsetYSub')} value={selectedKey.y2 ?? 0} step={editorSettings.gridSnap.toString()} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: val }, true); }} />
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-3 p-2 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/50 group hover:border-amber-500/30 transition-colors shrink-0">
-                <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors bg-[var(--bg-button)]">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedKey.stepped ?? false}
-                    onChange={(e) => { updateKey(selectedKey.id, { stepped: e.target.checked }); }}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <div className={cn(
-                    "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all",
-                    selectedKey.stepped ? "left-[18px] bg-amber-500" : "left-[2px] bg-zinc-400"
-                  )} />
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1.5">
-                    <Layers size={10} className={cn("transition-colors", selectedKey.stepped ? "text-amber-500" : "text-[var(--text-dim)]")} />
-                    <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('properties.stepped')}</span>
+                  <div className="flex items-center gap-3 p-2 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/50 group hover:border-amber-500/30 transition-colors shrink-0">
+                    <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors bg-[var(--bg-button)]">
+                      <input
+                        type="checkbox"
+                        checked={selectedKey.stepped ?? false}
+                        onChange={(e) => { updateKey(selectedKey.id, { stepped: e.target.checked }); }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className={cn(
+                        "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all",
+                        selectedKey.stepped ? "left-[18px] bg-amber-500" : "left-[2px] bg-zinc-400"
+                      )} />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <Layers size={10} className={cn("transition-colors", selectedKey.stepped ? "text-amber-500" : "text-[var(--text-dim)]")} />
+                        <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('properties.stepped')}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </PropertySection>
+              </PropertySection>
 
-          <Divider orientation="horizontal" />
+              <Divider orientation="horizontal" />
+            </>
+          )}
 
           {/* Visibility */}
           <PropertySection 

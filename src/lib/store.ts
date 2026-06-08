@@ -74,6 +74,14 @@ const assignRuntimeEncoderIds = (
   return { ...keyWithoutIndex, encoderId: encoder.id };
 });
 
+const getReferencedEncoders = (
+  encoders: RuntimeEncoder[] = [],
+  keys: PhysicalKey[] = []
+): RuntimeEncoder[] => {
+  const referencedEncoderIds = new Set(keys.map(key => key.encoderId).filter(Boolean));
+  return encoders.filter(encoder => referencedEncoderIds.has(encoder.id));
+};
+
 export const getCenteredTransform = (keys: PhysicalKey[], activeOptions: Record<string, number> = {}) => {
   const visKeys = keys.filter(k => !k.group || (activeOptions[k.group] ?? 0) === k.option);
   
@@ -146,8 +154,8 @@ export interface KeyboardState {
   editorMode: 'layout' | 'matrix' | 'hardware' | 'keymap';
   setEditorMode: (mode: 'layout' | 'matrix' | 'hardware' | 'keymap') => void;
   currentLayer: number;
-  encoderActionDirection: 'counterClockwise' | 'clockwise';
-  setEncoderActionDirection: (direction: 'counterClockwise' | 'clockwise') => void;
+  encoderActionDirection: 'counterClockwise' | 'clockwise' | 'button';
+  setEncoderActionDirection: (direction: 'counterClockwise' | 'clockwise' | 'button') => void;
   setCurrentLayer: (layer: number) => void;
   addLayer: () => void;
   removeLastLayer: () => void;
@@ -209,7 +217,7 @@ export interface KeyboardState {
   // Matrix Painting
   setMatrixPosition: (id: string, row: number | undefined, col: number | undefined, side?: MatrixSide) => void;
   addEncoderToKey: (keyId: string) => void;
-  removeEncoderFromKey: (keyId: string) => void;
+  addEncoderKey: () => void;
   updateEncoder: (encoderId: string, updates: Partial<EncoderDefinition>) => void;
   painter: { currentRow: number; currentCol: number; currentSide: MatrixSide; autoIncrement: 'matrix' | 'col' | 'row'; };
   setPainter: (painter: Partial<KeyboardState['painter']>) => void;
@@ -338,7 +346,7 @@ const initialState: Partial<KeyboardState> = {
   appMode: isDemoModeEnabled() ? 'remap' : getStoredAppMode(),
   editorMode: getStoredEditorMode(),
   currentLayer: 0,
-  encoderActionDirection: 'clockwise',
+  encoderActionDirection: 'button',
   connectedDevice: null,
   deviceCapabilities: null,
   activeTransport: null,
@@ -1947,14 +1955,46 @@ export const useKeyboardStore = create<KeyboardState>()(
             if (clipboard.length > 0) {
               // Apply a slight offset (0.25u) to avoid perfect overlap
               const offset = 0.25;
-              const newKeys = clipboard.map(k => ({
-                ...k,
-                id: undefined, // remove ID so addKeys generates new ones
-                x: roundCoord((k.x ?? 0) + offset),
-                y: roundCoord((k.y ?? 0) + offset),
-                rx: roundCoord((k.rx ?? 0) + offset),
-                ry: roundCoord((k.ry ?? 0) + offset),
-              }));
+              const s = get();
+              const newEncoders: RuntimeEncoder[] = [];
+              const newKeys = clipboard.map(k => {
+                const { id, encoderId, encoderIndex, ...keyData } = k;
+                let nextEncoderId: string | undefined;
+                if (encoderId) {
+                  const sourceEncoder = (s.settings.encoders || []).find(encoder => encoder.id === encoderId);
+                  if (sourceEncoder) {
+                    const { id: _sourceEncoderId, ...encoderData } = sourceEncoder;
+                    nextEncoderId = crypto.randomUUID();
+                    newEncoders.push({ ...encoderData, id: nextEncoderId });
+                  }
+                } else if (encoderIndex !== undefined) {
+                  const sourceEncoder = (s.settings.encoders || [])[encoderIndex];
+                  if (sourceEncoder) {
+                    const { id: _sourceEncoderId, ...encoderData } = sourceEncoder;
+                    nextEncoderId = crypto.randomUUID();
+                    newEncoders.push({ ...encoderData, id: nextEncoderId });
+                  }
+                }
+                return {
+                  ...keyData,
+                  id: undefined, // remove ID so addKeys generates new ones
+                  encoderId: nextEncoderId,
+                  encoderIndex: undefined,
+                  x: roundCoord((k.x ?? 0) + offset),
+                  y: roundCoord((k.y ?? 0) + offset),
+                  rx: roundCoord((k.rx ?? 0) + offset),
+                  ry: roundCoord((k.ry ?? 0) + offset),
+                };
+              });
+              if (newEncoders.length > 0) {
+                set((state) => ({
+                  settings: {
+                    ...state.settings,
+                    features: { ...state.settings.features, encoder: true },
+                    encoders: [...getReferencedEncoders(state.settings.encoders as RuntimeEncoder[], state.keys), ...newEncoders],
+                  },
+                }));
+              }
               addKeys(newKeys as Partial<PhysicalKey>[], { skipCollision: true });
             }
           }
@@ -2085,7 +2125,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             const matrixSide = s.settings.features.split
               ? side || k.matrixSide || inferMatrixSideFromGeometry(k, s.keys)
               : undefined;
-            return { ...k, row, col, matrixSide: row === undefined || col === undefined ? undefined : matrixSide };
+            return { ...k, row, col, matrixSide };
           })
         })),
 
@@ -2097,38 +2137,63 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
 
           const encoder: RuntimeEncoder = { id: crypto.randomUUID(), keymap: {} };
+          const referencedEncoders = getReferencedEncoders(s.settings.encoders as RuntimeEncoder[], s.keys);
           return {
-            keys: s.keys.map(k => k.id === keyId ? { ...k, encoderId: encoder.id, encoderIndex: undefined } : k),
+            keys: s.keys.map(k => k.id === keyId ? {
+              ...k,
+              kind: 'encoder',
+              encoderId: encoder.id,
+              encoderIndex: undefined,
+              w2: undefined,
+              h2: undefined,
+              x2: undefined,
+              y2: undefined,
+              stepped: undefined,
+            } : k),
             settings: {
               ...s.settings,
               features: { ...s.settings.features, encoder: true },
-              encoders: [...(s.settings.encoders || []), encoder],
+              encoders: [...referencedEncoders, encoder],
             },
           };
         }),
 
-        removeEncoderFromKey: (keyId: string) => set((s) => {
-          const key = s.keys.find(k => k.id === keyId);
-          if (!key?.encoderId) return s;
-          const encoderId = key.encoderId;
-          const keys = s.keys.map(k => (
-            k.id === keyId
-              ? { ...k, encoderId: undefined, encoderIndex: undefined }
-              : k
-          ));
-          const encoderStillUsed = keys.some(k => k.encoderId === encoderId);
-          const encoders = encoderStillUsed
-            ? s.settings.encoders || []
-            : (s.settings.encoders || []).filter(encoder => encoder.id !== encoderId);
-          return {
-            keys,
-            settings: {
-              ...s.settings,
-              encoders,
-              features: { ...s.settings.features, encoder: encoders.length > 0 },
-            },
-          };
-        }),
+        addEncoderKey: () => {
+          const encoderId = crypto.randomUUID();
+          set((s) => {
+            const fk = s.focusedKeyId ? s.keys.find(i => i.id === s.focusedKeyId) : null;
+            const id = crypto.randomUUID();
+            const nx = fk ? roundCoord(fk.x + (fk.w || 1)) : 0;
+            const ny = fk ? roundCoord(fk.y) : 0;
+            const newKey: RuntimeKey = {
+              id,
+              kind: 'encoder',
+              encoderId,
+              label: '',
+              x: nx,
+              y: ny,
+              w: 1,
+              h: 1,
+              r: 0,
+              rx: nx,
+              ry: ny,
+            };
+            const keys = [...s.keys, newKey];
+            const referencedEncoders = getReferencedEncoders(s.settings.encoders as RuntimeEncoder[], s.keys);
+            return {
+              keys,
+              baseKeys: keys,
+              selectedKeyIds: [id],
+              focusedKeyId: id,
+              selectionAnchorId: id,
+              settings: {
+                ...s.settings,
+                features: { ...s.settings.features, encoder: true },
+                encoders: [...referencedEncoders, { id: encoderId, keymap: {} }],
+              },
+            };
+          });
+        },
 
         updateEncoder: (encoderId: string, updates: Partial<EncoderDefinition>) => set((s) => ({
           settings: {

@@ -26,6 +26,7 @@ export interface EncoderDefinition {
 export interface PhysicalKey {
   id?: string;   // runtime only - generated on load, stripped on save
   encoderId?: string; // runtime only - links to ProjectSettings.encoders
+  kind?: 'key' | 'encoder';
   row?: number;  // matrix row (undefined if unassigned)
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments

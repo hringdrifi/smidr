@@ -313,6 +313,77 @@ describe('useKeyboardStore', () => {
     expect(pastedKey?.y).toBe(2.25);
   });
 
+  it('should clone encoder definitions when copying and pasting encoder keys', () => {
+    const store = useKeyboardStore.getState();
+    useKeyboardStore.setState({
+      settings: {
+        ...store.settings,
+        features: { ...store.settings.features, encoder: true },
+        encoders: [{
+          id: 'encoder-original',
+          pinA: 'GP2',
+          pinB: 'GP3',
+          keymap: {
+            0: {
+              counterClockwise: { action: 'tap', keycode: 'VOLD' },
+              clockwise: { action: 'tap', keycode: 'VOLU' },
+            },
+          },
+        }],
+      },
+    });
+    store.addKey({
+      kind: 'encoder',
+      encoderId: 'encoder-original',
+      x: 2,
+      y: 2,
+      w: 1,
+      h: 1,
+      label: '',
+    });
+
+    let state = useKeyboardStore.getState();
+    const originalKey = state.keys[0];
+    store.setSelectedKeyIds([originalKey.id]);
+    store.copyKeys();
+    store.pasteKeys();
+
+    state = useKeyboardStore.getState();
+    expect(state.keys).toHaveLength(2);
+    expect(state.settings.encoders).toHaveLength(2);
+
+    const pastedKey = state.keys.find(k => k.id !== originalKey.id);
+    expect(pastedKey).toBeDefined();
+    expect(pastedKey?.encoderId).toBeDefined();
+    expect(pastedKey?.encoderId).not.toBe(originalKey.encoderId);
+    expect(state.settings.encoders?.map(encoder => encoder.id)).toContain(pastedKey?.encoderId);
+    expect(state.settings.encoders?.[1].pinA).toBe('GP2');
+    expect(state.settings.encoders?.[1].pinB).toBe('GP3');
+    expect(state.settings.encoders?.[1].keymap).toEqual(state.settings.encoders?.[0].keymap);
+  });
+
+  it('should prune orphan encoder definitions before adding a new encoder key', () => {
+    const store = useKeyboardStore.getState();
+    useKeyboardStore.setState({
+      keys: [],
+      selectedKeyIds: [],
+      focusedKeyId: null,
+      settings: {
+        ...store.settings,
+        features: { ...store.settings.features, encoder: true },
+        encoders: [{ id: 'orphan-encoder', pinA: 'GP2', pinB: 'GP3' }],
+      },
+    });
+
+    store.addEncoderKey();
+
+    const state = useKeyboardStore.getState();
+    expect(state.keys).toHaveLength(1);
+    expect(state.settings.encoders).toHaveLength(1);
+    expect(state.keys[0].encoderId).toBe(state.settings.encoders?.[0].id);
+    expect(state.settings.encoders?.[0].id).not.toBe('orphan-encoder');
+  });
+
   it('should handle copying and pasting matrix coordinates in matrix mode', () => {
     const store = useKeyboardStore.getState();
     useKeyboardStore.setState({ editorMode: 'matrix' });
@@ -351,6 +422,25 @@ describe('useKeyboardStore', () => {
     expect(state.keys[2].col).toBe(2);
     expect(state.keys[3].row).toBe(3);
     expect(state.keys[3].col).toBe(4);
+  });
+
+  it('should preserve split side without assigning matrix row and col', () => {
+    const store = useKeyboardStore.getState();
+    useKeyboardStore.setState({
+      settings: {
+        ...store.settings,
+        features: { ...store.settings.features, split: true },
+      },
+    });
+    store.addKey({ x: 0, y: 0, w: 1, h: 1, label: 'A' });
+
+    const keyId = useKeyboardStore.getState().keys[0].id;
+    store.setMatrixPosition(keyId, undefined, undefined, 'right');
+
+    const key = useKeyboardStore.getState().keys[0];
+    expect(key.row).toBeUndefined();
+    expect(key.col).toBeUndefined();
+    expect(key.matrixSide).toBe('right');
   });
 
   it('should handle copying and pasting universal actions in keymap mode (design app mode)', () => {

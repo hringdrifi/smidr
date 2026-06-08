@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid
+  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
   const { 
     settings, keys, editorMode,
-    addKeys, loadProject, resetProject,
+    addKeys, addEncoderKey, loadProject, resetProject,
     selectedKeyIds, removeKey, generateMatrix,
     matrixPaintMode, setMatrixPaintMode,
     painter, setPainter, clearMatrixMap
@@ -151,6 +151,13 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
               className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/40 active:scale-90"
             />
 
+            <FloatingButton
+              icon={Gauge}
+              label={t('tools.addEncoder')}
+              onClick={addEncoderKey}
+              className="active:scale-90"
+            />
+
             {/* Add Multiple */}
             <div className="relative">
               <FloatingButton 
@@ -235,7 +242,7 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                   <div className="space-y-3 p-3">
                     {settings.features.split && (
                       <div>
-                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.side')}</div>
+                        <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.half')}</div>
                         <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
                           {(['left', 'right'] as const).map(side => (
                             <button

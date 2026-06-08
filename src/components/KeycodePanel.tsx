@@ -79,6 +79,12 @@ export const KeycodePanel = () => {
   const selectedEncoder = selectedKey?.encoderId && appMode === 'design'
     ? (settings.encoders || []).find(encoder => encoder.id === selectedKey.encoderId)
     : null;
+  const hasEncoderButtonMatrix = selectedKey?.row !== undefined && selectedKey?.col !== undefined;
+  const effectiveEncoderActionDirection = selectedEncoder && encoderActionDirection === 'button' && !hasEncoderButtonMatrix
+    ? 'clockwise'
+    : encoderActionDirection;
+  const encoderRotationDirection = effectiveEncoderActionDirection === 'button' ? null : effectiveEncoderActionDirection;
+  const isEncoderRotationTarget = !!selectedEncoder && !!encoderRotationDirection;
   const hasSelectedKey = selectedKeyIds.length > 0;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
     selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
@@ -86,8 +92,8 @@ export const KeycodePanel = () => {
 
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
-    if (selectedEncoder) {
-      action = selectedEncoder.keymap?.[currentLayer]?.[encoderActionDirection] || { action: 'trans' };
+    if (isEncoderRotationTarget) {
+      action = selectedEncoder.keymap?.[currentLayer]?.[encoderRotationDirection] || { action: 'trans' };
     } else if (appMode === 'remap') {
       if (selectedRemoteIndex !== undefined) {
         action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
@@ -104,13 +110,13 @@ export const KeycodePanel = () => {
     : 'trans';
 
   const updateSelectedAction = (newAction: UniversalAction) => {
-    if (selectedKeyIds.length === 1 && selectedEncoder) {
+    if (selectedKeyIds.length === 1 && isEncoderRotationTarget && selectedEncoder) {
       updateEncoder(selectedEncoder.id!, {
         keymap: {
           ...(selectedEncoder.keymap || {}),
           [currentLayer]: {
             ...(selectedEncoder.keymap?.[currentLayer] || {}),
-            [encoderActionDirection]: newAction,
+            [encoderRotationDirection]: newAction,
           },
         },
       });
@@ -228,7 +234,7 @@ export const KeycodePanel = () => {
       updateSelectedAction(clickedAction);
     }
 
-    if (selectedKeyIds.length === 1) {
+    if (selectedKeyIds.length === 1 && !selectedEncoder) {
       const visKeys = keys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option);
       const sortedKeys = sortKeys(visKeys, editorSettings.sortThresholdY);
       

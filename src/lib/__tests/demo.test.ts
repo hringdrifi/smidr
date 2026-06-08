@@ -11,7 +11,8 @@ describe('demo project', () => {
     expect(project.pins.cols).toHaveLength(6);
     expect(project.pins.splitRows).toHaveLength(4);
     expect(project.pins.splitCols).toHaveLength(6);
-    expect(project.encoders?.[0]).toEqual({ pinA: 'GP3', pinB: 'GP14' });
+    expect(project.features.encoder).toBe(false);
+    expect(project.encoders).toEqual([]);
 
     const leftKeys = project.keys.filter(key => key.matrixSide === 'left');
     const rightKeys = project.keys.filter(key => key.matrixSide === 'right');

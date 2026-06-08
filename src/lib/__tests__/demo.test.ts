@@ -47,7 +47,8 @@ describe('demo mode', () => {
 
     expect(project.id).toBe('smidr-demo-project');
     expect(project.features.rgb).toBe(true);
-    expect(project.features.encoder).toBe(true);
+    expect(project.features.encoder).toBe(false);
+    expect(project.encoders).toEqual([]);
     expect(project.layoutOptions['0']).toEqual({
       name: 'Columns',
       type: 'list',
