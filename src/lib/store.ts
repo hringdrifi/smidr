@@ -63,8 +63,8 @@ const normalizeEncoders = (
   }));
 };
 
-const assignRuntimeEncoderIds = (
-  keys: PhysicalKey[],
+const assignRuntimeEncoderIds = <T extends PhysicalKey>(
+  keys: T[],
   encoders: RuntimeEncoder[]
 ) => keys.map(key => {
   if (key.encoderId || key.encoderIndex === undefined) return key;
@@ -72,7 +72,7 @@ const assignRuntimeEncoderIds = (
   if (!encoder) return key;
   const { encoderIndex, ...keyWithoutIndex } = key;
   return { ...keyWithoutIndex, encoderId: encoder.id };
-});
+}) as T[];
 
 const getReferencedEncoders = (
   encoders: RuntimeEncoder[] = [],
@@ -2524,7 +2524,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               }
 
               // Assign fresh runtime IDs first so keys and baseKeys share the exact same key list and references
-              let appliedKeys = keys.map(k => ({ ...k, id: crypto.randomUUID() }));
+              let appliedKeys: RuntimeKey[] = keys.map(k => ({ ...k, id: crypto.randomUUID() }));
               
               // 3. Auto-align to (0,0) considering layout options
               if (appliedKeys.length > 0) {

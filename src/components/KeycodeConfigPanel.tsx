@@ -37,7 +37,7 @@ const describeAction = (action?: UniversalAction) => {
   if (action.action === 'td') return `TD${action.tapDanceId}`;
   if (action.action === 'macro') return `M${action.macroId}`;
   if (action.action === 'custom') return action.label || action.rawCode;
-  return action.action.toUpperCase();
+  return 'UNKNOWN';
 };
 
 
