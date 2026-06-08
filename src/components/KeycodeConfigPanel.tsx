@@ -21,7 +21,8 @@ export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
     settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
-    deviceCapabilities, remoteTapDances, openMacroSettings, openTapDanceSettings
+    deviceCapabilities, remoteTapDances, openMacroSettings, openTapDanceSettings,
+    updateEncoder, encoderActionDirection, setEncoderActionDirection
   } = useKeyboardStore();
   const { t } = useTranslation();
   const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
@@ -36,12 +37,18 @@ export const KeycodeConfigPanel = () => {
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
+  const selectedEncoder = selectedKey?.encoderId
+    ? (settings.encoders || []).find(encoder => encoder.id === selectedKey.encoderId)
+    : null;
+  const isEncoderActionMode = appMode === 'design' && !!selectedEncoder;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
     selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
   );
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
-    if (appMode === 'remap') {
+    if (isEncoderActionMode) {
+      action = selectedEncoder?.keymap?.[currentLayer]?.[encoderActionDirection] || { action: 'trans' };
+    } else if (appMode === 'remap') {
       if (selectedRemoteIndex !== undefined) {
         action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
       }
@@ -56,7 +63,7 @@ export const KeycodeConfigPanel = () => {
 
   useEffect(() => {
     setDraftAction(action);
-  }, [selectedKeyId, currentLayer, appMode, actionSignature]);
+  }, [selectedKeyId, currentLayer, appMode, encoderActionDirection, actionSignature]);
 
   useEffect(() => {
     if (activeAction.action === 'custom') {
@@ -88,7 +95,17 @@ export const KeycodeConfigPanel = () => {
   };
 
   const commitSelectedAction = (newAction: UniversalAction) => {
-    if (appMode === 'remap') {
+    if (isEncoderActionMode && selectedEncoder) {
+      updateEncoder(selectedEncoder.id!, {
+        keymap: {
+          ...(selectedEncoder.keymap || {}),
+          [currentLayer]: {
+            ...(selectedEncoder.keymap?.[currentLayer] || {}),
+            [encoderActionDirection]: newAction,
+          },
+        },
+      });
+    } else if (appMode === 'remap') {
       if (selectedKey.zmkPosition !== undefined) {
         updateDeviceKeycode(currentLayer, selectedKey.zmkPosition, -1, newAction);
       } else if (selectedKey.row !== undefined && selectedKey.col !== undefined) {
@@ -353,6 +370,34 @@ export const KeycodeConfigPanel = () => {
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden">
       <div className="p-4 flex flex-col gap-4 border-b border-[var(--border-main)] shrink-0 bg-[var(--bg-app)]/30">
+        {isEncoderActionMode && selectedEncoder && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              {t('keycodeConfig.encoderDirection')}
+            </label>
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
+              {([
+                ['counterClockwise', t('keycodeConfig.encoderCounterClockwise')],
+                ['clockwise', t('keycodeConfig.encoderClockwise')],
+              ] as const).map(([direction, label]) => (
+                <button
+                  key={direction}
+                  type="button"
+                  onClick={() => setEncoderActionDirection(direction)}
+                  className={cn(
+                    "h-8 rounded text-[10px] font-bold uppercase transition-all",
+                    encoderActionDirection === direction
+                      ? "bg-amber-500 text-zinc-950"
+                      : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Action Type Dropdown */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">

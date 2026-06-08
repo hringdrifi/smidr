@@ -1,6 +1,6 @@
 import { create, StateCreator } from 'zustand';
 import { temporal } from 'zundo';
-import { PhysicalKey, ProjectSettings, EditorSettings, SmidrProject } from '@/types/keyboard';
+import { EncoderDefinition, PhysicalKey, ProjectSettings, EditorSettings, SmidrProject } from '@/types/keyboard';
 import { UniversalAction, MacroAction, ComboEntry, TapDanceEntry } from '@/types/actions';
 import { deserializeMacros, serializeMacros } from './protocols/vial-macro-converter';
 import { Language } from './i18n';
@@ -40,12 +40,39 @@ import {
 export { getMatrixFromPins } from './matrix-utils';
 
 export type RuntimeKey = PhysicalKey & { id: string };
+type RuntimeEncoder = EncoderDefinition & { id: string };
 
 const createEmptyMacros = (count = 16): MacroAction[][] => Array.from({ length: count }, () => []);
 
 const normalizeMacros = (macros?: MacroAction[][], count = 16): MacroAction[][] => (
   Array.from({ length: Math.max(count, macros?.length || 0) }, (_, idx) => macros?.[idx] || [])
 );
+
+const normalizeEncoders = (
+  encoders?: EncoderDefinition[],
+  keys: PhysicalKey[] = []
+): RuntimeEncoder[] => {
+  const maxReferencedIndex = keys.reduce((max, key) => (
+    key.encoderIndex !== undefined ? Math.max(max, key.encoderIndex) : max
+  ), -1);
+  const count = Math.max(encoders?.length || 0, maxReferencedIndex + 1);
+
+  return Array.from({ length: count }, (_, index) => ({
+    ...(encoders?.[index] || {}),
+    id: encoders?.[index]?.id || crypto.randomUUID(),
+  }));
+};
+
+const assignRuntimeEncoderIds = (
+  keys: PhysicalKey[],
+  encoders: RuntimeEncoder[]
+) => keys.map(key => {
+  if (key.encoderId || key.encoderIndex === undefined) return key;
+  const encoder = encoders[key.encoderIndex];
+  if (!encoder) return key;
+  const { encoderIndex, ...keyWithoutIndex } = key;
+  return { ...keyWithoutIndex, encoderId: encoder.id };
+});
 
 export const getCenteredTransform = (keys: PhysicalKey[], activeOptions: Record<string, number> = {}) => {
   const visKeys = keys.filter(k => !k.group || (activeOptions[k.group] ?? 0) === k.option);
@@ -119,6 +146,8 @@ export interface KeyboardState {
   editorMode: 'layout' | 'matrix' | 'hardware' | 'keymap';
   setEditorMode: (mode: 'layout' | 'matrix' | 'hardware' | 'keymap') => void;
   currentLayer: number;
+  encoderActionDirection: 'counterClockwise' | 'clockwise';
+  setEncoderActionDirection: (direction: 'counterClockwise' | 'clockwise') => void;
   setCurrentLayer: (layer: number) => void;
   addLayer: () => void;
   removeLastLayer: () => void;
@@ -179,6 +208,9 @@ export interface KeyboardState {
 
   // Matrix Painting
   setMatrixPosition: (id: string, row: number | undefined, col: number | undefined, side?: MatrixSide) => void;
+  addEncoderToKey: (keyId: string) => void;
+  removeEncoderFromKey: (keyId: string) => void;
+  updateEncoder: (encoderId: string, updates: Partial<EncoderDefinition>) => void;
   painter: { currentRow: number; currentCol: number; currentSide: MatrixSide; autoIncrement: 'matrix' | 'col' | 'row'; };
   setPainter: (painter: Partial<KeyboardState['painter']>) => void;
   paintKey: (id: string) => void;
@@ -277,6 +309,7 @@ const initialState: Partial<KeyboardState> = {
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
     features: { rgb: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
+    encoders: [],
     macros: createEmptyMacros(),
     combos: [],
     tapDances: [],
@@ -305,6 +338,7 @@ const initialState: Partial<KeyboardState> = {
   appMode: isDemoModeEnabled() ? 'remap' : getStoredAppMode(),
   editorMode: getStoredEditorMode(),
   currentLayer: 0,
+  encoderActionDirection: 'clockwise',
   connectedDevice: null,
   deviceCapabilities: null,
   activeTransport: null,
@@ -1538,10 +1572,20 @@ export const useKeyboardStore = create<KeyboardState>()(
         })),
 
         removeKey: (id: string) => set((s) => {
+          const removedKey = s.keys.find(k => k.id === id);
           const newKeys = s.keys.filter(k => k.id !== id);
+          const removedEncoderId = removedKey?.encoderId;
+          const encoders = removedEncoderId && !newKeys.some(k => k.encoderId === removedEncoderId)
+            ? (s.settings.encoders || []).filter(encoder => encoder.id !== removedEncoderId)
+            : s.settings.encoders || [];
           return { 
             keys: newKeys,
             baseKeys: newKeys,
+            settings: {
+              ...s.settings,
+              encoders,
+              features: { ...s.settings.features, encoder: encoders.length > 0 },
+            },
             selectedKeyIds: s.selectedKeyIds.filter(i => i !== id),
             focusedKeyId: s.focusedKeyId === id ? null : s.focusedKeyId,
             selectionAnchorId: s.selectionAnchorId === id ? null : s.selectionAnchorId
@@ -1999,6 +2043,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
         },
         setCurrentLayer: (l: number) => set({ currentLayer: l }),
+        setEncoderActionDirection: (direction) => set({ encoderActionDirection: direction }),
         addLayer: () => set((s) => {
           const layers = Math.min(32, (s.settings.layers || 1) + 1);
           return {
@@ -2042,6 +2087,56 @@ export const useKeyboardStore = create<KeyboardState>()(
               : undefined;
             return { ...k, row, col, matrixSide: row === undefined || col === undefined ? undefined : matrixSide };
           })
+        })),
+
+        addEncoderToKey: (keyId: string) => set((s) => {
+          const key = s.keys.find(k => k.id === keyId);
+          if (!key) return s;
+          if (key.encoderId && (s.settings.encoders || []).some(encoder => encoder.id === key.encoderId)) {
+            return s;
+          }
+
+          const encoder: RuntimeEncoder = { id: crypto.randomUUID(), keymap: {} };
+          return {
+            keys: s.keys.map(k => k.id === keyId ? { ...k, encoderId: encoder.id, encoderIndex: undefined } : k),
+            settings: {
+              ...s.settings,
+              features: { ...s.settings.features, encoder: true },
+              encoders: [...(s.settings.encoders || []), encoder],
+            },
+          };
+        }),
+
+        removeEncoderFromKey: (keyId: string) => set((s) => {
+          const key = s.keys.find(k => k.id === keyId);
+          if (!key?.encoderId) return s;
+          const encoderId = key.encoderId;
+          const keys = s.keys.map(k => (
+            k.id === keyId
+              ? { ...k, encoderId: undefined, encoderIndex: undefined }
+              : k
+          ));
+          const encoderStillUsed = keys.some(k => k.encoderId === encoderId);
+          const encoders = encoderStillUsed
+            ? s.settings.encoders || []
+            : (s.settings.encoders || []).filter(encoder => encoder.id !== encoderId);
+          return {
+            keys,
+            settings: {
+              ...s.settings,
+              encoders,
+              features: { ...s.settings.features, encoder: encoders.length > 0 },
+            },
+          };
+        }),
+
+        updateEncoder: (encoderId: string, updates: Partial<EncoderDefinition>) => set((s) => ({
+          settings: {
+            ...s.settings,
+            encoders: (s.settings.encoders || []).map(encoder => (
+              encoder.id === encoderId ? { ...encoder, ...updates, id: encoder.id } : encoder
+            )),
+          },
         })),
 
         setPainter: (p: Partial<KeyboardState['painter']>) => set((s) => ({ painter: { ...s.painter, ...p } })),
@@ -2234,6 +2329,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           // Extract keys and id/updatedAt, rest is settings
           const { id, updatedAt, keys: rawKeys, vendorId, productId, vendorProductId, ...settings } = project;
           const normalizedVendorProductId = getProjectVendorProductId(project) ?? s.settings.vendorProductId;
+          const runtimeEncoders = normalizeEncoders(settings.encoders, rawKeys);
           const settingsWithDefaultMatrix = {
             ...settings,
             vendorProductId: normalizedVendorProductId,
@@ -2246,6 +2342,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             vial: settings.vial || {},
             zmk: settings.zmk || {},
             macros: normalizeMacros(settings.macros),
+            encoders: runtimeEncoders,
             combos: settings.combos || [],
             tapDances: settings.tapDances || [],
             matrix: settings.matrix || {
@@ -2255,7 +2352,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           };
 
           // Assign fresh runtime IDs to all keys (id is not persisted)
-          let newKeys = rawKeys.map(k => ({
+          let newKeys = assignRuntimeEncoderIds(rawKeys, runtimeEncoders).map(k => ({
             ...k,
             id: crypto.randomUUID(),
             keymap: k.keymap as Record<number, UniversalAction> | undefined
@@ -2316,7 +2413,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             }
 
             const result = parseKeyboardDefinition(input);
-            const { keys, name, vendorProductId, layoutOptions, activeOptions, matrix, pins, hardware, qmk, features } = result;
+            const { keys, name, vendorProductId, layoutOptions, activeOptions, matrix, pins, encoders, hardware, qmk, features } = result;
             const initialActiveOptions = activeOptions
               ?? Object.fromEntries(Object.keys(layoutOptions || {}).map(id => [id, 0]));
             
@@ -2387,7 +2484,8 @@ export const useKeyboardStore = create<KeyboardState>()(
                 }
               }
 
-              const finalKeys = appliedKeys.filter(k => !k.decal);
+              const finalEncoders = normalizeEncoders(encoders || s.settings.encoders, appliedKeys);
+              const finalKeys = assignRuntimeEncoderIds(appliedKeys, finalEncoders).filter(k => !k.decal);
 
               return {
                 keys: finalKeys,
@@ -2403,6 +2501,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
                   qmk: qmk ? { ...(s.settings.qmk || {}), ...qmk } : s.settings.qmk,
                   features: features ? { ...s.settings.features, ...features } : s.settings.features,
+                  encoders: finalEncoders,
                   tapDances: s.settings.tapDances || [],
                   matrix: nextMatrix
                 },

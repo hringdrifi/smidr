@@ -237,8 +237,10 @@ export const MatrixPinInspectorPanel = () => {
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
-    if (settings.pins.encoderA) pins.add(settings.pins.encoderA);
-    if (settings.pins.encoderB) pins.add(settings.pins.encoderB);
+    settings.encoders?.forEach(encoder => {
+      if (encoder.pinA) pins.add(encoder.pinA);
+      if (encoder.pinB) pins.add(encoder.pinB);
+    });
     if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
     return pins;
   };
@@ -272,8 +274,6 @@ export const MatrixPinInspectorPanel = () => {
         rgb: '',
         sda: '',
         scl: '',
-        encoderA: '',
-        encoderB: '',
         splitSerial: ''
       }
     });
@@ -381,7 +381,7 @@ export const MatrixPinInspectorPanel = () => {
         )}
       </section>
 
-      {(settings.features.rgb || settings.features.encoder || settings.features.oled || settings.features.split) && (
+      {(settings.features.rgb || settings.features.oled || settings.features.split) && (
         <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
           <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
           <div className="grid grid-cols-2 gap-3">
@@ -418,30 +418,6 @@ export const MatrixPinInspectorPanel = () => {
                     setFocusedFeature('scl');
                   }}
                   onClear={() => setPin('feature', 'scl', '')}
-                />
-              </>
-            )}
-            {settings.features.encoder && (
-              <>
-                <InteractivePinSlot
-                  label={t('hardware.encA')}
-                  value={settings.pins.encoderA || ''}
-                  isFocused={activeBox === 'feature' && focusedFeature === 'encoderA'}
-                  onFocus={() => {
-                    setActiveBox('feature');
-                    setFocusedFeature('encoderA');
-                  }}
-                  onClear={() => setPin('feature', 'encoderA', '')}
-                />
-                <InteractivePinSlot
-                  label={t('hardware.encB')}
-                  value={settings.pins.encoderB || ''}
-                  isFocused={activeBox === 'feature' && focusedFeature === 'encoderB'}
-                  onFocus={() => {
-                    setActiveBox('feature');
-                    setFocusedFeature('encoderB');
-                  }}
-                  onClear={() => setPin('feature', 'encoderB', '')}
                 />
               </>
             )}
@@ -609,8 +585,10 @@ export const MatrixPinSettingsPanel = () => {
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
-    if (settings.pins.encoderA) pins.add(settings.pins.encoderA);
-    if (settings.pins.encoderB) pins.add(settings.pins.encoderB);
+    settings.encoders?.forEach(encoder => {
+      if (encoder.pinA) pins.add(encoder.pinA);
+      if (encoder.pinB) pins.add(encoder.pinB);
+    });
     if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
     return pins;
   };
@@ -644,8 +622,6 @@ export const MatrixPinSettingsPanel = () => {
         rgb: '',
         sda: '',
         scl: '',
-        encoderA: '',
-        encoderB: '',
         splitSerial: ''
       }
     });
@@ -799,30 +775,6 @@ export const MatrixPinSettingsPanel = () => {
                       />
                     </>
                   )}
-                  {settings.features.encoder && (
-                    <>
-                      <InteractivePinSlot
-                        label={t('hardware.encA')}
-                        value={settings.pins.encoderA || ''}
-                        isFocused={activeBox === 'feature' && focusedFeature === 'encoderA'}
-                        onFocus={() => {
-                          setActiveBox('feature');
-                          setFocusedFeature('encoderA');
-                        }}
-                        onClear={() => setPin('feature', 'encoderA', '')}
-                      />
-                      <InteractivePinSlot
-                        label={t('hardware.encB')}
-                        value={settings.pins.encoderB || ''}
-                        isFocused={activeBox === 'feature' && focusedFeature === 'encoderB'}
-                        onFocus={() => {
-                          setActiveBox('feature');
-                          setFocusedFeature('encoderB');
-                        }}
-                        onClear={() => setPin('feature', 'encoderB', '')}
-                      />
-                    </>
-                  )}
                   {settings.features.split && (
                     <InteractivePinSlot
                       label={t('hardware.splitSerial')}
@@ -836,7 +788,7 @@ export const MatrixPinSettingsPanel = () => {
                     />
                   )}
                 </div>
-                {!settings.features.rgb && !settings.features.encoder && !settings.features.oled && !settings.features.split && (
+                {!settings.features.rgb && !settings.features.oled && !settings.features.split && (
                   <div className="h-24 flex items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
                     {t('hardware.specialPins')}
                   </div>

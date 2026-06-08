@@ -730,14 +730,13 @@ describe('export generation', () => {
         cols: ['GP4', 'GP5', 'GP6', 'GP7', 'GP8', 'GP9'],
         splitRows: ['GP10', 'GP11', 'GP12', 'GP13'],
         splitCols: ['GP14', 'GP15', 'GP16', 'GP17', 'GP18', 'GP19'],
-        encoderA: 'GP20',
-        encoderB: 'GP21',
       },
       features: {
         ...baseSettings.features,
         split: true,
         encoder: true,
       },
+      encoders: [{ pinA: 'GP20', pinB: 'GP21' }],
     };
     const keys: PhysicalKey[] = [
       {
@@ -798,6 +797,7 @@ describe('export generation', () => {
         ...baseSettings.features,
         encoder: true,
       },
+      encoders: [{}],
     };
     const keys: PhysicalKey[] = [
       {
@@ -821,6 +821,128 @@ describe('export generation', () => {
     const keyboardJson = JSON.parse(await zip.file('encoder_missing_pins/keyboard.json')!.async('string'));
     expect(keyboardJson.features.encoder).toBe(true);
     expect(keyboardJson.encoder.rotary).toEqual([{ pin_a: 'B0', pin_b: 'B1' }]);
+  });
+
+  it('serializes runtime encoder ids to saved encoder indexes', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: { ...baseSettings.features, encoder: true },
+      encoders: [
+        {
+          id: 'runtime-encoder-0',
+          pinA: 'GP2',
+          pinB: 'GP3',
+          keymap: {
+            0: {
+              counterClockwise: { action: 'tap', keycode: 'VOLD' },
+              clockwise: { action: 'tap', keycode: 'VOLU' },
+            },
+          },
+        },
+      ],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        id: 'runtime-key',
+        encoderId: 'runtime-encoder-0',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const saved = generateSmidrProjectJson({ settings, keys });
+
+    expect(saved.encoders?.[0]).toEqual({
+      pinA: 'GP2',
+      pinB: 'GP3',
+      keymap: {
+        0: {
+          counterClockwise: { action: 'tap', keycode: 'VOLD' },
+          clockwise: { action: 'tap', keycode: 'VOLU' },
+        },
+      },
+    });
+    expect((saved.encoders?.[0] as any).id).toBeUndefined();
+    expect(saved.keys[0].encoderIndex).toBe(0);
+    expect((saved.keys[0] as any).encoderId).toBeUndefined();
+  });
+
+  it('exports multiple encoder pins and encoder_map for QMK', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Encoder Map Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+      encoders: [
+        {
+          pinA: 'GP2',
+          pinB: 'GP3',
+          keymap: {
+            0: {
+              counterClockwise: { action: 'tap', keycode: 'VOLD' },
+              clockwise: { action: 'tap', keycode: 'VOLU' },
+            },
+          },
+        },
+        {
+          pinA: 'GP4',
+          pinB: 'GP5',
+          keymap: {
+            0: {
+              counterClockwise: { action: 'tap', keycode: 'LEFT' },
+              clockwise: { action: 'tap', keycode: 'RIGHT' },
+            },
+          },
+        },
+      ],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        encoderIndex: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('encoder_map_board/keyboard.json')!.async('string'));
+    const keymapC = await zip.file('encoder_map_board/keymaps/default/keymap.c')!.async('string');
+    const rulesMk = await zip.file('encoder_map_board/keymaps/default/rules.mk')!.async('string');
+
+    expect(keyboardJson.encoder.rotary).toEqual([
+      { pin_a: 'GP2', pin_b: 'GP3' },
+      { pin_a: 'GP4', pin_b: 'GP5' },
+    ]);
+    expect(keymapC).toContain('const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]');
+    expect(keymapC).toContain('ENCODER_CCW_CW(KC_VOLD, KC_VOLU)');
+    expect(keymapC).toContain('ENCODER_CCW_CW(KC_LEFT, KC_RGHT)');
+    expect(rulesMk).toContain('ENCODER_MAP_ENABLE = yes');
   });
 
   it('warns when encoder pins are missing during QMK and Vial export validation', () => {
@@ -870,8 +992,6 @@ describe('export generation', () => {
       pins: {
         rows: ['GP0'],
         cols: ['GP1'],
-        encoderA: 'GP2',
-        encoderB: 'GP3',
         splitRows: [],
         splitCols: [],
       },
@@ -879,6 +999,7 @@ describe('export generation', () => {
         ...baseSettings.features,
         encoder: true,
       },
+      encoders: [{ pinA: 'GP2', pinB: 'GP3' }],
     };
     const keys: PhysicalKey[] = [
       {
@@ -909,8 +1030,6 @@ describe('export generation', () => {
       pins: {
         rows: ['GP0'],
         cols: ['GP1'],
-        encoderA: 'B0',
-        encoderB: 'GP2',
         splitRows: [],
         splitCols: [],
       },
@@ -919,6 +1038,7 @@ describe('export generation', () => {
         encoder: true,
         split: true,
       },
+      encoders: [{ pinA: 'B0', pinB: 'GP2' }],
     };
     const keys: PhysicalKey[] = [
       {
@@ -940,7 +1060,7 @@ describe('export generation', () => {
     expect(issues).toContainEqual(expect.objectContaining({
       severity: 'warning',
       code: 'unknown-pin',
-      message: expect.stringContaining('Encoder A'),
+      message: expect.stringContaining('Encoder 0 A'),
     }));
     expect(issues).toContainEqual(expect.objectContaining({
       severity: 'warning',

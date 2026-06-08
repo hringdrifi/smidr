@@ -89,6 +89,14 @@ const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
   keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
 );
 
+const getEncoderIndex = (settings: ProjectSettings, key: PhysicalKey) => {
+  if (key.encoderId) {
+    const index = (settings.encoders || []).findIndex(encoder => encoder.id === key.encoderId);
+    if (index >= 0) return index;
+  }
+  return key.encoderIndex;
+};
+
 const normalizeKeysForKle = (keys: PhysicalKey[]) => {
   if (keys.length === 0) return [];
 
@@ -256,6 +264,13 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
         label += `\n\n\n${exportGroup},${key.option}`;
       }
     }
+    const encoderIndex = getEncoderIndex(settings, key);
+    if (!key.decal && encoderIndex !== undefined) {
+      const parts = label.split('\n');
+      while (parts.length <= 4) parts.push('');
+      parts[4] = `e${encoderIndex}`;
+      label = parts.join('\n');
+    }
     return {
       ...key,
       label
@@ -316,6 +331,8 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
 export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
   const { settings, keys } = state;
   const { matrix, pins, vendorProductId, visualLayout, ...settingsWithoutRuntimeIds } = settings;
+  const savedEncoders = (settings.encoders || []).map(({ id, ...encoder }) => encoder);
+  const encoderIndexById = new Map((settings.encoders || []).map((encoder, index) => [encoder.id, index]));
   const savedPins = settings.features.split ? pins : { ...pins };
   if (!settings.features.split) {
     delete savedPins.splitRows;
@@ -329,8 +346,17 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     vendorId: `0x${((vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     productId: `0x${(vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     pins: savedPins,
+    encoders: savedEncoders,
     // Strip runtime-only 'id' field before persisting
-    keys: keys.map(({ id, ...keyData }) => keyData as PhysicalKey)
+    keys: keys.map(({ id, encoderId, encoderIndex, ...keyData }) => {
+      const savedKey = { ...keyData } as PhysicalKey;
+      if (encoderId && encoderIndexById.has(encoderId)) {
+        savedKey.encoderIndex = encoderIndexById.get(encoderId);
+      } else if (encoderIndex !== undefined) {
+        savedKey.encoderIndex = encoderIndex;
+      }
+      return savedKey;
+    })
   } as unknown as SmidrProject;
 };
 

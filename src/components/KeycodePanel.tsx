@@ -27,7 +27,8 @@ export const KeycodePanel = () => {
   const { 
     keys, selectedKeyIds, setKeycode, setSelectedKeycode, setSelectedKeyIds, currentLayer, 
     editorSettings, settings, remoteKeymap,
-    connectedDevice, deviceCapabilities, appMode, zmkTapDanceIds, remoteTapDances
+    connectedDevice, deviceCapabilities, appMode, zmkTapDanceIds, remoteTapDances,
+    updateEncoder, encoderActionDirection
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
@@ -75,6 +76,9 @@ export const KeycodePanel = () => {
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
+  const selectedEncoder = selectedKey?.encoderId && appMode === 'design'
+    ? (settings.encoders || []).find(encoder => encoder.id === selectedKey.encoderId)
+    : null;
   const hasSelectedKey = selectedKeyIds.length > 0;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
     selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
@@ -82,7 +86,9 @@ export const KeycodePanel = () => {
 
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
-    if (appMode === 'remap') {
+    if (selectedEncoder) {
+      action = selectedEncoder.keymap?.[currentLayer]?.[encoderActionDirection] || { action: 'trans' };
+    } else if (appMode === 'remap') {
       if (selectedRemoteIndex !== undefined) {
         action = remoteKeymap[currentLayer]?.[selectedRemoteIndex] || { action: 'trans' };
       }
@@ -98,6 +104,18 @@ export const KeycodePanel = () => {
     : 'trans';
 
   const updateSelectedAction = (newAction: UniversalAction) => {
+    if (selectedKeyIds.length === 1 && selectedEncoder) {
+      updateEncoder(selectedEncoder.id!, {
+        keymap: {
+          ...(selectedEncoder.keymap || {}),
+          [currentLayer]: {
+            ...(selectedEncoder.keymap?.[currentLayer] || {}),
+            [encoderActionDirection]: newAction,
+          },
+        },
+      });
+      return;
+    }
     setSelectedKeycode(newAction);
   };
 

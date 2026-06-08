@@ -49,6 +49,10 @@ const shouldUseMatrixMask = (settings: ProjectSettings) => {
   return settings.qmk?.matrixMasked === true;
 };
 
+const getConfiguredEncoders = (settings: ProjectSettings) => {
+  return settings.encoders || [];
+};
+
 const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
   if (settings.qmk?.bootmagic?.enabled === false) {
     return { enabled: false };
@@ -110,6 +114,7 @@ ${rows}
 };
 
 const generateKeymapC = (validKeys: PhysicalKey[], layersCount: number, settings: ProjectSettings, tapDances: TapDanceEntry[] = []) => {
+  const encoders = getConfiguredEncoders(settings);
   let keymapC = `#include QMK_KEYBOARD_H
 
 ${generateQmkTapDanceC(tapDances)}
@@ -127,6 +132,25 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     keymapC += `\n  ),\n`;
   }
   keymapC += `};\n`;
+
+  if (encoders.length > 0) {
+    keymapC += `
+#if defined(ENCODER_MAP_ENABLE)
+const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
+`;
+    for (let i = 0; i < layersCount; i++) {
+      const layerMaps = encoders.map(encoder => {
+        const map = encoder.keymap?.[i];
+        const ccw = actionToQmkSourceString(map?.counterClockwise || { action: 'tap', keycode: 'VOLD' }, settings.macros || []);
+        const cw = actionToQmkSourceString(map?.clockwise || { action: 'tap', keycode: 'VOLU' }, settings.macros || []);
+        return `ENCODER_CCW_CW(${ccw}, ${cw})`;
+      }).join(', ');
+      keymapC += `  [${i}] = { ${layerMaps} },\n`;
+    }
+    keymapC += `};
+#endif
+`;
+  }
 
   return keymapC;
 };
@@ -178,6 +202,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
   }
   const useMatrixMask = shouldUseMatrixMask(settings);
   const bootmagic = getBootmagicConfig(settings, validKeys);
+  const encoders = getConfiguredEncoders(settings);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -204,7 +229,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
       extrakey: false,
       mousekey: false,
       nkro: true,
-      encoder: settings.features.encoder,
+      encoder: encoders.length > 0,
       rgblight: settings.features.rgb,
       via: true,  // Vial is built on top of VIA
     },
@@ -213,12 +238,12 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
       cols: settings.pins.cols,
       rows: settings.pins.rows
     },
-    ...(settings.features.encoder ? {
+    ...(encoders.length > 0 ? {
       encoder: {
-        rotary: [{
-          pin_a: settings.pins.encoderA || 'B0',
-          pin_b: settings.pins.encoderB || 'B1',
-        }],
+        rotary: encoders.map(encoder => ({
+          pin_a: encoder.pinA || 'B0',
+          pin_b: encoder.pinB || 'B1',
+        })),
       },
     } : {}),
     usb: {
@@ -292,12 +317,13 @@ ${useMatrixMask ? 'MATRIX_MASKED = yes\n' : ''}`;
   const vialKeymapC = generateKeymapC(validKeys, settings.layers || 4, settings, []);
   const tapDanceRules = (settings.tapDances || []).length > 0 ? `TAP_DANCE_ENABLE = yes\n` : '';
   const comboRules = hasConfiguredCombos(settings.combos || []) ? `COMBO_ENABLE = yes\n` : '';
+  const encoderMapRules = encoders.length > 0 ? `ENCODER_MAP_ENABLE = yes\n` : '';
 
   // 4. keymaps/default/
   const defaultFolder = kbFolder.folder('keymaps')?.folder('default');
   if (defaultFolder) {
     defaultFolder.file('keymap.c', keymapC);
-    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${tapDanceRules}${comboRules}`);
+    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${encoderMapRules}${tapDanceRules}${comboRules}`);
   }
 
   // 5. keymaps/vial/
@@ -333,6 +359,7 @@ VIAL_ENABLE = yes
 LTO_ENABLE = yes
 ${tapDanceRules}
 ${comboRules}
+${encoderMapRules}
 `;
     vialFolder.file('rules.mk', keymapRulesMk);
   }

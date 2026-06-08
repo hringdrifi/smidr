@@ -49,6 +49,15 @@ const pushInvalidPins = (
   });
 };
 
+const getConfiguredEncoders = (settings: ProjectSettings) => {
+  return settings.encoders || [];
+};
+
+const keyHasEncoder = (settings: ProjectSettings, key: PhysicalKey) => {
+  if (key.encoderId && (settings.encoders || []).some(encoder => encoder.id === key.encoderId)) return true;
+  return key.encoderIndex !== undefined;
+};
+
 export const validateFirmwareExport = (
   settings: ProjectSettings,
   keys: PhysicalKey[],
@@ -102,25 +111,28 @@ export const validateFirmwareExport = (
     }
   }
 
-  if (settings.features.encoder) {
-    if (!settings.pins.encoderA || !settings.pins.encoderB) {
+  const encoders = getConfiguredEncoders(settings);
+  if (settings.features.encoder || encoders.length > 0) {
+    const missingEncoderPins = encoders.length === 0 || encoders.some(encoder => !encoder.pinA || !encoder.pinB);
+    if (missingEncoderPins) {
       issues.push({
         severity: 'warning',
         code: 'encoder-pins-missing',
         message: 'Encoder is enabled, but encoder A/B pins are not fully assigned. The generated source may fail to compile until encoder pins are configured.',
       });
     }
-    if (!keys.some(key => key.encoderIndex !== undefined)) {
+    if (!keys.some(key => keyHasEncoder(settings, key))) {
       issues.push({
         severity: 'warning',
         code: 'encoder-layout-missing',
         message: 'Encoder is enabled, but no encoder is assigned in the layout. The generated source may not define any encoder instances.',
       });
     }
-    pushInvalidPins(issues, settings, [
-      { label: 'Encoder A', value: settings.pins.encoderA },
-      { label: 'Encoder B', value: settings.pins.encoderB },
+    const encoderPinLabels = encoders.flatMap((encoder, index) => [
+      { label: `Encoder ${index} A`, value: encoder.pinA },
+      { label: `Encoder ${index} B`, value: encoder.pinB },
     ]);
+    pushInvalidPins(issues, settings, encoderPinLabels);
   }
 
   if (target === 'vial' && (settings.tapDances || []).length > 0) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MousePointer2, Trash2 } from 'lucide-react';
+import { Gauge, MousePointer2, Trash2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { getLocalMatrixPosition, MatrixSide } from '@/lib/matrix-utils';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -14,6 +14,9 @@ export const MatrixPainter = () => {
     selectedKeyIds,
     keys,
     setMatrixPosition,
+    addEncoderToKey,
+    removeEncoderFromKey,
+    updateEncoder,
   } = useKeyboardStore();
   const { t } = useTranslation();
 
@@ -21,6 +24,12 @@ export const MatrixPainter = () => {
   const selectedKey = selectedKeyId ? keys.find(k => k.id === selectedKeyId) : null;
   const selectedMatrixPos = selectedKey ? getLocalMatrixPosition(settings, selectedKey, keys) : null;
   const selectedMatrixSide = selectedMatrixPos?.side || selectedKey?.matrixSide || 'left';
+  const selectedEncoder = selectedKey?.encoderId
+    ? (settings.encoders || []).find(encoder => encoder.id === selectedKey.encoderId)
+    : null;
+  const selectedEncoderIndex = selectedEncoder
+    ? (settings.encoders || []).findIndex(encoder => encoder.id === selectedEncoder.id)
+    : -1;
   const setSelectedSide = (side: MatrixSide) => {
     if (!selectedKeyId) return;
     setMatrixPosition(selectedKeyId, selectedMatrixPos?.row ?? 0, selectedMatrixPos?.col ?? 0, side);
@@ -103,6 +112,65 @@ export const MatrixPainter = () => {
           {t('matrix.notAssigned')}
         </p>
       )}
+
+      <div className="rounded border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Gauge size={14} className="text-[var(--text-dim)]" />
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                {t('matrix.encoder')}
+              </div>
+              {selectedEncoder && (
+                <div className="mt-0.5 font-mono text-[10px] text-amber-500">
+                  e{selectedEncoderIndex}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => selectedEncoder ? removeEncoderFromKey(selectedKeyId) : addEncoderToKey(selectedKeyId)}
+            className={cn(
+              "h-8 rounded border px-3 text-[10px] font-bold uppercase transition-all",
+              selectedEncoder
+                ? "border-red-500/25 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white"
+                : "border-amber-500/25 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-zinc-950"
+            )}
+          >
+            {selectedEncoder ? t('matrix.removeEncoder') : t('matrix.addEncoder')}
+          </button>
+        </div>
+
+        {selectedEncoder && (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                {t('matrix.encoderPinA')}
+              </span>
+              <input
+                type="text"
+                value={selectedEncoder.pinA || ''}
+                onChange={(e) => updateEncoder(selectedEncoder.id!, { pinA: e.target.value })}
+                className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none transition-all focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+                placeholder="GP2"
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                {t('matrix.encoderPinB')}
+              </span>
+              <input
+                type="text"
+                value={selectedEncoder.pinB || ''}
+                onChange={(e) => updateEncoder(selectedEncoder.id!, { pinB: e.target.value })}
+                className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none transition-all focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+                placeholder="GP3"
+              />
+            </label>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

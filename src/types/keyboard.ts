@@ -9,9 +9,23 @@ export interface KeymapData {
   [layerIndex: number]: UniversalAction;
 }
 
+export interface EncoderLayerMap {
+  clockwise?: UniversalAction;
+  counterClockwise?: UniversalAction;
+}
+
+export interface EncoderDefinition {
+  id?: string; // runtime only - generated on load, stripped on save
+  pinA?: string;
+  pinB?: string;
+  keymap?: {
+    [layerIndex: number]: EncoderLayerMap;
+  };
+}
 
 export interface PhysicalKey {
   id?: string;   // runtime only - generated on load, stripped on save
+  encoderId?: string; // runtime only - links to ProjectSettings.encoders
   row?: number;  // matrix row (undefined if unassigned)
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
@@ -39,7 +53,7 @@ export interface PhysicalKey {
 
   keymap?: KeymapData;
   decal?: boolean;
-  encoderIndex?: number;
+  encoderIndex?: number; // persisted/exported encoder index, converted to encoderId at runtime
 }
 
 export interface ProjectSettings {
@@ -57,8 +71,6 @@ export interface ProjectSettings {
     rgb?: string;
     sda?: string;
     scl?: string;
-    encoderA?: string;
-    encoderB?: string;
     splitSerial?: string; // Serial transport pin (e.g. GP1 for RP2040)
     splitRows?: string[]; // Right side row pins for split keyboards
     splitCols?: string[]; // Right side col pins for split keyboards
@@ -86,6 +98,7 @@ export interface ProjectSettings {
     split: boolean;
   };
   layers: number;
+  encoders?: EncoderDefinition[];
   macros?: MacroAction[][];
   combos?: ComboEntry[];
   tapDances?: TapDanceEntry[];

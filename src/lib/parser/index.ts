@@ -69,6 +69,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
   activeOptions?: ProjectSettings['activeOptions'],
   matrix?: ProjectSettings['matrix'],
   pins?: Partial<ProjectSettings['pins']>,
+  encoders?: ProjectSettings['encoders'],
   hardware?: Partial<ProjectSettings['hardware']>,
   qmk?: Partial<ProjectSettings['qmk']>,
   features?: Partial<ProjectSettings['features']>
@@ -162,12 +163,6 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           cols: Array.isArray(input.matrix_pins.cols) ? input.matrix_pins.cols.map(String) : [],
         };
         
-        // Parse encoder pins if present
-        if (input.encoder && Array.isArray(input.encoder.rotary) && input.encoder.rotary[0]) {
-          pins.encoderA = input.encoder.rotary[0].pin_a ? String(input.encoder.rotary[0].pin_a) : undefined;
-          pins.encoderB = input.encoder.rotary[0].pin_b ? String(input.encoder.rotary[0].pin_b) : undefined;
-        }
-
         // Parse RGB light pin if present
         if (input.rgblight && input.rgblight.pin) {
           pins.rgb = String(input.rgblight.pin);
@@ -175,6 +170,13 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           pins.rgb = String(input.ws2812.pin);
         }
       }
+
+      const encoders: ProjectSettings['encoders'] | undefined = input.encoder && Array.isArray(input.encoder.rotary)
+        ? input.encoder.rotary.map((encoder: any) => ({
+          pinA: encoder.pin_a ? String(encoder.pin_a) : undefined,
+          pinB: encoder.pin_b ? String(encoder.pin_b) : undefined,
+        }))
+        : undefined;
 
       let hardware: any = undefined;
       if (input.development_board || input.processor || input.bootloader || input.diode_direction) {
@@ -258,6 +260,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           activeOptions: {},
           matrix: undefined,
           pins,
+          encoders,
           hardware,
           qmk,
           features

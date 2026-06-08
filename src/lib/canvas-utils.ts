@@ -250,8 +250,14 @@ export const getKeyLabel = (
   }
 
   if (mode === 'matrix') {
+    const encoderIndex = k.encoderId && settings?.encoders
+      ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
+      : k.encoderIndex;
+    if (encoderIndex !== undefined && encoderIndex >= 0 && (k.row === undefined || k.col === undefined)) {
+      return { type: 'text', text: `ENC${encoderIndex}` };
+    }
     return (k.row !== undefined && k.col !== undefined)
-      ? { type: 'text', text: `R${k.row}:C${k.col}` }
+      ? { type: 'text', text: encoderIndex !== undefined && encoderIndex >= 0 ? `R${k.row}:C${k.col}\nENC${encoderIndex}` : `R${k.row}:C${k.col}` }
       : { type: 'empty' };
   }
   if (mode === 'keymap') {

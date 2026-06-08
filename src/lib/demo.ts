@@ -58,8 +58,6 @@ const getDemoSettings = (
     splitRows: ['GP4', 'GP5', 'GP6', 'GP7'],
     splitCols: ['GP8', 'GP9', 'GP10', 'GP11', 'GP12', 'GP13'],
     splitSerial: 'GP1',
-    encoderA: 'GP3',
-    encoderB: 'GP14',
   },
   hardware: {
     controllerType: 'development_board',
@@ -71,6 +69,7 @@ const getDemoSettings = (
   qmk: { matrixMasked: false, bootmagic: { enabled: true } },
   features: { rgb: true, encoder: true, oled: false, via: true, split: true },
   layers: 4,
+  encoders: [{ pinA: 'GP3', pinB: 'GP14' }],
   tapDances: DEMO_TAP_DANCES,
   layoutOptions,
   activeOptions,

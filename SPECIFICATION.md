@@ -122,6 +122,13 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。`controllerType: 'mcu'` の場合は左右を別 custom board (`<name>_left` / `<name>_right`) として生成し、右側 board DTS で同じ `col-offset` を指定する。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52840 系ターゲットを要求する。`wired` は `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
+### 7.6 ロータリーエンコーダー (Rotary Encoders)
+- **内部表現**: アプリ実行中は `ProjectSettings.encoders[]` の各要素に runtime-only の `id` を付与し、物理配置上の `PhysicalKey.encoderId` から参照する。`.smidr` 保存時は runtime `id` を保存せず、`encoders[]` の配列添字を `keys[].encoderIndex` として保存する。読み込み時は `encoderIndex` から新しい `encoderId` を復元する。
+- **物理位置**: ボタン付きエンコーダーは通常キーと同じ `PhysicalKey` に `row` / `col` / `keymap` と `encoderId` を併せ持つ。ボタン無しエンコーダーは `row` / `col` を持たず、物理位置と `encoderId` のみを持つ `PhysicalKey` として扱う。
+- **ピン設定**: エンコーダーの A/B ピンはグローバルな row / col ピン設定ではなく、選択中のエンコーダー物理位置に紐付く `ProjectSettings.encoders[]` で管理する。複数エンコーダーでは各 encoder 定義が独立した `pinA` / `pinB` を持つ。
+- **KLE/VIA ラベル**: VIA/Vial 互換 JSON へ出力する際は、エンコーダー位置の KLE ラベルに `e{index}` を埋め込む。`row,col` がある場合は押し込みスイッチのマトリクス位置として同じキーに保持し、`e{index}` は回転部の位置メタデータとして併記する。
+- **QMK/Vial 出力**: エンコーダーの物理ピンは `keyboard.json` の `encoder.rotary` に配列で出力する。回転時のレイヤー別アクションは `keymap.c` の `encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]` として生成し、対象 keymap の `rules.mk` に `ENCODER_MAP_ENABLE = yes` を出力する。
+
 ## 9. デバイス通信 & プロトコル統合仕様 (Device Protocol & ZMK Studio Integration)
 
 Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続を含むマルチプロトコルに完全に対応した通信層・UI層の結合設計をサポートします。
