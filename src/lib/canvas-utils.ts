@@ -261,6 +261,10 @@ export const getKeyLabel = (
       : { type: 'empty' };
   }
   if (mode === 'keymap') {
+    const isEncoder = k.kind === 'encoder' || !!k.encoderId || k.encoderIndex !== undefined;
+    if (isEncoder && (k.row === undefined || k.col === undefined)) {
+      return { type: 'empty' };
+    }
     const action = k.keymap?.[currentLayer];
     return formatActionLabel(action, visualLayout);
   }

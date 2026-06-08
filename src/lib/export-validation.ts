@@ -1,5 +1,5 @@
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
-import { getDevelopmentBoardPins, getMcuPins, getZmkTarget } from './mcu-presets';
+import { getDevelopmentBoardPins, getMcuPins, getZmkHardwareTarget } from './mcu-presets';
 import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
 
 export type FirmwareExportTarget = 'qmk' | 'vial' | 'zmk';
@@ -171,7 +171,7 @@ export const validateFirmwareExport = (
   if (settings.features.split) {
     if (target === 'zmk') {
       const zmkSplitTransport = settings.zmk?.splitTransport || 'ble';
-      if (zmkSplitTransport === 'ble' && getZmkTarget(settings.hardware.mcu) !== 'nrf52840') {
+      if (zmkSplitTransport === 'ble' && getZmkHardwareTarget(settings.hardware) !== 'nrf52840') {
         issues.push({
           severity: 'error',
           code: 'zmk-split-ble-target-required',
@@ -193,11 +193,19 @@ export const validateFirmwareExport = (
         message: 'Split is enabled, but the serial transport pin is not assigned. The generated source will use its fallback pin.',
       });
     }
-    if (!hasPins(settings.pins.splitRows) || !hasPins(settings.pins.splitCols)) {
+    const hasRightRows = hasPins(settings.pins.splitRows);
+    const hasRightCols = hasPins(settings.pins.splitCols);
+    if (!hasRightRows && !hasRightCols) {
       issues.push({
         severity: 'warning',
         code: 'split-matrix-pins-missing',
-        message: 'Split is enabled, but right-side row/column pins are not fully assigned. The generated source will reuse the left-side matrix pins where needed.',
+        message: 'Split is enabled, but right-side row/column pins are not assigned. The generated source will reuse the left-side matrix pins.',
+      });
+    } else if (!hasRightRows || !hasRightCols) {
+      issues.push({
+        severity: 'warning',
+        code: 'split-matrix-pins-partial',
+        message: 'Split is enabled, but only one right-side matrix axis is assigned. The generated source will use the configured right-side pins and reuse left-side pins for the blank axis.',
       });
     }
     pushInvalidPins(issues, settings, [

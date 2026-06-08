@@ -95,6 +95,7 @@ export const QMK_DEVELOPMENT_BOARDS = [
 export const ZMK_DEVELOPMENT_BOARDS = [
   'adafruit_kb2040',
   'boardsource_blok',
+  'seeeduino_xiao_ble',
   'nrfmicro_nrf52833',
   'nrfmicro_nrf52840_flipped',
   'nrfmicro_nrf52840',
@@ -111,6 +112,7 @@ export type DevelopmentBoardOption = {
   label: string;
   qmkBoard?: string;
   zmkBoard?: string;
+  zmkInterconnect?: 'pro_micro' | 'seeed_xiao';
   pinSet?: DevelopmentBoardPinSet;
 };
 
@@ -141,6 +143,7 @@ export const DEVELOPMENT_BOARD_OPTIONS: DevelopmentBoardOption[] = [
   { value: 'proton_c', label: 'QMK Proton-C', qmkBoard: 'proton_c', zmkBoard: 'proton_c', pinSet: 'stm32_blackpill' },
   { value: 'stemcell', label: 'Stemcell', qmkBoard: 'stemcell', pinSet: 'stm32_blackpill' },
   { value: 'svlinky', label: 'Svlinky', qmkBoard: 'svlinky', pinSet: 'rp2040_full' },
+  { value: 'xiao_ble', label: 'Seeed XIAO nRF52840', zmkBoard: 'seeeduino_xiao_ble', zmkInterconnect: 'seeed_xiao', pinSet: 'nrf52840_promicro' },
   { value: 'nrfmicro_nrf52833', label: 'nRFMicro (nRF52833)', zmkBoard: 'nrfmicro_nrf52833', pinSet: 'nrf52840_promicro' },
   { value: 'nrfmicro_nrf52840_flipped', label: 'nRFMicro nRF52840 (flipped)', zmkBoard: 'nrfmicro_nrf52840_flipped', pinSet: 'nrf52840_promicro' },
   { value: 'nrfmicro_nrf52840', label: 'nRFMicro (nRF52840) 1.1/1.2/1.3', zmkBoard: 'nrfmicro_nrf52840', pinSet: 'nrf52840_promicro' },
@@ -155,6 +158,28 @@ export const getQmkDevelopmentBoard = (board: string | undefined) =>
 
 export const getZmkDevelopmentBoard = (board: string | undefined) =>
   DEVELOPMENT_BOARD_OPTIONS.find(option => option.value === board)?.zmkBoard || board || 'nice_nano';
+
+export const getZmkDevelopmentBoardInterconnect = (board: string | undefined) => {
+  const option = DEVELOPMENT_BOARD_OPTIONS.find(candidate => candidate.value === board || candidate.zmkBoard === board);
+  return option?.zmkInterconnect || 'pro_micro';
+};
+
+export const getZmkDevelopmentBoardTarget = (board: string | undefined): ZmkTarget | undefined => {
+  const option = DEVELOPMENT_BOARD_OPTIONS.find(candidate => candidate.value === board || candidate.zmkBoard === board);
+  if (!option) return undefined;
+  if (option.pinSet === 'nrf52840_promicro') return 'nrf52840';
+  if (option.pinSet === 'rp2040_full') return 'rp2040';
+  return undefined;
+};
+
+export const getZmkHardwareTarget = (
+  hardware: { controllerType?: 'mcu' | 'development_board'; mcu?: string; board?: string } | undefined
+) => {
+  if ((hardware?.controllerType || 'development_board') === 'development_board') {
+    return getZmkDevelopmentBoardTarget(hardware?.board) || getZmkTarget(hardware?.mcu);
+  }
+  return getZmkTarget(hardware?.mcu);
+};
 
 export const isQmkDevelopmentBoardSupported = (board: string | undefined) => {
   const option = DEVELOPMENT_BOARD_OPTIONS.find(candidate => candidate.value === board);

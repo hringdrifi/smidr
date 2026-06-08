@@ -5,7 +5,7 @@ import { actionToZmkSourceString, generateZmkTapDanceBehaviors } from './tap-dan
 import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './macro-codegen';
 import { generateZmkComboBehaviors } from './combo-codegen';
 import { sortKeys } from './sorting';
-import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
+import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkDevelopmentBoardInterconnect, getZmkHardwareTarget, ZmkTarget } from './mcu-presets';
 import { getLocalMatrixPosition, getMatrixFromPins, inferMatrixSideFromGeometry, MatrixSide } from './matrix-utils';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
@@ -37,12 +37,12 @@ const parseZmkGpio = (pin: string, fallback: number, target: ZmkTarget) => {
 
 const formatGpios = (pins: string[], target: ZmkTarget, flags: string, label: string) => {
   if (pins.length === 0) {
-    return `&gpio0 0 ${flags} /* Please configure pins */`;
+    return `<&gpio0 0 ${flags}> /* Please configure pins */`;
   }
 
   return pins.map((pin, index) => {
     const parsed = parseZmkGpio(pin, index, target);
-    return `${parsed.controller} ${parsed.number} ${flags} /* ${label} ${index}: ${pin} */`;
+    return `<${parsed.controller} ${parsed.number} ${flags}> /* ${label} ${index}: ${pin} */`;
   }).join('\n            , ');
 };
 
@@ -58,6 +58,10 @@ const formatGpio = (pin: string | undefined, target: ZmkTarget, flags: string, f
 const getZmkSplitTransport = (settings: ProjectSettings) => settings.zmk?.splitTransport || 'ble';
 
 const getWiredSplitDevice = (settings: ProjectSettings) => settings.zmk?.wiredSplitDevice?.trim() || '&pro_micro_serial';
+
+const generateZmkBuildYaml = (entries: Array<{ board: string; shield?: string }>) => `include:
+${entries.map(entry => `  - board: ${entry.board}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
+`;
 
 const getSidePins = (settings: ProjectSettings, side: MatrixSide) => {
   if (side === 'left') {
@@ -249,6 +253,7 @@ const generateKeymapDts = (
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/outputs.h>
 #include <dt-bindings/zmk/rgb.h>
+#include <dt-bindings/zmk/backlight.h>
 #include <dt-bindings/zmk/mouse.h>
 
 / {
@@ -311,6 +316,7 @@ const generateSplitShieldFiles = (
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
   const leftShield = `${kbName}_left`;
   const rightShield = `${kbName}_right`;
+  const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board);
   const splitTransport = getZmkSplitTransport(settings);
   const wiredSplitDevice = getWiredSplitDevice(settings);
   const wiredSplitNode = splitTransport === 'wired' ? `
@@ -432,7 +438,8 @@ endif
 id: ${kbName}
 name: "${settings.name}"
 type: shield
-requires: [${zmkTarget === 'nrf52840' ? 'nice_nano' : 'xiao'}]
+requires:
+  - ${requiredInterconnect}
 features:
   - keys
 siblings:
@@ -443,6 +450,10 @@ siblings:
 
   const keymap = generateKeymapDts(settings, sortedKeys, kbName);
   shieldsFolder.file(keymap.filename, keymap.content);
+  zip.file('build.yaml', generateZmkBuildYaml([
+    { board: boardName, shield: leftShield },
+    { board: boardName, shield: rightShield },
+  ]));
 
   const readmeContent = `# ZMK Config for ${settings.name}
 
@@ -716,6 +727,10 @@ features:
     const keymap = generateKeymapDts(settings, sortedKeys, kbName);
     configFolder.file(keymap.filename, keymap.content);
   }
+  zip.file('build.yaml', generateZmkBuildYaml([
+    { board: leftBoard },
+    { board: rightBoard },
+  ]));
 
   const readmeContent = `# ZMK Config for ${settings.name}
 
@@ -762,12 +777,13 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const kbName = sanitizeIdentifier(settings.name, 'smidr_keyboard');
   const vendorName = sanitizeIdentifier(settings.manufacturer, 'custom_vendor');
   
-  if (!isZmkExportSupported(settings.hardware.mcu)) {
+  const zmkTarget = getZmkHardwareTarget(settings.hardware);
+  if (!zmkTarget) {
     throw new Error('ZMK export is currently implemented for RP2040 and nRF52840 projects only.');
   }
 
-  const zmkTarget = getZmkTarget(settings.hardware.mcu) || 'rp2040';
   const boardName = getZmkDevelopmentBoard(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
+  const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
 
   if (settings.features.split) {
     if (settings.hardware.controllerType === 'mcu') {
@@ -1065,12 +1081,18 @@ endif
 id: ${kbName}
 name: "${settings.name}"
 type: shield
-requires: [${zmkTarget === 'nrf52840' ? 'nice_nano' : 'xiao'}]
+requires:
+  - ${requiredInterconnect}
 features:
   - keys
 `;
     shieldsFolder.file(`${kbName}.zmk.yml`, zmkYml);
   }
+  zip.file('build.yaml', generateZmkBuildYaml(
+    settings.hardware.controllerType === 'mcu'
+      ? [{ board: kbName }]
+      : [{ board: boardName, shield: kbName }]
+  ));
 
   const layersCount = settings.layers || 4;
   let keymapDts = `/*
@@ -1083,6 +1105,7 @@ features:
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/outputs.h>
 #include <dt-bindings/zmk/rgb.h>
+#include <dt-bindings/zmk/backlight.h>
 #include <dt-bindings/zmk/mouse.h>
 
 / {

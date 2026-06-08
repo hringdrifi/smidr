@@ -10,8 +10,8 @@ export const DEMO_PROJECT_ID = 'smidr-demo-project';
 export const DEMO_DEVICE = {
   vid: 0xFEED,
   pid: 0xD0D0,
-  productName: 'Smiðr Demo Keyboard',
-  manufacturerName: 'Smiðr',
+  productName: 'Smidr Demo Keyboard',
+  manufacturerName: 'Smidr',
   protocolType: 'vial' as const,
 };
 
@@ -46,8 +46,8 @@ const getDemoSettings = (
   layoutOptions: ProjectSettings['layoutOptions'] = {},
   activeOptions: ProjectSettings['activeOptions'] = {}
 ): ProjectSettings => ({
-  name: 'Smiðr Demo Corne',
-  manufacturer: 'Smiðr',
+  name: 'Smidr Corne',
+  manufacturer: 'Smidr',
   description: 'Virtual keyboard project for demo mode',
   vendorProductId: (DEMO_DEVICE.vid << 16) | DEMO_DEVICE.pid,
   vialUid: '0x534D49445244454D',

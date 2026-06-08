@@ -8,6 +8,8 @@ import { generateQmkComboC, hasConfiguredCombos } from './combo-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
 import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
 
+const hasPins = (pins: string[] | undefined) => (pins?.filter(Boolean).length ?? 0) > 0;
+
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const matrixKeys = keys.filter(key => (
     key.row !== undefined &&
@@ -217,11 +219,11 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
         enabled: true,
         matrix_pins: {
           right: {
-            cols: settings.pins.splitCols && settings.pins.splitCols.length === settings.pins.cols.length 
-              ? settings.pins.splitCols 
+            cols: hasPins(settings.pins.splitCols)
+              ? settings.pins.splitCols || []
               : settings.pins.cols,
-            rows: settings.pins.splitRows && settings.pins.splitRows.length === settings.pins.rows.length 
-              ? settings.pins.splitRows 
+            rows: hasPins(settings.pins.splitRows)
+              ? settings.pins.splitRows || []
               : settings.pins.rows
           }
         },

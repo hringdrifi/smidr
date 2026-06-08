@@ -720,6 +720,61 @@ describe('export generation', () => {
     expect(keyboardC).toContain('(matrix_row_t)0x1ULL');
   });
 
+  it('uses configured QMK right-side split pins even when their counts differ from the left side', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Asymmetric Split QMK',
+      matrix: { rows: 2, cols: 3 },
+      pins: {
+        rows: ['GP0', 'GP1'],
+        cols: ['GP2', 'GP3', 'GP4'],
+        splitRows: ['GP5'],
+        splitCols: ['GP6', 'GP7'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 5,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('asymmetric_split_qmk/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.split.matrix_pins.right.rows).toEqual(['GP5']);
+    expect(keyboardJson.split.matrix_pins.right.cols).toEqual(['GP6', 'GP7']);
+  });
+
   it('exports split Vial matrix positions as per-half rows and columns', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -780,6 +835,61 @@ describe('export generation', () => {
     expect(configH).not.toContain('ENCODERS_PAD_A');
     expect(configH).not.toContain('ENCODERS_PAD_B');
     expect(vialJson.matrix).toEqual({ rows: 8, cols: 6 });
+  });
+
+  it('uses configured Vial right-side split pins even when their counts differ from the left side', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Asymmetric Split Vial',
+      matrix: { rows: 2, cols: 3 },
+      pins: {
+        rows: ['GP0', 'GP1'],
+        cols: ['GP2', 'GP3', 'GP4'],
+        splitRows: ['GP5'],
+        splitCols: ['GP6', 'GP7'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 5,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateVialZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('asymmetric_split_vial/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.split.matrix_pins.right.rows).toEqual(['GP5']);
+    expect(keyboardJson.split.matrix_pins.right.cols).toEqual(['GP6', 'GP7']);
   });
 
   it('keeps encoder output enabled when encoder pins are missing', async () => {
@@ -1122,6 +1232,47 @@ describe('export generation', () => {
     }));
   });
 
+  it('warns when only one right-side split matrix axis is assigned during export validation', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: ['GP2'],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'right',
+        x: 2,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'qmk');
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'split-matrix-pins-partial',
+    }));
+    expect(issues).not.toContainEqual(expect.objectContaining({
+      code: 'split-matrix-pins-missing',
+    }));
+  });
+
   it('allows ZMK custom-board split source export during validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -1203,6 +1354,47 @@ describe('export generation', () => {
         col: 0,
         matrixSide: 'right',
         x: 4,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'zmk');
+    expect(issues.filter(issue => issue.severity === 'error')).toEqual([]);
+  });
+
+  it('uses the ZMK development board target during split export validation', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'atmega32u4',
+        board: 'nice_nano',
+      },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08'],
+        splitRows: ['P1.06'],
+        splitCols: ['P1.08'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
         y: 0,
         w: 1,
         h: 1,
@@ -1639,6 +1831,7 @@ describe('export generation', () => {
     const leftConf = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.conf')!.async('string');
     const keymap = await zip.file('config/split_mcu_board.keymap')!.async('string');
     const readme = await zip.file('README.md')!.async('string');
+    const buildYaml = await zip.file('build.yaml')!.async('string');
 
     expect(leftDts).toContain('model = "Split MCU Board left"');
     expect(leftDts).toContain('RC(0,0) RC(0,1)');
@@ -1656,6 +1849,9 @@ describe('export generation', () => {
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('- board: split_mcu_board_left');
     expect(readme).toContain('- board: split_mcu_board_right');
+    expect(buildYaml).toContain('include:');
+    expect(buildYaml).toContain('- board: split_mcu_board_left');
+    expect(buildYaml).toContain('- board: split_mcu_board_right');
   });
 
   it('emits ZMK as an existing board plus shield when development board is selected', async () => {
@@ -1697,13 +1893,63 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const shieldOverlay = await zip.file('boards/shields/shield_board/shield_board.overlay')!.async('string');
     const readme = await zip.file('README.md')!.async('string');
+    const buildYaml = await zip.file('build.yaml')!.async('string');
+    const zmkYml = await zip.file('boards/shields/shield_board/shield_board.zmk.yml')!.async('string');
 
     expect(zip.file('boards/arm/shield_board/Kconfig.board')).toBeNull();
     expect(shieldOverlay).toContain('zmk,kscan = &kscan0;');
     expect(shieldOverlay).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(shieldOverlay).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
+    expect(zmkYml).toContain('requires:\n  - pro_micro');
     expect(readme).toContain('- board: nice_nano');
     expect(readme).toContain('shield: shield_board');
+    expect(buildYaml).toContain('- board: nice_nano');
+    expect(buildYaml).toContain('shield: shield_board');
+  });
+
+  it('emits Seeed XIAO nRF52840 ZMK shield metadata and build entry', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'XIAO Shield',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'xiao_ble',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P1.02'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const zmkYml = await zip.file('boards/shields/xiao_shield/xiao_shield.zmk.yml')!.async('string');
+    const buildYaml = await zip.file('build.yaml')!.async('string');
+
+    expect(zmkYml).toContain('requires:\n  - seeed_xiao');
+    expect(buildYaml).toContain('- board: seeeduino_xiao_ble');
+    expect(buildYaml).toContain('shield: xiao_shield');
   });
 
   it('emits ZMK encoder sensors and sensor bindings', async () => {
@@ -1776,6 +2022,65 @@ describe('export generation', () => {
     expect(keymap).toContain('&smidr_encoder_0_layer_0');
   });
 
+  it('includes ZMK backlight bindings when exporting keymaps', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'ZMK Backlight Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'RP2040',
+        board: 'kb2040',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+      encoders: [{
+        pinA: 'GP2',
+        pinB: 'GP3',
+        keymap: {
+          0: {
+            clockwise: { action: 'tap', keycode: 'BL_UP' },
+            counterClockwise: { action: 'tap', keycode: 'BL_DOWN' },
+          },
+        },
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        kind: 'encoder',
+        encoderIndex: 0,
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymap = await zip.file('config/zmk_backlight_board.keymap')!.async('string');
+
+    expect(keymap).toContain('#include <dt-bindings/zmk/backlight.h>');
+    expect(keymap).toContain('bindings = <&bl BL_INC>, <&bl BL_DEC>;');
+  });
+
   it('emits ZMK split as left and right shield siblings', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -1841,6 +2146,7 @@ describe('export generation', () => {
     const zmkYml = await zip.file('boards/shields/split_zmk_board/split_zmk_board.zmk.yml')!.async('string');
     const keymap = await zip.file('boards/shields/split_zmk_board/split_zmk_board.keymap')!.async('string');
     const readme = await zip.file('README.md')!.async('string');
+    const buildYaml = await zip.file('build.yaml')!.async('string');
 
     expect(zip.file('config/split_zmk_board.keymap')).toBeNull();
     expect(dtsi).toContain('columns = <4>');
@@ -1857,11 +2163,64 @@ describe('export generation', () => {
     expect(kconfigDefconfig).toContain('config ZMK_SPLIT_ROLE_CENTRAL');
     expect(kconfigDefconfig).toContain('config ZMK_SPLIT');
     expect(zmkYml).toContain('siblings:');
+    expect(zmkYml).toContain('requires:\n  - pro_micro');
     expect(zmkYml).toContain('  - split_zmk_board_left');
     expect(zmkYml).toContain('  - split_zmk_board_right');
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('shield: split_zmk_board_left');
     expect(readme).toContain('shield: split_zmk_board_right');
+    expect(buildYaml).toContain('- board: nice_nano');
+    expect(buildYaml).toContain('shield: split_zmk_board_left');
+    expect(buildYaml).toContain('shield: split_zmk_board_right');
+  });
+
+  it('uses the selected ZMK development board target during split source export', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Nice Nano Split',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'atmega32u4',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08'],
+        splitRows: ['P1.06'],
+        splitCols: ['P1.08'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(readme).toContain('- board: nice_nano');
+    expect(readme).toContain('shield: nice_nano_split_left');
+    expect(readme).toContain('shield: nice_nano_split_right');
   });
 
   it('enables ZMK split encoder sensors on their assigned half', async () => {

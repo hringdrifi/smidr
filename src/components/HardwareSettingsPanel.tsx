@@ -65,10 +65,11 @@ export const HardwareSettingsPanel = () => {
     const colPins = new Set(cols.map(normalizePin).filter(Boolean));
     return rows.some(row => colPins.has(normalizePin(row)));
   };
-  const rightRows = settings.pins.splitRows && settings.pins.splitRows.length === settings.pins.rows.length
+  const hasPins = (pins: string[] | undefined) => (pins?.filter(Boolean).length ?? 0) > 0;
+  const rightRows = hasPins(settings.pins.splitRows)
     ? settings.pins.splitRows
     : settings.pins.rows;
-  const rightCols = settings.pins.splitCols && settings.pins.splitCols.length === settings.pins.cols.length
+  const rightCols = hasPins(settings.pins.splitCols)
     ? settings.pins.splitCols
     : settings.pins.cols;
   const hasMatrixPinOverlap =
