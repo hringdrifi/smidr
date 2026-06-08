@@ -463,7 +463,11 @@ export class VialProtocol extends ViaProtocol {
       await this.sendReport(data);
       const resp = await this.waitForReport();
 
-      const view = new DataView(resp.buffer, resp.byteOffset);
+      if (resp[0] !== 0) {
+        throw new Error(`Failed to read Vial Tap Dance ${i}: status ${resp[0]}`);
+      }
+
+      const view = new DataView(resp.buffer, resp.byteOffset + 1, resp.byteLength - 1);
       const tap = view.getUint16(0, true);
       const hold = view.getUint16(2, true);
       const doubleTap = view.getUint16(4, true);

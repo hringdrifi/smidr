@@ -5,6 +5,7 @@ import { UniversalAction } from '@/types/actions';
 import { ZmkProtocol } from '../protocols/zmk';
 import { ITransport } from '../transport/types';
 import { ViaProtocol } from '../protocols/via';
+import { VialProtocol } from '../protocols/vial';
 
 describe('protocols conversion tests', () => {
   describe('VIA protocol transport commands', () => {
@@ -33,6 +34,97 @@ describe('protocols conversion tests', () => {
       expect(sent?.[2]).toBe(0x34);
       expect(sent?.[3]).toBe(4);
       expect(Array.from(buffer)).toEqual([0xAA, 0xBB, 0xCC, 0xDD]);
+    });
+  });
+
+  describe('Vial dynamic tap dance transport commands', () => {
+    it('reads tap dance entries after the Vial status byte', async () => {
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        new Uint8Array(32),
+        (() => {
+          const resp = new Uint8Array(32);
+          resp[0] = 0; // status
+          resp[1] = 0x04; // on_tap KC_A
+          resp[2] = 0x00;
+          resp[3] = 0x00; // on_hold KC_NO
+          resp[4] = 0x00;
+          resp[5] = 0x05; // on_double_tap KC_B
+          resp[6] = 0x00;
+          resp[7] = 0x00; // on_tap_hold KC_NO
+          resp[8] = 0x00;
+          resp[9] = 0xC8; // custom_tapping_term 200ms
+          resp[10] = 0x00;
+          return resp;
+        })()
+      ];
+      const transport: ITransport = {
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++],
+      };
+
+      const protocol = new VialProtocol();
+      await protocol.initialize(transport);
+      const tapDances = await protocol.getTapDances(1);
+
+      expect(sent[1][0]).toBe(0xFE);
+      expect(sent[1][1]).toBe(0x0D);
+      expect(sent[1][2]).toBe(0x01);
+      expect(tapDances).toEqual([{
+        id: 0,
+        tapAction: { action: 'tap', keycode: 'A' },
+        holdAction: { action: 'none' },
+        doubleTapAction: { action: 'tap', keycode: 'B' },
+        tapHoldAction: { action: 'none' },
+        tappingTerm: 200
+      }]);
+    });
+
+    it('writes tap dance entries in the Vial request payload', async () => {
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        new Uint8Array(32),
+        new Uint8Array(32)
+      ];
+      const transport: ITransport = {
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data) => {
+          sent.push(data);
+        },
+        receive: async () => responses[responseIndex++],
+      };
+
+      const protocol = new VialProtocol();
+      await protocol.initialize(transport);
+      await protocol.setTapDance(2, {
+        id: 2,
+        tapAction: { action: 'tap', keycode: 'A' },
+        holdAction: { action: 'none' },
+        doubleTapAction: { action: 'tap', keycode: 'B' },
+        tapHoldAction: { action: 'none' },
+        tappingTerm: 200
+      });
+
+      expect(sent[1][0]).toBe(0xFE);
+      expect(sent[1][1]).toBe(0x0D);
+      expect(sent[1][2]).toBe(0x02);
+      expect(sent[1][3]).toBe(2);
+      expect(Array.from(sent[1].slice(4, 14))).toEqual([
+        0x04, 0x00,
+        0x00, 0x00,
+        0x05, 0x00,
+        0x00, 0x00,
+        0xC8, 0x00
+      ]);
     });
   });
 
