@@ -1,11 +1,12 @@
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
+import { UniversalAction } from '@/types/actions';
 import { actionToZmkSourceString, generateZmkTapDanceBehaviors } from './tap-dance-codegen';
 import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './macro-codegen';
 import { generateZmkComboBehaviors } from './combo-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkTarget, isZmkExportSupported, ZmkTarget } from './mcu-presets';
-import { getLocalMatrixPosition, getMatrixFromPins, MatrixSide } from './matrix-utils';
+import { getLocalMatrixPosition, getMatrixFromPins, inferMatrixSideFromGeometry, MatrixSide } from './matrix-utils';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
@@ -43,6 +44,15 @@ const formatGpios = (pins: string[], target: ZmkTarget, flags: string, label: st
     const parsed = parseZmkGpio(pin, index, target);
     return `${parsed.controller} ${parsed.number} ${flags} /* ${label} ${index}: ${pin} */`;
   }).join('\n            , ');
+};
+
+const formatGpio = (pin: string | undefined, target: ZmkTarget, flags: string, fallback: number, label: string) => {
+  if (!pin) {
+    return `&gpio0 ${fallback} ${flags} /* Please configure ${label} */`;
+  }
+
+  const parsed = parseZmkGpio(pin, fallback, target);
+  return `${parsed.controller} ${parsed.number} ${flags} /* ${label}: ${pin} */`;
 };
 
 const getZmkSplitTransport = (settings: ProjectSettings) => settings.zmk?.splitTransport || 'ble';
@@ -108,6 +118,110 @@ const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   });
 };
 
+const getEncoderKey = (settings: ProjectSettings, keys: PhysicalKey[], encoderIndex: number) => (
+  keys.find(key => {
+    if (key.encoderId) {
+      return (settings.encoders || []).findIndex(encoder => encoder.id === key.encoderId) === encoderIndex;
+    }
+    return key.encoderIndex === encoderIndex;
+  })
+);
+
+const getEncoderSide = (settings: ProjectSettings, keys: PhysicalKey[], encoderIndex: number): MatrixSide => {
+  if (!settings.features.split) return 'left';
+  const key = getEncoderKey(settings, keys, encoderIndex);
+  if (!key) return 'left';
+  return getLocalMatrixPosition(settings, key, keys)?.side || key.matrixSide || inferMatrixSideFromGeometry(key, keys);
+};
+
+const getEncoderConfigSnippet = (settings: ProjectSettings) => (
+  (settings.encoders || []).length > 0
+    ? 'CONFIG_EC11=y\nCONFIG_EC11_TRIGGER_GLOBAL_THREAD=y\n'
+    : ''
+);
+
+const generateZmkEncoderNodes = (
+  settings: ProjectSettings,
+  zmkTarget: ZmkTarget,
+  statusForEncoder: (index: number) => 'okay' | 'disabled',
+) => {
+  const encoders = settings.encoders || [];
+  if (encoders.length === 0) return '';
+
+  return `${encoders.map((encoder, index) => `    encoder_${index}: encoder_${index} {
+        compatible = "alps,ec11";
+        a-gpios = <${formatGpio(encoder.pinA, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_UP)', index * 2, `Encoder ${index} A`)}>;
+        b-gpios = <${formatGpio(encoder.pinB, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_UP)', index * 2 + 1, `Encoder ${index} B`)}>;
+        steps = <80>;
+        status = "${statusForEncoder(index)}";
+    };`).join('\n\n')}
+
+    sensors: sensors {
+        compatible = "zmk,keymap-sensors";
+        sensors = <${encoders.map((_, index) => `&encoder_${index}`).join(' ')}>;
+        triggers-per-rotation = <20>;
+    };
+`;
+};
+
+const generateZmkEncoderStatusOverrides = (settings: ProjectSettings, keys: PhysicalKey[], side?: MatrixSide) => {
+  const encoders = settings.encoders || [];
+  if (encoders.length === 0) return '';
+
+  const matching = encoders
+    .map((_, index) => ({ index, side: getEncoderSide(settings, keys, index) }))
+    .filter(item => !side || item.side === side);
+
+  if (matching.length === 0) return '';
+
+  return `\n${matching.map(({ index }) => `&encoder_${index} {
+    status = "okay";
+};`).join('\n\n')}
+`;
+};
+
+const zmkActionForEncoder = (settings: ProjectSettings, action?: UniversalAction) => {
+  const safeAction: UniversalAction = action || { action: 'trans' };
+  return safeAction.action === 'td'
+    ? actionToZmkSourceString(safeAction)
+    : actionToZmkSourceStringWithMacros(safeAction, settings.macros || []);
+};
+
+const generateZmkEncoderBehaviors = (settings: ProjectSettings) => {
+  const encoders = settings.encoders || [];
+  if (encoders.length === 0) return '';
+
+  const layersCount = settings.layers || 4;
+  const behaviors: string[] = [];
+  for (let layer = 0; layer < layersCount; layer++) {
+    encoders.forEach((encoder, index) => {
+      const clockwise = zmkActionForEncoder(settings, encoder.keymap?.[layer]?.clockwise);
+      const counterClockwise = zmkActionForEncoder(settings, encoder.keymap?.[layer]?.counterClockwise);
+      behaviors.push(`        smidr_encoder_${index}_layer_${layer}: smidr_encoder_${index}_layer_${layer} {
+            compatible = "zmk,behavior-sensor-rotate";
+            #sensor-binding-cells = <0>;
+            bindings = <${clockwise}>, <${counterClockwise}>;
+        };`);
+    });
+  }
+
+  return `    smidr_encoder_behaviors {
+${behaviors.join('\n\n')}
+    };
+
+`;
+};
+
+const generateZmkEncoderSensorBindings = (settings: ProjectSettings, layer: number) => {
+  const encoders = settings.encoders || [];
+  if (encoders.length === 0) return '';
+
+  return `
+            sensor-bindings = <
+                ${encoders.map((_, index) => `&smidr_encoder_${index}_layer_${layer}`).join(' ')}
+            >;`;
+};
+
 const formatTransformMap = (settings: ProjectSettings, keys: PhysicalKey[], allKeys: PhysicalKey[]) => {
   let transformMapStr = '';
   for (let i = 0; i < keys.length; i += 10) {
@@ -141,6 +255,7 @@ const generateKeymapDts = (
 ${generateZmkTapDanceBehaviors(settings.tapDances || [])}
 ${generateZmkMacroBehaviors(settings.macros || [])}
 ${generateZmkComboBehaviors(settings.combos || [], sortedKeys, settings.macros || [])}
+${generateZmkEncoderBehaviors(settings)}
     keymap {
         compatible = "zmk,keymap";
 `;
@@ -162,7 +277,7 @@ ${generateZmkComboBehaviors(settings.combos || [], sortedKeys, settings.macros |
         layer_${l} {
             bindings = <
                 ${layerBindingsStr}
-            >;
+            >;${generateZmkEncoderSensorBindings(settings, l)}
         };
 `;
   }
@@ -227,6 +342,7 @@ const generateSplitShieldFiles = (
         diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
         wakeup-source;
     };
+${generateZmkEncoderNodes(settings, zmkTarget, () => 'disabled')}
 ${wiredSplitNode}
 };
 `;
@@ -243,6 +359,7 @@ ${wiredSplitNode}
         = ${leftCols}
         ;
 };
+${generateZmkEncoderStatusOverrides(settings, keys, 'left')}
 `;
   shieldsFolder.file(`${leftShield}.overlay`, leftOverlay);
 
@@ -261,6 +378,7 @@ ${wiredSplitNode}
         = ${rightCols}
         ;
 };
+${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
 `;
   shieldsFolder.file(`${rightShield}.overlay`, rightOverlay);
 
@@ -272,6 +390,7 @@ ${wiredSplitNode}
 
 # RGB features
 ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+${getEncoderConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
   shieldsFolder.file(`${kbName}.conf`, sharedConf);
@@ -531,6 +650,7 @@ CONFIG_RETENTION_BOOT_MODE=y
 
 # RGB features
 ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+${getEncoderConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
     boardFolder.file(`${boardName}.conf`, boardConf);
@@ -569,6 +689,7 @@ ${dtsChosen}
             = ${colGpios}
             ;
     };
+${generateZmkEncoderNodes(settings, zmkTarget, index => getEncoderSide(settings, keys, index) === side ? 'okay' : 'disabled')}
 ${wiredSplitNode}
 };
 ${colOffset}
@@ -739,6 +860,7 @@ CONFIG_RETENTION_BOOT_MODE=y
 
 # RGB features
 ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+${getEncoderConfigSnippet(settings)}
 `;
     boardFolder.file(`${kbName}.conf`, keyboardConf);
 
@@ -851,6 +973,7 @@ ${dtsChosen}
             = ${colGpiosStr}
             ;
     };
+${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 };
 
 ${peripheralDts}
@@ -901,6 +1024,7 @@ features:
             = ${colGpiosStr}
             ;
     };
+${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 };
 `;
     shieldsFolder.file(`${kbName}.overlay`, shieldOverlay);
@@ -913,6 +1037,7 @@ features:
 
 # RGB features
 ${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+${getEncoderConfigSnippet(settings)}
 `;
     shieldsFolder.file(`${kbName}.conf`, shieldConf);
 
@@ -964,6 +1089,7 @@ features:
 ${generateZmkTapDanceBehaviors(settings.tapDances || [])}
 ${generateZmkMacroBehaviors(settings.macros || [])}
 ${generateZmkComboBehaviors(settings.combos || [], sortedKeys, settings.macros || [])}
+${generateZmkEncoderBehaviors(settings)}
     keymap {
         compatible = "zmk,keymap";
 `;
@@ -985,7 +1111,7 @@ ${generateZmkComboBehaviors(settings.combos || [], sortedKeys, settings.macros |
         layer_${l} {
             bindings = <
                 ${layerBindingsStr}
-            >;
+            >;${generateZmkEncoderSensorBindings(settings, l)}
         };
 `;
   }

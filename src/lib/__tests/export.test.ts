@@ -1706,6 +1706,76 @@ describe('export generation', () => {
     expect(readme).toContain('shield: shield_board');
   });
 
+  it('emits ZMK encoder sensors and sensor bindings', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'ZMK Encoder Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'RP2040',
+        board: 'kb2040',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+      encoders: [{
+        pinA: 'GP2',
+        pinB: 'GP3',
+        keymap: {
+          0: {
+            clockwise: { action: 'tap', keycode: 'VOLU' },
+            counterClockwise: { action: 'tap', keycode: 'VOLD' },
+          },
+        },
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        kind: 'encoder',
+        encoderIndex: 0,
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const overlay = await zip.file('boards/shields/zmk_encoder_board/zmk_encoder_board.overlay')!.async('string');
+    const conf = await zip.file('boards/shields/zmk_encoder_board/zmk_encoder_board.conf')!.async('string');
+    const keymap = await zip.file('config/zmk_encoder_board.keymap')!.async('string');
+
+    expect(conf).toContain('CONFIG_EC11=y');
+    expect(conf).toContain('CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y');
+    expect(overlay).toContain('compatible = "alps,ec11"');
+    expect(overlay).toContain('a-gpios = <&gpio0 2 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)');
+    expect(overlay).toContain('b-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)');
+    expect(overlay).toContain('compatible = "zmk,keymap-sensors"');
+    expect(overlay).toContain('sensors = <&encoder_0>');
+    expect(keymap).toContain('compatible = "zmk,behavior-sensor-rotate"');
+    expect(keymap).toContain('bindings = <&kp C_VOL_UP>, <&kp C_VOL_DN>;');
+    expect(keymap).toContain('sensor-bindings = <');
+    expect(keymap).toContain('&smidr_encoder_0_layer_0');
+  });
+
   it('emits ZMK split as left and right shield siblings', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -1792,6 +1862,116 @@ describe('export generation', () => {
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('shield: split_zmk_board_left');
     expect(readme).toContain('shield: split_zmk_board_right');
+  });
+
+  it('enables ZMK split encoder sensors on their assigned half', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Split ZMK Encoder',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08'],
+        splitRows: ['P1.06'],
+        splitCols: ['P1.08'],
+      },
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+        split: true,
+      },
+      encoders: [
+        {
+          pinA: 'P0.10',
+          pinB: 'P0.11',
+          keymap: {
+            0: {
+              clockwise: { action: 'tap', keycode: 'PGUP' },
+              counterClockwise: { action: 'tap', keycode: 'PGDN' },
+            },
+          },
+        },
+        {
+          pinA: 'P1.10',
+          pinB: 'P1.11',
+          keymap: {
+            0: {
+              clockwise: { action: 'tap', keycode: 'VOLU' },
+              counterClockwise: { action: 'tap', keycode: 'VOLD' },
+            },
+          },
+        },
+      ],
+    };
+    const keys: PhysicalKey[] = [
+      {
+        kind: 'encoder',
+        encoderIndex: 0,
+        matrixSide: 'left',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        kind: 'encoder',
+        encoderIndex: 1,
+        matrixSide: 'right',
+        x: 5,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+      {
+        row: 0,
+        col: 0,
+        matrixSide: 'left',
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 1,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const dtsi = await zip.file('boards/shields/split_zmk_encoder/split_zmk_encoder.dtsi')!.async('string');
+    const leftOverlay = await zip.file('boards/shields/split_zmk_encoder/split_zmk_encoder_left.overlay')!.async('string');
+    const rightOverlay = await zip.file('boards/shields/split_zmk_encoder/split_zmk_encoder_right.overlay')!.async('string');
+    const conf = await zip.file('boards/shields/split_zmk_encoder/split_zmk_encoder.conf')!.async('string');
+    const keymap = await zip.file('boards/shields/split_zmk_encoder/split_zmk_encoder.keymap')!.async('string');
+
+    expect(conf).toContain('CONFIG_EC11=y');
+    expect(dtsi).toContain('encoder_0: encoder_0');
+    expect(dtsi).toContain('encoder_1: encoder_1');
+    expect(dtsi).toContain('sensors = <&encoder_0 &encoder_1>');
+    expect(leftOverlay).toContain('&encoder_0');
+    expect(leftOverlay).not.toContain('&encoder_1');
+    expect(rightOverlay).toContain('&encoder_1');
+    expect(rightOverlay).not.toContain('&encoder_0');
+    expect(keymap).toContain('&smidr_encoder_0_layer_0 &smidr_encoder_1_layer_0');
+    expect(keymap).toContain('bindings = <&kp PG_UP>, <&kp PG_DN>;');
+    expect(keymap).toContain('bindings = <&kp C_VOL_UP>, <&kp C_VOL_DN>;');
   });
 
   it('emits ZMK wired split transport settings', async () => {
