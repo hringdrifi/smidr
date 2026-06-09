@@ -271,6 +271,14 @@ export const getKeyLabel = (
     const action = k.keymap?.[currentLayer];
     return formatActionLabel(action, visualLayout);
   }
+  if (mode === 'rgbMatrix') {
+    if (k.ledIndex === undefined) return { type: 'empty' };
+    const hasPosition = k.ledX !== undefined && k.ledY !== undefined;
+    return {
+      type: 'text',
+      text: hasPosition ? `LED${k.ledIndex}\n${k.ledX},${k.ledY}` : `LED${k.ledIndex}`,
+    };
+  }
   return { type: 'empty' };
 };
 

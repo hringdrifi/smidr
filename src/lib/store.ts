@@ -36,11 +36,13 @@ import {
   inferMatrixSideFromGeometry,
   MatrixSide,
 } from './matrix-utils';
+import { getRgbMatrixBounds, getRgbMatrixLedPosition } from './rgb-matrix';
 
 export { getMatrixFromPins } from './matrix-utils';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 type RuntimeEncoder = EncoderDefinition & { id: string };
+type EditorMode = 'layout' | 'matrix' | 'hardware' | 'keymap' | 'rgbMatrix';
 
 const createEmptyMacros = (count = 16): MacroAction[][] => Array.from({ length: count }, () => []);
 
@@ -151,8 +153,8 @@ export interface KeyboardState {
   // Editor Modes & Layers
   appMode: 'design' | 'remap';
   setAppMode: (mode: 'design' | 'remap') => void;
-  editorMode: 'layout' | 'matrix' | 'hardware' | 'keymap';
-  setEditorMode: (mode: 'layout' | 'matrix' | 'hardware' | 'keymap') => void;
+  editorMode: EditorMode;
+  setEditorMode: (mode: EditorMode) => void;
   currentLayer: number;
   encoderActionDirection: 'counterClockwise' | 'clockwise' | 'button';
   setEncoderActionDirection: (direction: 'counterClockwise' | 'clockwise' | 'button') => void;
@@ -266,6 +268,8 @@ export interface KeyboardState {
   clearMatrixMap: () => void;
   generateMatrix: (rows: number, cols: number) => void;
   autoAssignMatrix: () => void;
+  clearRgbMatrix: () => void;
+  autoAssignRgbMatrix: () => void;
 
   // i18n
   language: Language;
@@ -315,7 +319,7 @@ const initialState: Partial<KeyboardState> = {
       diodeDirection: 'COL2ROW',
     },
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
-    features: { rgb: false, encoder: false, oled: false, via: true, split: false },
+    features: { rgb: false, rgbMatrix: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
     encoders: [],
     macros: createEmptyMacros(),
@@ -1645,7 +1649,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             set({ appMode: m, selectedKeyIds: [] });
           }
         },
-        setEditorMode: (m: 'layout' | 'matrix' | 'hardware' | 'keymap') => {
+        setEditorMode: (m: EditorMode) => {
           if (!get().isDemoMode) setStoredEditorMode(m);
           set({ editorMode: m, selectedKeyIds: [] });
         },
@@ -2617,6 +2621,10 @@ export const useKeyboardStore = create<KeyboardState>()(
           keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined, matrixSide: undefined, directPin: undefined }))
         })),
 
+        clearRgbMatrix: () => set((s: KeyboardState) => ({
+          keys: s.keys.map(k => ({ ...k, ledIndex: undefined, ledX: undefined, ledY: undefined, ledFlags: undefined }))
+        })),
+
         generateMatrix: (rows: number, cols: number) => {
           const newKeys: Partial<PhysicalKey>[] = [];
           for (let r = 0; r < rows; r++) {
@@ -2656,6 +2664,27 @@ export const useKeyboardStore = create<KeyboardState>()(
           return {
             keys: s.keys.map(k => idToMatrix[k.id!] ? { ...k, ...idToMatrix[k.id!] } : k),
             painter: { ...s.painter, currentRow: 0, currentCol: 0 }
+          };
+        }),
+
+        autoAssignRgbMatrix: () => set((s: KeyboardState) => {
+          const visKeys = s.keys.filter(k => !k.group || s.settings.activeOptions[k.group] === k.option);
+          const sortedKeys = sortKeys(visKeys, s.editorSettings.sortThresholdY);
+          if (sortedKeys.length === 0) return s;
+          const bounds = getRgbMatrixBounds(sortedKeys);
+          const updates = new Map(sortedKeys.map((key, index) => {
+            return [key.id, {
+              ledIndex: index,
+              ...getRgbMatrixLedPosition(key, bounds),
+              ledFlags: key.ledFlags ?? 4,
+            }];
+          }));
+          return {
+            settings: {
+              ...s.settings,
+              features: { ...s.settings.features, rgbMatrix: true },
+            },
+            keys: s.keys.map(k => updates.has(k.id) ? { ...k, ...updates.get(k.id)! } : k),
           };
         }),
 

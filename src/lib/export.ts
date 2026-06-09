@@ -5,7 +5,7 @@ import { getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getQmkMatr
 import { getKeyLabel, labelNodeToText, roundCoord } from './canvas-utils';
 import { UniversalAction } from '@/types/actions';
 
-type KleExportEditorMode = 'layout' | 'matrix' | 'keymap' | 'hardware';
+type KleExportEditorMode = 'layout' | 'matrix' | 'keymap' | 'hardware' | 'rgbMatrix';
 type KleExportAppMode = 'design' | 'remap';
 
 interface KleJsonExportOptions {
@@ -287,6 +287,12 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
       parts[4] = `e${encoderIndex}`;
       label = parts.join('\n');
     }
+    if (!key.decal && key.ledIndex !== undefined) {
+      const parts = label.split('\n');
+      while (parts.length <= 6) parts.push('');
+      parts[6] = `l${key.ledIndex}`;
+      label = parts.join('\n');
+    }
     return {
       ...stripEncoderSecondaryShape(key),
       label
@@ -326,7 +332,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
     description: settings.description,
     firmwareVersion: 1,
     menus: [
-      "qmk_rgb_matrix",
+      ...(settings.features.rgbMatrix ? ["qmk_rgb_matrix"] : []),
       "qmk_backlight"
     ],
     keycodes: [

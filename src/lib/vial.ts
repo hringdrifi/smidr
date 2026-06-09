@@ -57,6 +57,16 @@ const shouldUseMatrixMask = (settings: ProjectSettings) => {
   return settings.qmk?.matrixMasked === true;
 };
 
+const getRgbMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
+  settings.features.rgbMatrix
+    ? keys.filter(key => Number.isInteger(key.ledIndex) && key.ledIndex! >= 0)
+    : []
+);
+
+const getRgbMatrixLedCount = (keys: PhysicalKey[]) => (
+  keys.length === 0 ? 0 : Math.max(...keys.map(key => key.ledIndex ?? -1)) + 1
+);
+
 const generateDirectPins = (settings: ProjectSettings, validKeys: PhysicalKey[], allKeys: PhysicalKey[], side?: MatrixSide) => {
   const sourceKeys = side
     ? validKeys.filter(key => getDirectMatrixSide(settings, key, allKeys) === side)
@@ -143,6 +153,43 @@ ${rows}
 `;
 };
 
+const generateRgbMatrixConfigC = (settings: ProjectSettings, validKeys: PhysicalKey[], allKeys: PhysicalKey[]) => {
+  const rgbKeys = getRgbMatrixKeys(settings, validKeys);
+  const ledCount = getRgbMatrixLedCount(rgbKeys);
+  if (ledCount === 0) return '';
+
+  const matrix = getMatrixDimensions(settings, validKeys);
+  const matrixRows = Array.from({ length: matrix.rows }, () =>
+    Array.from({ length: matrix.cols }, () => 'NO_LED')
+  );
+  const positions = Array.from({ length: ledCount }, () => ({ x: 0, y: 0 }));
+  const flags = Array.from({ length: ledCount }, () => 4);
+
+  rgbKeys.forEach(key => {
+    const ledIndex = key.ledIndex!;
+    const pos = getFirmwareMatrixPosition(settings, key, allKeys);
+    if (pos && pos.row >= 0 && pos.row < matrix.rows && pos.col >= 0 && pos.col < matrix.cols) {
+      matrixRows[pos.row][pos.col] = String(ledIndex);
+    }
+    positions[ledIndex] = { x: key.ledX ?? 0, y: key.ledY ?? 0 };
+    flags[ledIndex] = key.ledFlags ?? 4;
+  });
+
+  return `
+#ifdef RGB_MATRIX_ENABLE
+led_config_t g_led_config = {
+  {
+${matrixRows.map(row => `    { ${row.join(', ')} }`).join(',\n')}
+  }, {
+${positions.map(position => `    { ${position.x}, ${position.y} }`).join(',\n')}
+  }, {
+    ${flags.join(', ')}
+  }
+};
+#endif
+`;
+};
+
 const generateKeymapC = (validKeys: PhysicalKey[], layersCount: number, settings: ProjectSettings, tapDances: TapDanceEntry[] = []) => {
   const encoders = getConfiguredEncoders(settings);
   let keymapC = `#include QMK_KEYBOARD_H
@@ -181,6 +228,8 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 #endif
 `;
   }
+
+  keymapC += generateRgbMatrixConfigC(settings, validKeys, validKeys);
 
   return keymapC;
 };
@@ -234,6 +283,8 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
   const bootmagic = getBootmagicConfig(settings, validKeys);
   const encoders = getConfiguredEncoders(settings);
   const useDirectPins = isDirectPinMatrix(settings);
+  const rgbMatrixKeys = getRgbMatrixKeys(settings, validKeys);
+  const rgbMatrixLedCount = getRgbMatrixLedCount(rgbMatrixKeys);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -262,6 +313,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
       nkro: true,
       encoder: encoders.length > 0,
       rgblight: settings.features.rgb,
+      rgb_matrix: settings.features.rgbMatrix === true && rgbMatrixLedCount > 0,
       via: true,  // Vial is built on top of VIA
     },
     bootmagic,
@@ -338,9 +390,15 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
 ${useMatrixMask ? '\n#define MATRIX_MASKED\n' : ''}
 
 /* RGB settings */
-${settings.features.rgb ? `
+${(settings.features.rgb || settings.features.rgbMatrix) ? `
 #define WS2812_DI_PIN ${settings.pins.rgb || 'D3'}
+` : ''}
+${settings.features.rgb ? `
 #define RGBLED_NUM ${validKeys.length}
+` : ''}
+${settings.features.rgbMatrix && rgbMatrixLedCount > 0 ? `
+#define RGB_MATRIX_LED_COUNT ${rgbMatrixLedCount}
+#define RGB_MATRIX_MAXIMUM_BRIGHTNESS 150
 ` : ''}
 `;
   kbFolder.file('config.h', configH);

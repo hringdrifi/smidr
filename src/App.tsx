@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash } from 'lucide-react';
+import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
@@ -15,6 +15,7 @@ import { HardwareSettingsPanel } from '@/components/HardwareSettingsPanel';
 import { KeycodeConfigPanel } from '@/components/KeycodeConfigPanel';
 import { MatrixPainter } from '@/components/MatrixPainter';
 import { MatrixPinInspectorPanel } from '@/components/MatrixPinSettingsPanel';
+import { RgbMatrixPanel } from '@/components/RgbMatrixPanel';
 import { AdvancedPanelKind } from '@/components/advanced-panel-types';
 import { MacroPanel } from '@/components/MacroPanel';
 import { ComboPanel } from '@/components/ComboPanel';
@@ -39,7 +40,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type RightPanelKind = 'settings' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'pins' | AdvancedPanelKind;
+type RightPanelKind = 'settings' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'pins' | 'rgbMatrix' | AdvancedPanelKind;
 
 export default function App() {
   const storeState = useKeyboardStore();
@@ -251,6 +252,7 @@ export default function App() {
   const designModes = [
     { id: 'layout', icon: Move },
     { id: 'matrix', icon: CircuitBoard },
+    { id: 'rgbMatrix', icon: Lightbulb },
     { id: 'keymap', icon: Keyboard },
   ] as const;
   const rightPanelTabs: Array<
@@ -269,6 +271,9 @@ export default function App() {
     ...(editorMode === 'keymap'
       ? [{ type: 'tab' as const, id: 'keymap' as RightPanelKind, title: t('keycodeConfig.title') || 'Keymap Config', icon: Wrench }]
       : []),
+    ...(editorMode === 'rgbMatrix'
+      ? [{ type: 'tab' as const, id: 'rgbMatrix' as RightPanelKind, title: t('rgbMatrix.title'), icon: Lightbulb }]
+      : []),
     ...(editorMode === 'keymap'
       ? [
           { type: 'tab' as const, id: 'macros' as RightPanelKind, title: macroPanelMeta.macros.title, icon: macroPanelMeta.macros.icon },
@@ -286,6 +291,7 @@ export default function App() {
   const defaultRightPanelForEditor = (mode: typeof editorMode): RightPanelKind => {
     if (mode === 'layout') return 'properties';
     if (mode === 'matrix') return 'matrixPainter';
+    if (mode === 'rgbMatrix') return 'rgbMatrix';
     return 'keymap';
   };
 
@@ -295,6 +301,7 @@ export default function App() {
       ((activeRightPanel === 'macros' || activeRightPanel === 'combos' || activeRightPanel === 'tapDance') && editorMode !== 'keymap') ||
       (activeRightPanel === 'pins' && editorMode !== 'matrix') ||
       (activeRightPanel === 'matrixPainter' && editorMode !== 'matrix') ||
+      (activeRightPanel === 'rgbMatrix' && editorMode !== 'rgbMatrix') ||
       (activeRightPanel === 'properties' && editorMode !== 'layout');
 
     if (isUnavailablePanel) {
@@ -987,6 +994,7 @@ export default function App() {
                     )}
                     {activeRightPanel === 'options' && <LayoutOptionsPanel />}
                     {activeRightPanel === 'keymap' && editorMode === 'keymap' && <KeycodeConfigPanel />}
+                    {activeRightPanel === 'rgbMatrix' && editorMode === 'rgbMatrix' && <RgbMatrixPanel />}
                     {activeRightPanel === 'pins' && editorMode === 'matrix' && (
                       <div className="h-full overflow-hidden">
                         <MatrixPinInspectorPanel />
