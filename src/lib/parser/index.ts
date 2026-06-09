@@ -157,6 +157,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
 
       // Parse QMK hardware configuration
       let pins: any = undefined;
+      const directPins = Array.isArray(input.matrix_pins?.direct) ? input.matrix_pins.direct : undefined;
       if (input.matrix_pins) {
         pins = {
           rows: Array.isArray(input.matrix_pins.rows) ? input.matrix_pins.rows.map(String) : [],
@@ -237,6 +238,9 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           const id = crypto.randomUUID();
           const row = Array.isArray(k.matrix) ? k.matrix[0] : undefined;
           const col = Array.isArray(k.matrix) ? k.matrix[1] : undefined;
+          const directPin = directPins && Number.isInteger(row) && Number.isInteger(col)
+            ? directPins[row]?.[col]
+            : undefined;
           return {
             id,
             x: k.x ?? 0,
@@ -249,6 +253,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
             label: k.label || '',
             row,
             col,
+            directPin: directPin && directPin !== 'NO_PIN' ? String(directPin) : undefined,
             keymap: {}
           };
         });
@@ -258,7 +263,13 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           vendorProductId,
           layoutOptions: {},
           activeOptions: {},
-          matrix: undefined,
+          matrix: directPins
+            ? {
+              rows: directPins.length,
+              cols: Math.max(0, ...directPins.map((row: any[]) => Array.isArray(row) ? row.length : 0)),
+              wiring: 'direct',
+            }
+            : undefined,
           pins,
           encoders,
           hardware,

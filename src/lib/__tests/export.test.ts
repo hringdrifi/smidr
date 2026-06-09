@@ -34,6 +34,88 @@ const baseSettings: ProjectSettings = {
 };
 
 describe('export generation', () => {
+  it('exports QMK direct pins from per-key assignments', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, row: 0, col: 0, directPin: 'GP2', label: 'A' },
+      { x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, row: 0, col: 1, directPin: 'GP3', label: 'B' },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('test_keyboard/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.matrix_pins).toEqual({ direct: [['GP2', 'GP3']] });
+    expect(keyboardJson.layouts.LAYOUT.layout.map((key: any) => key.matrix)).toEqual([[0, 0], [0, 1]]);
+  });
+
+  it('exports split QMK direct pins per side', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1, wiring: 'direct' },
+      features: { ...baseSettings.features, split: true },
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, row: 0, col: 0, matrixSide: 'left', directPin: 'GP2', label: 'A' },
+      { x: 8, y: 0, w: 1, h: 1, r: 0, rx: 8, ry: 0, row: 0, col: 0, matrixSide: 'right', directPin: 'GP2', label: 'B' },
+    ];
+
+    const blob = await generateQmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keyboardJson = JSON.parse(await zip.file('test_keyboard/keyboard.json')!.async('string'));
+
+    expect(keyboardJson.matrix_pins).toEqual({ direct: [['GP2']] });
+    expect(keyboardJson.split.matrix_pins.right).toEqual({ direct: [['GP2']] });
+    expect(keyboardJson.layouts.LAYOUT.layout.map((key: any) => key.matrix)).toEqual([[0, 0], [1, 0]]);
+  });
+
+  it('exports ZMK direct GPIO kscan for non-split keyboards', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, directPin: 'GP2', label: 'A' },
+      { x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, directPin: 'GP3', label: 'B' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const overlay = await zip.file('boards/shields/test_keyboard/test_keyboard.overlay')!.async('string');
+
+    expect(overlay).toContain('compatible = "zmk,kscan-gpio-direct"');
+    expect(overlay).toContain('input-gpios');
+    expect(overlay).toContain('Direct 0: GP2');
+    expect(overlay).toContain('Direct 1: GP3');
+  });
+
+  it('exports split ZMK direct GPIO kscan per side', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+      features: { ...baseSettings.features, split: true },
+      zmk: { splitTransport: 'wired' },
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, matrixSide: 'left', directPin: 'GP2', label: 'A' },
+      { x: 8, y: 0, w: 1, h: 1, r: 0, rx: 8, ry: 0, matrixSide: 'right', directPin: 'GP2', label: 'B' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const dtsi = await zip.file('boards/shields/test_keyboard/test_keyboard.dtsi')!.async('string');
+    const leftOverlay = await zip.file('boards/shields/test_keyboard/test_keyboard_left.overlay')!.async('string');
+    const rightOverlay = await zip.file('boards/shields/test_keyboard/test_keyboard_right.overlay')!.async('string');
+
+    expect(dtsi).toContain('compatible = "zmk,kscan-gpio-direct"');
+    expect(leftOverlay).toContain('Direct 0: GP2');
+    expect(rightOverlay).toContain('Direct 0: GP2');
+    expect(rightOverlay).toContain('col-offset = <1>');
+  });
+
   it('exports KLE JSON for only the currently visible layout option', () => {
     const settings: ProjectSettings = {
       ...baseSettings,

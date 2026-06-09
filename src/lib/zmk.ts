@@ -6,7 +6,7 @@ import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './
 import { generateZmkComboBehaviors } from './combo-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkDevelopmentBoardInterconnect, getZmkHardwareTarget, ZmkTarget } from './mcu-presets';
-import { getLocalMatrixPosition, getMatrixFromPins, inferMatrixSideFromGeometry, MatrixSide } from './matrix-utils';
+import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getLocalMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, inferMatrixSideFromGeometry, isDirectPinMatrix, MatrixSide } from './matrix-utils';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
@@ -55,6 +55,30 @@ const formatGpio = (pin: string | undefined, target: ZmkTarget, flags: string, f
   return `${parsed.controller} ${parsed.number} ${flags} /* ${label}: ${pin} */`;
 };
 
+const formatDirectInputGpios = (settings: ProjectSettings, keys: PhysicalKey[], target: ZmkTarget, side?: MatrixSide) => {
+  const sourceKeys = side
+    ? keys.filter(key => getDirectMatrixSide(settings, key, keys) === side)
+    : keys;
+  const matrix = side
+    ? getDirectSideDimensions(settings, keys, side)
+    : getMatrixDimensionsFromPositions(
+      sourceKeys.map(key => getDirectLocalMatrixPosition(settings, key, keys)).filter((pos): pos is { row: number; col: number } => !!pos),
+      settings.matrix
+    );
+  const pins = Array.from({ length: matrix.cols }, () => undefined as string | undefined);
+
+  sourceKeys.forEach(key => {
+    const pos = getDirectLocalMatrixPosition(settings, key, keys);
+    if (!pos) return;
+    pins[pos.col] = key.directPin;
+  });
+
+  return pins.map((pin, index) => {
+    const parsed = pin ? parseZmkGpio(pin, index, target) : { controller: '&gpio0', number: index };
+    return `<${parsed.controller} ${parsed.number} (GPIO_ACTIVE_LOW | GPIO_PULL_UP)> /* Direct ${index}: ${pin || 'Please configure pin'} */`;
+  }).join('\n            , ');
+};
+
 const getZmkSplitTransport = (settings: ProjectSettings) => settings.zmk?.splitTransport || 'ble';
 
 const getWiredSplitDevice = (settings: ProjectSettings) => settings.zmk?.wiredSplitDevice?.trim() || '&pro_micro_serial';
@@ -77,7 +101,22 @@ const getSidePins = (settings: ProjectSettings, side: MatrixSide) => {
   };
 };
 
-const getZmkMatrixDimensions = (settings: ProjectSettings) => {
+const getZmkMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[] = []) => {
+  if (isDirectPinMatrix(settings)) {
+    if (settings.features.split) {
+      const left = getDirectSideDimensions(settings, keys, 'left');
+      const right = getDirectSideDimensions(settings, keys, 'right');
+      return {
+        rows: Math.max(left.rows, right.rows),
+        cols: left.cols + right.cols,
+        wiring: settings.matrix?.wiring,
+      };
+    }
+    const positions = keys
+      .map(key => getFirmwareMatrixPosition(settings, key, keys))
+      .filter((pos): pos is { row: number; col: number } => !!pos);
+    return getMatrixDimensionsFromPositions(positions, settings.matrix);
+  }
   if (!settings.features.split) {
     return getMatrixFromPins(settings.pins, false) || settings.matrix;
   }
@@ -92,9 +131,20 @@ const getZmkMatrixDimensions = (settings: ProjectSettings) => {
 
 const getZmkMatrixPosition = (
   settings: ProjectSettings,
-  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'w'>,
-  keys: Array<Pick<PhysicalKey, 'x' | 'w'>> = []
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>> = []
 ) => {
+  if (isDirectPinMatrix(settings)) {
+    const local = getDirectLocalMatrixPosition(settings, key, keys);
+    if (!local) return undefined;
+    if (!settings.features.split) return local;
+    const side = getDirectMatrixSide(settings, key, keys);
+    const leftCols = getDirectSideDimensions(settings, keys, 'left').cols;
+    return {
+      row: local.row,
+      col: side === 'right' ? local.col + leftCols : local.col,
+    };
+  }
   const local = getLocalMatrixPosition(settings, key, keys);
   if (!local) return undefined;
   if (!settings.features.split) return { row: local.row, col: local.col };
@@ -107,10 +157,10 @@ const getZmkMatrixPosition = (
 };
 
 const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
-  const matrix = getZmkMatrixDimensions(settings);
+  const matrix = getZmkMatrixDimensions(settings, keys);
 
   return keys.filter((key, idx) => {
-    if (key.row === undefined || key.col === undefined) return false;
+    if (!isDirectPinMatrix(settings) && (key.row === undefined || key.col === undefined)) return false;
     const pos = getZmkMatrixPosition(settings, key, keys);
     if (!pos || pos.row < 0 || pos.col < 0) return false;
     if (pos.row >= matrix.rows || pos.col >= matrix.cols) return false;
@@ -306,9 +356,13 @@ const generateSplitShieldFiles = (
   const shieldsFolder = zip.folder('boards')?.folder('shields')?.folder(kbName);
   if (!shieldsFolder) return null;
 
-  const matrix = getZmkMatrixDimensions(settings);
+  const matrix = getZmkMatrixDimensions(settings, keys);
   const leftPins = getSidePins(settings, 'left');
   const rightPins = getSidePins(settings, 'right');
+  const useDirectPins = isDirectPinMatrix(settings);
+  const leftDirectPins = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, 'left') : '';
+  const rightDirectPins = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, 'right') : '';
+  const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, keys, 'left').cols : 0;
   const leftRows = formatGpios(leftPins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Left row');
   const leftCols = formatGpios(leftPins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Left col');
   const rightRows = formatGpios(rightPins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Right row');
@@ -344,8 +398,8 @@ const generateSplitShieldFiles = (
     };
 
     kscan0: kscan {
-        compatible = "zmk,kscan-gpio-matrix";
-        diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
+        compatible = "${useDirectPins ? 'zmk,kscan-gpio-direct' : 'zmk,kscan-gpio-matrix'}";
+${useDirectPins ? '' : `        diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";`}
         wakeup-source;
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'disabled')}
@@ -357,13 +411,15 @@ ${wiredSplitNode}
   const leftOverlay = `#include "${kbName}.dtsi"
 
 &kscan0 {
-    row-gpios
+${useDirectPins ? `    input-gpios
+        = ${leftDirectPins}
+        ;` : `    row-gpios
         = ${leftRows}
         ;
 
     col-gpios
         = ${leftCols}
-        ;
+        ;`}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'left')}
 `;
@@ -372,17 +428,19 @@ ${generateZmkEncoderStatusOverrides(settings, keys, 'left')}
   const rightOverlay = `#include "${kbName}.dtsi"
 
 &default_transform {
-    col-offset = <${leftPins.cols.length}>;
+    col-offset = <${useDirectPins ? leftDirectCols : leftPins.cols.length}>;
 };
 
 &kscan0 {
-    row-gpios
+${useDirectPins ? `    input-gpios
+        = ${rightDirectPins}
+        ;` : `    row-gpios
         = ${rightRows}
         ;
 
     col-gpios
         = ${rightCols}
-        ;
+        ;`}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
 `;
@@ -497,9 +555,11 @@ const generateSplitCustomBoardFiles = (
   const arch = 'arm';
   const leftBoard = `${kbName}_left`;
   const rightBoard = `${kbName}_right`;
-  const matrix = getZmkMatrixDimensions(settings);
+  const matrix = getZmkMatrixDimensions(settings, keys);
   const leftPins = getSidePins(settings, 'left');
   const rightPins = getSidePins(settings, 'right');
+  const useDirectPins = isDirectPinMatrix(settings);
+  const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, keys, 'left').cols : 0;
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
   const splitTransport = getZmkSplitTransport(settings);
   const wiredSplitDevice = getWiredSplitDevice(settings);
@@ -584,10 +644,11 @@ const generateSplitCustomBoardFiles = (
 
     const rowGpios = formatGpios(sidePins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', `${side} row`);
     const colGpios = formatGpios(sidePins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', `${side} col`);
+    const directGpios = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, side) : '';
     const colOffset = side === 'right' ? `
 
 &default_transform {
-    col-offset = <${leftPins.cols.length}>;
+    col-offset = <${useDirectPins ? leftDirectCols : leftPins.cols.length}>;
 };
 ` : '';
     const wiredSplitNode = splitTransport === 'wired' ? `
@@ -688,17 +749,19 @@ ${dtsChosen}
     };
 
     kscan0: kscan {
-        compatible = "zmk,kscan-gpio-matrix";
-        diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
+${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";` : `        compatible = "zmk,kscan-gpio-matrix";
+        diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";`}
         wakeup-source;
 
-        row-gpios
+${useDirectPins ? `        input-gpios
+            = ${directGpios}
+            ;` : `        row-gpios
             = ${rowGpios}
             ;
 
         col-gpios
             = ${colGpios}
-            ;
+            ;`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, index => getEncoderSide(settings, keys, index) === side ? 'okay' : 'disabled')}
 ${wiredSplitNode}
@@ -805,13 +868,17 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   if (!configFolder) return null;
 
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
-  const matrix = getZmkMatrixDimensions(settings);
+  const matrix = getZmkMatrixDimensions(settings, keys);
+  const useDirectPins = isDirectPinMatrix(settings);
 
   const rowPins = settings.pins.rows || [];
   const rowGpiosStr = formatGpios(rowPins, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Row');
 
   const colPins = settings.pins.cols || [];
   const colGpiosStr = formatGpios(colPins, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Col');
+  const directGpiosStr = useDirectPins
+    ? formatDirectInputGpios(settings, sortedKeys, zmkTarget)
+    : '';
 
   if (settings.hardware.controllerType === 'mcu') {
     const arch = 'arm';
@@ -978,7 +1045,11 @@ ${dtsChosen}
     };
 
     kscan0: kscan {
-        compatible = "zmk,kscan-gpio-matrix";
+${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";
+
+        input-gpios
+            = ${directGpiosStr}
+            ;` : `        compatible = "zmk,kscan-gpio-matrix";
         diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
 
         row-gpios
@@ -987,7 +1058,7 @@ ${dtsChosen}
 
         col-gpios
             = ${colGpiosStr}
-            ;
+            ;`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 };
@@ -1029,7 +1100,11 @@ features:
     };
 
     kscan0: kscan {
-        compatible = "zmk,kscan-gpio-matrix";
+${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";
+
+        input-gpios
+            = ${directGpiosStr}
+            ;` : `        compatible = "zmk,kscan-gpio-matrix";
         diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
 
         row-gpios
@@ -1038,7 +1113,7 @@ features:
 
         col-gpios
             = ${colGpiosStr}
-            ;
+            ;`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 };

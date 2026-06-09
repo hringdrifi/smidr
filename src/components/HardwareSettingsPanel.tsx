@@ -258,23 +258,6 @@ export const HardwareSettingsPanel = () => {
             </p>
           </div>
           )}
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.diodeDir')}</label>
-            <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
-              {(['COL2ROW', 'ROW2COL'] as const).map(dir => (
-                <button
-                  key={dir}
-                  onClick={() => updateHardware({ diodeDirection: dir })}
-                  className={cn(
-                    "flex-1 py-1 text-[10px] font-bold rounded transition-all",
-                    settings.hardware.diodeDirection === dir ? "bg-amber-500 text-[var(--bg-button)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                  )}
-                >
-                  {dir}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </Section>
 

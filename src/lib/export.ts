@@ -1,7 +1,7 @@
 import { PhysicalKey, SmidrProject, ProjectSettings } from '@/types/keyboard';
 import { exportKLE } from './kle';
 import { actionToQmkString } from './protocols/via-action-converter';
-import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
+import { getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getQmkMatrixFromPins, isDirectPinMatrix } from './matrix-utils';
 import { getKeyLabel, labelNodeToText, roundCoord } from './canvas-utils';
 import { UniversalAction } from '@/types/actions';
 
@@ -65,23 +65,29 @@ const keysOverlap = (a: PhysicalKey, b: PhysicalKey) => {
 };
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
-  const matrixKeys = keys.filter(key => (
-    key.row !== undefined &&
-    key.col !== undefined &&
-    key.row >= 0 &&
-    key.col >= 0
-  ));
+  const matrixKeys = isDirectPinMatrix(settings)
+    ? keys
+    : keys.filter(key => (
+      key.row !== undefined &&
+      key.col !== undefined &&
+      key.row >= 0 &&
+      key.col >= 0
+    ));
 
   const positions = matrixKeys
-    .map(key => getQmkMatrixPosition(settings, key, keys))
+    .map(key => getFirmwareMatrixPosition(settings, key, keys))
     .filter((pos): pos is { row: number; col: number } => !!pos);
-  const keyRows = positions.length > 0 ? Math.max(...positions.map(pos => pos.row)) + 1 : 0;
-  const keyCols = positions.length > 0 ? Math.max(...positions.map(pos => pos.col)) + 1 : 0;
   const pinMatrix = getQmkMatrixFromPins(settings.pins, settings.features.split);
+  if (isDirectPinMatrix(settings)) {
+    return getMatrixDimensionsFromPositions(positions, settings.matrix);
+  }
 
   return {
-    rows: Math.max(pinMatrix?.rows || settings.matrix?.rows || 0, keyRows),
-    cols: Math.max(pinMatrix?.cols || settings.matrix?.cols || 0, keyCols),
+    ...getMatrixDimensionsFromPositions(positions, {
+      ...settings.matrix,
+      rows: pinMatrix?.rows || settings.matrix?.rows || 0,
+      cols: pinMatrix?.cols || settings.matrix?.cols || 0,
+    }),
   };
 };
 
@@ -264,7 +270,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
   // Prepare keys with correct matrix and layout option labels for KLE export
   const viaKeys = allKeysToExport.map(key => {
     let label = '';
-    const pos = getQmkMatrixPosition(settings, key, keys);
+    const pos = getFirmwareMatrixPosition(settings, key, keys);
     if (!key.decal && pos) {
       label = `${pos.row},${pos.col}`;
     }
@@ -299,7 +305,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
   );
 
   keys.forEach(key => {
-    const pos = getQmkMatrixPosition(settings, key, keys);
+    const pos = getFirmwareMatrixPosition(settings, key, keys);
     if (pos &&
         pos.row >= 0 && pos.col >= 0 &&
         pos.row < matrix.rows && pos.col < matrix.cols) {
@@ -355,6 +361,7 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     ...settingsWithoutRuntimeIds,
     vendorId: `0x${((vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     productId: `0x${(vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
+    matrix,
     pins: savedPins,
     encoders: savedEncoders,
     // Strip runtime-only 'id' field before persisting

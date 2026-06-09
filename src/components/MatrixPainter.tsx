@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Gauge, MousePointer2, Trash2 } from 'lucide-react';
+import { Gauge, MousePointer2, PlugZap, Trash2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide } from '@/lib/matrix-utils';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -20,6 +20,7 @@ export const MatrixPainter = () => {
     settings,
     selectedKeyIds,
     keys,
+    updateKey,
     setMatrixPosition,
     addEncoderToKey,
     updateEncoder,
@@ -49,9 +50,25 @@ export const MatrixPainter = () => {
   const pinPool = controllerType === 'development_board'
     ? getDevelopmentBoardPins(selectedDevelopmentBoard, selectedMcu)
     : getMcuPins(selectedMcu);
+  const wiringMode = settings.matrix?.wiring || 'matrix';
+  const isDirectMode = wiringMode === 'direct';
 
   const assignedPins = React.useMemo(() => {
     const pins = new Set<string>();
+    if (isDirectMode) {
+      keys.forEach(key => {
+        const keySide = settings.features.split
+          ? key.matrixSide || inferMatrixSideFromGeometry(key, keys)
+          : 'left';
+        if (keySide === selectedMatrixSide && key.directPin) pins.add(key.directPin);
+      });
+      if (settings.pins.rgb) pins.add(settings.pins.rgb);
+      if (settings.pins.sda) pins.add(settings.pins.sda);
+      if (settings.pins.scl) pins.add(settings.pins.scl);
+      if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
+      return pins;
+    }
+
     if (settings.features.split && selectedMatrixSide === 'right') {
       settings.pins.splitRows?.forEach(p => p && pins.add(p));
       settings.pins.splitCols?.forEach(p => p && pins.add(p));
@@ -61,6 +78,7 @@ export const MatrixPainter = () => {
     }
 
     keys.forEach(key => {
+      if (key.directPin) pins.add(key.directPin);
       if (!key.encoderId) return;
       const encoderSide = settings.features.split
         ? getLocalMatrixPosition(settings, key, keys)?.side || key.matrixSide || inferMatrixSideFromGeometry(key, keys)
@@ -72,7 +90,7 @@ export const MatrixPainter = () => {
       if (encoder.pinB) pins.add(encoder.pinB);
     });
     return pins;
-  }, [keys, selectedMatrixSide, settings]);
+  }, [isDirectMode, keys, selectedMatrixSide, settings]);
 
   const encoderPinPlaceholder = t('matrix.encoderPinPlaceholder');
   const currentEncoderPin = focusedEncoderPin === 'pinA' ? selectedEncoder?.pinA : selectedEncoder?.pinB;
@@ -83,6 +101,12 @@ export const MatrixPainter = () => {
     updateEncoder(selectedEncoder.id!, {
       [focusedEncoderPin]: pinName,
     });
+  };
+
+  const assignDirectPin = (pinName: string) => {
+    if (!selectedKeyId) return;
+    if (preventDuplicatePins && assignedPins.has(pinName) && selectedKey?.directPin !== pinName) return;
+    updateKey(selectedKeyId, { directPin: pinName });
   };
 
   const setSelectedSide = (side: MatrixSide) => {
@@ -109,6 +133,52 @@ export const MatrixPainter = () => {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-panel)] animate-in fade-in slide-in-from-right-1 duration-200">
       <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-4 pb-4 pt-4 custom-scrollbar">
+        {isDirectMode ? (
+          <>
+          {settings.features.split && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                {t('matrix.half')}
+              </div>
+              <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+                {(['left', 'right'] as const).map(side => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setSelectedSide(side)}
+                    className={cn(
+                      "h-8 rounded text-[10px] font-bold uppercase transition-all",
+                      selectedMatrixSide === side
+                        ? "bg-amber-500 text-zinc-950"
+                        : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    )}
+                  >
+                    {side}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="rounded border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
+            <div className="mb-3 flex items-center gap-2">
+              <PlugZap size={14} className="text-[var(--text-dim)]" />
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t('matrix.directPin')}
+                </div>
+              </div>
+            </div>
+            <input
+              type="text"
+              value={selectedKey.directPin || ''}
+              onChange={(e) => updateKey(selectedKeyId, { directPin: e.target.value.toUpperCase() })}
+              placeholder={t('matrix.directPinPlaceholder')}
+              className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none transition-all placeholder:text-[var(--text-dim)] focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+            />
+          </div>
+          </>
+        ) : (
+          <>
         {settings.features.split && (
           <div className="space-y-1.5">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
@@ -240,9 +310,29 @@ export const MatrixPainter = () => {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
-      {selectedEncoder && (
+      {isDirectMode ? (
+        <AvailablePinPool
+          title={`${t('matrix.availablePins')} (${pinPoolLabel})`}
+          activeLabel={t('matrix.directPin')}
+          pins={pinPool}
+          assignedPins={assignedPins}
+          preventDuplicates={preventDuplicatePins}
+          onPreventDuplicatesChange={setPreventDuplicatePins}
+          onAssignPin={assignDirectPin}
+          isCurrentPin={(pinName) => selectedKey.directPin === pinName}
+          isActive
+          isListTarget={false}
+          customPinText={customEncoderPinText}
+          onCustomPinTextChange={(value) => setCustomEncoderPinText(value.toUpperCase())}
+          showCustomPinInput
+          className="sticky bottom-0 z-10"
+          pinListClassName="max-h-36 p-2"
+        />
+      ) : selectedEncoder && (
         <AvailablePinPool
           title={`${t('matrix.availablePins')} (${pinPoolLabel})`}
           activeLabel={focusedEncoderPin === 'pinA' ? t('matrix.encoderPinA') : t('matrix.encoderPinB')}

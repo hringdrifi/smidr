@@ -122,6 +122,13 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。`controllerType: 'mcu'` の場合は左右を別 custom board (`<name>_left` / `<name>_right`) として生成し、右側 board DTS で同じ `col-offset` を指定する。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52840 系ターゲットを要求する。`wired` は `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
+### 7.5.1 ダイレクトピン配線 (Direct Pin Wiring)
+- **配線方式**: `ProjectSettings.matrix.wiring` は `matrix`（既定）または `direct` を保持する。`direct` の場合、行/列ピンではなく各 `PhysicalKey.directPin` に 1 キー 1 GPIO を割り当てる。
+- **キーへの割り当て**: 非分割では `PhysicalKey.directPin` のみを使う。分割では `PhysicalKey.matrixSide` (`left` / `right`) と `directPin` を併用し、同じピン名でも左右の基板では別 GPIO として扱う。
+- **マトリクス位置**: 既存の `row` / `col` はキーマップ上の位置として残す。`row` / `col` が未設定の direct pin キーは、各 side 内の物理ソート順に `0,n` としてエクスポートする。
+- **QMK/Vial 出力**: 非分割では `matrix_pins.direct` を出力する。分割では左側をトップレベル `matrix_pins.direct`、右側を `split.matrix_pins.right.direct` として出力し、右側キーの matrix position は QMK/Vial split と同様に行方向へ連結する。未割り当ての direct pin は `NO_PIN` として埋める。
+- **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。
+
 ### 7.6 ロータリーエンコーダー (Rotary Encoders)
 - **内部表現**: アプリ実行中は `ProjectSettings.encoders[]` の各要素に runtime-only の `id` を付与し、物理配置上の `PhysicalKey.encoderId` から参照する。`.smidr` 保存時は runtime `id` を保存せず、`encoders[]` の配列添字を `keys[].encoderIndex` として保存する。読み込み時は `encoderIndex` から新しい `encoderId` を復元する。
 - **物理位置**: ボタン付きエンコーダーは通常キーと同じ `PhysicalKey` に `row` / `col` / `keymap` と `encoderId` を併せ持つ。ボタン無しエンコーダーは `row` / `col` を持たず、物理位置と `encoderId` のみを持つ `PhysicalKey` として扱う。エンコーダー物理位置は `kind: "encoder"` で明示できる。

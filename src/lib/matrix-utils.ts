@@ -1,6 +1,9 @@
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
 export type MatrixSide = 'left' | 'right';
+export type MatrixPosition = { row: number; col: number };
+
+export const isDirectPinMatrix = (settings: ProjectSettings) => settings.matrix?.wiring === 'direct';
 
 export const getMatrixFromPins = (
   pins: ProjectSettings['pins'],
@@ -70,7 +73,7 @@ export const getQmkMatrixPosition = (
   settings: ProjectSettings,
   key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'w'>,
   keys: Array<Pick<PhysicalKey, 'x' | 'w'>> = []
-): { row: number; col: number } | undefined => {
+): MatrixPosition | undefined => {
   const local = getLocalMatrixPosition(settings, key, keys);
   if (!local) return undefined;
   if (!settings.features.split) return { row: local.row, col: local.col };
@@ -79,5 +82,104 @@ export const getQmkMatrixPosition = (
   return {
     row: local.side === 'right' ? local.row + leftRows : local.row,
     col: local.col,
+  };
+};
+
+const hasMatrixPosition = (key: Pick<PhysicalKey, 'row' | 'col'>) => (
+  key.row !== undefined &&
+  key.col !== undefined &&
+  key.row >= 0 &&
+  key.col >= 0
+);
+
+export const getDirectMatrixSide = (
+  settings: ProjectSettings,
+  key: Pick<PhysicalKey, 'matrixSide' | 'x' | 'w'>,
+  keys: Array<Pick<PhysicalKey, 'x' | 'w'>> = []
+): MatrixSide => (
+  settings.features.split
+    ? key.matrixSide || inferMatrixSideFromGeometry(key, keys)
+    : 'left'
+);
+
+const sortDirectKeys = <T extends Pick<PhysicalKey, 'row' | 'col' | 'x' | 'y' | 'w'>>(keys: T[]) => (
+  [...keys].sort((a, b) => {
+    const aHasMatrix = hasMatrixPosition(a);
+    const bHasMatrix = hasMatrixPosition(b);
+    if (aHasMatrix && bHasMatrix) return (a.row! - b.row!) || (a.col! - b.col!);
+    if (aHasMatrix) return -1;
+    if (bHasMatrix) return 1;
+    const dy = (a.y ?? 0) - (b.y ?? 0);
+    if (Math.abs(dy) > 0.25) return dy;
+    return (a.x ?? 0) - (b.x ?? 0);
+  })
+);
+
+export const getDirectLocalMatrixPosition = (
+  settings: ProjectSettings,
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>> = []
+): MatrixPosition | undefined => {
+  if (hasMatrixPosition(key)) {
+    return { row: key.row!, col: key.col! };
+  }
+
+  const side = getDirectMatrixSide(settings, key, keys);
+  const sideKeys = keys.filter(k => getDirectMatrixSide(settings, k, keys) === side);
+  const directKeys = sortDirectKeys(sideKeys.filter(k => k.directPin || !hasMatrixPosition(k)));
+  const index = directKeys.findIndex(k => (key.id && k.id === key.id) || k === key);
+  if (index < 0) return undefined;
+  return { row: 0, col: index };
+};
+
+export const getDirectSideDimensions = (
+  settings: ProjectSettings,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>>,
+  side: MatrixSide
+): ProjectSettings['matrix'] => {
+  const sideKeys = keys.filter(key => getDirectMatrixSide(settings, key, keys) === side);
+  const positions = sideKeys
+    .map(key => getDirectLocalMatrixPosition(settings, key, keys))
+    .filter((pos): pos is MatrixPosition => !!pos);
+  return getMatrixDimensionsFromPositions(positions, { rows: positions.length > 0 ? 1 : 0, cols: 0, wiring: settings.matrix?.wiring });
+};
+
+export const getDirectMatrixPosition = (
+  settings: ProjectSettings,
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>> = []
+): MatrixPosition | undefined => {
+  const local = getDirectLocalMatrixPosition(settings, key, keys);
+  if (!local) return undefined;
+  if (!settings.features.split) return local;
+
+  const side = getDirectMatrixSide(settings, key, keys);
+  const leftRows = getDirectSideDimensions(settings, keys, 'left').rows || 0;
+  return {
+    row: side === 'right' ? local.row + leftRows : local.row,
+    col: local.col,
+  };
+};
+
+export const getFirmwareMatrixPosition = (
+  settings: ProjectSettings,
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>> = []
+): MatrixPosition | undefined => (
+  isDirectPinMatrix(settings)
+    ? getDirectMatrixPosition(settings, key, keys)
+    : getQmkMatrixPosition(settings, key, keys)
+);
+
+export const getMatrixDimensionsFromPositions = (
+  positions: MatrixPosition[],
+  fallback: ProjectSettings['matrix'] = { rows: 0, cols: 0 }
+): ProjectSettings['matrix'] => {
+  const keyRows = positions.length > 0 ? Math.max(...positions.map(pos => pos.row)) + 1 : 0;
+  const keyCols = positions.length > 0 ? Math.max(...positions.map(pos => pos.col)) + 1 : 0;
+  return {
+    ...fallback,
+    rows: Math.max(fallback.rows || 0, keyRows),
+    cols: Math.max(fallback.cols || 0, keyCols),
   };
 };

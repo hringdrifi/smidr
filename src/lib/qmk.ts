@@ -6,28 +6,34 @@ import { generateQmkTapDanceC } from './tap-dance-codegen';
 import { actionToQmkSourceString, generateQmkStaticMacroC } from './macro-codegen';
 import { generateQmkComboC, hasConfiguredCombos } from './combo-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
-import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
+import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getQmkMatrixFromPins, isDirectPinMatrix, MatrixSide } from './matrix-utils';
 
 const hasPins = (pins: string[] | undefined) => (pins?.filter(Boolean).length ?? 0) > 0;
 
 const getMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
-  const matrixKeys = keys.filter(key => (
-    key.row !== undefined &&
-    key.col !== undefined &&
-    key.row >= 0 &&
-    key.col >= 0
-  ));
+  const matrixKeys = isDirectPinMatrix(settings)
+    ? keys
+    : keys.filter(key => (
+      key.row !== undefined &&
+      key.col !== undefined &&
+      key.row >= 0 &&
+      key.col >= 0
+    ));
 
   const positions = matrixKeys
-    .map(key => getQmkMatrixPosition(settings, key, keys))
+    .map(key => getFirmwareMatrixPosition(settings, key, keys))
     .filter((pos): pos is { row: number; col: number } => !!pos);
-  const keyRows = positions.length > 0 ? Math.max(...positions.map(pos => pos.row)) + 1 : 0;
-  const keyCols = positions.length > 0 ? Math.max(...positions.map(pos => pos.col)) + 1 : 0;
   const pinMatrix = getQmkMatrixFromPins(settings.pins, settings.features.split);
+  if (isDirectPinMatrix(settings)) {
+    return getMatrixDimensionsFromPositions(positions, settings.matrix);
+  }
 
   return {
-    rows: Math.max(pinMatrix?.rows || settings.matrix?.rows || 0, keyRows),
-    cols: Math.max(pinMatrix?.cols || settings.matrix?.cols || 0, keyCols),
+    ...getMatrixDimensionsFromPositions(positions, {
+      ...settings.matrix,
+      rows: pinMatrix?.rows || settings.matrix?.rows || 0,
+      cols: pinMatrix?.cols || settings.matrix?.cols || 0,
+    }),
   };
 };
 
@@ -35,12 +41,12 @@ const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const matrix = getMatrixDimensions(settings, keys);
 
   return keys.filter((key, idx) => {
-    if (key.row === undefined || key.col === undefined) return false;
-    const pos = getQmkMatrixPosition(settings, key, keys);
+    if (!isDirectPinMatrix(settings) && (key.row === undefined || key.col === undefined)) return false;
+    const pos = getFirmwareMatrixPosition(settings, key, keys);
     if (!pos || pos.row < 0 || pos.col < 0) return false;
     if (pos.row >= matrix.rows || pos.col >= matrix.cols) return false;
     const firstIdx = keys.findIndex(k => {
-      const other = getQmkMatrixPosition(settings, k, keys);
+      const other = getFirmwareMatrixPosition(settings, k, keys);
       return other?.row === pos.row && other?.col === pos.col;
     });
     return firstIdx === idx;
@@ -49,6 +55,28 @@ const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
 
 const shouldUseMatrixMask = (settings: ProjectSettings) => {
   return settings.qmk?.matrixMasked === true;
+};
+
+const generateDirectPins = (settings: ProjectSettings, validKeys: PhysicalKey[], allKeys: PhysicalKey[], side?: MatrixSide) => {
+  const sourceKeys = side
+    ? validKeys.filter(key => getDirectMatrixSide(settings, key, allKeys) === side)
+    : validKeys;
+  const matrix = side
+    ? getDirectSideDimensions(settings, allKeys, side)
+    : getMatrixDimensions(settings, validKeys);
+  const direct = Array.from({ length: matrix.rows }, () =>
+    Array.from({ length: matrix.cols }, () => 'NO_PIN')
+  );
+
+  sourceKeys.forEach(key => {
+    const pos = side
+      ? getDirectLocalMatrixPosition(settings, key, allKeys)
+      : getFirmwareMatrixPosition(settings, key, allKeys);
+    if (!pos) return;
+    direct[pos.row][pos.col] = key.directPin?.trim() || 'NO_PIN';
+  });
+
+  return direct;
 };
 
 const getConfiguredEncoders = (settings: ProjectSettings) => {
@@ -61,7 +89,7 @@ const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[])
   }
 
   const firstKey = validKeys[0];
-  const firstPos = firstKey ? getQmkMatrixPosition(settings, firstKey, validKeys) : undefined;
+  const firstPos = firstKey ? getFirmwareMatrixPosition(settings, firstKey, validKeys) : undefined;
   const row = Number.isInteger(settings.qmk?.bootmagic?.row)
     ? settings.qmk!.bootmagic!.row!
     : firstPos?.row ?? firstKey?.row ?? 0;
@@ -80,7 +108,7 @@ const generateMatrixMaskC = (settings: ProjectSettings, validKeys: PhysicalKey[]
   const rowMasks = Array.from({ length: matrix.rows }, () => BigInt(0));
 
   validKeys.forEach(key => {
-    const pos = getQmkMatrixPosition(settings, key, validKeys);
+    const pos = getFirmwareMatrixPosition(settings, key, validKeys);
     if (!pos) return;
     rowMasks[pos.row] |= BigInt(1) << BigInt(pos.col);
   });
@@ -152,6 +180,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   const useMatrixMask = shouldUseMatrixMask(settings);
   const bootmagic = getBootmagicConfig(settings, validKeys);
   const encoders = getConfiguredEncoders(settings);
+  const useDirectPins = isDirectPinMatrix(settings);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -182,11 +211,13 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
       rgblight: settings.features.rgb
     },
     bootmagic,
-    matrix_pins: {
-      cols: settings.pins.cols,
-      rows: settings.pins.rows,
-      ...(useMatrixMask ? { masked: true } : {})
-    },
+    matrix_pins: useDirectPins
+      ? { direct: generateDirectPins(settings, validKeys, keys, settings.features.split ? 'left' : undefined) }
+      : {
+        cols: settings.pins.cols,
+        rows: settings.pins.rows,
+        ...(useMatrixMask ? { masked: true } : {})
+      },
     ...(encoders.length > 0 ? {
       encoder: {
         rotary: encoders.map(encoder => ({
@@ -203,7 +234,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     layouts: {
       LAYOUT: {
         layout: validKeys.map(key => {
-          const pos = getQmkMatrixPosition(settings, key, keys);
+          const pos = getFirmwareMatrixPosition(settings, key, keys);
           return {
             matrix: pos ? [pos.row, pos.col] : [0, 0],
             x: key.x,
@@ -217,16 +248,22 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     ...(settings.features.split ? {
       split: {
         enabled: true,
-        matrix_pins: {
-          right: {
-            cols: hasPins(settings.pins.splitCols)
-              ? settings.pins.splitCols || []
-              : settings.pins.cols,
-            rows: hasPins(settings.pins.splitRows)
-              ? settings.pins.splitRows || []
-              : settings.pins.rows
+        matrix_pins: useDirectPins
+          ? {
+            right: {
+              direct: generateDirectPins(settings, validKeys, keys, 'right'),
+            }
           }
-        },
+          : {
+            right: {
+              cols: hasPins(settings.pins.splitCols)
+                ? settings.pins.splitCols || []
+                : settings.pins.cols,
+              rows: hasPins(settings.pins.splitRows)
+                ? settings.pins.splitRows || []
+                : settings.pins.rows
+            }
+          },
         transport: {
           protocol: 'serial'
         },

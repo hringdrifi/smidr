@@ -238,6 +238,7 @@ export const MatrixPinInspectorPanel = () => {
     ? getDevelopmentBoardPins(selectedDevelopmentBoard, selectedMcu)
     : getMcuPins(selectedMcu);
   const effectiveMatrix = getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
+  const wiringMode = settings.matrix?.wiring || 'matrix';
 
   const getPinGroupLabel = (box: PinTarget | null, feature: string | null) => {
     if (box === 'row') return settings.features.split ? t('hardware.leftRowPins') : t('hardware.rowPins');
@@ -258,6 +259,7 @@ export const MatrixPinInspectorPanel = () => {
 
     settings.pins.rows.forEach(p => p && pins.add(p));
     settings.pins.cols.forEach(p => p && pins.add(p));
+    keys.forEach(key => key.directPin && pins.add(key.directPin));
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
@@ -268,6 +270,12 @@ export const MatrixPinInspectorPanel = () => {
   };
 
   const assignedPins = getAssignedPins();
+  const updateWiringMode = (mode: 'matrix' | 'direct') => {
+    updateSettings({ matrix: { ...settings.matrix, wiring: mode } });
+  };
+  const updateDiodeDirection = (diodeDirection: 'COL2ROW' | 'ROW2COL') => {
+    updateSettings({ hardware: { ...settings.hardware, diodeDirection } });
+  };
 
   const handleAssignPin = (pinName: string) => {
     const applyPinList = (key: 'rows' | 'cols' | 'splitRows' | 'splitCols', currentPins: string[] = []) => {
@@ -327,6 +335,56 @@ export const MatrixPinInspectorPanel = () => {
       </div>
 
       <div className="flex-1 min-h-0 space-y-4 overflow-y-auto bg-[var(--bg-app)]/20 p-4 custom-scrollbar">
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('matrix.wiringMode')}</h3>
+        <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+          {([
+            ['matrix', t('matrix.wiringMatrix')],
+            ['direct', t('matrix.wiringDirect')],
+          ] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => updateWiringMode(mode)}
+              className={cn(
+                "h-8 rounded text-[10px] font-bold uppercase transition-all",
+                wiringMode === mode
+                  ? "bg-amber-500 text-zinc-950"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {wiringMode === 'matrix' && (
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.diodeDir')}</label>
+            <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+              {(['COL2ROW', 'ROW2COL'] as const).map(dir => (
+                <button
+                  key={dir}
+                  type="button"
+                  onClick={() => updateDiodeDirection(dir)}
+                  className={cn(
+                    "h-8 rounded text-[10px] font-bold transition-all",
+                    settings.hardware.diodeDirection === dir
+                      ? "bg-amber-500 text-zinc-950"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                  )}
+                >
+                  {dir}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+      {wiringMode === 'direct' ? (
+        <section className="flex min-h-24 items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-center text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
+          {t('matrix.directPinPrompt')}
+        </section>
+      ) : (
       <section className="space-y-3">
         {settings.features.split ? (
           <>
@@ -402,6 +460,7 @@ export const MatrixPinInspectorPanel = () => {
           </>
         )}
       </section>
+      )}
 
       {(settings.features.rgb || settings.features.oled || settings.features.split) && (
         <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
@@ -511,6 +570,7 @@ export const MatrixPinSettingsPanel = () => {
     ? getDevelopmentBoardPins(selectedDevelopmentBoard, selectedMcu)
     : getMcuPins(selectedMcu);
   const effectiveMatrix = getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
+  const wiringMode = settings.matrix?.wiring || 'matrix';
 
   const getPinGroupLabel = (box: PinTarget | null, feature: string | null) => {
     if (box === 'row') return settings.features.split ? t('hardware.leftRowPins') : t('hardware.rowPins');
@@ -531,6 +591,7 @@ export const MatrixPinSettingsPanel = () => {
 
     settings.pins.rows.forEach(p => p && pins.add(p));
     settings.pins.cols.forEach(p => p && pins.add(p));
+    keys.forEach(key => key.directPin && pins.add(key.directPin));
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
@@ -541,6 +602,12 @@ export const MatrixPinSettingsPanel = () => {
   };
 
   const assignedPins = getAssignedPins();
+  const updateWiringMode = (mode: 'matrix' | 'direct') => {
+    updateSettings({ matrix: { ...settings.matrix, wiring: mode } });
+  };
+  const updateDiodeDirection = (diodeDirection: 'COL2ROW' | 'ROW2COL') => {
+    updateSettings({ hardware: { ...settings.hardware, diodeDirection } });
+  };
 
   const handleAssignPin = (pinName: string) => {
     const applyPinList = (key: 'rows' | 'cols' | 'splitRows' | 'splitCols', currentPins: string[] = []) => {
@@ -606,7 +673,57 @@ export const MatrixPinSettingsPanel = () => {
 
       <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar bg-[var(--bg-app)]/20">
         <div className="min-w-[820px] p-4">
+          <div className="mb-4 max-w-[540px] space-y-3">
+            <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('matrix.wiringMode')}</h3>
+            <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+              {([
+                ['matrix', t('matrix.wiringMatrix')],
+                ['direct', t('matrix.wiringDirect')],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => updateWiringMode(mode)}
+                  className={cn(
+                    "h-8 rounded text-[10px] font-bold uppercase transition-all",
+                    wiringMode === mode
+                      ? "bg-amber-500 text-zinc-950"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {wiringMode === 'matrix' && (
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase text-[var(--text-muted)] font-bold">{t('hardware.diodeDir')}</label>
+                <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+                  {(['COL2ROW', 'ROW2COL'] as const).map(dir => (
+                    <button
+                      key={dir}
+                      type="button"
+                      onClick={() => updateDiodeDirection(dir)}
+                      className={cn(
+                        "h-8 rounded text-[10px] font-bold transition-all",
+                        settings.hardware.diodeDirection === dir
+                          ? "bg-amber-500 text-zinc-950"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                      )}
+                    >
+                      {dir}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-[minmax(540px,1fr)_280px] gap-4">
+              {wiringMode === 'direct' ? (
+              <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-center text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
+                {t('matrix.directPinPrompt')}
+              </div>
+              ) : (
               <div className="space-y-3">
                 {settings.features.split ? (
                   <div className="grid grid-cols-2 gap-3">
@@ -682,6 +799,7 @@ export const MatrixPinSettingsPanel = () => {
                   </div>
                 )}
               </div>
+              )}
 
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>

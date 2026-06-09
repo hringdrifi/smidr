@@ -30,6 +30,7 @@ export interface PhysicalKey {
   row?: number;  // matrix row (undefined if unassigned)
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
+  directPin?: string; // direct GPIO pin for matrix.wiring === 'direct'
   zmkPosition?: number; // ZMK Studio keymap position index (runtime/source import aid)
   x: number;
   y: number;
@@ -65,6 +66,7 @@ export interface ProjectSettings {
   matrix: {
     rows: number;
     cols: number;
+    wiring?: 'matrix' | 'direct';
   };
   pins: {
     rows: string[];

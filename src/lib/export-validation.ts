@@ -1,6 +1,6 @@
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { getDevelopmentBoardPins, getMcuPins, getZmkHardwareTarget } from './mcu-presets';
-import { getQmkMatrixFromPins, getQmkMatrixPosition } from './matrix-utils';
+import { getFirmwareMatrixPosition, getQmkMatrixFromPins, isDirectPinMatrix } from './matrix-utils';
 
 export type FirmwareExportTarget = 'qmk' | 'vial' | 'zmk';
 export type ExportValidationSeverity = 'error' | 'warning';
@@ -65,8 +65,9 @@ export const validateFirmwareExport = (
 ) => {
   const issues: ExportValidationIssue[] = [];
   const label = targetLabel(target);
+  const directPins = isDirectPinMatrix(settings);
 
-  if (!hasPins(settings.pins.rows) || !hasPins(settings.pins.cols)) {
+  if (!directPins && (!hasPins(settings.pins.rows) || !hasPins(settings.pins.cols))) {
     issues.push({
       severity: 'warning',
       code: 'matrix-pins-missing',
@@ -75,7 +76,7 @@ export const validateFirmwareExport = (
   }
 
   const matrixPositions = keys
-    .map(key => getQmkMatrixPosition(settings, key, keys))
+    .map(key => getFirmwareMatrixPosition(settings, key, keys))
     .filter((pos): pos is { row: number; col: number } => !!pos && pos.row >= 0 && pos.col >= 0);
   if (matrixPositions.length === 0) {
     issues.push({
@@ -99,7 +100,7 @@ export const validateFirmwareExport = (
     });
   }
 
-  const pinMatrix = getQmkMatrixFromPins(settings.pins, settings.features.split);
+  const pinMatrix = directPins ? undefined : getQmkMatrixFromPins(settings.pins, settings.features.split);
   if (pinMatrix) {
     const outOfBoundsCount = matrixPositions.filter(pos => pos.row >= pinMatrix.rows || pos.col >= pinMatrix.cols).length;
     if (outOfBoundsCount > 0) {
@@ -109,6 +110,20 @@ export const validateFirmwareExport = (
         message: `${outOfBoundsCount} key(s) use matrix positions outside the current row/column pin dimensions.`,
       });
     }
+  }
+
+  if (directPins) {
+    const missingDirectPins = keys.filter(key => !key.decal && !key.directPin?.trim()).length;
+    if (missingDirectPins > 0) {
+      issues.push({
+        severity: 'warning',
+        code: 'direct-pins-missing',
+        message: `${missingDirectPins} key(s) have no direct pin assignment. The generated source will emit NO_PIN for those positions.`,
+      });
+    }
+    pushInvalidPins(issues, settings, keys
+      .filter(key => !!key.directPin)
+      .map((key, index) => ({ label: `Direct key ${index + 1}`, value: key.directPin })));
   }
 
   const encoders = getConfiguredEncoders(settings);
@@ -186,7 +201,7 @@ export const validateFirmwareExport = (
         });
       }
     }
-    if (target !== 'zmk' && !settings.pins.splitSerial) {
+    if (!directPins && target !== 'zmk' && !settings.pins.splitSerial) {
       issues.push({
         severity: 'warning',
         code: 'split-serial-missing',
@@ -195,30 +210,36 @@ export const validateFirmwareExport = (
     }
     const hasRightRows = hasPins(settings.pins.splitRows);
     const hasRightCols = hasPins(settings.pins.splitCols);
-    if (!hasRightRows && !hasRightCols) {
-      issues.push({
-        severity: 'warning',
-        code: 'split-matrix-pins-missing',
-        message: 'Split is enabled, but right-side row/column pins are not assigned. The generated source will reuse the left-side matrix pins.',
-      });
-    } else if (!hasRightRows || !hasRightCols) {
-      issues.push({
-        severity: 'warning',
-        code: 'split-matrix-pins-partial',
-        message: 'Split is enabled, but only one right-side matrix axis is assigned. The generated source will use the configured right-side pins and reuse left-side pins for the blank axis.',
-      });
+    if (!directPins) {
+      if (!hasRightRows && !hasRightCols) {
+        issues.push({
+          severity: 'warning',
+          code: 'split-matrix-pins-missing',
+          message: 'Split is enabled, but right-side row/column pins are not assigned. The generated source will reuse the left-side matrix pins.',
+        });
+      } else if (!hasRightRows || !hasRightCols) {
+        issues.push({
+          severity: 'warning',
+          code: 'split-matrix-pins-partial',
+          message: 'Split is enabled, but only one right-side matrix axis is assigned. The generated source will use the configured right-side pins and reuse left-side pins for the blank axis.',
+        });
+      }
     }
-    pushInvalidPins(issues, settings, [
-      { label: 'Split serial', value: settings.pins.splitSerial },
-      ...unique(settings.pins.splitRows || []).map((value, index) => ({ label: `Right row ${index + 1}`, value })),
-      ...unique(settings.pins.splitCols || []).map((value, index) => ({ label: `Right column ${index + 1}`, value })),
-    ]);
+    if (!directPins) {
+      pushInvalidPins(issues, settings, [
+        { label: 'Split serial', value: settings.pins.splitSerial },
+        ...unique(settings.pins.splitRows || []).map((value, index) => ({ label: `Right row ${index + 1}`, value })),
+        ...unique(settings.pins.splitCols || []).map((value, index) => ({ label: `Right column ${index + 1}`, value })),
+      ]);
+    }
   }
 
-  pushInvalidPins(issues, settings, [
-    ...unique(settings.pins.rows || []).map((value, index) => ({ label: `Row ${index + 1}`, value })),
-    ...unique(settings.pins.cols || []).map((value, index) => ({ label: `Column ${index + 1}`, value })),
-  ]);
+  if (!directPins) {
+    pushInvalidPins(issues, settings, [
+      ...unique(settings.pins.rows || []).map((value, index) => ({ label: `Row ${index + 1}`, value })),
+      ...unique(settings.pins.cols || []).map((value, index) => ({ label: `Column ${index + 1}`, value })),
+    ]);
+  }
 
   return issues;
 };

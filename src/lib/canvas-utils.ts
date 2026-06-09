@@ -2,7 +2,7 @@ import { PhysicalKey, ProjectSettings } from '../types/keyboard';
 import { UniversalAction, Modifier } from '../types/actions';
 import { actionToQmkString } from './protocols/via-action-converter';
 import { DEFAULT_VISUAL_LAYOUT, getKeycodeLegend, VisualLayoutId } from './visual-layouts';
-import { getQmkMatrixPosition } from './matrix-utils';
+import { getQmkMatrixPosition, isDirectPinMatrix } from './matrix-utils';
 
 export const UNIT = 48;
 export const TOP_INSET = 0.08;
@@ -250,6 +250,9 @@ export const getKeyLabel = (
   }
 
   if (mode === 'matrix') {
+    if (settings && isDirectPinMatrix(settings)) {
+      return k.directPin ? { type: 'text', text: k.directPin } : { type: 'empty' };
+    }
     const encoderIndex = k.encoderId && settings?.encoders
       ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
       : k.encoderIndex;

@@ -305,7 +305,7 @@ const initialState: Partial<KeyboardState> = {
     description: 'A custom keyboard layout',
     vendorProductId: 0xFEED0001,
     vialUid: generateRandomVialUid(),
-    matrix: { rows: 0, cols: 0 },
+    matrix: { rows: 0, cols: 0, wiring: 'matrix' },
     pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
     hardware: {
       controllerType: 'development_board',
@@ -650,7 +650,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           if (sets.pins || sets.features?.split !== undefined) {
             const pinMatrix = getMatrixFromPins(nextSettings.pins, nextSettings.features.split);
             if (pinMatrix) {
-              nextSettings.matrix = pinMatrix;
+              nextSettings.matrix = { ...pinMatrix, wiring: nextSettings.matrix?.wiring || 'matrix' };
             }
           }
           return { settings: nextSettings };
@@ -2240,7 +2240,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           if (type === 'feature') (p as any)[idx as string] = pin;
           const pinMatrix = getMatrixFromPins(p, s.settings.features.split);
           return {
-            settings: { ...s.settings, pins: p, ...(pinMatrix ? { matrix: pinMatrix } : {}) }
+            settings: { ...s.settings, pins: p, ...(pinMatrix ? { matrix: { ...pinMatrix, wiring: s.settings.matrix?.wiring || 'matrix' } } : {}) }
           };
         }),
 
@@ -2410,9 +2410,12 @@ export const useKeyboardStore = create<KeyboardState>()(
             encoders: runtimeEncoders,
             combos: settings.combos || [],
             tapDances: settings.tapDances || [],
-            matrix: settings.matrix || {
+            matrix: {
+              wiring: 'matrix',
+              ...(settings.matrix || {
               rows: settings.pins?.rows?.length || 0,
               cols: settings.pins?.cols?.length || 0
+              }),
             }
           };
 
@@ -2568,7 +2571,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                   features: features ? { ...s.settings.features, ...features } : s.settings.features,
                   encoders: finalEncoders,
                   tapDances: s.settings.tapDances || [],
-                  matrix: nextMatrix
+                matrix: { ...nextMatrix, wiring: matrix?.wiring || s.settings.matrix?.wiring || 'matrix' }
                 },
                 isProjectOpen: true,
                 selectedKeyIds: [],
@@ -2605,7 +2608,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         })),
 
         clearMatrixMap: () => set((s: KeyboardState) => ({
-          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined, matrixSide: undefined }))
+          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined, matrixSide: undefined, directPin: undefined }))
         })),
 
         generateMatrix: (rows: number, cols: number) => {
@@ -2661,9 +2664,8 @@ export const useKeyboardStore = create<KeyboardState>()(
       }),
       {
         partialize: (state: KeyboardState) => {
-          const { matrix, ...settingsWithoutMatrix } = state.settings;
           return {
-            settings: settingsWithoutMatrix,
+            settings: state.settings,
             keys: state.keys,
             historyId: state.historyId,
           };

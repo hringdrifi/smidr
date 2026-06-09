@@ -120,7 +120,7 @@ describe('useKeyboardStore', () => {
       '0': { name: 'Split Backspace', type: 'toggle' },
     });
     expect(state.settings.activeOptions).toEqual({ '0': 0 });
-    expect(state.settings.matrix).toEqual({ rows: 2, cols: 3 });
+    expect(state.settings.matrix).toEqual({ rows: 2, cols: 3, wiring: 'matrix' });
   });
 
   it('should keep pin-based matrix when imported VIA matrix differs', () => {
@@ -148,7 +148,7 @@ describe('useKeyboardStore', () => {
       });
 
       const state = useKeyboardStore.getState();
-      expect(state.settings.matrix).toEqual({ rows: 1, cols: 2 });
+      expect(state.settings.matrix).toEqual({ rows: 1, cols: 2, wiring: 'matrix' });
       expect(globalThis.alert).toHaveBeenCalledOnce();
     } finally {
       globalThis.alert = originalAlert;
