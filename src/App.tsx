@@ -261,7 +261,7 @@ export default function App() {
       ? [{ type: 'tab' as const, id: 'properties' as RightPanelKind, title: t('properties.title'), icon: SquarePen }]
       : []),
     ...(editorMode === 'matrix'
-      ? [{ type: 'tab' as const, id: 'matrixPainter' as RightPanelKind, title: t('modes.matrix'), icon: MousePointer2 }]
+      ? [{ type: 'tab' as const, id: 'matrixPainter' as RightPanelKind, title: t('matrix.keyWiring'), icon: MousePointer2 }]
       : []),
     ...(editorMode === 'matrix'
       ? [{ type: 'tab' as const, id: 'pins' as RightPanelKind, title: t('hardware.pins'), icon: Hash }]

@@ -143,6 +143,7 @@ export const TRANSLATIONS = {
     },
     matrix: {
       propertiesTitle: 'Matrix Properties',
+      keyWiring: 'Key Wiring',
       routing: 'Routing',
       wiringMode: 'Wiring Mode',
       wiringMatrix: 'Matrix',
@@ -677,6 +678,7 @@ export const TRANSLATIONS = {
     },
     matrix: {
       propertiesTitle: '矩阵属性',
+      keyWiring: '按键接线',
       routing: '布线',
       row: '行 (Row)',
       col: '列 (Col)',
@@ -1020,6 +1022,7 @@ export const TRANSLATIONS = {
     },
     matrix: {
       propertiesTitle: '매트릭스 속성',
+      keyWiring: '키 배선',
       routing: '라우팅',
       row: '행 (Row)',
       col: '열 (Col)',
@@ -1303,7 +1306,7 @@ export const TRANSLATIONS = {
     },
     modes: {
       layout: 'レイアウト',
-      matrix: 'マトリクス',
+      matrix: '配線',
       keymap: 'キーマップ',
       remap: 'リマップ',
       design: '設計',
@@ -1364,9 +1367,10 @@ export const TRANSLATIONS = {
     },
     matrix: {
       propertiesTitle: 'マトリクス属性',
+      keyWiring: 'キー配線',
       routing: 'ルーティング',
       wiringMode: '配線方式',
-      wiringMatrix: '行列',
+      wiringMatrix: 'マトリクス',
       wiringDirect: 'ダイレクトピン',
       row: '行 (Row)',
       col: '列 (Col)',
@@ -1898,6 +1902,7 @@ export const TRANSLATIONS = {
     },
     matrix: {
       propertiesTitle: 'Propiedades de la Matriz',
+      keyWiring: 'Cableado de Teclas',
       routing: 'Enrutamiento',
       row: 'Fila (Row)',
       col: 'Columna (Col)',
@@ -2241,6 +2246,7 @@ export const TRANSLATIONS = {
     },
     matrix: {
       propertiesTitle: 'Matrix-Eigenschaften',
+      keyWiring: 'Tastenverdrahtung',
       routing: 'Routing',
       row: 'Reihe (Row)',
       col: 'Spalte (Col)',
