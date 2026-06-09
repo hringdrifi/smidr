@@ -31,6 +31,10 @@ export interface PhysicalKey {
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
   directPin?: string; // direct GPIO pin for matrix.wiring === 'direct'
+  ledIndex?: number; // QMK/Vial RGB Matrix LED index
+  ledX?: number; // QMK/Vial RGB Matrix x coordinate (0-224)
+  ledY?: number; // QMK/Vial RGB Matrix y coordinate (0-64)
+  ledFlags?: number; // QMK/Vial RGB Matrix LED flags
   zmkPosition?: number; // ZMK Studio keymap position index (runtime/source import aid)
   x: number;
   y: number;
@@ -95,6 +99,7 @@ export interface ProjectSettings {
   };
   features: {
     rgb: boolean;
+    rgbMatrix?: boolean;
     encoder: boolean;
     oled: boolean;
     via: boolean;

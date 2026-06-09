@@ -223,7 +223,8 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       let features: any = undefined;
       if (input.features) {
         features = {
-          rgb: !!(input.features.rgblight || input.features.rgb_matrix),
+          rgb: !!input.features.rgblight,
+          rgbMatrix: !!input.features.rgb_matrix,
           encoder: !!input.features.encoder,
           oled: !!input.features.oled,
           via: !!input.features.via,
@@ -241,6 +242,9 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           const directPin = directPins && Number.isInteger(row) && Number.isInteger(col)
             ? directPins[row]?.[col]
             : undefined;
+          const rgbLed = Array.isArray(input.rgb_matrix?.layout)
+            ? input.rgb_matrix.layout.find((led: any) => Number(led.matrix?.[0]) === row && Number(led.matrix?.[1]) === col)
+            : undefined;
           return {
             id,
             x: k.x ?? 0,
@@ -253,6 +257,10 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
             label: k.label || '',
             row,
             col,
+            ledIndex: Number.isInteger(rgbLed?.index) ? rgbLed.index : undefined,
+            ledX: Number.isFinite(rgbLed?.x) ? Number(rgbLed.x) : undefined,
+            ledY: Number.isFinite(rgbLed?.y) ? Number(rgbLed.y) : undefined,
+            ledFlags: Number.isInteger(rgbLed?.flags) ? Number(rgbLed.flags) : undefined,
             directPin: directPin && directPin !== 'NO_PIN' ? String(directPin) : undefined,
             keymap: {}
           };
@@ -334,6 +342,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
 
     if (pk.decal) key.decal = true;
     if (pk.encoderIndex !== undefined) key.encoderIndex = pk.encoderIndex;
+    if (pk.ledIndex !== undefined) key.ledIndex = pk.ledIndex;
 
     return key;
   });

@@ -11,7 +11,7 @@ const VISUAL_LAYOUT_STORAGE_KEY = 'smidr_visual_layout';
 
 export type StoredTheme = 'dark' | 'light';
 export type StoredAppMode = 'design' | 'remap';
-export type StoredEditorMode = 'layout' | 'matrix' | 'hardware' | 'keymap';
+export type StoredEditorMode = 'layout' | 'matrix' | 'hardware' | 'keymap' | 'rgbMatrix';
 
 export const getStoredTheme = (): StoredTheme | null => {
   if (typeof window === 'undefined') return null;
@@ -40,7 +40,7 @@ export const setStoredAppMode = (mode: StoredAppMode): void => {
 export const getStoredEditorMode = (): StoredEditorMode => {
   if (typeof window === 'undefined') return 'layout';
   const value = localStorage.getItem(EDITOR_MODE_STORAGE_KEY);
-  if (value === 'layout' || value === 'matrix' || value === 'hardware' || value === 'keymap') return value;
+  if (value === 'layout' || value === 'matrix' || value === 'hardware' || value === 'keymap' || value === 'rgbMatrix') return value;
   return 'layout';
 };
 

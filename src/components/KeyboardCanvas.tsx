@@ -1115,6 +1115,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
               />
             </>
           )}
+
         </Layer>
 
         <Layer>

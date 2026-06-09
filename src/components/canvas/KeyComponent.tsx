@@ -20,7 +20,7 @@ interface KeyComponentProps {
   isSelected: boolean;
   isFocused: boolean;
   isColliding: boolean;
-  editorMode: 'layout' | 'matrix' | 'keymap' | 'hardware';
+  editorMode: 'layout' | 'matrix' | 'keymap' | 'hardware' | 'rgbMatrix';
   label: LabelNode;
   appMode: 'design' | 'remap';
   showKeycap?: boolean;
@@ -291,7 +291,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
             fontSize={11}
             lineHeight={1.18}
             fontStyle="bold"
-            fill={appMode === 'design' && editorMode === 'matrix' ? (matrixLabelFill || colors.accent) : colors.text}
+            fill={appMode === 'design' && (editorMode === 'matrix' || editorMode === 'rgbMatrix') ? (matrixLabelFill || colors.accent) : colors.text}
             align="center"
             verticalAlign="middle"
             listening={false}

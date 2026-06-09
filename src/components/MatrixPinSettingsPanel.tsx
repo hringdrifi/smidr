@@ -482,11 +482,11 @@ export const MatrixPinInspectorPanel = () => {
       </section>
       )}
 
-      {(settings.features.rgb || settings.features.oled || settings.features.split) && (
+      {((settings.features.rgb || settings.features.rgbMatrix) || settings.features.oled || settings.features.split) && (
         <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
           <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
           <div className="grid grid-cols-2 gap-3">
-            {settings.features.rgb && (
+            {(settings.features.rgb || settings.features.rgbMatrix) && (
               <InteractivePinSlot
                 label={t('hardware.rgbData')}
                 value={settings.pins.rgb || ''}
@@ -844,7 +844,7 @@ export const MatrixPinSettingsPanel = () => {
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  {settings.features.rgb && (
+                  {(settings.features.rgb || settings.features.rgbMatrix) && (
                     <InteractivePinSlot
                       label={t('hardware.rgbData')}
                       value={settings.pins.rgb || ''}
@@ -893,7 +893,7 @@ export const MatrixPinSettingsPanel = () => {
                     />
                   )}
                 </div>
-                {!settings.features.rgb && !settings.features.oled && !settings.features.split && (
+                {!(settings.features.rgb || settings.features.rgbMatrix) && !settings.features.oled && !settings.features.split && (
                   <div className="h-24 flex items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
                     {t('hardware.specialPins')}
                   </div>

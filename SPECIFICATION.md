@@ -137,6 +137,13 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **KLE/VIA ラベル**: VIA/Vial 互換 JSON へ出力する際は、エンコーダー位置の KLE ラベルに `e{index}` を埋め込む。`row,col` がある場合は押し込みスイッチのマトリクス位置として同じキーに保持し、`e{index}` は回転部の位置メタデータとして併記する。
 - **QMK/Vial 出力**: エンコーダーの物理ピンは `keyboard.json` の `encoder.rotary` に配列で出力する。回転時のレイヤー別アクションは `keymap.c` の `encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]` として生成し、対象 keymap の `rules.mk` に `ENCODER_MAP_ENABLE = yes` を出力する。
 
+### 7.7 RGB Matrix
+- **内部表現**: RGB Matrix は既存の RGB ライト（ZMK では RGB underglow として扱う）とは別に `ProjectSettings.features.rgbMatrix` で有効化する。各キーは `PhysicalKey.ledIndex`, `ledX`, `ledY`, `ledFlags` を保持する。
+- **編集 UI**: 設計モードに RGB Matrix エディタモードを追加する。右パネルで選択キーの LED index、QMK/Vial RGB Matrix 座標 (`x: 0..224`, `y: 0..64`) および flags を編集できる。自動割り当てでは表示中キーを物理ソート順に LED index へ割り当て、キーボード全体の左上を基準にキー中心から座標を正規化する。
+- **KLE/VIA ラベル**: KLE ラベルの LED index は `l{index}` 形式で扱う。インポート時は該当ラベルから `ledIndex` を復元し、VIA/Vial JSON エクスポート時もラベルへ再出力する。
+- **QMK/Vial 出力**: `features.rgbMatrix` が有効で LED index が割り当てられている場合、QMK/Vial ソース出力は `keyboard.json` の `features.rgb_matrix`、`config.h` の `RGB_MATRIX_LED_COUNT`、および `keymap.c` の `g_led_config` を生成する。RGB Matrix 用のデータピンは `pins.rgb` を使用する。
+- **ZMK 出力**: 現時点では ZMK RGB Matrix には対応しない。ZMK ソース出力では `features.rgb` の RGB underglow 設定のみを扱い、`features.rgbMatrix` およびキーごとの LED 座標は出力しない。
+
 ## 9. デバイス通信 & プロトコル統合仕様 (Device Protocol & ZMK Studio Integration)
 
 Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続を含むマルチプロトコルに完全に対応した通信層・UI層の結合設計をサポートします。

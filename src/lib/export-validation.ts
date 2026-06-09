@@ -158,7 +158,7 @@ export const validateFirmwareExport = (
     });
   }
 
-  if (settings.features.rgb) {
+  if (settings.features.rgb || settings.features.rgbMatrix) {
     if (!settings.pins.rgb) {
       issues.push({
         severity: 'warning',
