@@ -2125,7 +2125,13 @@ export const useKeyboardStore = create<KeyboardState>()(
             const matrixSide = s.settings.features.split
               ? side || k.matrixSide || inferMatrixSideFromGeometry(k, s.keys)
               : undefined;
-            return { ...k, row, col, matrixSide };
+            return {
+              ...k,
+              row,
+              col,
+              matrixSide,
+              directPin: row !== undefined || col !== undefined ? undefined : k.directPin,
+            };
           })
         })),
 

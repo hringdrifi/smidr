@@ -106,11 +106,15 @@ export const MatrixPainter = () => {
   const assignDirectPin = (pinName: string) => {
     if (!selectedKeyId) return;
     if (preventDuplicatePins && assignedPins.has(pinName) && selectedKey?.directPin !== pinName) return;
-    updateKey(selectedKeyId, { directPin: pinName });
+    updateKey(selectedKeyId, { directPin: pinName, row: undefined, col: undefined });
   };
 
   const setSelectedSide = (side: MatrixSide) => {
     if (!selectedKeyId) return;
+    if (isDirectMode) {
+      updateKey(selectedKeyId, { matrixSide: side, row: undefined, col: undefined });
+      return;
+    }
     setMatrixPosition(selectedKeyId, selectedMatrixPos?.row, selectedMatrixPos?.col, side);
   };
 
@@ -171,7 +175,7 @@ export const MatrixPainter = () => {
             <input
               type="text"
               value={selectedKey.directPin || ''}
-              onChange={(e) => updateKey(selectedKeyId, { directPin: e.target.value.toUpperCase() })}
+              onChange={(e) => updateKey(selectedKeyId, { directPin: e.target.value.toUpperCase(), row: undefined, col: undefined })}
               placeholder={t('matrix.directPinPlaceholder')}
               className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none transition-all placeholder:text-[var(--text-dim)] focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
             />

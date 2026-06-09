@@ -215,7 +215,7 @@ const PinTagInput = ({
 };
 
 export const MatrixPinInspectorPanel = () => {
-  const { settings, updateSettings, setPin, keys } = useKeyboardStore();
+  const { settings, updateSettings, setPin, keys, batchUpdateKeys } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
     Object.entries(values).reduce(
@@ -271,6 +271,26 @@ export const MatrixPinInspectorPanel = () => {
 
   const assignedPins = getAssignedPins();
   const updateWiringMode = (mode: 'matrix' | 'direct') => {
+    if (mode === wiringMode) return;
+
+    if (mode === 'direct') {
+      const matrixKeys = keys.filter(key => key.row !== undefined || key.col !== undefined);
+      if (matrixKeys.length > 0 && !window.confirm(format('matrix.confirmSwitchToDirect', { count: matrixKeys.length }))) {
+        return;
+      }
+      if (matrixKeys.length > 0) {
+        batchUpdateKeys(matrixKeys.map(key => key.id!), { row: undefined, col: undefined });
+      }
+    } else {
+      const directKeys = keys.filter(key => !!key.directPin);
+      if (directKeys.length > 0 && !window.confirm(format('matrix.confirmSwitchToMatrix', { count: directKeys.length }))) {
+        return;
+      }
+      if (directKeys.length > 0) {
+        batchUpdateKeys(directKeys.map(key => key.id!), { directPin: undefined });
+      }
+    }
+
     updateSettings({ matrix: { ...settings.matrix, wiring: mode } });
   };
   const updateDiodeDirection = (diodeDirection: 'COL2ROW' | 'ROW2COL') => {
@@ -547,7 +567,7 @@ export const MatrixPinInspectorPanel = () => {
 };
 
 export const MatrixPinSettingsPanel = () => {
-  const { settings, updateSettings, setPin, keys } = useKeyboardStore();
+  const { settings, updateSettings, setPin, keys, batchUpdateKeys } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
     Object.entries(values).reduce(
@@ -603,6 +623,26 @@ export const MatrixPinSettingsPanel = () => {
 
   const assignedPins = getAssignedPins();
   const updateWiringMode = (mode: 'matrix' | 'direct') => {
+    if (mode === wiringMode) return;
+
+    if (mode === 'direct') {
+      const matrixKeys = keys.filter(key => key.row !== undefined || key.col !== undefined);
+      if (matrixKeys.length > 0 && !window.confirm(format('matrix.confirmSwitchToDirect', { count: matrixKeys.length }))) {
+        return;
+      }
+      if (matrixKeys.length > 0) {
+        batchUpdateKeys(matrixKeys.map(key => key.id!), { row: undefined, col: undefined });
+      }
+    } else {
+      const directKeys = keys.filter(key => !!key.directPin);
+      if (directKeys.length > 0 && !window.confirm(format('matrix.confirmSwitchToMatrix', { count: directKeys.length }))) {
+        return;
+      }
+      if (directKeys.length > 0) {
+        batchUpdateKeys(directKeys.map(key => key.id!), { directPin: undefined });
+      }
+    }
+
     updateSettings({ matrix: { ...settings.matrix, wiring: mode } });
   };
   const updateDiodeDirection = (diodeDirection: 'COL2ROW' | 'ROW2COL') => {

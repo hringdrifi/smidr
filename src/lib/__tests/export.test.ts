@@ -116,6 +116,22 @@ describe('export generation', () => {
     expect(rightOverlay).toContain('col-offset = <1>');
   });
 
+  it('omits saved row and column assignments for direct pin projects', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, row: 0, col: 1, directPin: 'GP2', label: 'A' },
+    ];
+
+    const project = generateSmidrProjectJson({ settings, keys });
+
+    expect(project.keys[0].directPin).toBe('GP2');
+    expect(project.keys[0].row).toBeUndefined();
+    expect(project.keys[0].col).toBeUndefined();
+  });
+
   it('exports KLE JSON for only the currently visible layout option', () => {
     const settings: ProjectSettings = {
       ...baseSettings,

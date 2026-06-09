@@ -443,6 +443,19 @@ describe('useKeyboardStore', () => {
     expect(key.matrixSide).toBe('right');
   });
 
+  it('should clear direct pin when assigning matrix position', () => {
+    const store = useKeyboardStore.getState();
+    store.addKey({ x: 0, y: 0, w: 1, h: 1, label: 'A', directPin: 'GP2' });
+
+    const keyId = useKeyboardStore.getState().keys[0].id;
+    store.setMatrixPosition(keyId, 1, 2);
+
+    const key = useKeyboardStore.getState().keys[0];
+    expect(key.row).toBe(1);
+    expect(key.col).toBe(2);
+    expect(key.directPin).toBeUndefined();
+  });
+
   it('should handle copying and pasting universal actions in keymap mode (design app mode)', () => {
     const store = useKeyboardStore.getState();
     useKeyboardStore.setState({ editorMode: 'keymap', appMode: 'design', currentLayer: 0 });
