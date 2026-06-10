@@ -169,6 +169,17 @@ export const validateFirmwareExport = (
     pushInvalidPins(issues, settings, [{ label: 'RGB data', value: settings.pins.rgb }]);
   }
 
+  if (settings.features.backlight) {
+    if (!settings.pins.backlight) {
+      issues.push({
+        severity: 'warning',
+        code: 'backlight-pin-missing',
+        message: 'Backlight is enabled, but the backlight pin is not assigned. The generated source will use its fallback pin.',
+      });
+    }
+    pushInvalidPins(issues, settings, [{ label: 'Backlight', value: settings.pins.backlight }]);
+  }
+
   if (settings.features.oled) {
     if (!settings.pins.sda || !settings.pins.scl) {
       issues.push({

@@ -261,6 +261,7 @@ export const MatrixPinInspectorPanel = () => {
     settings.pins.cols.forEach(p => p && pins.add(p));
     keys.forEach(key => key.directPin && pins.add(key.directPin));
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
+    if (settings.pins.backlight) pins.add(settings.pins.backlight);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
     getEncoderAssignedPins(settings, keys, settings.features.split && (activeBox === 'row' || activeBox === 'col') ? 'left' : undefined)
@@ -322,6 +323,7 @@ export const MatrixPinInspectorPanel = () => {
         splitRows: [],
         splitCols: [],
         rgb: '',
+        backlight: '',
         sda: '',
         scl: '',
         splitSerial: ''
@@ -482,7 +484,7 @@ export const MatrixPinInspectorPanel = () => {
       </section>
       )}
 
-      {((settings.features.rgb || settings.features.rgbMatrix) || settings.features.oled || settings.features.split) && (
+      {((settings.features.rgb || settings.features.rgbMatrix || settings.features.backlight) || settings.features.oled || settings.features.split) && (
         <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
           <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
           <div className="grid grid-cols-2 gap-3">
@@ -496,6 +498,18 @@ export const MatrixPinInspectorPanel = () => {
                   setFocusedFeature('rgb');
                 }}
                 onClear={() => setPin('feature', 'rgb', '')}
+              />
+            )}
+            {settings.features.backlight && (
+              <InteractivePinSlot
+                label={t('hardware.backlightPin')}
+                value={settings.pins.backlight || ''}
+                isFocused={activeBox === 'feature' && focusedFeature === 'backlight'}
+                onFocus={() => {
+                  setActiveBox('feature');
+                  setFocusedFeature('backlight');
+                }}
+                onClear={() => setPin('feature', 'backlight', '')}
               />
             )}
             {settings.features.oled && (
@@ -613,6 +627,7 @@ export const MatrixPinSettingsPanel = () => {
     settings.pins.cols.forEach(p => p && pins.add(p));
     keys.forEach(key => key.directPin && pins.add(key.directPin));
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
+    if (settings.pins.backlight) pins.add(settings.pins.backlight);
     if (settings.pins.sda) pins.add(settings.pins.sda);
     if (settings.pins.scl) pins.add(settings.pins.scl);
     getEncoderAssignedPins(settings, keys, settings.features.split && (activeBox === 'row' || activeBox === 'col') ? 'left' : undefined)
@@ -674,6 +689,7 @@ export const MatrixPinSettingsPanel = () => {
         splitRows: [],
         splitCols: [],
         rgb: '',
+        backlight: '',
         sda: '',
         scl: '',
         splitSerial: ''
@@ -856,6 +872,18 @@ export const MatrixPinSettingsPanel = () => {
                       onClear={() => setPin('feature', 'rgb', '')}
                     />
                   )}
+                  {settings.features.backlight && (
+                    <InteractivePinSlot
+                      label={t('hardware.backlightPin')}
+                      value={settings.pins.backlight || ''}
+                      isFocused={activeBox === 'feature' && focusedFeature === 'backlight'}
+                      onFocus={() => {
+                        setActiveBox('feature');
+                        setFocusedFeature('backlight');
+                      }}
+                      onClear={() => setPin('feature', 'backlight', '')}
+                    />
+                  )}
                   {settings.features.oled && (
                     <>
                       <InteractivePinSlot
@@ -893,7 +921,7 @@ export const MatrixPinSettingsPanel = () => {
                     />
                   )}
                 </div>
-                {!(settings.features.rgb || settings.features.rgbMatrix) && !settings.features.oled && !settings.features.split && (
+                {!(settings.features.rgb || settings.features.rgbMatrix || settings.features.backlight) && !settings.features.oled && !settings.features.split && (
                   <div className="h-24 flex items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
                     {t('hardware.specialPins')}
                   </div>

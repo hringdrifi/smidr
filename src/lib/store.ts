@@ -319,7 +319,7 @@ const initialState: Partial<KeyboardState> = {
       diodeDirection: 'COL2ROW',
     },
     qmk: { matrixMasked: false, bootmagic: { enabled: true } },
-    features: { rgb: false, rgbMatrix: false, encoder: false, oled: false, via: true, split: false },
+    features: { rgb: false, backlight: false, rgbMatrix: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
     encoders: [],
     macros: createEmptyMacros(),

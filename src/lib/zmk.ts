@@ -83,6 +83,10 @@ const getZmkSplitTransport = (settings: ProjectSettings) => settings.zmk?.splitT
 
 const getWiredSplitDevice = (settings: ProjectSettings) => settings.zmk?.wiredSplitDevice?.trim() || '&pro_micro_serial';
 
+const getZmkLightingConfigSnippet = (settings: ProjectSettings) => `${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y
+CONFIG_WS2812_STRIP=y` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y' : '# CONFIG_ZMK_BACKLIGHT is not set'}`;
+
 const generateZmkBuildYaml = (entries: Array<{ board: string; shield?: string }>) => `include:
 ${entries.map(entry => `  - board: ${entry.board}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
 `;
@@ -452,8 +456,8 @@ ${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
 # Enable deep sleep support (uncomment to activate)
 # CONFIG_ZMK_SLEEP=y
 
-# RGB features
-${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+# Lighting features
+${getZmkLightingConfigSnippet(settings)}
 ${getEncoderConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
@@ -720,8 +724,8 @@ CONFIG_RETENTION_BOOT_MODE=y
 # Enable deep sleep support (uncomment to activate)
 # CONFIG_ZMK_SLEEP=y
 
-# RGB features
-${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+# Lighting features
+${getZmkLightingConfigSnippet(settings)}
 ${getEncoderConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
@@ -941,8 +945,8 @@ CONFIG_RETENTION_BOOT_MODE=y
 # Enable deep sleep support (uncomment to activate)
 # CONFIG_ZMK_SLEEP=y
 
-# RGB features
-${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+# Lighting features
+${getZmkLightingConfigSnippet(settings)}
 ${getEncoderConfigSnippet(settings)}
 `;
     boardFolder.file(`${kbName}.conf`, keyboardConf);
@@ -1126,8 +1130,8 @@ ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 # Enable deep sleep support (uncomment to activate)
 # CONFIG_ZMK_SLEEP=y
 
-# RGB features
-${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
+# Lighting features
+${getZmkLightingConfigSnippet(settings)}
 ${getEncoderConfigSnippet(settings)}
 `;
     shieldsFolder.file(`${kbName}.conf`, shieldConf);

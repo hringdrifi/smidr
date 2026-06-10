@@ -170,6 +170,9 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
         } else if (input.ws2812 && input.ws2812.pin) {
           pins.rgb = String(input.ws2812.pin);
         }
+        if (input.backlight && input.backlight.pin) {
+          pins.backlight = String(input.backlight.pin);
+        }
       }
 
       const encoders: ProjectSettings['encoders'] | undefined = input.encoder && Array.isArray(input.encoder.rotary)
@@ -224,6 +227,7 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       if (input.features) {
         features = {
           rgb: !!input.features.rgblight,
+          backlight: !!input.features.backlight,
           rgbMatrix: !!input.features.rgb_matrix,
           encoder: !!input.features.encoder,
           oled: !!input.features.oled,
