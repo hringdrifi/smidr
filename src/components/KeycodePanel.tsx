@@ -11,6 +11,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey } from '@/types/actions';
 import { applyVisualLayoutToKeycode } from '@/lib/visual-layouts';
 import { getKeycodeSupport, KeycodeSupportTarget } from '@/lib/keycode-support';
+import { getFirmwareMatrixPosition } from '@/lib/matrix-utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -86,8 +87,11 @@ export const KeycodePanel = () => {
   const encoderRotationDirection = effectiveEncoderActionDirection === 'button' ? null : effectiveEncoderActionDirection;
   const isEncoderRotationTarget = !!selectedEncoder && !!encoderRotationDirection;
   const hasSelectedKey = selectedKeyIds.length > 0;
+  const selectedFirmwarePosition = selectedKey
+    ? getFirmwareMatrixPosition(settings, selectedKey, keys)
+    : undefined;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
-    selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
+    selectedFirmwarePosition ? selectedFirmwarePosition.row * 32 + selectedFirmwarePosition.col : undefined
   );
 
   let action: UniversalAction = { action: 'trans' };

@@ -548,6 +548,46 @@ describe('useKeyboardStore', () => {
     expect(state.remoteKeymap[0][33]).toEqual({ action: 'tap', keycode: 'Y' });
   });
 
+  it('should write split right-half remap actions to the firmware matrix row offset', async () => {
+    const store = useKeyboardStore.getState();
+    useKeyboardStore.setState({
+      editorMode: 'keymap',
+      appMode: 'remap',
+      currentLayer: 0,
+      remoteKeymap: {
+        0: []
+      },
+      settings: {
+        ...store.settings,
+        pins: {
+          ...store.settings.pins,
+          rows: ['L0', 'L1', 'L2', 'L3'],
+          cols: ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'],
+          splitRows: ['R0', 'R1', 'R2', 'R3'],
+          splitCols: ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'],
+        },
+        features: {
+          ...store.settings.features,
+          split: true,
+        },
+      },
+    });
+
+    store.addKeys([
+      { x: 0, y: 0, w: 1, h: 1, row: 0, col: 0, matrixSide: 'left' },
+      { x: 8, y: 0, w: 1, h: 1, row: 0, col: 0, matrixSide: 'right' },
+    ], { skipCollision: true });
+
+    const rightKey = useKeyboardStore.getState().keys.find(k => k.matrixSide === 'right')!;
+    store.setSelectedKeyIds([rightKey.id]);
+    await store.setSelectedKeycode({ action: 'tap', keycode: 'B' });
+
+    const state = useKeyboardStore.getState();
+    expect(state.remoteKeymap[0][0]).toBeUndefined();
+    expect(state.remoteKeymap[0][4 * 32]).toEqual({ action: 'tap', keycode: 'B' });
+    expect(state.keys.find(k => k.matrixSide === 'right')?.keymap?.[0]).toEqual({ action: 'tap', keycode: 'B' });
+  });
+
   it('should remove the last layer keymap data and retarget references to layer 0', () => {
     const store = useKeyboardStore.getState();
     useKeyboardStore.setState({

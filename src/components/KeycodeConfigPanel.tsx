@@ -8,6 +8,7 @@ import { Info, Check, Code2, Settings, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { RightPanelEmptyState } from './RightPanelEmptyState';
+import { getFirmwareMatrixPosition } from '@/lib/matrix-utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -72,8 +73,11 @@ export const KeycodeConfigPanel = () => {
     : encoderActionDirection;
   const encoderRotationDirection = effectiveEncoderActionDirection === 'button' ? null : effectiveEncoderActionDirection;
   const isEncoderRotationTarget = isEncoderActionMode && !!encoderRotationDirection;
+  const selectedFirmwarePosition = selectedKey
+    ? getFirmwareMatrixPosition(settings, selectedKey, keys)
+    : undefined;
   const selectedRemoteIndex = selectedKey?.zmkPosition ?? (
-    selectedKey?.row !== undefined && selectedKey?.col !== undefined ? selectedKey.row * 32 + selectedKey.col : undefined
+    selectedFirmwarePosition ? selectedFirmwarePosition.row * 32 + selectedFirmwarePosition.col : undefined
   );
   let action: UniversalAction = { action: 'trans' };
   if (selectedKey) {
@@ -139,8 +143,8 @@ export const KeycodeConfigPanel = () => {
     } else if (appMode === 'remap') {
       if (selectedKey.zmkPosition !== undefined) {
         updateDeviceKeycode(currentLayer, selectedKey.zmkPosition, -1, newAction);
-      } else if (selectedKey.row !== undefined && selectedKey.col !== undefined) {
-        updateDeviceKeycode(currentLayer, selectedKey.row, selectedKey.col, newAction);
+      } else if (selectedFirmwarePosition) {
+        updateDeviceKeycode(currentLayer, selectedFirmwarePosition.row, selectedFirmwarePosition.col, newAction);
       }
     } else {
       setKeycode(selectedKey.id!, currentLayer, newAction);
