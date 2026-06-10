@@ -32,6 +32,7 @@ import { generateZmkZip } from '@/lib/zmk';
 import {
   DEFAULT_KICAD_EXPORT_OPTIONS,
   generateKiCadZip,
+  getKiCadFootprintPreviewTemplate,
   KICAD_DIODE_FOOTPRINTS,
   KICAD_SWITCH_FOOTPRINTS,
   KiCadExportOptions,
@@ -48,6 +49,263 @@ function cn(...inputs: ClassValue[]) {
 }
 
 type RightPanelKind = 'settings' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'pins' | 'rgbMatrix' | AdvancedPanelKind;
+
+const findMatchingParenInText = (value: string, start: number) => {
+  let depth = 0;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === '(') depth += 1;
+    if (char === ')') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+};
+
+const collectKiCadForms = (value: string, formName: string) => {
+  const forms: string[] = [];
+  let index = 0;
+  while (index < value.length) {
+    const start = value.indexOf(`(${formName}`, index);
+    if (start === -1) break;
+    const end = findMatchingParenInText(value, start);
+    if (end === -1) break;
+    forms.push(value.slice(start, end + 1));
+    index = end + 1;
+  }
+  return forms;
+};
+
+const parseKiCadPoint = (block: string, name: string) => {
+  const match = block.match(new RegExp(`\\(${name}\\s+([-+]?\\d*\\.?\\d+)\\s+([-+]?\\d*\\.?\\d+)(?:\\s+([-+]?\\d*\\.?\\d+))?`));
+  if (!match) return null;
+  return {
+    x: Number.parseFloat(match[1]),
+    y: Number.parseFloat(match[2]),
+    r: match[3] === undefined ? 0 : Number.parseFloat(match[3]),
+  };
+};
+
+const parseKiCadSize = (block: string, name: string) => {
+  const match = block.match(new RegExp(`\\(${name}\\s+([-+]?\\d*\\.?\\d+)(?:\\s+([-+]?\\d*\\.?\\d+))?`));
+  if (!match) return null;
+  return { w: Number.parseFloat(match[1]), h: Number.parseFloat(match[2] ?? match[1]) };
+};
+
+const isSilkLayer = (block: string) => /\(layer\s+"[FB]\.SilkS"\)/.test(block);
+
+const normalizeSvgArcDelta = (angle: number) => {
+  const full = Math.PI * 2;
+  return ((angle % full) + full) % full;
+};
+
+const getSvgArcFromThreePoints = (
+  start: { x: number; y: number },
+  mid: { x: number; y: number },
+  end: { x: number; y: number }
+) => {
+  const determinant = 2 * (
+    start.x * (mid.y - end.y) +
+    mid.x * (end.y - start.y) +
+    end.x * (start.y - mid.y)
+  );
+  if (Math.abs(determinant) < 0.000001) return null;
+
+  const startSq = start.x ** 2 + start.y ** 2;
+  const midSq = mid.x ** 2 + mid.y ** 2;
+  const endSq = end.x ** 2 + end.y ** 2;
+  const center = {
+    x: (
+      startSq * (mid.y - end.y) +
+      midSq * (end.y - start.y) +
+      endSq * (start.y - mid.y)
+    ) / determinant,
+    y: (
+      startSq * (end.x - mid.x) +
+      midSq * (start.x - end.x) +
+      endSq * (mid.x - start.x)
+    ) / determinant,
+  };
+  const radius = Math.hypot(start.x - center.x, start.y - center.y);
+  const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+  const midAngle = Math.atan2(mid.y - center.y, mid.x - center.x);
+  const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+  const positiveDelta = normalizeSvgArcDelta(endAngle - startAngle);
+  const midDelta = normalizeSvgArcDelta(midAngle - startAngle);
+  const sweepFlag = midDelta <= positiveDelta ? 1 : 0;
+  const arcDelta = sweepFlag === 1 ? positiveDelta : Math.PI * 2 - positiveDelta;
+  return {
+    radius,
+    largeArcFlag: arcDelta > Math.PI ? 1 : 0,
+    sweepFlag,
+  };
+};
+
+const renderKiCadFootprintPreview = (
+  rawFootprint: string,
+  seed: string,
+  originX: number,
+  originY: number,
+  rotation: number,
+  scale: number,
+  flipBack = false
+) => {
+  const silkItems: React.ReactNode[] = [];
+  const smdPadItems: React.ReactNode[] = [];
+  const thruHoleItems: React.ReactNode[] = [];
+  const npthItems: React.ReactNode[] = [];
+  const toSvgX = (x: number) => x * scale;
+  const toSvgY = (y: number) => (flipBack ? -y : y) * scale;
+  const toSvgLength = (value: number) => Math.abs(value * scale);
+  const toSvgAngle = (angle: number) => (flipBack ? 180 - angle : angle);
+
+  collectKiCadForms(rawFootprint, 'pad').forEach((block, index) => {
+    const head = block.match(/^\(pad\s+"[^"]*"\s+([^\s]+)\s+([^\s]+)/);
+    const at = parseKiCadPoint(block, 'at') ?? { x: 0, y: 0, r: 0 };
+    const size = parseKiCadSize(block, 'size') ?? { w: 1, h: 1 };
+    const drill = parseKiCadSize(block, 'drill');
+    const type = head?.[1] ?? '';
+    const shape = head?.[2] ?? '';
+    const isHole = type.includes('thru_hole');
+    const isNp = type.includes('np_thru_hole');
+    const fill = isNp ? 'rgba(15, 23, 42, 0.92)' : isHole ? 'rgba(251, 191, 36, 0.52)' : 'rgba(56, 189, 248, 0.58)';
+    const stroke = isNp ? 'rgba(226, 232, 240, 0.8)' : isHole ? 'rgb(251, 191, 36)' : 'rgb(56, 189, 248)';
+    const padWidth = toSvgLength(size.w);
+    const padHeight = toSvgLength(size.h);
+    const rx = shape.includes('roundrect') || shape.includes('circle') || shape.includes('oval') ? Math.min(padWidth, padHeight) * 0.22 : 0;
+    const padItems = isNp ? npthItems : isHole ? thruHoleItems : smdPadItems;
+    padItems.push(
+      <g key={`${seed}-pad-${index}`} transform={`translate(${toSvgX(at.x)} ${toSvgY(at.y)}) rotate(${toSvgAngle(at.r)})`}>
+        {shape.includes('circle') && Math.abs(size.w - size.h) < 0.01 ? (
+          <circle cx="0" cy="0" r={padWidth / 2} fill={fill} stroke={stroke} strokeWidth="1.2" />
+        ) : (
+          <rect
+            x={-padWidth / 2}
+            y={-padHeight / 2}
+            width={padWidth}
+            height={padHeight}
+            rx={rx}
+            fill={fill}
+            stroke={stroke}
+            strokeWidth="1.2"
+          />
+        )}
+        {drill && (
+          <ellipse
+            cx="0"
+            cy="0"
+            rx={toSvgLength(drill.w) / 2}
+            ry={toSvgLength(drill.h) / 2}
+            fill="rgba(3, 7, 18, 0.95)"
+            stroke="rgba(226, 232, 240, 0.32)"
+            strokeWidth="0.8"
+          />
+        )}
+      </g>
+    );
+  });
+
+  collectKiCadForms(rawFootprint, 'fp_line').filter(isSilkLayer).forEach((block, index) => {
+    const start = parseKiCadPoint(block, 'start');
+    const end = parseKiCadPoint(block, 'end');
+    if (!start || !end) return;
+    silkItems.push(
+      <line
+        key={`${seed}-line-${index}`}
+        x1={toSvgX(start.x)}
+        y1={toSvgY(start.y)}
+        x2={toSvgX(end.x)}
+        y2={toSvgY(end.y)}
+        stroke="rgba(226, 232, 240, 0.85)"
+        strokeWidth="1"
+      />
+    );
+  });
+
+  collectKiCadForms(rawFootprint, 'fp_rect').filter(isSilkLayer).forEach((block, index) => {
+    const start = parseKiCadPoint(block, 'start');
+    const end = parseKiCadPoint(block, 'end');
+    if (!start || !end) return;
+    const x1 = toSvgX(start.x);
+    const x2 = toSvgX(end.x);
+    const y1 = toSvgY(start.y);
+    const y2 = toSvgY(end.y);
+    silkItems.push(
+      <rect
+        key={`${seed}-rect-${index}`}
+        x={Math.min(x1, x2)}
+        y={Math.min(y1, y2)}
+        width={Math.abs(x2 - x1)}
+        height={Math.abs(y2 - y1)}
+        fill="none"
+        stroke="rgba(226, 232, 240, 0.85)"
+        strokeWidth="1"
+      />
+    );
+  });
+
+  collectKiCadForms(rawFootprint, 'fp_arc').filter(isSilkLayer).forEach((block, index) => {
+    const start = parseKiCadPoint(block, 'start');
+    const mid = parseKiCadPoint(block, 'mid');
+    const end = parseKiCadPoint(block, 'end');
+    if (!start || !mid || !end) return;
+    const svgStart = { x: toSvgX(start.x), y: toSvgY(start.y) };
+    const svgMid = { x: toSvgX(mid.x), y: toSvgY(mid.y) };
+    const svgEnd = { x: toSvgX(end.x), y: toSvgY(end.y) };
+    const arc = getSvgArcFromThreePoints(svgStart, svgMid, svgEnd);
+    if (!arc) {
+      silkItems.push(
+        <line
+          key={`${seed}-arc-${index}`}
+          x1={svgStart.x}
+          y1={svgStart.y}
+          x2={svgEnd.x}
+          y2={svgEnd.y}
+          stroke="rgba(226, 232, 240, 0.85)"
+          strokeWidth="1"
+        />
+      );
+      return;
+    }
+    silkItems.push(
+      <path
+        key={`${seed}-arc-${index}`}
+        d={`M ${svgStart.x} ${svgStart.y} A ${arc.radius} ${arc.radius} 0 ${arc.largeArcFlag} ${arc.sweepFlag} ${svgEnd.x} ${svgEnd.y}`}
+        fill="none"
+        stroke="rgba(226, 232, 240, 0.85)"
+        strokeWidth="1"
+      />
+    );
+  });
+
+  collectKiCadForms(rawFootprint, 'fp_circle').filter(isSilkLayer).forEach((block, index) => {
+    const center = parseKiCadPoint(block, 'center');
+    const end = parseKiCadPoint(block, 'end');
+    if (!center || !end) return;
+    const radius = Math.hypot(toSvgX(end.x) - toSvgX(center.x), toSvgY(end.y) - toSvgY(center.y));
+    silkItems.push(
+      <circle
+        key={`${seed}-circle-${index}`}
+        cx={toSvgX(center.x)}
+        cy={toSvgY(center.y)}
+        r={radius}
+        fill="none"
+        stroke="rgba(226, 232, 240, 0.85)"
+        strokeWidth="1"
+      />
+    );
+  });
+
+  return (
+    <g transform={`translate(${originX} ${originY}) rotate(${rotation})`}>
+      {silkItems}
+      {smdPadItems}
+      {thruHoleItems}
+      {npthItems}
+    </g>
+  );
+};
 
 export default function App() {
   const storeState = useKeyboardStore();
@@ -84,6 +342,22 @@ export default function App() {
     combos: { title: t('macros.combos'), icon: Workflow },
     tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: WandSparkles },
   } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
+  const diodePreviewScale = 5;
+  const diodeOffsetX = kicadExportOptions.diodeOffsetX ?? DEFAULT_KICAD_EXPORT_OPTIONS.diodeOffsetX;
+  const diodeOffsetY = kicadExportOptions.diodeOffsetY ?? DEFAULT_KICAD_EXPORT_OPTIONS.diodeOffsetY;
+  const diodeRotation = kicadExportOptions.diodeRotation ?? DEFAULT_KICAD_EXPORT_OPTIONS.diodeRotation;
+  const diodePreviewX = 90 + diodeOffsetX * diodePreviewScale;
+  const diodePreviewY = 90 + diodeOffsetY * diodePreviewScale;
+  const switchPreviewTemplate = getKiCadFootprintPreviewTemplate(kicadExportOptions.switchFootprint);
+  const diodePreviewTemplate = getKiCadFootprintPreviewTemplate(kicadExportOptions.diodeFootprint);
+  const switchPreviewChoice = KICAD_SWITCH_FOOTPRINTS.find(option => option.footprint === kicadExportOptions.switchFootprint);
+  const diodePreviewChoice = KICAD_DIODE_FOOTPRINTS.find(option => option.footprint === kicadExportOptions.diodeFootprint);
+  const switchPreviewBack = switchPreviewChoice?.mountType === 'smd';
+  const diodePreviewBack = diodePreviewChoice?.mountType === 'smd';
+  const updateKiCadNumberOption = (key: 'diodeOffsetX' | 'diodeOffsetY' | 'diodeRotation', value: string) => {
+    const parsed = Number.parseFloat(value);
+    setKiCadExportOptions(options => ({ ...options, [key]: Number.isFinite(parsed) ? parsed : 0 }));
+  };
 
   React.useEffect(() => {
     if (storeState.appMode !== 'design') return;
@@ -1068,7 +1342,7 @@ export default function App() {
       {isKiCadDialogOpen && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsKiCadDialogOpen(false)} />
-          <div className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200">
+          <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
               <div className="flex items-center gap-3">
                 <CircuitBoard size={18} className="text-amber-500" />
@@ -1085,41 +1359,82 @@ export default function App() {
               </button>
             </div>
 
-            <div className="space-y-4 p-4">
-              <label className="block space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  {t('kicad.switchFootprint')}
-                </span>
-                <select
-                  value={kicadExportOptions.switchFootprint}
-                  onChange={(e) => setKiCadExportOptions(options => ({ ...options, switchFootprint: e.target.value }))}
-                  className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
-                >
-                  {KICAD_SWITCH_FOOTPRINTS.map(option => (
-                    <option key={option.id} value={option.footprint}>
-                      {option.label} - {option.footprint}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="min-h-0 overflow-y-auto p-4 custom-scrollbar">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,420px)_minmax(360px,1fr)]">
+                <div className="space-y-4">
+                  <label className="block space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {t('kicad.switchFootprint')}
+                    </span>
+                    <select
+                      value={kicadExportOptions.switchFootprint}
+                      onChange={(e) => setKiCadExportOptions(options => ({ ...options, switchFootprint: e.target.value }))}
+                      className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
+                    >
+                      {KICAD_SWITCH_FOOTPRINTS.map(option => (
+                        <option key={option.id} value={option.footprint}>
+                          {option.label} - {option.footprint}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <label className="block space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  {t('kicad.diodeFootprint')}
-                </span>
-                <select
-                  value={kicadExportOptions.diodeFootprint}
-                  onChange={(e) => setKiCadExportOptions(options => ({ ...options, diodeFootprint: e.target.value }))}
-                  className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
-                >
-                  {KICAD_DIODE_FOOTPRINTS.map(option => (
-                    <option key={option.id} value={option.footprint}>
-                      {option.label} - {option.footprint}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <label className="block space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {t('kicad.diodeFootprint')}
+                    </span>
+                    <select
+                      value={kicadExportOptions.diodeFootprint}
+                      onChange={(e) => setKiCadExportOptions(options => ({ ...options, diodeFootprint: e.target.value }))}
+                      className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
+                    >
+                      {KICAD_DIODE_FOOTPRINTS.map(option => (
+                        <option key={option.id} value={option.footprint}>
+                          {option.label} - {option.footprint}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
+                  <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { key: 'diodeOffsetX' as const, label: t('kicad.diodeOffsetX'), suffix: 'mm' },
+                    { key: 'diodeOffsetY' as const, label: t('kicad.diodeOffsetY'), suffix: 'mm' },
+                    { key: 'diodeRotation' as const, label: t('kicad.diodeRotation'), suffix: 'deg' },
+                  ].map(field => (
+                    <label key={field.key} className="block space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                        {field.label}
+                      </span>
+                      <div className="flex h-10 items-center rounded border border-[var(--border-main)] bg-[var(--bg-app)] focus-within:border-amber-500">
+                        <input
+                          type="number"
+                          step={field.key === 'diodeRotation' ? 15 : 0.1}
+                          value={kicadExportOptions[field.key] ?? DEFAULT_KICAD_EXPORT_OPTIONS[field.key]}
+                          onChange={(e) => updateKiCadNumberOption(field.key, e.target.value)}
+                          className="min-w-0 flex-1 bg-transparent px-3 text-xs font-bold text-[var(--text-main)] outline-none"
+                        />
+                        <span className="shrink-0 px-2 text-[10px] font-bold uppercase text-[var(--text-dim)]">{field.suffix}</span>
+                      </div>
+                    </label>
+                  ))}
+                  </div>
+                </div>
+
+                <div className="flex min-h-[360px] flex-col rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-4">
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    {t('kicad.diodePreview')}
+                  </div>
+                  <svg viewBox="0 0 180 180" className="min-h-[320px] w-full flex-1 lg:min-h-[440px]">
+                    <rect x="42" y="42" width="96" height="96" rx="4" fill="rgba(245, 158, 11, 0.06)" stroke="rgba(245, 158, 11, 0.65)" strokeWidth="2" />
+                    <line x1="90" y1="34" x2="90" y2="146" stroke="rgba(148, 163, 184, 0.28)" strokeWidth="1" />
+                    <line x1="34" y1="90" x2="146" y2="90" stroke="rgba(148, 163, 184, 0.28)" strokeWidth="1" />
+                    <circle cx="90" cy="90" r="3" fill="rgb(245, 158, 11)" />
+                    {renderKiCadFootprintPreview(switchPreviewTemplate, 'switch', 90, 90, switchPreviewBack ? 180 : 0, diodePreviewScale, switchPreviewBack)}
+                    {renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, (diodePreviewBack ? 180 : 0) - diodeRotation, diodePreviewScale, diodePreviewBack)}
+                  </svg>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">

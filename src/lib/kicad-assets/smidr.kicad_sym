@@ -137,7 +137,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(property "Reference" "D"
+		(property "Reference" "LED"
 			(at 0 2.54 0)
 			(effects
 				(font

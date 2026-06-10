@@ -138,7 +138,8 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **QMK/Vial 出力**: エンコーダーの物理ピンは `keyboard.json` の `encoder.rotary` に配列で出力する。回転時のレイヤー別アクションは `keymap.c` の `encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]` として生成し、対象 keymap の `rules.mk` に `ENCODER_MAP_ENABLE = yes` を出力する。
 
 ### 7.7 RGB Matrix
-- **内部表現**: RGB Matrix は既存の RGB ライト（ZMK では RGB underglow として扱う）とは別に `ProjectSettings.features.rgbMatrix` で有効化する。各キーは `PhysicalKey.ledIndex`, `ledX`, `ledY`, `ledFlags` を保持する。
+- **内部表現**: RGB Matrix は RGB アンダーグローとは別に `ProjectSettings.features.rgbMatrix` で有効化する。RGB アンダーグローは `ProjectSettings.features.rgb` で管理し、QMK/Vial では `rgblight`、ZMK では `CONFIG_ZMK_RGB_UNDERGLOW` / `CONFIG_WS2812_STRIP` に対応する。各キーは `PhysicalKey.ledIndex`, `ledX`, `ledY`, `ledFlags` を保持する。
+- **バックライト**: 単色 LED バックライトは `ProjectSettings.features.backlight` で有効化し、制御ピンは `ProjectSettings.pins.backlight` に保持する。QMK/Vial では `features.backlight`, `backlight.pin`, `BACKLIGHT_PIN`, `BACKLIGHT_LEVELS` を出力する。ZMK では `CONFIG_ZMK_BACKLIGHT` を出力し、具体的な LED/PWM デバイス定義は後続段階の対象とする。
 - **編集 UI**: 設計モードに RGB Matrix エディタモードを追加する。右パネルで選択キーの LED index、QMK/Vial RGB Matrix 座標 (`x: 0..224`, `y: 0..64`) および flags を編集できる。自動割り当てでは表示中キーを物理ソート順に LED index へ割り当て、キーボード全体の左上を基準にキー中心から座標を正規化する。
 - **KLE/VIA ラベル**: KLE ラベルの LED index は `l{index}` 形式で扱う。インポート時は該当ラベルから `ledIndex` を復元し、VIA/Vial JSON エクスポート時もラベルへ再出力する。
 - **QMK/Vial 出力**: `features.rgbMatrix` が有効で LED index が割り当てられている場合、QMK/Vial ソース出力は `keyboard.json` の `features.rgb_matrix`、`config.h` の `RGB_MATRIX_LED_COUNT`、および `keymap.c` の `g_led_config` を生成する。RGB Matrix 用のデータピンは `pins.rgb` を使用する。
@@ -152,6 +153,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **SMD footprint の裏面配置**: MX/Choc の hot-swap、SOD123/SOD323、SK6812MINI-E は `attr smd` の footprint として扱う。テンプレート上では `F.Cu` / `F.Paste` / `F.Mask` 側に定義し、`.kicad_pcb` へ直接展開する際は footprint layer と各要素を `B.Cu` / `B.Paste` / `B.Mask` / `B.SilkS` / `B.Fab` / `B.CrtYd` へ切り替えて裏面配置する。THT の MX/Choc solder と DO-35 は表面配置のままとする。
 - **PCB 初期表示**: `.kicad_pcb` には `src/lib/kicad-assets/smidr.pretty/*.kicad_mod` を読み込んで board footprint として直接展開する。KiCad 側の footprint 更新なしで初期表示できることを優先しつつ、`smidr.kicad_sym` と `smidr.pretty` は後から更新/差し替えしやすいテンプレートとして同梱する。
 - **LED 出力**: `features.rgbMatrix` が有効で `ledIndex` を持つキーがある場合、選択中のスイッチ footprint 種別に応じたLED中心位置へ `Smidr:LED_Smidr_SK6812MINI_E` を配置し、`VCC`, `GND`, `RGB_DIN`, `RGB_DOUT_<index>` ネットを生成する。LED位置はスイッチ中心から MX では下方向へ 5.08mm、Choc では上方向へ 4.7mm とし、キー回転に追従する。単色バックライト用 `Smidr:LED_Smidr_Backlight` はテンプレートとして `smidr.pretty` に同梱する。
+- **ダイオード配置**: KiCad 出力ダイアログでは、ダイオード footprint のキー中心からの X/Y オフセットと追加回転を設定できる。オフセットはキー中心を原点とする純粋な mm 指定で、キー回転に追従する。初期値は X=5.08mm, Y=4mm, 追加回転=90度とする。ダイアログには 1u キーとダイオード位置を示す簡易プレビューを表示する。
 - **プレート PCB 出力**: `<project>_plate.kicad_pcb` には `Smidr:Plate_Smidr_Key_Hole` を各キー中心へ配置する。プレート用 footprint はネットを持たず、キー穴はテンプレート内の `Edge.Cuts` として定義する。`PhysicalKey.w/h` に応じて keycap, `F.Fab`, `F.CrtYd` の外形をキーごとに可変生成する。
 - **物理配置**: PCB 上のスイッチ footprint は `PhysicalKey.x/y/w/h/r/rx/ry` から算出した物理レイアウトに合わせて配置する。単位変換は `1u = 19.05mm` とする。PCB footprint の回転角は KiCad の座標系に合わせ、Smiðr 上の回転値を反転して出力する。
 - **回路図**: `.kicad_sch` には各キーのスイッチ、マトリクス配線時のダイオード、および `ROWn` / `COLn` / `KEY_Rn_Cn` ネットラベルを出力する。回路図上の部品配置は読みやすさ優先の自動整列とし、物理レイアウトとは一致させない。

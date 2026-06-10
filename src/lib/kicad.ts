@@ -31,6 +31,9 @@ export interface KiCadFootprintChoice {
 export interface KiCadExportOptions {
   switchFootprint: string;
   diodeFootprint: string;
+  diodeOffsetX: number;
+  diodeOffsetY: number;
+  diodeRotation: number;
 }
 
 export const KICAD_SWITCH_FOOTPRINTS: KiCadFootprintChoice[] = [
@@ -68,6 +71,9 @@ const KICAD_FOOTPRINT_TEMPLATE_FILES: Record<string, string> = {
 export const DEFAULT_KICAD_EXPORT_OPTIONS: KiCadExportOptions = {
   switchFootprint: KICAD_SWITCH_FOOTPRINTS[0].footprint,
   diodeFootprint: KICAD_DIODE_FOOTPRINTS[0].footprint,
+  diodeOffsetX: 5.08,
+  diodeOffsetY: 4,
+  diodeRotation: 90,
 };
 
 const UNIT_MM = 19.05;
@@ -271,10 +277,10 @@ const footprintNet = (netId?: number, netName?: string) => (
   netName ? `(net ${netId ?? 0} "${escapeString(netName)}")` : ''
 );
 
-const makeProperty = (name: string, value: string, x: number, y: number) => `
+const makeProperty = (name: string, value: string, x: number, y: number, hidden = false) => `
       (property "${name}" "${escapeString(value)}"
         (at ${mm(x)} ${mm(y)} 0)
-        (effects (font (size 1.27 1.27)))
+        (effects (font (size 1.27 1.27))${hidden ? ' hide' : ''})
       )`;
 
 const makeSchematicSymbol = (
@@ -294,7 +300,7 @@ const makeSchematicSymbol = (
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y - 2.54)}${makeProperty('Value', value, x, y + 2.54)}${makeProperty('Footprint', footprint, x, y + 5.08)}
+    (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y - 2.54)}${makeProperty('Value', value, x, y + 2.54)}${makeProperty('Footprint', footprint, x, y + 5.08, true)}
   )`;
 
 const findMatchingParen = (value: string, start: number) => {
@@ -359,6 +365,12 @@ const makeRect = (layer: string, halfWidth: number, halfHeight: number, seed: st
     (fp_rect (start ${mm(-halfWidth)} ${mm(-halfHeight)}) (end ${mm(halfWidth)} ${mm(halfHeight)}) (stroke (width ${mm(width)}) (type solid)) (fill none) (layer "${layer}") (tstamp ${seededUuid(seed)}))`;
 
 const getFootprintTemplate = (source: string) => KICAD_FOOTPRINT_TEMPLATE_FILES[source] ?? '';
+
+export const getKiCadFootprintPreviewTemplate = (footprint: string) => {
+  const choice = [...KICAD_SWITCH_FOOTPRINTS, ...KICAD_DIODE_FOOTPRINTS]
+    .find(item => item.footprint === footprint);
+  return choice ? getFootprintTemplate(choice.footprintSource) : '';
+};
 
 const removeLibraryOnlyFootprintForms = (footprint: string) => footprint
   .replace(/\n\s*\((version|generator|generator_version|embedded_fonts)\s+[^()\n]*\)/g, '');
@@ -834,8 +846,11 @@ const makeDiodeFootprint = (
   nets: ReturnType<typeof getMatrixNetNames>
 ) => {
   const center = getKeyCenter(key);
-  const offset = rotatePoint(center.x, center.y + (key.h * UNIT_MM / 2) + 3.5, center.x, center.y, center.r);
-  const pcbRotation = -center.r;
+  const offsetX = Number.isFinite(options.diodeOffsetX) ? options.diodeOffsetX : DEFAULT_KICAD_EXPORT_OPTIONS.diodeOffsetX;
+  const offsetY = Number.isFinite(options.diodeOffsetY) ? options.diodeOffsetY : DEFAULT_KICAD_EXPORT_OPTIONS.diodeOffsetY;
+  const offset = rotatePoint(center.x + offsetX, center.y + offsetY, center.x, center.y, center.r);
+  const diodeRotation = Number.isFinite(options.diodeRotation) ? options.diodeRotation : DEFAULT_KICAD_EXPORT_OPTIONS.diodeRotation;
+  const pcbRotation = -center.r - diodeRotation;
   const diodeChoice = getDiodeChoice(options.diodeFootprint);
   return instantiateFootprintTemplate(
     getFootprintTemplate(diodeChoice.footprintSource),

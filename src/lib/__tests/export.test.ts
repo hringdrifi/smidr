@@ -55,6 +55,9 @@ describe('export generation', () => {
       {
         switchFootprint: 'Smidr:SW_Smidr_MX_Hotswap',
         diodeFootprint: 'Smidr:D_Smidr_SOD323',
+        diodeOffsetX: 5.08,
+        diodeOffsetY: 4,
+        diodeRotation: 90,
       }
     );
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
@@ -102,6 +105,7 @@ describe('export generation', () => {
     expect(pcb).not.toContain('(angle ');
     expect(pcb).toContain('(footprint "Smidr:D_Smidr_SOD323"');
     expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_SOD323"[\s\S]*?\(layer "B\.Cu"\)/);
+    expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_SOD323"[\s\S]*?\(at 14\.605 13\.525 90\.000\)/);
     expect(pcb).toContain('(pad "1" smd roundrect');
     expect(pcb).toContain('(layers "B.Cu" "B.Mask" "B.Paste")');
     expect(pcb).toContain('(net 1 "COL0"');
@@ -223,6 +227,9 @@ describe('export generation', () => {
       {
         switchFootprint: 'Smidr:SW_Smidr_Choc_Hotswap',
         diodeFootprint: 'Smidr:D_Smidr_DO35',
+        diodeOffsetX: 5.08,
+        diodeOffsetY: 4,
+        diodeRotation: 90,
       }
     );
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
@@ -241,14 +248,40 @@ describe('export generation', () => {
     expect(pcb).toContain('(footprint "Smidr:D_Smidr_DO35"');
     expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_DO35"[\s\S]*?\(layer "F\.Cu"\)/);
     expect(pcb).toContain('DO-35 horizontal diode');
-    expect(pcb).toMatch(/\(pad "1" thru_hole [\s\S]*?\(at -3\.810 0\.000 0\.000\)/);
-    expect(pcb).toMatch(/\(pad "2" thru_hole circle[\s\S]*?\(at 3\.810 0\.000 0\.000\)/);
+    expect(pcb).toMatch(/\(pad "1" thru_hole [\s\S]*?\(at -3\.810 0\.000 270\.000\)/);
+    expect(pcb).toMatch(/\(pad "2" thru_hole circle[\s\S]*?\(at 3\.810 0\.000 270\.000\)/);
     expect(chocTemplate).toContain('(footprint "SW_Smidr_Choc_Hotswap"');
     expect(chocTemplate).toMatch(/\(footprint "SW_Smidr_Choc_Hotswap"[\s\S]*?\(layer "F\.Cu"\)/);
     expect(chocTemplate).toContain('(layers "F.Cu"');
     expect(do35Template).toContain('(footprint "D_Smidr_DO35"');
     expect(do35Template).toContain('DO-35 horizontal diode');
     expect(do35Template).toMatch(/\(pad "1" thru_hole [\s\S]*?\(at -3\.81 0\)/);
+  });
+
+  it('exports KiCad diodes with custom position and rotation options', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Diode Placement KiCad',
+      matrix: { rows: 1, cols: 1 },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+    ];
+
+    const blob = await generateKiCadZip(
+      { settings, keys },
+      {
+        switchFootprint: 'Smidr:SW_Smidr_MX_Solder',
+        diodeFootprint: 'Smidr:D_Smidr_DO35',
+        diodeOffsetX: 2,
+        diodeOffsetY: 3,
+        diodeRotation: 45,
+      }
+    );
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const pcb = await zip.file('diode_placement_kicad.kicad_pcb')!.async('string');
+
+    expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_DO35"[\s\S]*?\(at 11\.525 12\.525 -45\.000\)/);
   });
 
   it('exports KiCad RGB Matrix LEDs as SK6812MINI-E footprints', async () => {
@@ -306,6 +339,9 @@ describe('export generation', () => {
       {
         switchFootprint: 'Smidr:SW_Smidr_Choc_Solder',
         diodeFootprint: 'Smidr:D_Smidr_SOD123',
+        diodeOffsetX: 5.08,
+        diodeOffsetY: 4,
+        diodeRotation: 90,
       }
     );
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
@@ -759,6 +795,60 @@ describe('export generation', () => {
       expect(configH).toContain('#define RGBLED_NUM 1');
       expect(configH).not.toContain('RGB_DI_PIN');
       expect(configH).not.toContain('RGBLIGHT_ANIMATIONS');
+    }
+  });
+
+  it('emits backlight firmware settings and pins for QMK and Vial', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Backlight Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+        backlight: 'GP4',
+      },
+      features: {
+        ...baseSettings.features,
+        backlight: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+
+    const qmkBlob = await generateQmkZip({ settings, keys });
+    const vialBlob = await generateVialZip({ settings, keys });
+    expect(qmkBlob).toBeTruthy();
+    expect(vialBlob).toBeTruthy();
+
+    const qmkZip = await JSZip.loadAsync(await qmkBlob!.arrayBuffer());
+    const vialZip = await JSZip.loadAsync(await vialBlob!.arrayBuffer());
+    const qmkKeyboardJson = JSON.parse(await qmkZip.file('backlight_board/keyboard.json')!.async('string'));
+    const vialKeyboardJson = JSON.parse(await vialZip.file('backlight_board/keyboard.json')!.async('string'));
+    const qmkConfigH = await qmkZip.file('backlight_board/config.h')!.async('string');
+    const vialConfigH = await vialZip.file('backlight_board/config.h')!.async('string');
+
+    for (const keyboardJson of [qmkKeyboardJson, vialKeyboardJson]) {
+      expect(keyboardJson.features.backlight).toBe(true);
+      expect(keyboardJson.backlight).toEqual({ pin: 'GP4', levels: 5 });
+    }
+    for (const configH of [qmkConfigH, vialConfigH]) {
+      expect(configH).toContain('#define BACKLIGHT_PIN GP4');
+      expect(configH).toContain('#define BACKLIGHT_LEVELS 5');
     }
   });
 
@@ -1284,6 +1374,7 @@ describe('export generation', () => {
       },
       features: {
         ...baseSettings.features,
+        backlight: true,
         encoder: true,
       },
       encoders: [{}],
@@ -1425,6 +1516,7 @@ describe('export generation', () => {
       },
       features: {
         ...baseSettings.features,
+        backlight: true,
         encoder: true,
       },
       encoders: [
@@ -2350,6 +2442,7 @@ describe('export generation', () => {
       },
       features: {
         ...baseSettings.features,
+        backlight: true,
         encoder: true,
       },
       encoders: [{
@@ -2420,6 +2513,7 @@ describe('export generation', () => {
       },
       features: {
         ...baseSettings.features,
+        backlight: true,
         encoder: true,
       },
       encoders: [{
@@ -2454,8 +2548,10 @@ describe('export generation', () => {
     expect(blob).toBeTruthy();
 
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const conf = await zip.file('boards/shields/zmk_backlight_board/zmk_backlight_board.conf')!.async('string');
     const keymap = await zip.file('config/zmk_backlight_board.keymap')!.async('string');
 
+    expect(conf).toContain('CONFIG_ZMK_BACKLIGHT=y');
     expect(keymap).toContain('#include <dt-bindings/zmk/backlight.h>');
     expect(keymap).toContain('bindings = <&bl BL_INC>, <&bl BL_DEC>;');
   });

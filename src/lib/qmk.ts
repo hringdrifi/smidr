@@ -260,8 +260,15 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
       nkro: true,
       encoder: encoders.length > 0,
       rgblight: settings.features.rgb,
+      backlight: settings.features.backlight === true,
       rgb_matrix: settings.features.rgbMatrix === true && rgbMatrixLedCount > 0
     },
+    ...(settings.features.backlight ? {
+      backlight: {
+        pin: settings.pins.backlight || 'D4',
+        levels: 5,
+      },
+    } : {}),
     bootmagic,
     matrix_pins: useDirectPins
       ? { direct: generateDirectPins(settings, validKeys, keys, settings.features.split ? 'left' : undefined) }
@@ -345,6 +352,11 @@ ${settings.features.rgb ? `
 ${settings.features.rgbMatrix && rgbMatrixLedCount > 0 ? `
 #define RGB_MATRIX_LED_COUNT ${rgbMatrixLedCount}
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 150
+` : ''}
+${settings.features.backlight ? `
+/* Backlight settings */
+#define BACKLIGHT_PIN ${settings.pins.backlight || 'D4'}
+#define BACKLIGHT_LEVELS 5
 ` : ''}
 `;
   kbFolder.file('config.h', configH);

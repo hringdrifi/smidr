@@ -267,6 +267,7 @@ export const HardwareSettingsPanel = () => {
           {[
             { id: 'rgb', label: t('hardware.rgb'), icon: Lightbulb },
             { id: 'rgbMatrix', label: t('rgbMatrix.title'), icon: Lightbulb },
+            { id: 'backlight', label: t('hardware.backlight'), icon: Lightbulb },
             { id: 'encoder', label: t('hardware.encoder'), icon: Gauge },
             { id: 'oled', label: t('hardware.oled'), icon: Monitor },
             { id: 'via', label: t('hardware.via'), icon: Database },

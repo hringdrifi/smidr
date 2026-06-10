@@ -76,6 +76,7 @@ export interface ProjectSettings {
     rows: string[];
     cols: string[];
     rgb?: string;
+    backlight?: string;
     sda?: string;
     scl?: string;
     splitSerial?: string; // Serial transport pin (e.g. GP1 for RP2040)
@@ -99,6 +100,7 @@ export interface ProjectSettings {
   };
   features: {
     rgb: boolean;
+    backlight?: boolean;
     rgbMatrix?: boolean;
     encoder: boolean;
     oled: boolean;
