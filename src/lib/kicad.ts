@@ -426,10 +426,17 @@ const mirrorCoordinateFormsForBack = (footprint: string) => {
   const mirrorPoint = (match: string, form: string, x: string, y: string) => (
     `(${form} ${mm(parseNumber(x))} ${mm(-parseNumber(y))}`
   );
+  const mirrorChamferCorner = (corner: string) => corner
+    .replace(/left/g, '__SMIDR_LEFT__')
+    .replace(/right/g, 'left')
+    .replace(/__SMIDR_LEFT__/g, 'right');
   return footprint
     .replace(new RegExp(`\\((start|end|center|mid|xy)\\s+(${number})\\s+(${number})`, 'g'), mirrorPoint)
     .replace(new RegExp(`\\(at\\s+(${number})\\s+(${number})(?:\\s+(${number}))?`, 'g'), (match, x: string, y: string, angle?: string) => (
       `(at ${mm(parseNumber(x))} ${mm(-parseNumber(y))}${angle === undefined ? '' : ` ${mm(normalizeAngle(180 - parseNumber(angle)))}`}`
+    ))
+    .replace(/\(chamfer\s+([^)]+)\)/g, (match, corners: string) => (
+      `(chamfer ${corners.trim().split(/\s+/).map(mirrorChamferCorner).join(' ')})`
     ));
 };
 
