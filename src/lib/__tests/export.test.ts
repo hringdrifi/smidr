@@ -4,6 +4,7 @@ import { generateKleJson, generateSmidrProjectJson, generateViaJson } from '../e
 import { generateQmkZip } from '../qmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
+import { generateKiCadZip } from '../kicad';
 import { validateFirmwareExport } from '../export-validation';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
@@ -34,6 +35,286 @@ const baseSettings: ProjectSettings = {
 };
 
 describe('export generation', () => {
+  it('exports KiCad schematic and PCB data with selected footprints and matrix nets', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'KiCad Board',
+      matrix: { rows: 1, cols: 2 },
+      hardware: {
+        ...baseSettings.hardware,
+        diodeDirection: 'COL2ROW',
+      },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B' },
+    ];
+
+    const blob = await generateKiCadZip(
+      { settings, keys },
+      {
+        switchFootprint: 'Smidr:SW_Smidr_MX_Hotswap',
+        diodeFootprint: 'Smidr:D_Smidr_SOD323',
+      }
+    );
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const schematic = await zip.file('kicad_board.kicad_sch')!.async('string');
+    const pcb = await zip.file('kicad_board.kicad_pcb')!.async('string');
+    const platePcb = await zip.file('kicad_board_plate.kicad_pcb')!.async('string');
+    const symbolLibrary = await zip.file('smidr.kicad_sym')!.async('string');
+    const symLibTable = await zip.file('sym-lib-table')!.async('string');
+    const fpLibTable = await zip.file('fp-lib-table')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
+
+    expect(zip.file('kicad_board.kicad_pro')).toBeTruthy();
+    expect(symLibTable).toContain('(name "Smidr")');
+    expect(symLibTable).toContain('${KIPRJMOD}/smidr.kicad_sym');
+    expect(fpLibTable).toContain('(name "Smidr")');
+    expect(fpLibTable).toContain('${KIPRJMOD}/smidr.pretty');
+    expect(zip.file('smidr.kicad_sym')).toBeTruthy();
+    expect(zip.file('kicad_board.kicad_sym')).toBeNull();
+    expect(zip.file('smidr.pretty/SW_Smidr_MX_Solder.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/SW_Smidr_MX_Hotswap.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/SW_Smidr_Choc_Solder.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/SW_Smidr_Choc_Hotswap.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/D_Smidr_SOD123.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/D_Smidr_SOD323.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/D_Smidr_DO35.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/LED_Smidr_Backlight.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/LED_Smidr_SK6812MINI_E.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/Plate_Smidr_Key_Hole.kicad_mod')).toBeTruthy();
+    expect(zip.file('NOTICE.md')).toBeNull();
+    expect(zip.file('LICENSE-marbastlib.txt')).toBeNull();
+    expect(schematic).toContain('Switch footprint: Smidr:SW_Smidr_MX_Hotswap');
+    expect(schematic).toContain('(symbol "Smidr:SW_Push"');
+    expect(schematic).toContain('(lib_id "Smidr:SW_Push")');
+    expect(schematic).toContain('(property "Footprint" "Smidr:SW_Smidr_MX_Hotswap"');
+    expect(schematic).toContain('(symbol "Device:D"');
+    expect(schematic).toContain('(lib_id "Device:D")');
+    expect(symbolLibrary).toContain('(symbol "D"');
+    expect(symbolLibrary).toContain('(symbol "SW_Push"');
+    expect(schematic).toContain('(label "ROW0"');
+    expect(schematic).toContain('(label "COL1"');
+    expect(pcb).toContain('(footprint "Smidr:SW_Smidr_MX_Hotswap"');
+    expect(pcb).toContain('center-origin template');
+    expect(pcb).toContain('(property "Reference" "SW1"');
+    expect(pcb).toContain('(property "Value" "R0C0"');
+    expect(pcb).not.toContain('(angle ');
+    expect(pcb).toContain('(footprint "Smidr:D_Smidr_SOD323"');
+    expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_SOD323"[\s\S]*?\(layer "B\.Cu"\)/);
+    expect(pcb).toContain('(pad "1" smd roundrect');
+    expect(pcb).toContain('(layers "B.Cu" "B.Mask" "B.Paste")');
+    expect(pcb).toContain('(net 1 "COL0"');
+    expect(pcb).toContain('"KEY_R0_C1"');
+    expect(pcb).toContain('(layer "Edge.Cuts")');
+    expect(platePcb).toContain('(footprint "Smidr:Plate_Smidr_Key_Hole"');
+    expect(platePcb).toContain('(property "Reference" "PH1"');
+    expect(platePcb).toContain('(property "Value" "A"');
+    expect(platePcb).toContain('(layer "Edge.Cuts")');
+    expect(platePcb).not.toContain('(net ');
+    expect(platePcb).not.toContain('(footprint "Smidr:SW_');
+    expect(platePcb).not.toContain('(footprint "Smidr:D_');
+    expect(platePcb).not.toContain('(footprint "Smidr:LED_');
+    expect(readme).toContain('Footprint library: smidr.pretty');
+    expect(readme).toContain('Plate PCB: kicad_board_plate.kicad_pcb');
+    expect(readme).toContain('Switch outlines: keycap, fab, and courtyard geometry are generated from each key');
+    expect(readme).not.toContain('marbastlib');
+    expect(readme).not.toContain('key-switches.pretty');
+  });
+
+  it('sanitizes multiline KiCad footprint values in plate PCB output', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Plate Labels KiCad',
+      matrix: { rows: 1, cols: 1 },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'Tab\n\n\n0,0' },
+    ];
+
+    const blob = await generateKiCadZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const platePcb = await zip.file('plate_labels_kicad_plate.kicad_pcb')!.async('string');
+
+    expect(platePcb).toContain('(property "Value" "Tab 0,0"');
+    expect(platePcb).not.toContain('(property "Value" "Tab\n');
+  });
+
+  it('generates KiCad switch outlines from each key width and height', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Width KiCad',
+      matrix: { rows: 1, cols: 3 },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1.25, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 0, col: 1, x: 1.25, y: 0, w: 1.3, h: 1, r: 0, rx: 1.25, ry: 0, label: 'B' },
+      { row: 0, col: 2, x: 2.55, y: 0, w: 2, h: 1.25, r: 0, rx: 2.55, ry: 0, label: 'C' },
+    ];
+
+    const blob = await generateKiCadZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const pcb = await zip.file('width_kicad.kicad_pcb')!.async('string');
+    const platePcb = await zip.file('width_kicad_plate.kicad_pcb')!.async('string');
+
+    expect(pcb).toContain('(footprint "Smidr:SW_Smidr_MX_Solder"');
+    expect(pcb).toMatch(/\(fp_rect[\s\S]*?\(start -11\.906 -9\.525\)[\s\S]*?\(end 11\.906 9\.525\)/);
+    expect(pcb).not.toContain('(fp_rect (start -19.300 -12.156) (end 19.300 12.156)');
+    expect(pcb).toMatch(/\(fp_rect[\s\S]*?\(start -19\.050 -11\.906\)[\s\S]*?\(end 19\.050 11\.906\)/);
+    expect(platePcb).toContain('(footprint "Smidr:Plate_Smidr_Key_Hole"');
+    expect(platePcb).toMatch(/\(fp_rect[\s\S]*?\(start -11\.906 -9\.525\)[\s\S]*?\(end 11\.906 9\.525\)/);
+    expect(platePcb).toMatch(/\(fp_rect[\s\S]*?\(start -19\.050 -11\.906\)[\s\S]*?\(end 19\.050 11\.906\)/);
+  });
+
+  it('exports KiCad direct-pin switches between GPIO nets and GND', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Direct KiCad',
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, directPin: 'GP2', label: 'A' },
+      { x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, directPin: 'GP3', label: 'B' },
+    ];
+
+    const blob = await generateKiCadZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const pcb = await zip.file('direct_kicad.kicad_pcb')!.async('string');
+
+    expect(pcb).toContain('"PIN_GP2"');
+    expect(pcb).toContain('"GND"');
+    expect(pcb).not.toContain('(footprint "Diode_');
+  });
+
+  it('exports KiCad PCB footprints with inverted rotation to match KiCad coordinates', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Rotated KiCad',
+      matrix: { rows: 1, cols: 1 },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 15, rx: 0, ry: 0, label: 'A' },
+    ];
+
+    const blob = await generateKiCadZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const pcb = await zip.file('rotated_kicad.kicad_pcb')!.async('string');
+
+    expect(pcb).toContain('(at 6.735 11.666 -15.000)');
+    expect(pcb).toMatch(/\(footprint "Smidr:SW_Smidr_MX_Solder"[\s\S]*?\(layer "F\.Cu"\)\s+\(uuid "[^"]+"\)\s+\(at 6\.735 11\.666 -15\.000\)/);
+    expect(pcb).toContain('(footprint "Smidr:SW_Smidr_MX_Solder"');
+    expect(pcb).toContain('(pad "1" thru_hole circle');
+    expect(pcb).toContain('(at -3.810 -2.540 345.000)');
+    expect(pcb).toContain('np_thru_hole');
+  });
+
+  it('exports KiCad Choc hotswap, DO-35 diode, and template footprints', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Template KiCad',
+      matrix: { rows: 1, cols: 1 },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+    ];
+
+    const blob = await generateKiCadZip(
+      { settings, keys },
+      {
+        switchFootprint: 'Smidr:SW_Smidr_Choc_Hotswap',
+        diodeFootprint: 'Smidr:D_Smidr_DO35',
+      }
+    );
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const schematic = await zip.file('template_kicad.kicad_sch')!.async('string');
+    const pcb = await zip.file('template_kicad.kicad_pcb')!.async('string');
+    const chocTemplate = await zip.file('smidr.pretty/SW_Smidr_Choc_Hotswap.kicad_mod')!.async('string');
+    const do35Template = await zip.file('smidr.pretty/D_Smidr_DO35.kicad_mod')!.async('string');
+
+    expect(schematic).toContain('(property "Footprint" "Smidr:SW_Smidr_Choc_Hotswap"');
+    expect(schematic).toContain('(property "Footprint" "Smidr:D_Smidr_DO35"');
+    expect(pcb).toContain('(footprint "Smidr:SW_Smidr_Choc_Hotswap"');
+    expect(pcb).toMatch(/\(footprint "Smidr:SW_Smidr_Choc_Hotswap"[\s\S]*?\(layer "B\.Cu"\)/);
+    expect(pcb).toContain('(pad "1" smd roundrect');
+    expect(pcb).toContain('(layers "B.Cu" "B.Mask" "B.Paste")');
+    expect(pcb).toContain('(layers "*.Cu" "F.Mask")');
+    expect(pcb).toContain('(footprint "Smidr:D_Smidr_DO35"');
+    expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_DO35"[\s\S]*?\(layer "F\.Cu"\)/);
+    expect(pcb).toContain('DO-35 horizontal diode');
+    expect(pcb).toMatch(/\(pad "1" thru_hole [\s\S]*?\(at -3\.810 0\.000 0\.000\)/);
+    expect(pcb).toMatch(/\(pad "2" thru_hole circle[\s\S]*?\(at 3\.810 0\.000 0\.000\)/);
+    expect(chocTemplate).toContain('(footprint "SW_Smidr_Choc_Hotswap"');
+    expect(chocTemplate).toMatch(/\(footprint "SW_Smidr_Choc_Hotswap"[\s\S]*?\(layer "F\.Cu"\)/);
+    expect(chocTemplate).toContain('(layers "F.Cu"');
+    expect(do35Template).toContain('(footprint "D_Smidr_DO35"');
+    expect(do35Template).toContain('DO-35 horizontal diode');
+    expect(do35Template).toMatch(/\(pad "1" thru_hole [\s\S]*?\(at -3\.81 0\)/);
+  });
+
+  it('exports KiCad RGB Matrix LEDs as SK6812MINI-E footprints', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'RGB KiCad',
+      matrix: { rows: 1, cols: 2 },
+      features: { ...baseSettings.features, rgbMatrix: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', ledIndex: 1 },
+    ];
+
+    const blob = await generateKiCadZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const schematic = await zip.file('rgb_kicad.kicad_sch')!.async('string');
+    const pcb = await zip.file('rgb_kicad.kicad_pcb')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
+    const ledTemplate = await zip.file('smidr.pretty/LED_Smidr_SK6812MINI_E.kicad_mod')!.async('string');
+
+    expect(schematic).toContain('(lib_id "Smidr:SK6812MINI_E")');
+    expect(schematic).toContain('(property "Footprint" "Smidr:LED_Smidr_SK6812MINI_E"');
+    expect(pcb).toContain('(footprint "Smidr:LED_Smidr_SK6812MINI_E"');
+    expect(pcb).toMatch(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(layer "B\.Cu"\)/);
+    expect(pcb).toContain('(pad "1" smd roundrect');
+    expect(pcb).toContain('(layers "B.Cu" "B.Mask" "B.Paste")');
+    expect(pcb).toContain('"RGB_DIN"');
+    expect(pcb).toContain('"RGB_DOUT_0"');
+    expect(pcb).toContain('"RGB_DOUT_1"');
+    expect(pcb).toContain('(at 9.525 14.605 180.000)');
+    expect(pcb).toContain('(at 28.575 14.605 180.000)');
+    expect(pcb).toContain('(justify mirror)');
+    expect(pcb).not.toMatch(/\(thickness [^)]+\)\s*\(justify mirror\)\s*\)/);
+    expect(pcb).toMatch(/\(effects[\s\S]*?\(font[\s\S]*?\)\s*\(justify mirror\)\s*\)/);
+    expect(readme).toContain('2 SK6812MINI-E LED footprints are placed with switch-specific LED offsets');
+    expect(ledTemplate).toContain('(footprint "LED_Smidr_SK6812MINI_E"');
+    expect(ledTemplate).toMatch(/\(footprint "LED_Smidr_SK6812MINI_E"[\s\S]*?\(layer "F\.Cu"\)/);
+    expect(ledTemplate).toContain('(layers "F.Cu"');
+  });
+
+  it('places KiCad RGB Matrix LEDs with Choc switch offsets', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Choc RGB KiCad',
+      matrix: { rows: 1, cols: 1 },
+      features: { ...baseSettings.features, rgbMatrix: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
+    ];
+
+    const blob = await generateKiCadZip(
+      { settings, keys },
+      {
+        switchFootprint: 'Smidr:SW_Smidr_Choc_Solder',
+        diodeFootprint: 'Smidr:D_Smidr_SOD123',
+      }
+    );
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const pcb = await zip.file('choc_rgb_kicad.kicad_pcb')!.async('string');
+
+    expect(pcb).toContain('(footprint "Smidr:LED_Smidr_SK6812MINI_E"');
+    expect(pcb).toContain('(at 9.525 4.825 180.000)');
+  });
+
   it('exports QMK direct pins from per-key assignments', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -122,7 +403,7 @@ describe('export generation', () => {
       matrix: { rows: 1, cols: 2, wiring: 'direct' },
     };
     const keys: PhysicalKey[] = [
-      { x: 0, y: 0, w: 1, h: 1, row: 0, col: 1, directPin: 'GP2', label: 'A' },
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, row: 0, col: 1, directPin: 'GP2', label: 'A' },
     ];
 
     const project = generateSmidrProjectJson({ settings, keys });

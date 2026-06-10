@@ -144,6 +144,21 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **QMK/Vial 出力**: `features.rgbMatrix` が有効で LED index が割り当てられている場合、QMK/Vial ソース出力は `keyboard.json` の `features.rgb_matrix`、`config.h` の `RGB_MATRIX_LED_COUNT`、および `keymap.c` の `g_led_config` を生成する。RGB Matrix 用のデータピンは `pins.rgb` を使用する。
 - **ZMK 出力**: 現時点では ZMK RGB Matrix には対応しない。ZMK ソース出力では `features.rgb` の RGB underglow 設定のみを扱い、`features.rgbMatrix` およびキーごとの LED 座標は出力しない。
 
+### 7.8 KiCad MVP 出力
+- **出力形式**: KiCad データは ZIP として出力し、`<project>.kicad_pro`, `<project>.kicad_sch`, `<project>.kicad_pcb`, `<project>_plate.kicad_pcb`, `sym-lib-table`, `fp-lib-table`, `README.md`, `smidr.kicad_sym`, `smidr.pretty/*.kicad_mod` を含める。
+- **フットプリント選択**: 出力直前にスイッチおよびダイオードの footprint を選択できるダイアログを表示する。選択値は当該エクスポートにのみ適用し、`.smidr` プロジェクト設定には保存しない。スイッチは `Smidr:SW_Smidr_MX_Solder`, `Smidr:SW_Smidr_MX_Hotswap`, `Smidr:SW_Smidr_Choc_Solder`, `Smidr:SW_Smidr_Choc_Hotswap` を選択肢とする。ダイオードは `Smidr:D_Smidr_SOD123`, `Smidr:D_Smidr_SOD323`, `Smidr:D_Smidr_DO35` を選択肢とする。
+- **自前ライブラリ**: ソース管理下の `src/lib/kicad-assets/smidr.kicad_sym` と `src/lib/kicad-assets/smidr.pretty/*.kicad_mod` をテンプレートとして読み込み、ZIP 内に `smidr.kicad_sym` と `smidr.pretty` を同梱する。`sym-lib-table` は `${KIPRJMOD}/smidr.kicad_sym`、`fp-lib-table` は `${KIPRJMOD}/smidr.pretty` を `Smidr` ライブラリとして参照する。追加の git submodule やサードパーティライセンス同梱ファイルは生成しない。
+- **スイッチ外形の生成**: スイッチ footprint はキー中心を origin とし、電気パッドおよびスイッチ本体形状は選択した方式に応じて生成する。`PhysicalKey.w/h` に応じて keycap, `F.Fab`, `F.CrtYd` の外形をキーごとに可変生成する。
+- **SMD footprint の裏面配置**: MX/Choc の hot-swap、SOD123/SOD323、SK6812MINI-E は `attr smd` の footprint として扱う。テンプレート上では `F.Cu` / `F.Paste` / `F.Mask` 側に定義し、`.kicad_pcb` へ直接展開する際は footprint layer と各要素を `B.Cu` / `B.Paste` / `B.Mask` / `B.SilkS` / `B.Fab` / `B.CrtYd` へ切り替えて裏面配置する。THT の MX/Choc solder と DO-35 は表面配置のままとする。
+- **PCB 初期表示**: `.kicad_pcb` には `src/lib/kicad-assets/smidr.pretty/*.kicad_mod` を読み込んで board footprint として直接展開する。KiCad 側の footprint 更新なしで初期表示できることを優先しつつ、`smidr.kicad_sym` と `smidr.pretty` は後から更新/差し替えしやすいテンプレートとして同梱する。
+- **LED 出力**: `features.rgbMatrix` が有効で `ledIndex` を持つキーがある場合、選択中のスイッチ footprint 種別に応じたLED中心位置へ `Smidr:LED_Smidr_SK6812MINI_E` を配置し、`VCC`, `GND`, `RGB_DIN`, `RGB_DOUT_<index>` ネットを生成する。LED位置はスイッチ中心から MX では下方向へ 5.08mm、Choc では上方向へ 4.7mm とし、キー回転に追従する。単色バックライト用 `Smidr:LED_Smidr_Backlight` はテンプレートとして `smidr.pretty` に同梱する。
+- **プレート PCB 出力**: `<project>_plate.kicad_pcb` には `Smidr:Plate_Smidr_Key_Hole` を各キー中心へ配置する。プレート用 footprint はネットを持たず、キー穴はテンプレート内の `Edge.Cuts` として定義する。`PhysicalKey.w/h` に応じて keycap, `F.Fab`, `F.CrtYd` の外形をキーごとに可変生成する。
+- **物理配置**: PCB 上のスイッチ footprint は `PhysicalKey.x/y/w/h/r/rx/ry` から算出した物理レイアウトに合わせて配置する。単位変換は `1u = 19.05mm` とする。PCB footprint の回転角は KiCad の座標系に合わせ、Smiðr 上の回転値を反転して出力する。
+- **回路図**: `.kicad_sch` には各キーのスイッチ、マトリクス配線時のダイオード、および `ROWn` / `COLn` / `KEY_Rn_Cn` ネットラベルを出力する。回路図上の部品配置は読みやすさ優先の自動整列とし、物理レイアウトとは一致させない。
+- **マトリクス配線**: `matrix.wiring === 'matrix'` の場合、スイッチとダイオードを `hardware.diodeDirection` に従って `ROWn` / `COLn` / `KEY_Rn_Cn` ネットへ接続する。
+- **ダイレクトピン配線**: `matrix.wiring === 'direct'` の場合、各スイッチを `PIN_<directPin>` と `GND` の間に接続する。ダイオードは出力しない。
+- **基板外形**: MVP では、表示対象キーの配置範囲に一定余白を加えた簡易矩形を `Edge.Cuts` として出力する。キー形状に沿った外形生成、自動配線、MCU/コネクタの実装は次段階の対象とする。
+
 ## 9. デバイス通信 & プロトコル統合仕様 (Device Protocol & ZMK Studio Integration)
 
 Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続を含むマルチプロトコルに完全に対応した通信層・UI層の結合設計をサポートします。

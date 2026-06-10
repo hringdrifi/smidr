@@ -29,6 +29,13 @@ import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson, 
 import { generateQmkZip } from '@/lib/qmk';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
+import {
+  DEFAULT_KICAD_EXPORT_OPTIONS,
+  generateKiCadZip,
+  KICAD_DIODE_FOOTPRINTS,
+  KICAD_SWITCH_FOOTPRINTS,
+  KiCadExportOptions,
+} from '@/lib/kicad';
 import { FirmwareExportTarget, formatExportValidationIssues, validateFirmwareExport } from '@/lib/export-validation';
 import { isQmkSourceExportSupported, isZmkSourceExportSupported } from '@/lib/mcu-presets';
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
@@ -56,6 +63,8 @@ export default function App() {
   const { t, language, setLanguage } = useTranslation();
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
+  const [isKiCadDialogOpen, setIsKiCadDialogOpen] = React.useState(false);
+  const [kicadExportOptions, setKiCadExportOptions] = React.useState<KiCadExportOptions>(DEFAULT_KICAD_EXPORT_OPTIONS);
   const [isLangMenuOpen, setIsLangMenuOpen] = React.useState(false);
   const [isEditorModeMenuOpen, setIsEditorModeMenuOpen] = React.useState(false);
   const [savedProjects, setSavedProjects] = React.useState<any[]>([]);
@@ -235,6 +244,23 @@ export default function App() {
     }
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
+  };
+
+  const handleOpenKiCadDialog = () => {
+    setIsExportMenuOpen(false);
+    setIsKiCadDialogOpen(true);
+  };
+
+  const handleExportKiCadZip = async () => {
+    if (keys.length === 0) {
+      alert(t('kicad.noKeys'));
+      return;
+    }
+
+    const zipBlob = await generateKiCadZip({ settings, keys }, kicadExportOptions);
+    downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_kicad.zip`, zipBlob);
+    setIsProjectMenuOpen(false);
+    setIsKiCadDialogOpen(false);
   };
 
   const qmkSourceUnsupported = !isQmkSourceExportSupported(settings.hardware);
@@ -832,6 +858,14 @@ export default function App() {
                       </button>
 
                       <button
+                        onClick={handleOpenKiCadDialog}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                      >
+                        <CircuitBoard size={14} className="text-amber-500" />
+                        <span>{t('header.exportKiCadZip')}</span>
+                      </button>
+
+                      <button
                         onClick={handleExportViaZip}
                         disabled={qmkSourceUnsupported}
                         className={cn(
@@ -1030,6 +1064,81 @@ export default function App() {
           <RemapView />
         )}
       </div>
+
+      {isKiCadDialogOpen && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsKiCadDialogOpen(false)} />
+          <div className="relative flex w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <CircuitBoard size={18} className="text-amber-500" />
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--text-highlight)]">{t('kicad.title')}</h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('kicad.desc')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsKiCadDialogOpen(false)}
+                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-4">
+              <label className="block space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t('kicad.switchFootprint')}
+                </span>
+                <select
+                  value={kicadExportOptions.switchFootprint}
+                  onChange={(e) => setKiCadExportOptions(options => ({ ...options, switchFootprint: e.target.value }))}
+                  className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
+                >
+                  {KICAD_SWITCH_FOOTPRINTS.map(option => (
+                    <option key={option.id} value={option.footprint}>
+                      {option.label} - {option.footprint}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  {t('kicad.diodeFootprint')}
+                </span>
+                <select
+                  value={kicadExportOptions.diodeFootprint}
+                  onChange={(e) => setKiCadExportOptions(options => ({ ...options, diodeFootprint: e.target.value }))}
+                  className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
+                >
+                  {KICAD_DIODE_FOOTPRINTS.map(option => (
+                    <option key={option.id} value={option.footprint}>
+                      {option.label} - {option.footprint}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <button
+                onClick={() => setIsKiCadDialogOpen(false)}
+                className="rounded-md border border-[var(--border-main)] px-4 py-2 text-xs font-bold text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleExportKiCadZip}
+                className="rounded-md bg-amber-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                {t('kicad.export')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hardware Setup Modal */}
       {storeState.isHardwareModalOpen && (

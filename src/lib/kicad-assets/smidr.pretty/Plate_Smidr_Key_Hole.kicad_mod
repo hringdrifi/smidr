@@ -1,0 +1,77 @@
+(footprint "Plate_Smidr_Key_Hole"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(descr "Smidr keyboard plate key hole, center-origin template")
+	(tags "Smidr keyboard plate key hole center origin")
+	(property "Reference" "REF**"
+		(at 0 -11.025 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "0cd9d242-774e-470f-bf2b-3b0f50d21960")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Plate_Smidr_Key_Hole"
+		(at 0 11.025 0)
+		(layer "F.Fab")
+		(uuid "23d0cf78-2976-43c8-b8a6-f1af326a9988")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr board_only exclude_from_pos_files exclude_from_bom)
+	(fp_rect
+		(start -9.525 -9.525)
+		(end 9.525 9.525)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(fill no)
+		(layer "Dwgs.User")
+		(uuid "64045916-a42d-4d91-9138-6a7f0db8afc5")
+	)
+	(fp_rect
+		(start -7 -7)
+		(end 7 7)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "db307702-532e-4d04-ae49-2d4e230d0aa6")
+	)
+	(fp_rect
+		(start -9.525 -9.525)
+		(end 9.525 9.525)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "dcff28df-ea58-4920-8ef3-6fa7850d3686")
+	)
+	(fp_rect
+		(start -9.775 -9.775)
+		(end 9.775 9.775)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "24923a09-989f-41d0-8965-899112e88a6d")
+	)
+	(embedded_fonts no)
+)
