@@ -354,6 +354,7 @@ export default function App() {
   const diodePreviewChoice = KICAD_DIODE_FOOTPRINTS.find(option => option.footprint === kicadExportOptions.diodeFootprint);
   const switchPreviewBack = switchPreviewChoice?.mountType === 'smd';
   const diodePreviewBack = diodePreviewChoice?.mountType === 'smd';
+  const diodePreviewRotation = (diodePreviewBack ? 180 : 0) + diodeRotation;
   const updateKiCadNumberOption = (key: 'diodeOffsetX' | 'diodeOffsetY' | 'diodeRotation', value: string) => {
     const parsed = Number.parseFloat(value);
     setKiCadExportOptions(options => ({ ...options, [key]: Number.isFinite(parsed) ? parsed : 0 }));
@@ -1431,7 +1432,7 @@ export default function App() {
                     <line x1="34" y1="90" x2="146" y2="90" stroke="rgba(148, 163, 184, 0.28)" strokeWidth="1" />
                     <circle cx="90" cy="90" r="3" fill="rgb(245, 158, 11)" />
                     {renderKiCadFootprintPreview(switchPreviewTemplate, 'switch', 90, 90, switchPreviewBack ? 180 : 0, diodePreviewScale, switchPreviewBack)}
-                    {renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, (diodePreviewBack ? 180 : 0) - diodeRotation, diodePreviewScale, diodePreviewBack)}
+                    {renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, diodePreviewRotation, diodePreviewScale, diodePreviewBack)}
                   </svg>
                 </div>
               </div>
