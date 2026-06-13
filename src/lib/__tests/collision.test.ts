@@ -61,7 +61,7 @@ describe('Collision Detection (SAT)', () => {
     });
 
     it('should respect EPSILON and return false for perfectly adjacent edges', () => {
-      // 0.01u edge tolerance
+      // 0.02u edge tolerance
       const poly1 = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
       const poly2 = [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 1 }, { x: 1, y: 1 }];
       expect(polygonsIntersect(poly1, poly2)).toBe(false);
