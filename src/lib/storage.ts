@@ -119,3 +119,17 @@ export const setStoredLanguage = (lang: Language): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
 };
+
+const LAYOUT_UNIT_STORAGE_KEY = 'smidr_layout_unit';
+
+export const getStoredLayoutUnit = (): 'u' | 'mm' => {
+  if (typeof window === 'undefined') return 'u';
+  const value = localStorage.getItem(LAYOUT_UNIT_STORAGE_KEY);
+  if (value === 'u' || value === 'mm') return value;
+  return 'u';
+};
+
+export const setStoredLayoutUnit = (unit: 'u' | 'mm'): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LAYOUT_UNIT_STORAGE_KEY, unit);
+};

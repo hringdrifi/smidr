@@ -10,7 +10,8 @@ export const PropertyInput = ({
   min,
   max,
   step = "1",
-  icon: Icon
+  icon: Icon,
+  unit
 }: { 
   label: string, 
   value: number, 
@@ -20,12 +21,16 @@ export const PropertyInput = ({
   min?: string,
   max?: string,
   step?: string,
-  icon?: any
+  icon?: any,
+  unit?: string
 }) => {
   const [localValue, setLocalValue] = useState(value?.toString() ?? '');
 
   useEffect(() => {
-    setLocalValue(value?.toString() ?? '');
+    const parsedLocal = parseFloat(localValue);
+    if (isNaN(parsedLocal) || parsedLocal !== value || localValue.trim() === '') {
+      setLocalValue(value?.toString() ?? '');
+    }
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,18 +60,28 @@ export const PropertyInput = ({
         {Icon && <Icon size={10} className="text-[var(--text-muted)]" />}
         <label className="text-[9px] uppercase text-[var(--text-muted)] font-bold tracking-wider leading-none">{label}</label>
       </div>
-      <input 
-        type="number" 
-        value={localValue}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        onFocus={onFocus}
-        onKeyDown={handleKeyDown}
-        min={min}
-        max={max}
-        step={step}
-        className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 outline-none text-[var(--text-highlight)] transition-all placeholder:text-[var(--text-muted)] font-mono" 
-      />
+      <div className="relative">
+        <input 
+          type="number" 
+          value={localValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onFocus={onFocus}
+          onKeyDown={handleKeyDown}
+          min={min}
+          max={max}
+          step={step}
+          className={cn(
+            "w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded py-1 text-xs focus:ring-1 focus:ring-amber-500/50 focus:border-amber-500/50 outline-none text-[var(--text-highlight)] transition-all placeholder:text-[var(--text-muted)] font-mono",
+            unit ? "pl-2 pr-8" : "px-2"
+          )} 
+        />
+        {unit && (
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--text-muted)] uppercase pointer-events-none font-mono">
+            {unit}
+          </span>
+        )}
+      </div>
     </div>
   );
 };

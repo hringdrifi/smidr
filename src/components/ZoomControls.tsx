@@ -351,7 +351,10 @@ export const ZoomControls = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-[10px]">
                       <span className="text-[var(--text-main)] font-medium">{t('zoom.snapInterval')}</span>
-                      <span className="text-amber-500 font-mono font-bold">{editorSettings.gridSnap}u</span>
+                      <span className="text-amber-500 font-mono font-bold">
+                        {editorSettings.gridSnap}u
+                        {editorSettings.layoutUnit === 'mm' && ` (${(editorSettings.gridSnap * 19.05).toFixed(3)}mm)`}
+                      </span>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {[1, 0.5, 0.25, 0.125, 0.1].map(snap => (
@@ -368,6 +371,34 @@ export const ZoomControls = () => {
                           {snap}
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-[var(--border-main)]">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-[var(--text-main)] font-medium">{t('zoom.layoutUnit')}</span>
+                      <span className="text-amber-500 font-mono font-bold">
+                        {(editorSettings.layoutUnit || 'u') === 'mm' ? t('zoom.unitMm') : t('zoom.unitU')}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {['u', 'mm'].map(unit => {
+                        const active = (editorSettings.layoutUnit || 'u') === unit;
+                        return (
+                          <button
+                            key={unit}
+                            onClick={() => updateEditorSettings({ layoutUnit: unit as 'u' | 'mm' })}
+                            className={cn(
+                              "flex-1 py-1 rounded text-[9px] font-bold transition-all border uppercase",
+                              active 
+                                ? "bg-amber-500 text-zinc-950 border-amber-600" 
+                                : "bg-[var(--bg-button)] text-[var(--text-main)] border-[var(--border-main)] hover:bg-zinc-700"
+                            )}
+                          >
+                            {unit}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </section>

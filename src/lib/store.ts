@@ -24,7 +24,9 @@ import {
   getStoredLanguage,
   setStoredLanguage,
   getStoredVisualLayout,
-  setStoredVisualLayout
+  setStoredVisualLayout,
+  getStoredLayoutUnit,
+  setStoredLayoutUnit
 } from './storage';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
@@ -340,7 +342,8 @@ const initialState: Partial<KeyboardState> = {
     theme: getStoredTheme() ?? 'dark', 
     showMatrixLines: false, 
     sortThresholdY: 0.25,
-    debugMode: false
+    debugMode: false,
+    layoutUnit: getStoredLayoutUnit()
   },
   transform: { scale: 1, x: 0, y: 0 },
   keys: [],
@@ -690,6 +693,7 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         updateEditorSettings: (es: Partial<EditorSettings>) => {
           if (es.theme) setStoredTheme(es.theme);
+          if (es.layoutUnit) setStoredLayoutUnit(es.layoutUnit);
           set((s) => ({
             editorSettings: { ...s.editorSettings, ...es }
           }));

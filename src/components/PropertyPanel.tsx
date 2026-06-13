@@ -295,6 +295,13 @@ export const PropertyPanel = () => {
   if (!selectedKey) return null;
   const selectedKeyIsEncoder = selectedKey.kind === 'encoder' || !!selectedKey.encoderId || selectedKey.encoderIndex !== undefined;
 
+  const isMm = editorSettings.layoutUnit === 'mm';
+  const scaleUnit = (v: number) => isMm ? Math.round(v * 19.05 * 100000) / 100000 : v;
+  const parseUnit = (v: number) => isMm ? Math.round((v / 19.05) * 10000000) / 10000000 : v;
+  const formatStep = (step: number) => isMm ? (step * 19.05).toString() : step.toString();
+  const formatMin = (min: number) => isMm ? (min * 19.05).toString() : min.toString();
+  const unitLabel = isMm ? 'mm' : 'u';
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden animate-in fade-in duration-200" onMouseLeave={() => setFocusedField(null)}>
       {/* Content */}
@@ -308,15 +315,15 @@ export const PropertyPanel = () => {
           >
             <div className="space-y-4">
               <div className="flex gap-3">
-                <PropertyInput label={t('properties.xPos')} value={selectedKey.x} step={editorSettings.gridSnap.toString()} icon={MoveHorizontal} onFocus={() => setFocusedField('x')} onChange={(val: number) => updateKey(selectedKey.id, { x: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x: val }, true); }} />
-                <PropertyInput label={t('properties.yPos')} value={selectedKey.y} step={editorSettings.gridSnap.toString()} icon={MoveVertical} onFocus={() => setFocusedField('y')} onChange={(val: number) => updateKey(selectedKey.id, { y: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y: val }, true); }} />
+                <PropertyInput label={t('properties.xPos')} value={scaleUnit(selectedKey.x)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={MoveHorizontal} onFocus={() => setFocusedField('x')} onChange={(val: number) => updateKey(selectedKey.id, { x: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x: parseUnit(val) }, true); }} />
+                <PropertyInput label={t('properties.yPos')} value={scaleUnit(selectedKey.y)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={MoveVertical} onFocus={() => setFocusedField('y')} onChange={(val: number) => updateKey(selectedKey.id, { y: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y: parseUnit(val) }, true); }} />
               </div>
               
               <div className="space-y-2">
-                <PropertyInput label={t('properties.rotationAngle')} value={selectedKey.r} step="1" icon={UndoDot} onFocus={() => setFocusedField('r')} onChange={(val: number) => updateKey(selectedKey.id, { r: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { r: val }, true); }} />
+                <PropertyInput label={t('properties.rotationAngle')} value={selectedKey.r} step="1" unit="deg" icon={UndoDot} onFocus={() => setFocusedField('r')} onChange={(val: number) => updateKey(selectedKey.id, { r: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { r: val }, true); }} />
                 <div className="flex gap-3">
-                  <PropertyInput label={t('properties.pivotX')} value={selectedKey.rx} step={editorSettings.gridSnap.toString()} icon={Crosshair} onFocus={() => setFocusedField('rx')} onChange={(val: number) => updateKey(selectedKey.id, { rx: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { rx: val }, true); }} />
-                  <PropertyInput label={t('properties.pivotY')} value={selectedKey.ry} step={editorSettings.gridSnap.toString()} icon={Crosshair} onFocus={() => setFocusedField('ry')} onChange={(val: number) => updateKey(selectedKey.id, { ry: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { ry: val }, true); }} />
+                  <PropertyInput label={t('properties.pivotX')} value={scaleUnit(selectedKey.rx)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={Crosshair} onFocus={() => setFocusedField('rx')} onChange={(val: number) => updateKey(selectedKey.id, { rx: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { rx: parseUnit(val) }, true); }} />
+                  <PropertyInput label={t('properties.pivotY')} value={scaleUnit(selectedKey.ry)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={Crosshair} onFocus={() => setFocusedField('ry')} onChange={(val: number) => updateKey(selectedKey.id, { ry: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { ry: parseUnit(val) }, true); }} />
                 </div>
               </div>
             </div>
@@ -405,8 +412,8 @@ export const PropertyPanel = () => {
               </div>
 
               <div className="flex gap-3">
-                <PropertyInput label={t('properties.width')} value={selectedKey.w} step="0.25" min="0.5" icon={MoveHorizontal} onFocus={() => setFocusedField('w')} onChange={(val: number) => updateKey(selectedKey.id, { w: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w: val }, true); }} />
-                <PropertyInput label={t('properties.height')} value={selectedKey.h} step="0.25" min="0.5" icon={MoveVertical} onFocus={() => setFocusedField('h')} onChange={(val: number) => updateKey(selectedKey.id, { h: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h: val }, true); }} />
+                <PropertyInput label={t('properties.width')} value={scaleUnit(selectedKey.w)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={MoveHorizontal} onFocus={() => setFocusedField('w')} onChange={(val: number) => updateKey(selectedKey.id, { w: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w: parseUnit(val) }, true); }} />
+                <PropertyInput label={t('properties.height')} value={scaleUnit(selectedKey.h)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={MoveVertical} onFocus={() => setFocusedField('h')} onChange={(val: number) => updateKey(selectedKey.id, { h: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h: parseUnit(val) }, true); }} />
               </div>
             </div>
           </PropertySection>
@@ -424,12 +431,12 @@ export const PropertyPanel = () => {
                 <div className="flex flex-col h-full space-y-4">
                   <div className="space-y-3">
                     <div className="flex gap-3">
-                      <PropertyInput label={t('properties.widthSub')} value={selectedKey.w2 ?? selectedKey.w} step="0.25" min="0.5" icon={ArrowLeftRight} onFocus={() => setFocusedField('w2')} onChange={(val: number) => updateKey(selectedKey.id, { w2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w2: val }, true); }} />
-                      <PropertyInput label={t('properties.heightSub')} value={selectedKey.h2 ?? selectedKey.h} step="0.25" min="0.5" icon={ArrowUpDown} onFocus={() => setFocusedField('h2')} onChange={(val: number) => updateKey(selectedKey.id, { h2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h2: val }, true); }} />
+                      <PropertyInput label={t('properties.widthSub')} value={scaleUnit(selectedKey.w2 ?? selectedKey.w)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={ArrowLeftRight} onFocus={() => setFocusedField('w2')} onChange={(val: number) => updateKey(selectedKey.id, { w2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w2: parseUnit(val) }, true); }} />
+                      <PropertyInput label={t('properties.heightSub')} value={scaleUnit(selectedKey.h2 ?? selectedKey.h)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={ArrowUpDown} onFocus={() => setFocusedField('h2')} onChange={(val: number) => updateKey(selectedKey.id, { h2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h2: parseUnit(val) }, true); }} />
                     </div>
                     <div className="flex gap-3">
-                      <PropertyInput label={t('properties.offsetXSub')} value={selectedKey.x2 ?? 0} step={editorSettings.gridSnap.toString()} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: val }, true); }} />
-                      <PropertyInput label={t('properties.offsetYSub')} value={selectedKey.y2 ?? 0} step={editorSettings.gridSnap.toString()} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: val })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: val }, true); }} />
+                      <PropertyInput label={t('properties.offsetXSub')} value={scaleUnit(selectedKey.x2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: parseUnit(val) }, true); }} />
+                      <PropertyInput label={t('properties.offsetYSub')} value={scaleUnit(selectedKey.y2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: parseUnit(val) }, true); }} />
                     </div>
                   </div>
 

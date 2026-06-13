@@ -1,4 +1,4 @@
-﻿export type Language = 'en' | 'zh' | 'ko' | 'ja' | 'es' | 'de';
+export type Language = 'en' | 'zh' | 'ko' | 'ja' | 'es' | 'de';
 
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: 'English',
@@ -409,6 +409,9 @@ export const TRANSLATIONS = {
       addZmkLayer: 'Add ZMK layer',
       removeLastZmkLayer: 'Remove last ZMK layer',
       renameLayerFailed: 'Failed to rename layer.',
+      layoutUnit: 'Layout Unit',
+      unitU: 'U',
+      unitMm: 'mm',
     },
     options: {
       title: 'Layout Options',
@@ -1670,6 +1673,9 @@ export const TRANSLATIONS = {
       addZmkLayer: 'ZMK レイヤーを追加',
       removeLastZmkLayer: '最後の ZMK レイヤーを削除',
       renameLayerFailed: 'レイヤー名の変更に失敗しました。',
+      layoutUnit: 'レイアウト単位',
+      unitU: 'U',
+      unitMm: 'mm',
     },
     options: {
       title: 'レイアウトオプション',

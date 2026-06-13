@@ -149,6 +149,7 @@ export interface EditorSettings {
   showMatrixLines: boolean;
   sortThresholdY: number;
   debugMode: boolean;
+  layoutUnit?: 'u' | 'mm';
 }
 
 export type SmidrProject = Omit<ProjectSettings, 'vendorProductId'> & {
