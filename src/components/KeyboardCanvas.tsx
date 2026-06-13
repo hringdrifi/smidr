@@ -2,9 +2,10 @@
 
 import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Group, Rect, Line, Circle, Path as KonvaPath } from 'react-konva';
-import { getLocalMatrixPosition, getMatrixFromPins } from '@/lib/matrix-utils';
+import { getLocalMatrixPosition, getMatrixFromPins, getFirmwareMatrixPosition } from '@/lib/matrix-utils';
 import { useKeyboardStore, RuntimeKey } from '@/lib/store';
 import { PhysicalKey } from '@/types/keyboard';
+import { UniversalAction } from '@/types/actions';
 import { sortKeys } from '@/lib/sorting';
 import { keysIntersect } from '@/lib/collision';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -38,7 +39,8 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     isProjectOpen, setIsHardwareModalOpen, resetProject,
     setCanvasDimensions,
     connectedDevice, currentProjectId,
-    zmkLocked, isKeymapSyncing
+    zmkLocked, isKeymapSyncing,
+    setKeycode, updateDeviceKeycode
   } = useKeyboardStore();
   
   const { t } = useTranslation();
@@ -171,11 +173,30 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
         setFocusedKeyId(null);
         setSelectionAnchorId(null);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedKeyIds.length > 0 && !readonlyGeometry) {
-          e.preventDefault();
-          selectedKeyIds.forEach(id => removeKey(id));
-          setSelectedKeyIds([]);
-          setFocusedKeyId(null);
+        if (selectedKeyIds.length > 0) {
+          if (editorMode === 'keymap' || appMode === 'remap') {
+            e.preventDefault();
+            const targetAction: UniversalAction = { action: 'none' };
+            selectedKeyIds.forEach(id => {
+              const selectedKey = keys.find(k => k.id === id);
+              if (!selectedKey) return;
+              if (appMode === 'remap') {
+                const selectedFirmwarePosition = getFirmwareMatrixPosition(settings, selectedKey, keys);
+                if (selectedKey.zmkPosition !== undefined) {
+                  updateDeviceKeycode(currentLayer, selectedKey.zmkPosition, -1, targetAction);
+                } else if (selectedFirmwarePosition) {
+                  updateDeviceKeycode(currentLayer, selectedFirmwarePosition.row, selectedFirmwarePosition.col, targetAction);
+                }
+              } else {
+                setKeycode(id, currentLayer, targetAction);
+              }
+            });
+          } else if (!readonlyGeometry) {
+            e.preventDefault();
+            selectedKeyIds.forEach(id => removeKey(id));
+            setSelectedKeyIds([]);
+            setFocusedKeyId(null);
+          }
         }
       } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
