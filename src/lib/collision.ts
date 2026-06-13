@@ -65,8 +65,8 @@ export const polygonsIntersect = (poly1: Point[], poly2: Point[]): boolean => {
       const proj1 = project(poly1);
       const proj2 = project(poly2);
 
-      // Add a small EPSILON to allow perfect adjacency (0.025u as per SPECIFICATION.md)
-      const EPSILON = 0.025;
+      // Add a small EPSILON to allow perfect adjacency (0.03u as per SPECIFICATION.md)
+      const EPSILON = 0.03;
       if (proj1.max <= proj2.min + EPSILON || proj2.max <= proj1.min + EPSILON) {
         return false;
       }
