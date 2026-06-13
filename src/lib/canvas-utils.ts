@@ -22,7 +22,7 @@ export const num = (v: any): number => {
 
 export const round = (v: number) => Math.round(num(v) * 10000000) / 10000000;
 export const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
-export const roundRot = (v: number) => Math.round(v * 100) / 100;
+export const roundRot = (v: number) => Math.round(v * 1000) / 1000;
 
 export const isLayoutMode = (appMode: string, editorMode: string) => 
   appMode === 'design' && editorMode === 'layout';

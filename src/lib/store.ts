@@ -393,7 +393,7 @@ const initialState: Partial<KeyboardState> = {
 };
 
 const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
-const roundRot = (v: number) => Math.round(v * 100) / 100;
+const roundRot = (v: number) => Math.round(v * 1000) / 1000;
 const isZmkDebugLoggingEnabled = () => (
   typeof localStorage !== 'undefined' && localStorage.getItem('smidr:zmk-debug') === '1'
 );
