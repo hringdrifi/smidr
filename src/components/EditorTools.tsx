@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge
+  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge, CornerDownLeft
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
@@ -285,6 +285,15 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                         />
                       </label>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPainter({ currentRow: painter.currentRow + 1, currentCol: 0 })}
+                      className="w-full h-8 rounded border border-[var(--border-main)] bg-[var(--bg-app)] text-[10px] font-bold uppercase text-[var(--text-main)] hover:text-amber-500 hover:border-amber-500/50 transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      <CornerDownLeft size={12} />
+                      {t('matrix.nextRow')}
+                    </button>
 
                     <div>
                       <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.autoIncrement')}</div>

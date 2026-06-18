@@ -57,6 +57,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
 }) => {
   const { x, y, w, h, r, rx, ry, x2, y2, w2, h2, stepped } = keyData;
   const isDebug = useKeyboardStore(s => s.editorSettings.debugMode);
+  const matrixPaintMode = useKeyboardStore(s => s.matrixPaintMode);
   const { t } = useTranslation();
   const isEncoder = keyData.kind === 'encoder' || !!keyData.encoderId || keyData.encoderIndex !== undefined;
   
@@ -120,7 +121,9 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   const pivotInLocalY = (num(ry) - (num(y) + mY)) * UNIT;
 
   const layoutMode = isLayoutMode(appMode, editorMode);
-  const hoverCursor = layoutMode ? 'move' : 'pointer';
+  const hoverCursor = (appMode === 'design' && editorMode === 'matrix' && matrixPaintMode)
+    ? 'crosshair'
+    : (layoutMode ? 'move' : 'pointer');
 
   // Shared layout values for label rendering
   const centerX = (-num(mX) + num(w) / 2) * UNIT;
@@ -375,7 +378,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
       onMouseLeave={(e) => {
         const stage = e.target.getStage();
         const container = stage ? stage.container() : document.body;
-        container.style.cursor = 'default';
+        container.style.cursor = (appMode === 'design' && editorMode === 'matrix' && matrixPaintMode) ? 'crosshair' : 'default';
       }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}

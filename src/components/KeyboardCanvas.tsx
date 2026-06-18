@@ -51,6 +51,13 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const stageRef = useRef<any>(null);
   const [selBox, setSelBox] = useState<{ start: { x: number, y: number }, end: { x: number, y: number }, isRealDrag: boolean } | null>(null);
   const [paintHintPos, setPaintHintPos] = useState<{ x: number; y: number } | null>(null);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.style.cursor = (appMode === 'design' && editorMode === 'matrix' && matrixPaintMode) ? 'crosshair' : 'default';
+    }
+  }, [appMode, editorMode, matrixPaintMode]);
   const transformRef = useRef(transform);
   const touchGestureRef = useRef<{
     mode: 'pan' | 'pinch' | 'select';
