@@ -9,11 +9,13 @@ import plateKeyHoleRaw from './kicad-assets/smidr.pretty/Plate_Smidr_Key_Hole.ki
 import switchChocHotswapRaw from './kicad-assets/smidr.pretty/SW_Smidr_Choc_Hotswap.kicad_mod?raw';
 import switchChocSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_Choc_Solder.kicad_mod?raw';
 import switchMxHotswapRaw from './kicad-assets/smidr.pretty/SW_Smidr_MX_Hotswap.kicad_mod?raw';
+import switchGateronLpHotswapRaw from './kicad-assets/smidr.pretty/SW_Smidr_Gateron_LP_Hotswap.kicad_mod?raw';
+import switchGateronLpSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_Gateron_LP_Solder.kicad_mod?raw';
 import switchMxSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_MX_Solder.kicad_mod?raw';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { getFirmwareMatrixPosition, isDirectPinMatrix } from './matrix-utils';
 
-type SwitchFootprintKind = 'mx-solder' | 'mx-hotswap' | 'choc-solder' | 'choc-hotswap';
+type SwitchFootprintKind = 'mx-solder' | 'mx-hotswap' | 'choc-solder' | 'choc-hotswap' | 'gateron-lp-solder' | 'gateron-lp-hotswap';
 type DiodeFootprintKind = 'sod123' | 'sod323' | 'do35';
 type FootprintMountType = 'through_hole' | 'smd';
 type FootprintSide = 'front' | 'back';
@@ -41,6 +43,8 @@ export const KICAD_SWITCH_FOOTPRINTS: KiCadFootprintChoice[] = [
   { id: 'mx-hotswap', label: 'MX Hotswap', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_MX_Hotswap', footprintSource: 'SW_Smidr_MX_Hotswap.kicad_mod', kind: 'mx-hotswap', mountType: 'smd' },
   { id: 'choc-solder', label: 'Choc Solder', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Choc_Solder', footprintSource: 'SW_Smidr_Choc_Solder.kicad_mod', kind: 'choc-solder', mountType: 'through_hole' },
   { id: 'choc-hotswap', label: 'Choc Hotswap', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Choc_Hotswap', footprintSource: 'SW_Smidr_Choc_Hotswap.kicad_mod', kind: 'choc-hotswap', mountType: 'smd' },
+  { id: 'gateron-lp-solder', label: 'Gateron LP Solder', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Gateron_LP_Solder', footprintSource: 'SW_Smidr_Gateron_LP_Solder.kicad_mod', kind: 'gateron-lp-solder', mountType: 'through_hole' },
+  { id: 'gateron-lp-hotswap', label: 'Gateron LP Hotswap', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Gateron_LP_Hotswap', footprintSource: 'SW_Smidr_Gateron_LP_Hotswap.kicad_mod', kind: 'gateron-lp-hotswap', mountType: 'smd' },
 ];
 
 export const KICAD_DIODE_FOOTPRINTS: KiCadFootprintChoice[] = [
@@ -61,6 +65,8 @@ const KICAD_FOOTPRINT_TEMPLATE_FILES: Record<string, string> = {
   'SW_Smidr_MX_Hotswap.kicad_mod': switchMxHotswapRaw,
   'SW_Smidr_Choc_Solder.kicad_mod': switchChocSolderRaw,
   'SW_Smidr_Choc_Hotswap.kicad_mod': switchChocHotswapRaw,
+  'SW_Smidr_Gateron_LP_Solder.kicad_mod': switchGateronLpSolderRaw,
+  'SW_Smidr_Gateron_LP_Hotswap.kicad_mod': switchGateronLpHotswapRaw,
   'D_Smidr_SOD123.kicad_mod': diodeSod123Raw,
   'D_Smidr_SOD323.kicad_mod': diodeSod323Raw,
   'D_Smidr_DO35.kicad_mod': diodeDo35Raw,
@@ -101,6 +107,9 @@ const getPcbSide = (mountType?: FootprintMountType): FootprintSide => (
 );
 const getSwitchLedOffset = (choice: KiCadFootprintChoice) => {
   const kind = (choice.kind ?? 'mx-solder') as SwitchFootprintKind;
+  if (kind.startsWith('gateron-lp')) {
+    return { x: 0, y: -5.175 };
+  }
   return kind.startsWith('choc')
     ? { x: 0, y: -4.7 }
     : { x: 0, y: 5.08 };
@@ -302,6 +311,21 @@ const makeSchematicSymbol = (
     (dnp no)
     (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y - 2.54)}${makeProperty('Value', value, x, y + 2.54)}${makeProperty('Footprint', footprint, x, y + 5.08, true)}
   )`;
+
+const makeSchematicPath = (seed: string) => `/${seededUuid(seed)}`;
+
+const makeSymbolInstance = (
+  seed: string,
+  reference: string,
+  value: string,
+  footprint: string
+) => `
+    (path "${makeSchematicPath(seed)}"
+      (reference "${escapeString(reference)}")
+      (unit 1)
+      (value "${escapeString(value)}")
+      (footprint "${escapeString(footprint)}")
+    )`;
 
 const findMatchingParen = (value: string, start: number) => {
   let depth = 0;
@@ -544,6 +568,7 @@ const instantiateFootprintTemplate = (
   uuid: string,
   padNets: Record<string, string>,
   side: FootprintSide,
+  schematicPath?: string,
   key?: PhysicalKey
 ) => {
   let footprint = rawFootprint.trim().replace(/^\(footprint\s+"[^"]+"/, `(footprint "${escapeString(libId)}"`);
@@ -564,7 +589,7 @@ const instantiateFootprintTemplate = (
   footprint = uniquifyFootprintUuids(footprint, uuid);
   footprint = footprint.replace(
     /\(\s*layer\s+"[^"]+"\s*\)/,
-    `(layer "${sideLayer(side, 'F.Cu')}")\n    (uuid "${uuid}")\n    (at ${mm(x)} ${mm(y)} ${mm(footprintRotation)})`
+    `(layer "${sideLayer(side, 'F.Cu')}")\n    (uuid "${uuid}")\n    (at ${mm(x)} ${mm(y)} ${mm(footprintRotation)})${schematicPath ? `\n    (path "${escapeString(schematicPath)}")` : ''}`
   );
   return `\n  ${footprint}`;
 };
@@ -572,32 +597,53 @@ const instantiateFootprintTemplate = (
 const makeSwitchPads = (kind: SwitchFootprintKind, uuid: string, pad1Net: string, pad2Net: string, side: FootprintSide, rotation: number) => {
   const isChoc = kind.startsWith('choc');
   const isHotswap = kind.endsWith('hotswap');
-  const centerHole = isChoc ? '' : `
-    (pad "" np_thru_hole circle ${padAt(0, 0, rotation)} (size 4.000 4.000) (drill 4.000) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-center`)}))`;
-  const locatingPins = isChoc
-    ? `
-    (pad "" np_thru_hole circle ${padAt(-5.5, 0, rotation)} (size 1.900 1.900) (drill 1.900) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-left`)}))
-    (pad "" np_thru_hole circle ${padAt(5.5, 0, rotation)} (size 1.900 1.900) (drill 1.900) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-right`)}))`
+  const isGateronLp = kind.startsWith('gateron-lp');
+  const centerHole = isChoc ? '' : (
+    isGateronLp ? `
+    (pad "" np_thru_hole circle ${padAt(0, 0, rotation)} (size 5.100 5.100) (drill 5.100) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-center`)}))`
     : `
-    (pad "" np_thru_hole circle ${padAt(-5.08, 0, rotation)} (size 1.700 1.700) (drill 1.700) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-left`)}))
-    (pad "" np_thru_hole circle ${padAt(5.08, 0, rotation)} (size 1.700 1.700) (drill 1.700) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-right`)}))`;
-  if (isHotswap) {
-    const pads = isChoc
+    (pad "" np_thru_hole circle ${padAt(0, 0, rotation)} (size 4.000 4.000) (drill 4.000) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-center`)}))`
+  );
+  const locatingPins = isGateronLp ? '' : (
+    isChoc
       ? `
-    (pad "1" smd roundrect ${padAt(-5, -3.8, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad1Net})
-    (pad "2" smd roundrect ${padAt(5, -3.8, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad2Net})`
+      (pad "" np_thru_hole circle ${padAt(-5.5, 0, rotation)} (size 1.900 1.900) (drill 1.900) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-left`)}))
+      (pad "" np_thru_hole circle ${padAt(5.5, 0, rotation)} (size 1.900 1.900) (drill 1.900) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-right`)}))`
       : `
-    (pad "1" smd roundrect ${padAt(-3.81, -4.7, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad1Net})
-    (pad "2" smd roundrect ${padAt(2.54, -6.9, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad2Net})`;
+      (pad "" np_thru_hole circle ${padAt(-5.08, 0, rotation)} (size 1.700 1.700) (drill 1.700) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-left`)}))
+      (pad "" np_thru_hole circle ${padAt(5.08, 0, rotation)} (size 1.700 1.700) (drill 1.700) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-right`)}))`
+  );
+  if (isHotswap) {
+    const pads = isGateronLp
+      ? `
+    (pad "" np_thru_hole circle ${padAt(-4.4, 4.7, rotation)} (size 3.000 3.000) (drill 3.000) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-left`)}))
+    (pad "" np_thru_hole circle ${padAt(2.6, 5.75, rotation)} (size 3.000 3.000) (drill 3.000) (layers "*.Cu" "*.Mask") (tstamp ${seededUuid(`${uuid}-pin-right`)}))
+    (pad "1" smd rect ${padAt(-8.275, 4.7, rotation)} (size 2.550 2.550) (layers ${smdLayers(side)}) ${pad1Net})
+    (pad "2" smd rect ${padAt(6.475, 5.75, rotation)} (size 2.550 2.550) (layers ${smdLayers(side)}) ${pad2Net})`
+      : (
+        isChoc
+          ? `
+        (pad "1" smd roundrect ${padAt(-5, -3.8, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad1Net})
+        (pad "2" smd roundrect ${padAt(5, -3.8, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad2Net})`
+          : `
+        (pad "1" smd roundrect ${padAt(-3.81, -4.7, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad1Net})
+        (pad "2" smd roundrect ${padAt(2.54, -6.9, rotation)} (size 3.000 2.200) (layers ${smdLayers(side)}) (roundrect_rratio 0.18) ${pad2Net})`
+      );
     return `${centerHole}${locatingPins}${pads}`;
   }
-  const pads = isChoc
+  const pads = isGateronLp
     ? `
-    (pad "1" thru_hole circle ${padAt(-5, -3.8, rotation)} (size 2.200 2.200) (drill 1.300) (layers "*.Cu" "*.Mask") ${pad1Net})
-    (pad "2" thru_hole circle ${padAt(5, -3.8, rotation)} (size 2.200 2.200) (drill 1.300) (layers "*.Cu" "*.Mask") ${pad2Net})`
-    : `
-    (pad "1" thru_hole circle ${padAt(-3.81, -2.54, rotation)} (size 2.500 2.500) (drill 1.500) (layers "*.Cu" "*.Mask") ${pad1Net})
-    (pad "2" thru_hole circle ${padAt(2.54, -5.08, rotation)} (size 2.500 2.500) (drill 1.500) (layers "*.Cu" "*.Mask") ${pad2Net})`;
+    (pad "1" thru_hole circle ${padAt(-4.4, 4.7, rotation)} (size 2.500 2.500) (drill 1.500) (layers "*.Cu" "*.Mask") ${pad1Net})
+    (pad "2" thru_hole circle ${padAt(2.6, 5.75, rotation)} (size 2.500 2.500) (drill 1.500) (layers "*.Cu" "*.Mask") ${pad2Net})`
+    : (
+      isChoc
+        ? `
+      (pad "1" thru_hole circle ${padAt(-5, -3.8, rotation)} (size 2.200 2.200) (drill 1.300) (layers "*.Cu" "*.Mask") ${pad1Net})
+      (pad "2" thru_hole circle ${padAt(5, -3.8, rotation)} (size 2.200 2.200) (drill 1.300) (layers "*.Cu" "*.Mask") ${pad2Net})`
+        : `
+      (pad "1" thru_hole circle ${padAt(-3.81, -2.54, rotation)} (size 2.500 2.500) (drill 1.500) (layers "*.Cu" "*.Mask") ${pad1Net})
+      (pad "2" thru_hole circle ${padAt(2.54, -5.08, rotation)} (size 2.500 2.500) (drill 1.500) (layers "*.Cu" "*.Mask") ${pad2Net})`
+    );
   return `${centerHole}${locatingPins}${pads}`;
 };
 
@@ -745,17 +791,22 @@ const generateKiCadSchematic = (
   const switchChoice = getSwitchChoice(options.switchFootprint);
   const diodeChoice = getDiodeChoice(options.diodeFootprint);
   const rgbKeys = getRgbLedKeys(settings, visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
+  const instances: string[] = [];
   const symbols = visibleKeys.flatMap((key, index) => {
     const col = index % 8;
     const row = Math.floor(index / 8);
     const x = 25 + col * 28;
     const y = 25 + row * 24;
     const nets = getMatrixNetNames(settings, key, keys, index);
+    const switchSeed = `sch-sw-${index}`;
+    instances.push(makeSymbolInstance(switchSeed, `SW${index + 1}`, nets.position, switchChoice.footprint));
     const entries = [
-      makeSchematicSymbol(switchChoice.symbol, `SW${index + 1}`, nets.position, switchChoice.footprint, x, y, `sch-sw-${index}`),
+      makeSchematicSymbol(switchChoice.symbol, `SW${index + 1}`, nets.position, switchChoice.footprint, x, y, switchSeed),
     ];
     if (!isDirectPinMatrix(settings)) {
-      entries.push(makeSchematicSymbol(diodeChoice.symbol, `D${index + 1}`, nets.position, diodeChoice.footprint, x + 12, y, `sch-d-${index}`));
+      const diodeSeed = `sch-d-${index}`;
+      instances.push(makeSymbolInstance(diodeSeed, `D${index + 1}`, nets.position, diodeChoice.footprint));
+      entries.push(makeSchematicSymbol(diodeChoice.symbol, `D${index + 1}`, nets.position, diodeChoice.footprint, x + 12, y, diodeSeed));
     }
     return entries;
   });
@@ -763,7 +814,9 @@ const generateKiCadSchematic = (
   rgbKeys.forEach((key, index) => {
     const x = 25 + (index % 6) * 34;
     const y = 25 + Math.ceil(visibleKeys.length / 8) * 24 + 24 + Math.floor(index / 6) * 24;
-    symbols.push(makeSchematicSymbol('Smidr:SK6812MINI_E', `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, `sch-rgb-${key.ledIndex}`));
+    const ledSeed = `sch-rgb-${key.ledIndex}`;
+    instances.push(makeSymbolInstance(ledSeed, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb));
+    symbols.push(makeSchematicSymbol('Smidr:SK6812MINI_E', `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, ledSeed));
   });
 
   const labels = visibleKeys.map((key, index) => {
@@ -814,6 +867,9 @@ ${labels.join('\n')}
   (sheet_instances
     (path "/" (page "1"))
   )
+  (symbol_instances
+${instances.join('\n')}
+  )
 )`;
 };
 
@@ -841,6 +897,7 @@ const makeSwitchFootprint = (
       2: footprintNet(netIds.get(nets.switchB) ?? 0, nets.switchB),
     },
     getPcbSide(switchChoice.mountType),
+    makeSchematicPath(`sch-sw-${index}`),
     key
   );
 };
@@ -872,7 +929,8 @@ const makeDiodeFootprint = (
       1: footprintNet(netIds.get(nets.diodeA) ?? 0, nets.diodeA),
       2: footprintNet(netIds.get(nets.diodeB) ?? 0, nets.diodeB),
     },
-    getPcbSide(diodeChoice.mountType)
+    getPcbSide(diodeChoice.mountType),
+    makeSchematicPath(`sch-d-${index}`)
   );
 };
 
@@ -911,7 +969,8 @@ const makeRgbLedFootprint = (
       3: footprintNet(netIds.get('GND') ?? 0, 'GND'),
       4: footprintNet(netIds.get(din) ?? 0, din),
     },
-    'back'
+    'back',
+    makeSchematicPath(`sch-rgb-${key.ledIndex}`)
   );
 };
 
@@ -928,6 +987,7 @@ const makePlateHoleFootprint = (index: number, key: PhysicalKey) => {
     seededUuid(`plate-hole-${index}`),
     {},
     'front',
+    undefined,
     key
   );
 };

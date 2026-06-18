@@ -80,6 +80,8 @@ describe('export generation', () => {
     expect(zip.file('smidr.pretty/SW_Smidr_MX_Hotswap.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/SW_Smidr_Choc_Solder.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/SW_Smidr_Choc_Hotswap.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/SW_Smidr_Gateron_LP_Solder.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/SW_Smidr_Gateron_LP_Hotswap.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/D_Smidr_SOD123.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/D_Smidr_SOD323.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/D_Smidr_DO35.kicad_mod')).toBeTruthy();
@@ -94,16 +96,23 @@ describe('export generation', () => {
     expect(schematic).toContain('(property "Footprint" "Smidr:SW_Smidr_MX_Hotswap"');
     expect(schematic).toContain('(symbol "Device:D"');
     expect(schematic).toContain('(lib_id "Device:D")');
+    expect(schematic).toContain('(symbol_instances');
+    const sw1Path = schematic.match(/\(path "(\/[^"]+)"\s+\(reference "SW1"\)[\s\S]*?\(footprint "Smidr:SW_Smidr_MX_Hotswap"\)/)?.[1];
+    const d1Path = schematic.match(/\(path "(\/[^"]+)"\s+\(reference "D1"\)[\s\S]*?\(footprint "Smidr:D_Smidr_SOD323"\)/)?.[1];
+    expect(sw1Path).toBeTruthy();
+    expect(d1Path).toBeTruthy();
     expect(symbolLibrary).toContain('(symbol "D"');
     expect(symbolLibrary).toContain('(symbol "SW_Push"');
     expect(schematic).toContain('(label "ROW0"');
     expect(schematic).toContain('(label "COL1"');
     expect(pcb).toContain('(footprint "Smidr:SW_Smidr_MX_Hotswap"');
+    expect(pcb).toContain(`(path "${sw1Path}")`);
     expect(pcb).toContain('center-origin template');
     expect(pcb).toContain('(property "Reference" "SW1"');
     expect(pcb).toContain('(property "Value" "R0C0"');
     expect(pcb).not.toContain('(angle ');
     expect(pcb).toContain('(footprint "Smidr:D_Smidr_SOD323"');
+    expect(pcb).toContain(`(path "${d1Path}")`);
     expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_SOD323"[\s\S]*?\(layer "B\.Cu"\)/);
     expect(pcb).toMatch(/\(footprint "Smidr:D_Smidr_SOD323"[\s\S]*?\(at 14\.605 13\.525 90\.000\)/);
     expect(pcb).toContain('(pad "1" smd roundrect');
@@ -124,6 +133,63 @@ describe('export generation', () => {
     expect(readme).toContain('Switch outlines: keycap, fab, and courtyard geometry are generated from each key');
     expect(readme).not.toContain('marbastlib');
     expect(readme).not.toContain('key-switches.pretty');
+  });
+
+  it('exports KiCad Gateron LP hotswap/solder, switch pad coordinates, and LED offset', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Gateron LP KiCad',
+      matrix: { rows: 1, cols: 2 },
+      features: { ...baseSettings.features, rgbMatrix: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', ledIndex: 1 },
+    ];
+
+    const blobHotswap = await generateKiCadZip(
+      { settings, keys },
+      {
+        switchFootprint: 'Smidr:SW_Smidr_Gateron_LP_Hotswap',
+        diodeFootprint: 'Smidr:D_Smidr_SOD323',
+        diodeOffsetX: 5.08,
+        diodeOffsetY: 4,
+        diodeRotation: 90,
+      }
+    );
+    const zipHotswap = await JSZip.loadAsync(await blobHotswap.arrayBuffer());
+    const pcbHotswap = await zipHotswap.file('gateron_lp_kicad.kicad_pcb')!.async('string');
+    const hotswapTemplate = await zipHotswap.file('smidr.pretty/SW_Smidr_Gateron_LP_Hotswap.kicad_mod')!.async('string');
+
+    expect(pcbHotswap).toContain('(footprint "Smidr:SW_Smidr_Gateron_LP_Hotswap"');
+    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at 0\.000 0\.000 180\.000\)[\s\S]*?\(size 5\.1 5\.1\)[\s\S]*?\(drill 5\.1\)/);
+    expect(pcbHotswap).toMatch(/\(pad "1" smd rect[\s\S]*?\(at -8\.275 -4\.700 180\.000\)[\s\S]*?\(size 2\.55 2\.55\)/);
+    expect(pcbHotswap).toMatch(/\(pad "2" smd rect[\s\S]*?\(at 6\.475 -5\.750 180\.000\)[\s\S]*?\(size 2\.55 2\.55\)/);
+    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at -4\.400 -4\.700 180\.000\)[\s\S]*?\(size 3 3\)[\s\S]*?\(drill 3\)/);
+    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at 2\.600 -5\.750 180\.000\)[\s\S]*?\(size 3 3\)[\s\S]*?\(drill 3\)/);
+    expect(pcbHotswap).toContain('(at 9.525 4.350 180.000)');
+    expect(hotswapTemplate).toContain('(footprint "SW_Smidr_Gateron_LP_Hotswap"');
+    expect(hotswapTemplate).toContain('(attr smd)');
+
+    const blobSolder = await generateKiCadZip(
+      { settings, keys },
+      {
+        switchFootprint: 'Smidr:SW_Smidr_Gateron_LP_Solder',
+        diodeFootprint: 'Smidr:D_Smidr_SOD323',
+        diodeOffsetX: 5.08,
+        diodeOffsetY: 4,
+        diodeRotation: 90,
+      }
+    );
+    const zipSolder = await JSZip.loadAsync(await blobSolder.arrayBuffer());
+    const pcbSolder = await zipSolder.file('gateron_lp_kicad.kicad_pcb')!.async('string');
+    const solderTemplate = await zipSolder.file('smidr.pretty/SW_Smidr_Gateron_LP_Solder.kicad_mod')!.async('string');
+
+    expect(pcbSolder).toContain('(footprint "Smidr:SW_Smidr_Gateron_LP_Solder"');
+    expect(pcbSolder).toMatch(/\(pad "1" thru_hole circle[\s\S]*?\(at -4\.400 4\.700 0\.000\)[\s\S]*?\(size 2\.5 2\.5\)[\s\S]*?\(drill 1\.5\)/);
+    expect(pcbSolder).toMatch(/\(pad "2" thru_hole circle[\s\S]*?\(at 2\.600 5\.750 0\.000\)[\s\S]*?\(size 2\.5 2\.5\)[\s\S]*?\(drill 1\.5\)/);
+    expect(solderTemplate).toContain('(footprint "SW_Smidr_Gateron_LP_Solder"');
+    expect(solderTemplate).toContain('(attr through_hole)');
   });
 
   it('sanitizes multiline KiCad footprint values in plate PCB output', async () => {
@@ -305,7 +371,10 @@ describe('export generation', () => {
 
     expect(schematic).toContain('(lib_id "Smidr:SK6812MINI_E")');
     expect(schematic).toContain('(property "Footprint" "Smidr:LED_Smidr_SK6812MINI_E"');
+    const led0Path = schematic.match(/\(path "(\/[^"]+)"\s+\(reference "LED0"\)[\s\S]*?\(footprint "Smidr:LED_Smidr_SK6812MINI_E"\)/)?.[1];
+    expect(led0Path).toBeTruthy();
     expect(pcb).toContain('(footprint "Smidr:LED_Smidr_SK6812MINI_E"');
+    expect(pcb).toContain(`(path "${led0Path}")`);
     expect(pcb).toMatch(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(layer "B\.Cu"\)/);
     expect(pcb).toContain('(pad "1" smd roundrect');
     expect(pcb).toContain('(layers "B.Cu" "B.Mask" "B.Paste")');
