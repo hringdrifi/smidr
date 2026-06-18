@@ -162,11 +162,11 @@ describe('export generation', () => {
     const hotswapTemplate = await zipHotswap.file('smidr.pretty/SW_Smidr_Gateron_LP_Hotswap.kicad_mod')!.async('string');
 
     expect(pcbHotswap).toContain('(footprint "Smidr:SW_Smidr_Gateron_LP_Hotswap"');
-    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at 0\.000 0\.000 180\.000\)[\s\S]*?\(size 5\.1 5\.1\)[\s\S]*?\(drill 5\.1\)/);
-    expect(pcbHotswap).toMatch(/\(pad "1" smd rect[\s\S]*?\(at -8\.275 -4\.700 180\.000\)[\s\S]*?\(size 2\.55 2\.55\)/);
-    expect(pcbHotswap).toMatch(/\(pad "2" smd rect[\s\S]*?\(at 6\.475 -5\.750 180\.000\)[\s\S]*?\(size 2\.55 2\.55\)/);
-    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at -4\.400 -4\.700 180\.000\)[\s\S]*?\(size 3 3\)[\s\S]*?\(drill 3\)/);
-    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at 2\.600 -5\.750 180\.000\)[\s\S]*?\(size 3 3\)[\s\S]*?\(drill 3\)/);
+    expect(pcbHotswap).toMatch(/\(pad "" np_thru_hole circle[\s\S]*?\(at 0\.000 0\.000 270\.000\)[\s\S]*?\(size 5\.25 5\.25\)[\s\S]*?\(drill 5\.25\)/);
+    expect(pcbHotswap).toMatch(/\(pad "1" smd rect[\s\S]*?\(at 6\.350 -4\.700 180\.000\)[\s\S]*?\(size 1\.5 2\.55\)/);
+    expect(pcbHotswap).toMatch(/\(pad "1" smd roundrect[\s\S]*?\(at 8\.075 -4\.700 180\.000\)[\s\S]*?\(size 2\.5 2\.55\)/);
+    expect(pcbHotswap).toMatch(/\(pad "2" smd rect[\s\S]*?\(at -4\.550 -5\.750 180\.000\)[\s\S]*?\(size 1\.5 2\.55\)/);
+    expect(pcbHotswap).toMatch(/\(pad "2" smd roundrect[\s\S]*?\(at -6\.275 -5\.750 180\.000\)[\s\S]*?\(size 2\.5 2\.55\)/);
     expect(pcbHotswap).toContain('(at 9.525 4.350 180.000)');
     expect(hotswapTemplate).toContain('(footprint "SW_Smidr_Gateron_LP_Hotswap"');
     expect(hotswapTemplate).toContain('(attr smd)');
