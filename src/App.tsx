@@ -342,6 +342,7 @@ export default function App() {
     combos: { title: t('macros.combos'), icon: Workflow },
     tapDance: { title: t('keycodeConfig.tapDance') || 'Tap Dance', icon: WandSparkles },
   } satisfies Record<AdvancedPanelKind, { title: string; icon: React.ComponentType<{ size?: number; className?: string }> }>;
+  const isKiCadDirectPin = settings.matrix.wiring === 'direct';
   const diodePreviewScale = 5;
   const diodeOffsetX = kicadExportOptions.diodeOffsetX ?? DEFAULT_KICAD_EXPORT_OPTIONS.diodeOffsetX;
   const diodeOffsetY = kicadExportOptions.diodeOffsetY ?? DEFAULT_KICAD_EXPORT_OPTIONS.diodeOffsetY;
@@ -1380,51 +1381,55 @@ export default function App() {
                     </select>
                   </label>
 
-                  <label className="block space-y-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                      {t('kicad.diodeFootprint')}
-                    </span>
-                    <select
-                      value={kicadExportOptions.diodeFootprint}
-                      onChange={(e) => setKiCadExportOptions(options => ({ ...options, diodeFootprint: e.target.value }))}
-                      className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
-                    >
-                      {KICAD_DIODE_FOOTPRINTS.map(option => (
-                        <option key={option.id} value={option.footprint}>
-                          {option.label} - {option.footprint}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {!isKiCadDirectPin && (
+                    <>
+                      <label className="block space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                          {t('kicad.diodeFootprint')}
+                        </span>
+                        <select
+                          value={kicadExportOptions.diodeFootprint}
+                          onChange={(e) => setKiCadExportOptions(options => ({ ...options, diodeFootprint: e.target.value }))}
+                          className="h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 text-xs font-bold text-[var(--text-main)] outline-none focus:border-amber-500"
+                        >
+                          {KICAD_DIODE_FOOTPRINTS.map(option => (
+                            <option key={option.id} value={option.footprint}>
+                              {option.label} - {option.footprint}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
 
-                  <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { key: 'diodeOffsetX' as const, label: t('kicad.diodeOffsetX'), suffix: 'mm' },
-                    { key: 'diodeOffsetY' as const, label: t('kicad.diodeOffsetY'), suffix: 'mm' },
-                    { key: 'diodeRotation' as const, label: t('kicad.diodeRotation'), suffix: 'deg' },
-                  ].map(field => (
-                    <label key={field.key} className="block space-y-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                        {field.label}
-                      </span>
-                      <div className="flex h-10 items-center rounded border border-[var(--border-main)] bg-[var(--bg-app)] focus-within:border-amber-500">
-                        <input
-                          type="number"
-                          step={field.key === 'diodeRotation' ? 15 : 0.1}
-                          value={kicadExportOptions[field.key] ?? DEFAULT_KICAD_EXPORT_OPTIONS[field.key]}
-                          onChange={(e) => updateKiCadNumberOption(field.key, e.target.value)}
-                          className="min-w-0 flex-1 bg-transparent px-3 text-xs font-bold text-[var(--text-main)] outline-none"
-                        />
-                        <span className="shrink-0 px-2 text-[10px] font-bold uppercase text-[var(--text-dim)]">{field.suffix}</span>
+                      <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'diodeOffsetX' as const, label: t('kicad.diodeOffsetX'), suffix: 'mm' },
+                        { key: 'diodeOffsetY' as const, label: t('kicad.diodeOffsetY'), suffix: 'mm' },
+                        { key: 'diodeRotation' as const, label: t('kicad.diodeRotation'), suffix: 'deg' },
+                      ].map(field => (
+                        <label key={field.key} className="block space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                            {field.label}
+                          </span>
+                          <div className="flex h-10 items-center rounded border border-[var(--border-main)] bg-[var(--bg-app)] focus-within:border-amber-500">
+                            <input
+                              type="number"
+                              step={field.key === 'diodeRotation' ? 15 : 0.1}
+                              value={kicadExportOptions[field.key] ?? DEFAULT_KICAD_EXPORT_OPTIONS[field.key]}
+                              onChange={(e) => updateKiCadNumberOption(field.key, e.target.value)}
+                              className="min-w-0 flex-1 bg-transparent px-3 text-xs font-bold text-[var(--text-main)] outline-none"
+                            />
+                            <span className="shrink-0 px-2 text-[10px] font-bold uppercase text-[var(--text-dim)]">{field.suffix}</span>
+                          </div>
+                        </label>
+                      ))}
                       </div>
-                    </label>
-                  ))}
-                  </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex min-h-[360px] flex-col rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-4">
                   <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    {t('kicad.diodePreview')}
+                    {isKiCadDirectPin ? t('kicad.switchFootprint') : t('kicad.diodePreview')}
                   </div>
                   <svg viewBox="0 0 180 180" className="min-h-[320px] w-full flex-1 lg:min-h-[440px]">
                     <rect x="42" y="42" width="96" height="96" rx="4" fill="rgba(245, 158, 11, 0.06)" stroke="rgba(245, 158, 11, 0.65)" strokeWidth="2" />
@@ -1432,7 +1437,7 @@ export default function App() {
                     <line x1="34" y1="90" x2="146" y2="90" stroke="rgba(148, 163, 184, 0.28)" strokeWidth="1" />
                     <circle cx="90" cy="90" r="3" fill="rgb(245, 158, 11)" />
                     {renderKiCadFootprintPreview(switchPreviewTemplate, 'switch', 90, 90, switchPreviewBack ? 180 : 0, diodePreviewScale, switchPreviewBack)}
-                    {renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, diodePreviewRotation, diodePreviewScale, diodePreviewBack)}
+                    {!isKiCadDirectPin && renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, diodePreviewRotation, diodePreviewScale, diodePreviewBack)}
                   </svg>
                 </div>
               </div>
