@@ -15,7 +15,12 @@
       {
         "title": "Smidr",
         "width": 1280,
-        "height": 900
+        "height": 900,
+        "transparent": true,
+        "windowEffects": {
+          "effects": ["mica", "acrylic"],
+          "state": "active"
+        }
       }
     ]
   },
