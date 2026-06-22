@@ -54,4 +54,24 @@ describe('sortKeys', () => {
     const sorted = sortKeys(keys, 0.25);
     expect(sorted.map(k => k.label)).toEqual(['A', 'B']);
   });
+
+  it('should sort by visual position when keys are rotated negatively', () => {
+    const keys = [
+      { id: '1', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'B' },
+      { id: '2', x: 1.2, y: 0, w: 1, h: 1, r: -45, rx: 0, ry: 0, label: 'A' },
+    ] as unknown as PhysicalKey[];
+
+    const sorted = sortKeys(keys, 0.25);
+    expect(sorted.map(k => k.label)).toEqual(['A', 'B']);
+  });
+
+  it('should sort by visual position when keys are rotated positively', () => {
+    const keys = [
+      { id: '1', x: 0, y: 0, w: 1, h: 1, r: 45, rx: 0, ry: 1, label: 'B' },
+      { id: '2', x: 1.2, y: 0.2, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+    ] as unknown as PhysicalKey[];
+
+    const sorted = sortKeys(keys, 0.25);
+    expect(sorted.map(k => k.label)).toEqual(['A', 'B']);
+  });
 });
