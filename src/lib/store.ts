@@ -341,7 +341,7 @@ const initialState: Partial<KeyboardState> = {
     keepPosOnOriginChange: false, 
     theme: getStoredTheme() ?? 'dark', 
     showMatrixLines: false, 
-    sortThresholdY: 0.25,
+    sortThresholdY: 0.5,
     debugMode: false,
     layoutUnit: getStoredLayoutUnit()
   },

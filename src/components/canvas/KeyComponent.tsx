@@ -31,6 +31,8 @@ interface KeyComponentProps {
   onDragMove?: (e: any) => void;
   onDragEnd?: (e: any) => void;
   onMouseDown?: (e: any) => void;
+  onMouseEnter?: (e: any) => void;
+  onMouseLeave?: (e: any) => void;
   onMouseMove?: (e: any) => void;
   onClick?: (e: any) => void;
 }
@@ -52,6 +54,8 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   onDragMove,
   onDragEnd,
   onMouseDown,
+  onMouseEnter,
+  onMouseLeave,
   onMouseMove,
   onClick
 }) => {
@@ -371,6 +375,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
         onDragEnd?.(e);
       }}
       onMouseEnter={(e) => {
+        onMouseEnter?.(e);
         if (!showKeycap) return;
         const container = e.target.getStage()?.container();
         if (container) container.style.cursor = hoverCursor;
@@ -379,6 +384,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
         const stage = e.target.getStage();
         const container = stage ? stage.container() : document.body;
         container.style.cursor = (appMode === 'design' && editorMode === 'matrix' && matrixPaintMode) ? 'crosshair' : 'default';
+        onMouseLeave?.(e);
       }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}

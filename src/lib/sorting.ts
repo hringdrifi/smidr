@@ -6,7 +6,7 @@ const num = (v: any): number => {
   return isNaN(n) ? 0 : n;
 };
 
-const getSortPoint = (key: PhysicalKey) => {
+export const getSortPoint = (key: PhysicalKey) => {
   const minX = Math.min(0, num(key.x2));
   const minY = Math.min(0, num(key.y2));
   const maxX = Math.max(num(key.w), num(key.x2) + num(key.w2 || key.w));
@@ -27,8 +27,8 @@ const getSortPoint = (key: PhysicalKey) => {
 };
 
 /**
- * Sorts keys primarily by visual Y and secondarily by visual X,
- * with a tolerance for visual Y coordinates to handle staggered layouts.
+ * Sorts keys into physical rows by seeding the topmost remaining key,
+ * walking right while keys stay within the vertical threshold, then walking left.
  */
 export const sortKeys = (keys: PhysicalKey[], threshold: number): PhysicalKey[] => {
   if (keys.length === 0) return [];
@@ -42,35 +42,72 @@ export const sortKeys = (keys: PhysicalKey[], threshold: number): PhysicalKey[] 
     return point;
   };
 
-  // 1. Sort all keys by visual Y coordinate first to group them.
-  const sortedByY = [...keys].sort((a, b) => pointFor(a).y - pointFor(b).y);
+  const byTopThenLeft = (a: PhysicalKey, b: PhysicalKey) => {
+    const pa = pointFor(a);
+    const pb = pointFor(b);
+    return (pa.y - pb.y) || (pa.x - pb.x);
+  };
 
   const rows: PhysicalKey[][] = [];
-  let currentRow: PhysicalKey[] = [];
+  const remaining = new Set(keys);
 
-  if (sortedByY.length > 0) {
-    currentRow.push(sortedByY[0]);
-    
-    for (let i = 1; i < sortedByY.length; i++) {
-      const prev = sortedByY[i - 1];
-      const curr = sortedByY[i];
+  const pickNextRight = (current: PhysicalKey) => {
+    const currentPoint = pointFor(current);
+    return [...remaining]
+      .filter(key => {
+        const point = pointFor(key);
+        return point.x > currentPoint.x && Math.abs(point.y - currentPoint.y) <= threshold;
+      })
+      .sort((a, b) => {
+        const pa = pointFor(a);
+        const pb = pointFor(b);
+        return (pa.x - pb.x)
+          || (Math.abs(pa.y - currentPoint.y) - Math.abs(pb.y - currentPoint.y))
+          || (pa.y - pb.y);
+      })[0];
+  };
 
-      // If the visual Y difference is within threshold, consider them the same "row".
-      if (Math.abs(pointFor(curr).y - pointFor(prev).y) <= threshold) {
-        currentRow.push(curr);
-      } else {
-        // Sort the completed row by visual X coordinate (Left to Right).
-        currentRow.sort((a, b) => pointFor(a).x - pointFor(b).x);
-        rows.push(currentRow);
-        currentRow = [curr];
-      }
+  const pickNextLeft = (current: PhysicalKey) => {
+    const currentPoint = pointFor(current);
+    return [...remaining]
+      .filter(key => {
+        const point = pointFor(key);
+        return point.x < currentPoint.x && Math.abs(point.y - currentPoint.y) <= threshold;
+      })
+      .sort((a, b) => {
+        const pa = pointFor(a);
+        const pb = pointFor(b);
+        return (pb.x - pa.x)
+          || (Math.abs(pa.y - currentPoint.y) - Math.abs(pb.y - currentPoint.y))
+          || (pa.y - pb.y);
+      })[0];
+  };
+
+  while (remaining.size > 0) {
+    const seed = [...remaining].sort(byTopThenLeft)[0];
+    const row = [seed];
+    remaining.delete(seed);
+
+    let current = seed;
+    while (true) {
+      const next = pickNextRight(current);
+      if (!next) break;
+      row.push(next);
+      remaining.delete(next);
+      current = next;
     }
-    
-    // Don't forget the last row
-    currentRow.sort((a, b) => pointFor(a).x - pointFor(b).x);
-    rows.push(currentRow);
+
+    current = row[0];
+    while (true) {
+      const next = pickNextLeft(current);
+      if (!next) break;
+      row.unshift(next);
+      remaining.delete(next);
+      current = next;
+    }
+
+    rows.push(row);
   }
 
-  // Flatten the rows back into a single array
   return rows.flat();
 };

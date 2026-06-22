@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
-import { Stage, Layer, Group, Rect, Line, Circle, Path as KonvaPath } from 'react-konva';
+import { Stage, Layer, Group, Rect, Line, Circle, Text, Path as KonvaPath } from 'react-konva';
 import { getLocalMatrixPosition, getMatrixFromPins, getFirmwareMatrixPosition } from '@/lib/matrix-utils';
 import { useKeyboardStore, RuntimeKey } from '@/lib/store';
 import { PhysicalKey } from '@/types/keyboard';
 import { UniversalAction } from '@/types/actions';
-import { sortKeys } from '@/lib/sorting';
+import { getSortPoint, sortKeys } from '@/lib/sorting';
 import { keysIntersect } from '@/lib/collision';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LayoutGrid, FolderOpen, Plus, RefreshCw } from 'lucide-react';
@@ -51,6 +51,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const stageRef = useRef<any>(null);
   const [selBox, setSelBox] = useState<{ start: { x: number, y: number }, end: { x: number, y: number }, isRealDrag: boolean } | null>(null);
   const [paintHintPos, setPaintHintPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredSortKeyId, setHoveredSortKeyId] = useState<string | null>(null);
 
   React.useEffect(() => {
     const container = containerRef.current;
@@ -78,6 +79,17 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
   const displayKeys = previewKeys || keys;
   const visKeys = useMemo(() => (displayKeys.filter(k => !k.group || (settings.activeOptions[k.group] ?? 0) === k.option)) as RuntimeKey[], [displayKeys, settings.activeOptions]);
+  const sortDebugInfo = useMemo(() => {
+    if (!editorSettings.debugMode) return new Map<string, { index: number; x: number; y: number }>();
+    return new Map(sortKeys(visKeys, editorSettings.sortThresholdY).map((key, index) => {
+      const point = getSortPoint(key);
+      return [key.id, { index, x: point.x, y: point.y }];
+    }));
+  }, [editorSettings.debugMode, editorSettings.sortThresholdY, visKeys]);
+  const hoveredSortKey = useMemo(() => (
+    hoveredSortKeyId ? visKeys.find(key => key.id === hoveredSortKeyId) : undefined
+  ), [hoveredSortKeyId, visKeys]);
+  const hoveredSortInfo = hoveredSortKeyId ? sortDebugInfo.get(hoveredSortKeyId) : undefined;
 
   const focusedKey = useMemo(() => visKeys.find(k => k.id === focusedKeyId), [visKeys, focusedKeyId]);
 
@@ -844,6 +856,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
               isSelected={selectedKeyIds.includes(key.id)} isFocused={focusedKeyId === key.id} isColliding={warningKeyIds.includes(key.id)}
               editorMode={editorMode} appMode={appMode} label={getKeyLabel(key, editorMode, currentLayer, appMode, remoteKeymap, settings.visualLayout, settings, visKeys)}
               showLabel={false} draggable={!readonlyGeometry && appMode === 'design'}
+              onMouseEnter={() => {
+                if (editorSettings.debugMode) setHoveredSortKeyId(key.id);
+              }}
+              onMouseLeave={() => setHoveredSortKeyId(null)}
               onDragStart={(e) => {
                 if (readonlyGeometry || appMode !== 'design') return;
                 const nextSelectedIds = selectedKeyIds.includes(key.id) ? selectedKeyIds : [key.id];
@@ -1021,6 +1037,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   ? matrixSide === 'right' ? '#06b6d4' : '#f59e0b'
                   : undefined}
                 showKeycap={false}
+                onMouseEnter={() => {
+                  if (editorSettings.debugMode) setHoveredSortKeyId(key.id);
+                }}
+                onMouseLeave={() => setHoveredSortKeyId(null)}
               onMouseDown={(e) => {
                 if (e.evt && e.evt.button !== 0) return;
                 if (isMatrixPaintEvent(e)) {
@@ -1074,6 +1094,37 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
               />
             );
           })}
+
+          {editorSettings.debugMode && hoveredSortKey && hoveredSortInfo && (() => {
+            const center = getVisualCenter(hoveredSortKey);
+            const tooltipText = `sort #${hoveredSortInfo.index}\nx ${hoveredSortInfo.x.toFixed(3)}\ny ${hoveredSortInfo.y.toFixed(3)}`;
+            return (
+              <Group x={center.x + 12} y={center.y - 46} listening={false}>
+                <Rect
+                  width={88}
+                  height={42}
+                  cornerRadius={4}
+                  fill="rgba(9, 9, 11, 0.94)"
+                  stroke="#f59e0b"
+                  strokeWidth={1}
+                  shadowColor="black"
+                  shadowBlur={6}
+                  shadowOpacity={0.35}
+                />
+                <Text
+                  text={tooltipText}
+                  x={6}
+                  y={5}
+                  width={76}
+                  fontSize={10}
+                  lineHeight={1.15}
+                  fontStyle="bold"
+                  fill="#fbbf24"
+                  listening={false}
+                />
+              </Group>
+            );
+          })()}
 
           {/* Smiðr Professional Handles */}
           {!readonlyGeometry && editorMode === 'layout' && focusedKey && selectedKeyIds.length > 0 && (
