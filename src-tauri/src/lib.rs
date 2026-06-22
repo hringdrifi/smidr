@@ -4,6 +4,10 @@ use std::sync::Mutex;
 #[cfg(windows)]
 use tauri::Emitter;
 use tauri::{AppHandle, Manager, State};
+#[cfg(target_os = "windows")]
+use window_vibrancy::{apply_acrylic, apply_mica};
+#[cfg(target_os = "macos")]
+use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
 
 #[cfg(windows)]
 mod winrt_ble {
@@ -423,12 +427,43 @@ fn zmk_ble_disconnect(state: State<'_, NativeBleState>) -> Result<(), String> {
     }
 }
 
+fn apply_window_material(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    {
+        if let Err(mica_error) = apply_mica(window, Some(true)) {
+            if let Err(acrylic_error) = apply_acrylic(window, Some((18, 18, 18, 135))) {
+                eprintln!(
+                    "Failed to apply Windows window material: mica={mica_error}; acrylic={acrylic_error}"
+                );
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Err(error) = apply_vibrancy(
+            window,
+            NSVisualEffectMaterial::WindowBackground,
+            Some(NSVisualEffectState::Active),
+            None,
+        ) {
+            eprintln!("Failed to apply macOS window vibrancy: {error}");
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = window;
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(NativeBleState::default())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_title(&format!("Smidr v{}", env!("CARGO_PKG_VERSION")));
+                apply_window_material(&window);
             }
             Ok(())
         })
