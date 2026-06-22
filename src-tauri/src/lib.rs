@@ -427,11 +427,16 @@ fn zmk_ble_disconnect(state: State<'_, NativeBleState>) -> Result<(), String> {
     }
 }
 
-fn apply_window_material(window: &tauri::WebviewWindow) {
+fn apply_window_material(window: &tauri::WebviewWindow, dark: bool) {
     #[cfg(target_os = "windows")]
     {
-        if let Err(mica_error) = apply_mica(window, Some(true)) {
-            if let Err(acrylic_error) = apply_acrylic(window, Some((18, 18, 18, 135))) {
+        let acrylic_color = if dark {
+            (18, 18, 18, 135)
+        } else {
+            (248, 250, 252, 155)
+        };
+        if let Err(mica_error) = apply_mica(window, Some(dark)) {
+            if let Err(acrylic_error) = apply_acrylic(window, Some(acrylic_color)) {
                 eprintln!(
                     "Failed to apply Windows window material: mica={mica_error}; acrylic={acrylic_error}"
                 );
@@ -453,8 +458,17 @@ fn apply_window_material(window: &tauri::WebviewWindow) {
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
-        let _ = window;
+        let _ = (window, dark);
     }
+}
+
+#[tauri::command]
+fn set_window_theme(app: AppHandle, dark: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Main window was not found".to_string())?;
+    apply_window_material(&window, dark);
+    Ok(())
 }
 
 pub fn run() {
@@ -463,11 +477,12 @@ pub fn run() {
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_title(&format!("Smidr v{}", env!("CARGO_PKG_VERSION")));
-                apply_window_material(&window);
+                apply_window_material(&window, true);
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            set_window_theme,
             zmk_ble_list_devices,
             zmk_ble_connect,
             zmk_ble_send,
