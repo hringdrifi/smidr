@@ -187,7 +187,7 @@ const getMatrixNetNames = (
       diodeA: '',
       diodeB: '',
       key: `KEY_DIRECT_${index + 1}`,
-      position: `D${index + 1}`,
+      position: pin,
     };
   }
 
@@ -312,6 +312,24 @@ const makeSchematicSymbol = (
     (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y - 2.54)}${makeProperty('Value', value, x, y + 2.54)}${makeProperty('Footprint', footprint, x, y + 5.08, true)}
   )`;
 
+const makePowerSymbol = (
+  reference: string,
+  x: number,
+  y: number,
+  seed: string
+) => `
+  (symbol
+    (lib_id "power:GND")
+    (at ${mm(x)} ${mm(y)} 0)
+    (unit 1)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (fields_autoplaced)
+    (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y + 6.35, true)}${makeProperty('Value', 'GND', x, y + 5.08)}${makeProperty('Footprint', '', x, y, true)}${makeProperty('Datasheet', '', x, y, true)}
+    (pin "1" (uuid "${seededUuid(`${seed}-pin-1`)}"))
+  )`;
+
 const makeSchematicPath = (seed: string) => `/${seededUuid(seed)}`;
 
 const makeSymbolInstance = (
@@ -326,6 +344,57 @@ const makeSymbolInstance = (
       (value "${escapeString(value)}")
       (footprint "${escapeString(footprint)}")
     )`;
+
+const makeWire = (x1: number, y1: number, x2: number, y2: number, seed: string) => `
+  (wire
+    (pts (xy ${mm(x1)} ${mm(y1)}) (xy ${mm(x2)} ${mm(y2)}))
+    (stroke (width 0) (type default))
+    (uuid "${seededUuid(seed)}")
+  )`;
+
+const makeLabel = (name: string, x: number, y: number, seed: string) => `
+  (label "${escapeString(name)}" (at ${mm(x)} ${mm(y)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(seed)}"))`;
+
+const POWER_GND_SYMBOL = `  (symbol "power:GND" (power) (pin_names (offset 0)) (in_bom yes) (on_board yes)
+    (property "Reference" "#PWR" (at 0 -6.35 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Value" "GND" (at 0 -3.81 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Footprint" "" (at 0 0 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "" (at 0 0 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "ki_keywords" "global power" (at 0 0 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "ki_description" "Power symbol creates a global label with name \\"GND\\" , ground" (at 0 0 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (symbol "GND_0_1"
+      (polyline
+        (pts
+          (xy 0 0)
+          (xy 0 -1.27)
+          (xy 1.27 -1.27)
+          (xy 0 -2.54)
+          (xy -1.27 -1.27)
+          (xy 0 -1.27)
+        )
+        (stroke (width 0) (type default))
+        (fill (type none))
+      )
+    )
+    (symbol "GND_1_1"
+      (pin power_in line (at 0 0 270) (length 0) hide
+        (name "GND" (effects (font (size 1.27 1.27))))
+        (number "1" (effects (font (size 1.27 1.27))))
+      )
+    )
+  )`;
 
 const findMatchingParen = (value: string, start: number) => {
   let depth = 0;
@@ -376,7 +445,7 @@ const generateEmbeddedSymbols = () => {
     symbols.push(`  ${symbol}`);
     index = end + 1;
   }
-  return symbols.join('\n');
+  return [POWER_GND_SYMBOL, ...symbols].join('\n');
 };
 
 const keyOutline = (key: Pick<PhysicalKey, 'w' | 'h'>, clearance = 0) => {
@@ -791,60 +860,76 @@ const generateKiCadSchematic = (
   const switchChoice = getSwitchChoice(options.switchFootprint);
   const diodeChoice = getDiodeChoice(options.diodeFootprint);
   const rgbKeys = getRgbLedKeys(settings, visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
+  const directPins = isDirectPinMatrix(settings);
   const instances: string[] = [];
+  const labels: string[] = [];
+  const wires: string[] = [];
   const symbols = visibleKeys.flatMap((key, index) => {
     const col = index % 8;
     const row = Math.floor(index / 8);
-    const x = 25 + col * 28;
-    const y = 25 + row * 24;
+    const x = 25.4 + col * 30.48;
+    const y = 25.4 + row * 25.4;
     const nets = getMatrixNetNames(settings, key, keys, index);
     const switchSeed = `sch-sw-${index}`;
     instances.push(makeSymbolInstance(switchSeed, `SW${index + 1}`, nets.position, switchChoice.footprint));
     const entries = [
       makeSchematicSymbol(switchChoice.symbol, `SW${index + 1}`, nets.position, switchChoice.footprint, x, y, switchSeed),
     ];
-    if (!isDirectPinMatrix(settings)) {
+    const switchLeftPin = x - 5.08;
+    const switchRightPin = x + 5.08;
+    if (directPins) {
+      if (key.directPin?.trim()) {
+        wires.push(makeWire(switchLeftPin - 5.08, y, switchLeftPin, y, `wire-sa-${index}`));
+        labels.push(makeLabel(nets.switchA, switchLeftPin - 5.08, y, `label-sa-${index}`));
+      }
+      const gndSeed = `sch-gnd-${index}`;
+      const gndX = switchRightPin + 5.08;
+      const gndY = y;
+      wires.push(makeWire(switchRightPin, y, gndX, gndY, `wire-gnd-${index}`));
+      instances.push(makeSymbolInstance(gndSeed, `#PWR${index + 1}`, 'GND', ''));
+      entries.push(makePowerSymbol(`#PWR${index + 1}`, gndX, gndY, gndSeed));
+    } else {
       const diodeSeed = `sch-d-${index}`;
       instances.push(makeSymbolInstance(diodeSeed, `D${index + 1}`, nets.position, diodeChoice.footprint));
-      entries.push(makeSchematicSymbol(diodeChoice.symbol, `D${index + 1}`, nets.position, diodeChoice.footprint, x + 12, y, diodeSeed));
+      const diodeX = x + 15.24;
+      entries.push(makeSchematicSymbol(diodeChoice.symbol, `D${index + 1}`, nets.position, diodeChoice.footprint, diodeX, y, diodeSeed));
+      const diodeLeftPin = diodeX - 2.54;
+      const diodeRightPin = diodeX + 2.54;
+      wires.push(makeWire(switchLeftPin - 5.08, y, switchLeftPin, y, `wire-sa-${index}`));
+      labels.push(makeLabel(nets.switchA, switchLeftPin - 5.08, y, `label-sa-${index}`));
+      wires.push(makeWire(switchRightPin, y, diodeLeftPin, y, `wire-key-${index}`));
+      labels.push(makeLabel(nets.key, x + 10.16, y - 5.08, `label-key-${index}`));
+      wires.push(makeWire(diodeRightPin, y, diodeRightPin + 5.08, y, `wire-db-${index}`));
+      labels.push(makeLabel(nets.diodeB, diodeRightPin + 5.08, y, `label-db-${index}`));
     }
     return entries;
   });
 
   rgbKeys.forEach((key, index) => {
-    const x = 25 + (index % 6) * 34;
-    const y = 25 + Math.ceil(visibleKeys.length / 8) * 24 + 24 + Math.floor(index / 6) * 24;
+    const x = 25.4 + (index % 6) * 35.56;
+    const y = 25.4 + Math.ceil(visibleKeys.length / 8) * 25.4 + 25.4 + Math.floor(index / 6) * 25.4;
     const ledSeed = `sch-rgb-${key.ledIndex}`;
     instances.push(makeSymbolInstance(ledSeed, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb));
     symbols.push(makeSchematicSymbol('Smidr:SK6812MINI_E', `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, ledSeed));
   });
 
-  const labels = visibleKeys.map((key, index) => {
-    const col = index % 8;
-    const row = Math.floor(index / 8);
-    const x = 25 + col * 28;
-    const y = 25 + row * 24;
-    const nets = getMatrixNetNames(settings, key, keys, index);
-    const diodeLabels = isDirectPinMatrix(settings)
-      ? ''
-      : `
-  (label "${nets.diodeA}" (at ${mm(x + 8)} ${mm(y - 4)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-da-${index}`)}"))
-  (label "${nets.diodeB}" (at ${mm(x + 16)} ${mm(y + 4)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-db-${index}`)}"))`;
-    return `
-  (label "${nets.switchA}" (at ${mm(x - 6)} ${mm(y - 4)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-sa-${index}`)}"))
-  (label "${nets.switchB}" (at ${mm(x + 6)} ${mm(y + 4)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-sb-${index}`)}"))${diodeLabels}`;
-  });
-
   rgbKeys.forEach((key, index) => {
-    const x = 25 + (index % 6) * 34;
-    const y = 25 + Math.ceil(visibleKeys.length / 8) * 24 + 24 + Math.floor(index / 6) * 24;
+    const x = 25.4 + (index % 6) * 35.56;
+    const y = 25.4 + Math.ceil(visibleKeys.length / 8) * 25.4 + 25.4 + Math.floor(index / 6) * 25.4;
     const din = index === 0 ? 'RGB_DIN' : `RGB_DOUT_${rgbKeys[index - 1].ledIndex}`;
     const dout = `RGB_DOUT_${key.ledIndex}`;
-    labels.push(`
-  (label "VCC" (at ${mm(x - 10)} ${mm(y - 6)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-rgb-vcc-${key.ledIndex}`)}"))
-  (label "GND" (at ${mm(x - 10)} ${mm(y + 6)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-rgb-gnd-${key.ledIndex}`)}"))
-  (label "${din}" (at ${mm(x + 10)} ${mm(y + 6)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-rgb-din-${key.ledIndex}`)}"))
-  (label "${dout}" (at ${mm(x + 10)} ${mm(y - 6)} 0) (effects (font (size 1.27 1.27))) (uuid "${seededUuid(`label-rgb-dout-${key.ledIndex}`)}"))`);
+    const gndSeed = `sch-rgb-gnd-${key.ledIndex}`;
+    const gndX = x + 15.24;
+    const gndY = y - 2.54;
+    wires.push(makeWire(x - 11.43, y + 2.54, x - 15.24, y + 2.54, `wire-rgb-vcc-${key.ledIndex}`));
+    labels.push(makeLabel('VCC', x - 15.24, y + 2.54, `label-rgb-vcc-${key.ledIndex}`));
+    wires.push(makeWire(x + 11.43, y - 2.54, gndX, gndY, `wire-rgb-gnd-${key.ledIndex}`));
+    instances.push(makeSymbolInstance(gndSeed, `#PWR${visibleKeys.length + index + 1}`, 'GND', ''));
+    symbols.push(makePowerSymbol(`#PWR${visibleKeys.length + index + 1}`, gndX, gndY, gndSeed));
+    wires.push(makeWire(x + 11.43, y + 2.54, x + 15.24, y + 2.54, `wire-rgb-din-${key.ledIndex}`));
+    labels.push(makeLabel(din, x + 15.24, y + 2.54, `label-rgb-din-${key.ledIndex}`));
+    wires.push(makeWire(x - 11.43, y - 2.54, x - 15.24, y - 2.54, `wire-rgb-dout-${key.ledIndex}`));
+    labels.push(makeLabel(dout, x - 15.24, y - 2.54, `label-rgb-dout-${key.ledIndex}`));
   });
 
   return `(kicad_sch
@@ -863,6 +948,7 @@ const generateKiCadSchematic = (
 ${generateEmbeddedSymbols()}
   )
 ${symbols.join('\n')}
+${wires.join('\n')}
 ${labels.join('\n')}
   (sheet_instances
     (path "/" (page "1"))

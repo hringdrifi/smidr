@@ -73,6 +73,7 @@ describe('export generation', () => {
     expect(zip.file('kicad_board.kicad_pro')).toBeTruthy();
     expect(symLibTable).toContain('(name "Smidr")');
     expect(symLibTable).toContain('${KIPRJMOD}/smidr.kicad_sym');
+    expect(symLibTable).not.toContain('power.kicad_sym');
     expect(fpLibTable).toContain('(name "Smidr")');
     expect(fpLibTable).toContain('${KIPRJMOD}/smidr.pretty');
     expect(zip.file('smidr.kicad_sym')).toBeTruthy();
@@ -246,12 +247,30 @@ describe('export generation', () => {
     const keys: PhysicalKey[] = [
       { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, directPin: 'GP2', label: 'A' },
       { x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, directPin: 'GP3', label: 'B' },
+      { x: 2, y: 0, w: 1, h: 1, r: 0, rx: 2, ry: 0, label: 'C' },
     ];
 
     const blob = await generateKiCadZip({ settings, keys });
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const schematic = await zip.file('direct_kicad.kicad_sch')!.async('string');
     const pcb = await zip.file('direct_kicad.kicad_pcb')!.async('string');
 
+    expect(schematic).toContain('(property "Value" "GP2"');
+    expect(schematic).toContain('(value "GP2")');
+    expect(schematic).toContain('(property "Value" "UNASSIGNED_3"');
+    expect(schematic).toContain('(label "PIN_GP2"');
+    expect(schematic).not.toContain('(label "PIN_UNASSIGNED_3"');
+    expect(schematic).not.toContain('(label "GND"');
+    expect(schematic).toContain('(symbol "power:GND" (power)');
+    expect(schematic).toContain('Power symbol creates a global label with name \\"GND\\" , ground');
+    expect(schematic).toContain('(lib_id "power:GND")');
+    expect(schematic).toContain('(pin "1" (uuid');
+    expect(schematic).toContain('(wire');
+    expect(schematic).toContain('(pts (xy 15.240 25.400) (xy 20.320 25.400))');
+    expect(schematic).toContain('(pts (xy 30.480 25.400) (xy 35.560 25.400))');
+    expect(schematic).not.toContain('(lib_id "Device:D")');
+    expect(schematic).not.toContain('(reference "D1")');
+    expect(schematic).not.toContain('(value "D1")');
     expect(pcb).toContain('"PIN_GP2"');
     expect(pcb).toContain('"GND"');
     expect(pcb).not.toContain('(footprint "Diode_');
