@@ -154,15 +154,15 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "RGUI": { qmk: "KC_RGUI", hid: 0x00E7 },
 
   // Media / Consumer
-  "MPLY": { qmk: "KC_MPLY", hid: 0x00CD },
-  "MSTP": { qmk: "KC_MSTP", hid: 0x00CC },
-  "MNXT": { qmk: "KC_MNXT", hid: 0x00B5 },
-  "MPRV": { qmk: "KC_MPRV", hid: 0x00B6 },
-  "VOLU": { qmk: "KC_VOLU", hid: 0x00B9 },
-  "VOLD": { qmk: "KC_VOLD", hid: 0x00BA },
-  "MUTE": { qmk: "KC_MUTE", hid: 0x00E2 },
-  "BRIU": { qmk: "KC_BRIU", hid: 0x006F },
-  "BRID": { qmk: "KC_BRID", hid: 0x0070 },
+  "MUTE": { qmk: "KC_MUTE", hid: 0x00A8 },
+  "VOLU": { qmk: "KC_VOLU", hid: 0x00A9 },
+  "VOLD": { qmk: "KC_VOLD", hid: 0x00AA },
+  "MNXT": { qmk: "KC_MNXT", hid: 0x00AB },
+  "MPRV": { qmk: "KC_MPRV", hid: 0x00AC },
+  "MSTP": { qmk: "KC_MSTP", hid: 0x00AD },
+  "MPLY": { qmk: "KC_MPLY", hid: 0x00AE },
+  "BRIU": { qmk: "KC_BRIU", hid: 0x00BD },
+  "BRID": { qmk: "KC_BRID", hid: 0x00BE },
 
   // Lighting
   "UG_TOGG": { qmk: "UG_TOGG", hid: 0x7820 },
@@ -211,15 +211,15 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "RM_FLGP": { qmk: "RM_FLGP", hid: 0x784E },
 
   // Mouse Keys
-  "MOUSE_UP": { qmk: "KC_MS_U", hid: 0x00F0 },
-  "MOUSE_DOWN": { qmk: "KC_MS_D", hid: 0x00F1 },
-  "MOUSE_LEFT": { qmk: "KC_MS_L", hid: 0x00F2 },
-  "MOUSE_RIGHT": { qmk: "KC_MS_R", hid: 0x00F3 },
-  "MOUSE_BTN1": { qmk: "KC_BTN1", hid: 0x00F4 },
-  "MOUSE_BTN2": { qmk: "KC_BTN2", hid: 0x00F5 },
-  "MOUSE_BTN3": { qmk: "KC_BTN3", hid: 0x00F6 },
-  "MOUSE_BTN4": { qmk: "KC_BTN4", hid: 0x00F7 },
-  "MOUSE_BTN5": { qmk: "KC_BTN5", hid: 0x00F8 },
+  "MOUSE_UP": { qmk: "KC_MS_U", hid: 0x00CD },
+  "MOUSE_DOWN": { qmk: "KC_MS_D", hid: 0x00CE },
+  "MOUSE_LEFT": { qmk: "KC_MS_L", hid: 0x00CF },
+  "MOUSE_RIGHT": { qmk: "KC_MS_R", hid: 0x00D0 },
+  "MOUSE_BTN1": { qmk: "KC_BTN1", hid: 0x00D1 },
+  "MOUSE_BTN2": { qmk: "KC_BTN2", hid: 0x00D2 },
+  "MOUSE_BTN3": { qmk: "KC_BTN3", hid: 0x00D3 },
+  "MOUSE_BTN4": { qmk: "KC_BTN4", hid: 0x00D4 },
+  "MOUSE_BTN5": { qmk: "KC_BTN5", hid: 0x00D5 },
 
   // System
   "BOOTLOADER": { qmk: "QK_BOOT", hid: 0x7C00 },

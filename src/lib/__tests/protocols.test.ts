@@ -142,6 +142,50 @@ describe('protocols conversion tests', () => {
       expect(actionToViaCode({ action: 'tap', keycode: 'A' })).toBe(0x0004);
     });
 
+    it('should convert media keycodes returned by VIA', () => {
+      expect(viaCodeToAction(0x00A8)).toEqual({ action: 'tap', keycode: 'MUTE' });
+      expect(viaCodeToAction(0x00A9)).toEqual({ action: 'tap', keycode: 'VOLU' });
+      expect(viaCodeToAction(0x00AA)).toEqual({ action: 'tap', keycode: 'VOLD' });
+      expect(viaCodeToAction(0x00AB)).toEqual({ action: 'tap', keycode: 'MNXT' });
+      expect(viaCodeToAction(0x00AC)).toEqual({ action: 'tap', keycode: 'MPRV' });
+      expect(viaCodeToAction(0x00AD)).toEqual({ action: 'tap', keycode: 'MSTP' });
+      expect(viaCodeToAction(0x00AE)).toEqual({ action: 'tap', keycode: 'MPLY' });
+      expect(viaCodeToAction(0x00BD)).toEqual({ action: 'tap', keycode: 'BRIU' });
+      expect(viaCodeToAction(0x00BE)).toEqual({ action: 'tap', keycode: 'BRID' });
+
+      expect(actionToViaCode({ action: 'tap', keycode: 'MUTE' })).toBe(0x00A8);
+      expect(actionToViaCode({ action: 'tap', keycode: 'VOLU' })).toBe(0x00A9);
+      expect(actionToViaCode({ action: 'tap', keycode: 'VOLD' })).toBe(0x00AA);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MNXT' })).toBe(0x00AB);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MPRV' })).toBe(0x00AC);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MSTP' })).toBe(0x00AD);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MPLY' })).toBe(0x00AE);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BRIU' })).toBe(0x00BD);
+      expect(actionToViaCode({ action: 'tap', keycode: 'BRID' })).toBe(0x00BE);
+    });
+
+    it('should convert mouse keycodes returned by VIA', () => {
+      expect(viaCodeToAction(0x00CD)).toEqual({ action: 'tap', keycode: 'MOUSE_UP' });
+      expect(viaCodeToAction(0x00CE)).toEqual({ action: 'tap', keycode: 'MOUSE_DOWN' });
+      expect(viaCodeToAction(0x00CF)).toEqual({ action: 'tap', keycode: 'MOUSE_LEFT' });
+      expect(viaCodeToAction(0x00D0)).toEqual({ action: 'tap', keycode: 'MOUSE_RIGHT' });
+      expect(viaCodeToAction(0x00D1)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN1' });
+      expect(viaCodeToAction(0x00D2)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN2' });
+      expect(viaCodeToAction(0x00D3)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN3' });
+      expect(viaCodeToAction(0x00D4)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN4' });
+      expect(viaCodeToAction(0x00D5)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN5' });
+
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_UP' })).toBe(0x00CD);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_DOWN' })).toBe(0x00CE);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_LEFT' })).toBe(0x00CF);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_RIGHT' })).toBe(0x00D0);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN1' })).toBe(0x00D1);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN2' })).toBe(0x00D2);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN3' })).toBe(0x00D3);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN4' })).toBe(0x00D4);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN5' })).toBe(0x00D5);
+    });
+
     it('should convert modifier combination keycodes', () => {
       // LCTL (0x01) + LSFT (0x02) = 0x03. Inner key C (0x0006). Value = (0x03 << 8) | 0x06 = 0x0306
       expect(viaCodeToAction(0x0306)).toEqual({
