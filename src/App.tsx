@@ -27,6 +27,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson, generateKleJson } from '@/lib/export';
 import { generateQmkZip } from '@/lib/qmk';
+import { generateRmkZip } from '@/lib/rmk';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
 import {
@@ -517,6 +518,16 @@ export default function App() {
     const zipBlob = await generateZmkZip({ settings, keys });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_zmk.zip`, zipBlob);
+    }
+    setIsProjectMenuOpen(false);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportRmkZip = async () => {
+    if (!confirmFirmwareExportValidation('rmk')) return;
+    const zipBlob = await generateRmkZip({ settings, keys });
+    if (zipBlob) {
+      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_rmk.zip`, zipBlob);
     }
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
@@ -1168,6 +1179,14 @@ export default function App() {
                       >
                         <Download size={14} className={qmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
                         <span>{t('header.exportVialZip')}</span>
+                      </button>
+
+                      <button
+                        onClick={handleExportRmkZip}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                      >
+                        <Download size={14} className="text-amber-500" />
+                        <span>{t('header.exportRmkZip')}</span>
                       </button>
 
                       {(() => {

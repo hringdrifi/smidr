@@ -53,8 +53,46 @@ const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   });
 };
 
+const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
+  keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
+);
+
 const shouldUseMatrixMask = (settings: ProjectSettings) => {
   return settings.qmk?.matrixMasked === true;
+};
+
+const normalizePinName = (pin: string | undefined) => (pin || '').trim().toUpperCase();
+
+const getMaskPinsForPosition = (settings: ProjectSettings, row: number, col: number) => {
+  if (!settings.features.split) {
+    return {
+      rowPin: settings.pins.rows?.[row],
+      colPin: settings.pins.cols?.[col],
+    };
+  }
+
+  const leftRows = settings.pins.rows?.length || 0;
+  const rightRows = hasPins(settings.pins.splitRows) ? settings.pins.splitRows || [] : settings.pins.rows || [];
+  const rightCols = hasPins(settings.pins.splitCols) ? settings.pins.splitCols || [] : settings.pins.cols || [];
+  if (row >= leftRows) {
+    return {
+      rowPin: rightRows[row - leftRows],
+      colPin: rightCols[col],
+    };
+  }
+
+  return {
+    rowPin: settings.pins.rows?.[row],
+    colPin: settings.pins.cols?.[col],
+  };
+};
+
+const isSameRowColPinPosition = (settings: ProjectSettings, row: number, col: number) => {
+  if (isDirectPinMatrix(settings)) return false;
+  const { rowPin, colPin } = getMaskPinsForPosition(settings, row, col);
+  const normalizedRow = normalizePinName(rowPin);
+  const normalizedCol = normalizePinName(colPin);
+  return !!normalizedRow && normalizedRow === normalizedCol;
 };
 
 const getRgbMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
@@ -113,13 +151,14 @@ const getBootmagicConfig = (settings: ProjectSettings, validKeys: PhysicalKey[])
   };
 };
 
-const generateMatrixMaskC = (settings: ProjectSettings, validKeys: PhysicalKey[]) => {
-  const matrix = getMatrixDimensions(settings, validKeys);
+const generateMatrixMaskC = (settings: ProjectSettings, maskKeys: PhysicalKey[]) => {
+  const matrix = getMatrixDimensions(settings, maskKeys);
   const rowMasks = Array.from({ length: matrix.rows }, () => BigInt(0));
 
-  validKeys.forEach(key => {
-    const pos = getFirmwareMatrixPosition(settings, key, validKeys);
+  maskKeys.forEach(key => {
+    const pos = getFirmwareMatrixPosition(settings, key, maskKeys);
     if (!pos) return;
+    if (isSameRowColPinPosition(settings, pos.row, pos.col)) return;
     rowMasks[pos.row] |= BigInt(1) << BigInt(pos.col);
   });
 
@@ -220,13 +259,15 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
  */
 export const generateQmkZip = async (state: { settings: ProjectSettings, keys: PhysicalKey[] }) => {
   const { settings, keys } = state;
+  const firmwareKeys = getVisibleKeys(settings, keys);
 
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
-  const validKeys = getValidMatrixKeys(settings, keys);
+  const validKeys = getValidMatrixKeys(settings, firmwareKeys);
   if (validKeys.length === 0) {
     throw new Error('Cannot export QMK firmware: no keys have valid matrix row/col assignments.');
   }
   const useMatrixMask = shouldUseMatrixMask(settings);
+  const maskKeys = useMatrixMask ? getValidMatrixKeys(settings, keys) : [];
   const bootmagic = getBootmagicConfig(settings, validKeys);
   const encoders = getConfiguredEncoders(settings);
   const useDirectPins = isDirectPinMatrix(settings);
@@ -271,7 +312,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     } : {}),
     bootmagic,
     matrix_pins: useDirectPins
-      ? { direct: generateDirectPins(settings, validKeys, keys, settings.features.split ? 'left' : undefined) }
+      ? { direct: generateDirectPins(settings, validKeys, firmwareKeys, settings.features.split ? 'left' : undefined) }
       : {
         cols: settings.pins.cols,
         rows: settings.pins.rows,
@@ -293,7 +334,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
     layouts: {
       LAYOUT: {
         layout: validKeys.map(key => {
-          const pos = getFirmwareMatrixPosition(settings, key, keys);
+          const pos = getFirmwareMatrixPosition(settings, key, firmwareKeys);
           return {
             matrix: pos ? [pos.row, pos.col] : [0, 0],
             x: key.x,
@@ -310,7 +351,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
         matrix_pins: useDirectPins
           ? {
             right: {
-              direct: generateDirectPins(settings, validKeys, keys, 'right'),
+              direct: generateDirectPins(settings, validKeys, firmwareKeys, 'right'),
             }
           }
           : {
@@ -335,7 +376,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   };
   kbFolder.file('keyboard.json', JSON.stringify(infoJson, null, 2));
   if (useMatrixMask) {
-    kbFolder.file(`${kbName}.c`, generateMatrixMaskC(settings, validKeys));
+    kbFolder.file(`${kbName}.c`, generateMatrixMaskC(settings, maskKeys));
   }
 
   // 2. config.h - config_common.h is deprecated in modern QMK

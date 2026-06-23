@@ -2,7 +2,7 @@ import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { getDevelopmentBoardPins, getMcuPins, getZmkHardwareTarget } from './mcu-presets';
 import { getFirmwareMatrixPosition, getQmkMatrixFromPins, isDirectPinMatrix } from './matrix-utils';
 
-export type FirmwareExportTarget = 'qmk' | 'vial' | 'zmk';
+export type FirmwareExportTarget = 'qmk' | 'vial' | 'zmk' | 'rmk';
 export type ExportValidationSeverity = 'error' | 'warning';
 
 export interface ExportValidationIssue {
@@ -14,12 +14,30 @@ export interface ExportValidationIssue {
 const targetLabel = (target: FirmwareExportTarget) => {
   if (target === 'qmk') return 'QMK/VIA';
   if (target === 'vial') return 'Vial';
+  if (target === 'rmk') return 'RMK';
   return 'ZMK';
 };
 
 const hasPins = (pins: string[] | undefined) => (pins?.filter(Boolean).length ?? 0) > 0;
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
+
+const hasConfiguredAdvancedCombos = (combos: ProjectSettings['combos'] = []) => (
+  combos.some(combo => combo.inputs.some(input => input.action !== 'none') && combo.output.action !== 'none')
+);
+
+const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
+  keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
+);
+
+const normalizePinName = (pin: string | undefined) => (pin || '').trim().toUpperCase();
+
+const getOverlappingMatrixPins = (settings: ProjectSettings) => {
+  const rowPins = new Set((settings.pins.rows || []).map(normalizePinName).filter(Boolean));
+  return (settings.pins.cols || [])
+    .map(normalizePinName)
+    .filter(pin => pin && rowPins.has(pin));
+};
 
 const getAvailablePins = (settings: ProjectSettings) => {
   const controllerType = settings.hardware.controllerType || 'development_board';
@@ -66,6 +84,8 @@ export const validateFirmwareExport = (
   const issues: ExportValidationIssue[] = [];
   const label = targetLabel(target);
   const directPins = isDirectPinMatrix(settings);
+  const usesActiveLayoutOptions = target === 'qmk' || target === 'vial' || target === 'rmk';
+  const matrixKeys = usesActiveLayoutOptions ? getVisibleKeys(settings, keys) : keys;
 
   if (!directPins && (!hasPins(settings.pins.rows) || !hasPins(settings.pins.cols))) {
     issues.push({
@@ -75,8 +95,8 @@ export const validateFirmwareExport = (
     });
   }
 
-  const matrixPositions = keys
-    .map(key => getFirmwareMatrixPosition(settings, key, keys))
+  const matrixPositions = matrixKeys
+    .map(key => getFirmwareMatrixPosition(settings, key, matrixKeys))
     .filter((pos): pos is { row: number; col: number } => !!pos && pos.row >= 0 && pos.col >= 0);
   if (matrixPositions.length === 0) {
     issues.push({
@@ -113,7 +133,7 @@ export const validateFirmwareExport = (
   }
 
   if (directPins) {
-    const missingDirectPins = keys.filter(key => !key.decal && !key.directPin?.trim()).length;
+    const missingDirectPins = matrixKeys.filter(key => !key.decal && !key.directPin?.trim()).length;
     if (missingDirectPins > 0) {
       issues.push({
         severity: 'warning',
@@ -121,7 +141,7 @@ export const validateFirmwareExport = (
         message: `${missingDirectPins} key(s) have no direct pin assignment. The generated source will emit NO_PIN for those positions.`,
       });
     }
-    pushInvalidPins(issues, settings, keys
+    pushInvalidPins(issues, settings, matrixKeys
       .filter(key => !!key.directPin)
       .map((key, index) => ({ label: `Direct key ${index + 1}`, value: key.directPin })));
   }
@@ -156,6 +176,52 @@ export const validateFirmwareExport = (
       code: 'vial-tap-dance-source-not-emitted',
       message: 'Vial source export does not emit static project tap dance definitions. Configure tap dances through Vial dynamic tap dance after flashing.',
     });
+  }
+
+  if (target === 'rmk') {
+    const overlappingPins = directPins ? [] : getOverlappingMatrixPins(settings);
+    if (overlappingPins.length > 0) {
+      issues.push({
+        severity: 'warning',
+        code: 'rmk-bidirectional-matrix-not-represented',
+        message: 'RMK TOML export cannot represent bidirectional matrix yet. Use Rust API or change wiring.',
+      });
+    }
+    if (settings.features.split) {
+      issues.push({
+        severity: 'warning',
+        code: 'rmk-split-export-experimental',
+        message: 'RMK split source export currently emits a single keyboard.toml layout map. Verify split central/peripheral matrix sections before flashing.',
+      });
+    }
+    if ((settings.macros || []).some(actions => actions.length > 0)) {
+      issues.push({
+        severity: 'warning',
+        code: 'rmk-project-macros-not-emitted',
+        message: 'RMK source export maps Macro(n) key assignments, but does not emit RMK macro definitions yet.',
+      });
+    }
+    if (hasConfiguredAdvancedCombos(settings.combos || [])) {
+      issues.push({
+        severity: 'warning',
+        code: 'rmk-combos-not-emitted',
+        message: 'RMK source export does not emit project combo definitions yet.',
+      });
+    }
+    if (settings.features.rgb || settings.features.rgbMatrix || settings.features.backlight) {
+      issues.push({
+        severity: 'warning',
+        code: 'rmk-lighting-not-emitted',
+        message: 'RMK source export does not emit lighting hardware configuration yet.',
+      });
+    }
+    if ((settings.encoders || []).length > 0 || settings.features.encoder) {
+      issues.push({
+        severity: 'warning',
+        code: 'rmk-encoders-not-emitted',
+        message: 'RMK source export does not emit rotary encoder configuration yet.',
+      });
+    }
   }
 
   if (settings.features.rgb || settings.features.rgbMatrix) {

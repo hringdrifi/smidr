@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { generateKleJson, generateSmidrProjectJson, generateViaJson } from '../export';
 import { generateQmkZip } from '../qmk';
+import { generateRmkZip } from '../rmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
 import { generateKiCadZip } from '../kicad';
@@ -724,6 +725,49 @@ describe('export generation', () => {
     expect(viaJson.keymaps[0][1][2]).toBe('KC_A');
   });
 
+  it('emits VIA/Vial lighting menus only for enabled lighting features', () => {
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+      },
+    ];
+    const withoutLighting = generateViaJson({ settings: baseSettings, keys });
+
+    expect(withoutLighting.menus).toEqual([]);
+    expect(withoutLighting.keycodes).toEqual([]);
+
+    const withBacklight = generateViaJson({
+      settings: {
+        ...baseSettings,
+        features: { ...baseSettings.features, backlight: true },
+      },
+      keys,
+    });
+
+    expect(withBacklight.menus).toEqual(['qmk_backlight']);
+    expect(withBacklight.keycodes).toEqual(['qmk_lighting']);
+
+    const withRgbMatrix = generateViaJson({
+      settings: {
+        ...baseSettings,
+        features: { ...baseSettings.features, rgbMatrix: true },
+      },
+      keys,
+    });
+
+    expect(withRgbMatrix.menus).toEqual(['qmk_rgb_matrix']);
+    expect(withRgbMatrix.keycodes).toEqual(['qmk_lighting']);
+  });
+
   it('does not emit a matrix mask from pin overlap alone', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -1256,6 +1300,55 @@ describe('export generation', () => {
     expect(keyboardJson.split.matrix_pins.right.rows).toEqual(['GP4', 'GP5']);
     expect(keyboardJson.split.matrix_pins.right.cols).toEqual(['GP5', 'GP6']);
     expect(keyboardC).toContain('(matrix_row_t)0x1ULL');
+  });
+
+  it('builds matrix masks from all layout options and excludes same row/column pin positions', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Option Mask Board',
+      matrix: { rows: 2, cols: 3 },
+      pins: {
+        rows: ['GP0', 'GP1'],
+        cols: ['GP2', 'GP1', 'GP3'],
+        splitRows: [],
+        splitCols: [],
+      },
+      layoutOptions: {
+        thumb: {
+          name: 'Thumb',
+          type: 'toggle',
+        },
+      },
+      activeOptions: {
+        thumb: 0,
+      },
+      qmk: {
+        matrixMasked: true,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 1, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'SamePin' },
+      { row: 1, col: 2, x: 2, y: 0, w: 1, h: 1, r: 0, rx: 2, ry: 0, label: 'Hidden', group: 'thumb', option: 1 },
+    ];
+
+    const qmkBlob = await generateQmkZip({ settings, keys });
+    expect(qmkBlob).toBeTruthy();
+    const qmkZip = await JSZip.loadAsync(await qmkBlob!.arrayBuffer());
+    const qmkKeyboardC = await qmkZip.file('option_mask_board/option_mask_board.c')!.async('string');
+
+    expect(qmkKeyboardC).toContain('(matrix_row_t)0x1ULL');
+    expect(qmkKeyboardC).toContain('(matrix_row_t)0x4ULL');
+    expect(qmkKeyboardC).not.toContain('(matrix_row_t)0x6ULL');
+
+    const vialBlob = await generateVialZip({ settings, keys });
+    expect(vialBlob).toBeTruthy();
+    const vialZip = await JSZip.loadAsync(await vialBlob!.arrayBuffer());
+    const vialKeyboardC = await vialZip.file('option_mask_board/option_mask_board.c')!.async('string');
+
+    expect(vialKeyboardC).toContain('(matrix_row_t)0x1ULL');
+    expect(vialKeyboardC).toContain('(matrix_row_t)0x4ULL');
+    expect(vialKeyboardC).not.toContain('(matrix_row_t)0x6ULL');
   });
 
   it('uses configured QMK right-side split pins even when their counts differ from the left side', async () => {
@@ -3168,5 +3261,177 @@ describe('export generation', () => {
 
     expect(readme).toContain('- board: adafruit_kb2040');
     expect(readme).toContain('shield: shared_board');
+  });
+
+  it('exports RMK keyboard.toml and Vial layout data', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'RMK Board',
+      matrix: { rows: 2, cols: 2 },
+      pins: {
+        rows: ['GP0', 'GP1'],
+        cols: ['GP2', 'GP3'],
+        splitRows: [],
+        splitCols: [],
+      },
+      layers: 2,
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', keymap: { 0: { action: 'tap', keycode: 'A' }, 1: { action: 'mo', layerId: 0 } } },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', keymap: { 0: { action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'SPC' } } } },
+      { row: 1, col: 0, x: 0, y: 1, w: 1, h: 1, r: 0, rx: 0, ry: 1, label: 'C', keymap: { 0: { action: 'mt', modifiers: ['LCTL'], tapAction: { action: 'tap', keycode: 'ESC' } } } },
+      { row: 1, col: 1, x: 1, y: 1, w: 1, h: 1, r: 0, rx: 1, ry: 1, label: 'D', keymap: { 0: { action: 'tap', keycode: 'B', mods: ['LSFT'] } } },
+    ];
+
+    const blob = await generateRmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const toml = await zip.file('keyboard.toml')!.async('string');
+    const vialJson = await zip.file('vial.json')!.async('string');
+
+    expect(zip.file('Cargo.toml')).toBeTruthy();
+    expect(zip.file('README.md')).toBeTruthy();
+    expect(toml).toContain('[keyboard]');
+    expect(toml).toContain('chip = "rp2040"');
+    expect(toml).toContain('row_pins = ["PIN_0", "PIN_1"]');
+    expect(toml).toContain('col_pins = ["PIN_2", "PIN_3"]');
+    expect(toml).not.toContain('matrix_map');
+    expect(toml).not.toContain('[[layer]]');
+    expect(toml).toContain('keymap = [');
+    expect(toml).toContain('["A", "LT(1, Space)"]');
+    expect(toml).toContain('["MT(Escape, LCtrl)", "WM(B, LShift)"]');
+    expect(toml).toContain('["MO(0)", "_"]');
+    expect(JSON.parse(vialJson).name).toBe('RMK Board');
+  });
+
+  it('exports RMK direct pin matrix pins', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'RMK Direct',
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, directPin: 'P0.06', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 0, col: 1, directPin: 'P1.02', x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B' },
+    ];
+
+    const blob = await generateRmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const toml = await zip.file('keyboard.toml')!.async('string');
+
+    expect(toml).toContain('matrix_type = "direct_pin"');
+    expect(toml).toContain('["P0_06", "P1_02"]');
+  });
+
+  it('uses only active layout option keys for RMK firmware output and validation', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'RMK Options',
+      matrix: { rows: 1, cols: 2 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1', 'GP2'],
+        splitRows: [],
+        splitCols: [],
+      },
+      layoutOptions: {
+        thumb: {
+          name: 'Thumb',
+          type: 'toggle',
+        },
+      },
+      activeOptions: {
+        thumb: 1,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', keymap: { 0: { action: 'tap', keycode: 'A' } } },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'Old', group: 'thumb', option: 0, keymap: { 0: { action: 'tap', keycode: 'F13' } } },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'New', group: 'thumb', option: 1, keymap: { 0: { action: 'tap', keycode: 'F14' } } },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'rmk');
+    expect(issues.some(issue => issue.code === 'matrix-position-duplicates')).toBe(false);
+
+    const blob = await generateRmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const toml = await zip.file('keyboard.toml')!.async('string');
+
+    expect(toml).toContain('["A", "F14"]');
+    expect(toml).not.toContain('F13');
+  });
+
+  it('warns that RMK TOML export cannot represent bidirectional matrix pin overlap', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 2, cols: 2 },
+      pins: {
+        rows: ['GP0', 'GP1'],
+        cols: ['GP1', 'GP2'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: '' },
+    ];
+
+    const issues = validateFirmwareExport(settings, keys, 'rmk');
+
+    expect(issues).toContainEqual(expect.objectContaining({
+      severity: 'warning',
+      code: 'rmk-bidirectional-matrix-not-represented',
+      message: 'RMK TOML export cannot represent bidirectional matrix yet. Use Rust API or change wiring.',
+    }));
+  });
+
+  it('uses only active layout option keys for QMK and Vial firmware source output and validation', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Option Source',
+      matrix: { rows: 1, cols: 2 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1', 'GP2'],
+        splitRows: [],
+        splitCols: [],
+      },
+      layoutOptions: {
+        thumb: {
+          name: 'Thumb',
+          type: 'toggle',
+        },
+      },
+      activeOptions: {
+        thumb: 1,
+      },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', keymap: { 0: { action: 'tap', keycode: 'A' } } },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'Old', group: 'thumb', option: 0, keymap: { 0: { action: 'tap', keycode: 'F13' } } },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'New', group: 'thumb', option: 1, keymap: { 0: { action: 'tap', keycode: 'F14' } } },
+    ];
+
+    expect(validateFirmwareExport(settings, keys, 'qmk').some(issue => issue.code === 'matrix-position-duplicates')).toBe(false);
+    expect(validateFirmwareExport(settings, keys, 'vial').some(issue => issue.code === 'matrix-position-duplicates')).toBe(false);
+
+    const qmkBlob = await generateQmkZip({ settings, keys });
+    expect(qmkBlob).toBeTruthy();
+    const qmkZip = await JSZip.loadAsync(await qmkBlob!.arrayBuffer());
+    const qmkKeymap = await qmkZip.file('option_source/keymaps/via/keymap.c')!.async('string');
+    const qmkKeyboardJson = JSON.parse(await qmkZip.file('option_source/keyboard.json')!.async('string'));
+
+    expect(qmkKeymap).toContain('KC_F14');
+    expect(qmkKeymap).not.toContain('KC_F13');
+    expect(qmkKeyboardJson.layouts.LAYOUT.layout).toHaveLength(2);
+
+    const vialBlob = await generateVialZip({ settings, keys });
+    expect(vialBlob).toBeTruthy();
+    const vialZip = await JSZip.loadAsync(await vialBlob!.arrayBuffer());
+    const vialKeymap = await vialZip.file('option_source/keymaps/vial/keymap.c')!.async('string');
+    const vialJson = JSON.parse(await vialZip.file('option_source/keymaps/vial/vial.json')!.async('string'));
+
+    expect(vialKeymap).toContain('KC_F14');
+    expect(vialKeymap).not.toContain('KC_F13');
+    expect(vialJson.layouts.keymap.flat().join('\n')).toContain('0,1');
   });
 });

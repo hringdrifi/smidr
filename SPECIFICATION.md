@@ -122,6 +122,8 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **内部表現**: 分割キーボードでは `matrixSide` (`left` / `right`) と、各半分ごとのローカル `row`, `col` を保持する。左右どちらも `0,0` から始まる。
 - **編集 UI**: マトリクスエディタは左右を別マトリクスとして扱い、右側キーも右側内のローカル座標で編集する。分割時のペイントモードでは、割り当て先の `left` / `right` をユーザーが明示選択する。
 - **QMK/Vial 出力**: QMK/Vial の split matrix では右側を行方向に連結するため、右側キーは `row + leftRows`, `col` に変換して出力する。例: 左右各 `4x6` の場合、内部は左右とも `0..3 x 0..5`、QMK/Vial 出力は `8x6`。
+- **QMK/Vial ソースのレイアウトオプション**: `keyboard.json` の `layouts.LAYOUT.layout`、`keymap.c`、direct pin 配列などの firmware 実体は現在の `activeOptions` で表示されているキーだけを対象にする。VIA/Vial JSON 定義は外部アプリ上で選択肢を保持するため、全レイアウトオプションを出力する。
+- **QMK/Vial Matrix Mask**: `qmk.matrixMasked` が有効な場合、`matrix_mask` は現在の `activeOptions` ではなく全レイアウトオプションで使われる matrix position の union から生成する。どのレイアウトでも使われないセルは mask し、row pin と column pin が同じ物理ピンになるセルも mask する。
 - **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。`controllerType: 'mcu'` の場合は左右を別 custom board (`<name>_left` / `<name>_right`) として生成し、右側 board DTS で同じ `col-offset` を指定する。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52840 系ターゲットを要求する。`wired` は `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
@@ -145,8 +147,18 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **バックライト**: 単色 LED バックライトは `ProjectSettings.features.backlight` で有効化し、制御ピンは `ProjectSettings.pins.backlight` に保持する。QMK/Vial では `features.backlight`, `backlight.pin`, `BACKLIGHT_PIN`, `BACKLIGHT_LEVELS` を出力する。ZMK では `CONFIG_ZMK_BACKLIGHT` を出力し、具体的な LED/PWM デバイス定義は後続段階の対象とする。
 - **編集 UI**: 設計モードに RGB Matrix エディタモードを追加する。右パネルで選択キーの LED index、QMK/Vial RGB Matrix 座標 (`x: 0..224`, `y: 0..64`) および flags を編集できる。自動割り当てでは表示中キーを物理ソート順に LED index へ割り当て、キーボード全体の左上を基準にキー中心から座標を正規化する。
 - **KLE/VIA ラベル**: KLE ラベルの LED index は `l{index}` 形式で扱う。インポート時は該当ラベルから `ledIndex` を復元し、VIA/Vial JSON エクスポート時もラベルへ再出力する。
+- **VIA/Vial JSON メニュー**: `menus` / `keycodes` は有効なライティング機能に応じて出力する。`features.backlight` が有効な場合のみ `qmk_backlight`、`features.rgbMatrix` が有効な場合のみ `qmk_rgb_matrix` を `menus` に含める。`qmk_lighting` keycode グループは RGB / RGB Matrix / Backlight のいずれかが有効な場合のみ出力する。
 - **QMK/Vial 出力**: `features.rgbMatrix` が有効で LED index が割り当てられている場合、QMK/Vial ソース出力は `keyboard.json` の `features.rgb_matrix`、`config.h` の `RGB_MATRIX_LED_COUNT`、および `keymap.c` の `g_led_config` を生成する。RGB Matrix 用のデータピンは `pins.rgb` を使用する。
 - **ZMK 出力**: 現時点では ZMK RGB Matrix には対応しない。ZMK ソース出力では `features.rgb` の RGB underglow 設定のみを扱い、`features.rgbMatrix` およびキーごとの LED 座標は出力しない。
+
+### 7.7.1 RMK ソース出力
+- **出力形式**: RMK データは ZIP として出力し、`keyboard.toml`, `vial.json`, `Cargo.toml`, `README.md`, `rmk.project.json` を含める。`keyboard.toml` は RMK の設定方式に合わせ、`[keyboard]`, `[host]`, `[matrix]`, `[layout]` を生成し、`[layout].keymap` は `layer -> row -> col` の3次元配列として出力する。
+- **キーコード**: Smiðr の `UniversalAction` から RMK の keymap 文字列へ変換する。通常キーは RMK の `KeyCode` 名（例: `A`, `Kc1`, `Escape`）、レイヤー操作は `MO(n)`, `TG(n)`, `TO(n)`, `LT(n, key)`, `MT(key, modifier)`、Tap Dance は `TD(n)`、Macro 割当は `Macro(n)` として出力する。
+- **Vial 連携**: RMK の Vial サポート向けに、Smiðr の既存 VIA/Vial レイアウト定義と同じ `vial.json` を ZIP ルートに出力する。`keyboard.toml` の `serial_number` は Vial 認識用プレフィックスを持つ値を設定し、`[host].vial_enabled = true` と unlock keys を出力する。
+- **マトリクス**: 通常マトリクスでは `row_pins`, `col_pins`, `row2col` を出力する。ダイレクトピン配線では `matrix_type = "direct_pin"` と `direct_pins` の2次元配列を出力する。GPIO 名は RP2040 (`GPn`/`GPIOn` -> `PIN_n`) と nRF52 (`P0.nn`/`P1.nn` -> `P0_nn`/`P1_nn`) を RMK/Embassy 形式へ正規化する。
+- **Bidirectional Matrix**: RMK は Rust API では bidirectional matrix を扱えるが、初期実装の TOML export では表現しない。通常マトリクスで row pin と column pin に同じ物理ピンが含まれる場合は `RMK TOML export cannot represent bidirectional matrix yet. Use Rust API or change wiring.` warning を出す。
+- **レイアウトオプション**: `keyboard.toml` の firmware layout / keymap は現在の `activeOptions` で表示されているキーだけを対象にする。`vial.json` は Vial レイアウト定義として全オプションを保持する。
+- **制限**: 初期実装では Split の central/peripheral matrix、Encoder、RGB/Backlight、Combo 定義、Macro 定義の RMK 固有コード生成は警告対象とし、キー上の `TD(n)` / `Macro(n)` 参照のみを出力する。
 
 ### 7.8 KiCad MVP 出力
 - **出力形式**: KiCad データは ZIP として出力し、`<project>.kicad_pro`, `<project>.kicad_sch`, `<project>.kicad_pcb`, `<project>_plate.kicad_pcb`, `sym-lib-table`, `fp-lib-table`, `README.md`, `smidr.kicad_sym`, `smidr.pretty/*.kicad_mod` を含める。

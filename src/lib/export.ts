@@ -309,6 +309,13 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
       Array.from({ length: matrix.cols }, () => 'KC_TRNS')
     )
   );
+  const menus = [
+    ...(settings.features.rgbMatrix ? ["qmk_rgb_matrix"] : []),
+    ...(settings.features.backlight === true ? ["qmk_backlight"] : []),
+  ];
+  const keycodes = [
+    ...((settings.features.rgb || settings.features.rgbMatrix || settings.features.backlight === true) ? ["qmk_lighting"] : []),
+  ];
 
   keys.forEach(key => {
     const pos = getFirmwareMatrixPosition(settings, key, keys);
@@ -331,13 +338,8 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
     manufacturer: settings.manufacturer,
     description: settings.description,
     firmwareVersion: 1,
-    menus: [
-      ...(settings.features.rgbMatrix ? ["qmk_rgb_matrix"] : []),
-      "qmk_backlight"
-    ],
-    keycodes: [
-      "qmk_lighting"
-    ],
+    menus,
+    keycodes,
     matrix,
     layouts: {
       labels: labels.length > 0 ? labels : undefined,
