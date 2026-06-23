@@ -16,6 +16,8 @@ function cn(...inputs: ClassValue[]) {
 
 const MODIFIERS: Modifier[] = ['LCTL', 'LSFT', 'LALT', 'LGUI', 'RCTL', 'RSFT', 'RALT', 'RGUI'];
 
+const uniqueModifiers = (modifiers: Modifier[]) => Array.from(new Set(modifiers));
+
 const describeAction = (action?: UniversalAction) => {
   if (!action) return 'TRNS';
   if (action.action === 'tap') {
@@ -46,7 +48,7 @@ const describeAction = (action?: UniversalAction) => {
 export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
-    settings, remoteKeymap, updateDeviceKeycode, appMode, connectedDevice,
+    settings, remoteKeymap, updateRemoteKeycode, updateDeviceKeycode, appMode, connectedDevice,
     deviceCapabilities, remoteTapDances, openMacroSettings, openTapDanceSettings,
     updateEncoder, encoderActionDirection, setEncoderActionDirection
   } = useKeyboardStore();
@@ -118,16 +120,21 @@ export const KeycodeConfigPanel = () => {
 
   const isCommitReady = (nextAction: UniversalAction) => {
     if (nextAction.action === 'mt') {
-      return nextAction.modifiers.length > 0 && nextAction.tapAction.action === 'tap';
+      return true;
     }
     if (nextAction.action === 'lt') {
-      return nextAction.tapAction.action === 'tap';
+      return true;
     }
     if (nextAction.action === 'custom') {
       return nextAction.rawCode.trim().length > 0;
     }
     return true;
   };
+
+  const isIncompleteModTap = (newAction: UniversalAction) => (
+    newAction.action === 'mt' &&
+    (newAction.modifiers.length === 0 || newAction.tapAction.action !== 'tap')
+  );
 
   const commitSelectedAction = (newAction: UniversalAction) => {
     if (isEncoderRotationTarget && selectedEncoder) {
@@ -141,6 +148,13 @@ export const KeycodeConfigPanel = () => {
         },
       });
     } else if (appMode === 'remap') {
+      if (isIncompleteModTap(newAction)) {
+        setKeycode(selectedKey.id!, currentLayer, newAction);
+        if (selectedRemoteIndex !== undefined) {
+          updateRemoteKeycode(currentLayer, selectedRemoteIndex, newAction);
+        }
+        return;
+      }
       if (selectedKey.zmkPosition !== undefined) {
         updateDeviceKeycode(currentLayer, selectedKey.zmkPosition, -1, newAction);
       } else if (selectedFirmwarePosition) {
@@ -296,7 +310,7 @@ export const KeycodeConfigPanel = () => {
               "RCTL": "LCTL", "RSFT": "LSFT", "RALT": "LALT", "RGUI": "LGUI",
               "LCTL": "LCTL", "LSFT": "LSFT", "LALT": "LALT", "LGUI": "LGUI"
             };
-        nextModifiers = nextModifiers.map(m => mapping[m]);
+        nextModifiers = uniqueModifiers(nextModifiers.map(m => mapping[m]));
       }
 
       updateDraftAction({ ...activeAction, modifiers: nextModifiers });
@@ -319,7 +333,7 @@ export const KeycodeConfigPanel = () => {
               "RCTL": "LCTL", "RSFT": "LSFT", "RALT": "LALT", "RGUI": "LGUI",
               "LCTL": "LCTL", "LSFT": "LSFT", "LALT": "LALT", "LGUI": "LGUI"
             };
-        nextModifiers = nextModifiers.map(m => mapping[m]);
+        nextModifiers = uniqueModifiers(nextModifiers.map(m => mapping[m]));
       }
 
       let baseKeycode: UniversalKey = 'TRNS';
@@ -422,7 +436,7 @@ export const KeycodeConfigPanel = () => {
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden">
-      <div className="p-4 flex flex-col gap-4 shrink-0 bg-[#151518]">
+      <div className="p-4 flex flex-col gap-4 shrink-0 bg-[var(--bg-app)]/50">
         {isEncoderActionMode && selectedEncoder && (
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">

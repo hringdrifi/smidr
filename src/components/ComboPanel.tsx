@@ -117,7 +117,7 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-zinc-200">
+    <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-[var(--text-main)]">
       {message && (
         <div className={cn(
           "px-4 py-2 text-xs font-semibold text-center border-b animate-in slide-in-from-top-4 duration-300",
@@ -147,11 +147,11 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                     "border rounded-xl p-4 transition-all duration-300 flex flex-col gap-3",
                     editingComboIdx === idx
                       ? "bg-amber-500/5 border-amber-500/50 shadow-[0_4px_25px_rgba(245,158,11,0.05)]"
-                      : "bg-zinc-950/20 border-[var(--border-main)] hover:border-zinc-700"
+                      : "bg-[var(--bg-app)]/40 border-[var(--border-main)] hover:border-amber-500/30"
                   )}
                 >
                   <div className="flex items-center justify-between border-b border-[var(--border-main)]/60 pb-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] flex items-center gap-1.5">
                       <Sliders size={12} className="text-amber-500" />
                       {format('macros.combo', { id: idx })}
                     </span>
@@ -160,7 +160,7 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                       <div className="flex gap-2">
                         <button
                           onClick={() => setEditingComboIdx(null)}
-                          className="px-2 py-1 bg-zinc-900 border border-[var(--border-main)] text-zinc-400 hover:text-zinc-200 text-[10px] font-bold rounded"
+                          className="px-2 py-1 bg-[var(--bg-button)] border border-[var(--border-main)] text-[var(--text-muted)] hover:text-[var(--text-main)] text-[10px] font-bold rounded"
                         >
                           {t('common.cancel')}
                         </button>
@@ -177,7 +177,7 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEditingCombo(idx, combo)}
-                          className="px-2.5 py-1 border border-zinc-700 text-zinc-300 hover:border-amber-500/40 hover:text-amber-500 text-[10px] font-bold rounded transition-colors"
+                          className="px-2.5 py-1 border border-[var(--border-main)] text-[var(--text-main)] hover:border-amber-500/40 hover:text-amber-500 text-[10px] font-bold rounded transition-colors"
                         >
                           {t('macros.edit')}
                         </button>
@@ -196,14 +196,14 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                   {editingComboIdx === idx ? (
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-2">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">{t('macros.triggerInputs')}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('macros.triggerInputs')}</span>
                         <div className="grid grid-cols-4 gap-2">
                           {comboInputs.map((input, slotIdx) => (
                             <select
                               key={slotIdx}
                               value={actionToKey(input)}
                               onChange={(e) => updateComboKey(slotIdx, e.target.value)}
-                              className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-1.5 text-[10px] font-mono text-zinc-300 select-arrow"
+                              className="h-8 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-1.5 text-[10px] font-mono text-[var(--text-main)] select-arrow"
                             >
                               <option value="none">{t('macros.noneOption')}</option>
                               {keyOptions.map((opt) => (
@@ -215,11 +215,11 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                       </div>
 
                       <div className="flex items-center justify-between border-t border-[var(--border-main)] pt-3 mt-1">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500">{t('macros.triggerOutput')}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('macros.triggerOutput')}</span>
                         <select
                           value={actionToKey(comboOutput)}
                           onChange={(e) => setComboOutput(keyToAction(e.target.value))}
-                          className="w-40 h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-amber-500 font-bold select-arrow"
+                          className="w-40 h-8 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-amber-500 font-bold select-arrow"
                         >
                           <option value="none">{t('macros.noneOption')}</option>
                           {keyOptions.map((opt) => (
@@ -232,12 +232,12 @@ export const ComboPanel: React.FC<ComboPanelProps> = ({ scope }) => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         {combo.inputs.filter(i => i.action === 'tap').map((i, sIdx) => (
-                          <span key={sIdx} className="h-6 px-2 bg-zinc-900 border border-zinc-800 rounded flex items-center justify-center text-[10px] font-mono text-zinc-300 font-semibold">
+                          <span key={sIdx} className="h-6 px-2 bg-[var(--bg-button)] border border-[var(--border-main)] rounded flex items-center justify-center text-[10px] font-mono text-[var(--text-main)] font-semibold">
                             {(i as any).keycode}
                           </span>
                         ))}
                       </div>
-                      <ArrowRight size={14} className="text-zinc-600 shrink-0 mx-2" />
+                      <ArrowRight size={14} className="text-[var(--text-muted)] shrink-0 mx-2" />
                       <span className="h-6 px-2.5 bg-amber-500/10 border border-amber-500/20 rounded flex items-center justify-center text-[10px] font-mono text-amber-500 font-bold">
                         {combo.output.action === 'tap' ? combo.output.keycode : 'NONE'}
                       </span>

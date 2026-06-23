@@ -136,7 +136,7 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-zinc-200">
+    <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-[var(--text-main)]">
       {message && (
         <div className={cn(
           "px-4 py-2 text-xs font-semibold text-center border-b animate-in slide-in-from-top-4 duration-300",
@@ -157,7 +157,7 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
                   "h-9 rounded-lg border text-xs font-black transition-all duration-300 flex items-center justify-center",
                   selectedMacroId === idx
                     ? "bg-amber-500/15 border-amber-500 text-amber-500 font-extrabold shadow-[0_0_15px_rgba(245,158,11,0.1)]"
-                    : "bg-zinc-900/50 border-[var(--border-main)] hover:border-zinc-500 text-zinc-400"
+                    : "bg-[var(--bg-button)] border-[var(--border-main)] hover:border-amber-500/40 text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 )}
               >
                 M{idx}
@@ -165,19 +165,19 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
             ))}
           </div>
 
-          <div className="border border-[var(--border-main)] bg-zinc-950/20 rounded-xl p-4 flex flex-col gap-4">
+          <div className="border border-[var(--border-main)] bg-[var(--bg-app)]/40 rounded-xl p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
               <span className="text-xs font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
                 <Settings size={14} />
                 {t('macros.macroEditor').replace('{id}', String(selectedMacroId))}
               </span>
 
-              <div className="flex bg-zinc-900 border border-[var(--border-main)] p-0.5 rounded-lg">
+              <div className="flex bg-[var(--bg-button)] border border-[var(--border-main)] p-0.5 rounded-lg">
                 <button
                   onClick={() => setMacroEditMode('text')}
                   className={cn(
                     "px-2.5 py-1 text-[10px] font-bold rounded-md uppercase tracking-wider transition-colors",
-                    macroEditMode === 'text' ? "bg-amber-500 text-zinc-950" : "text-zinc-400 hover:text-white"
+                    macroEditMode === 'text' ? "bg-amber-500 text-zinc-950" : "text-[var(--text-muted)] hover:text-[var(--text-highlight)]"
                   )}
                 >
                   {t('macros.text')}
@@ -186,7 +186,7 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
                   onClick={() => setMacroEditMode('sequence')}
                   className={cn(
                     "px-2.5 py-1 text-[10px] font-bold rounded-md uppercase tracking-wider transition-colors",
-                    macroEditMode === 'sequence' ? "bg-amber-500 text-zinc-950" : "text-zinc-400 hover:text-white"
+                    macroEditMode === 'sequence' ? "bg-amber-500 text-zinc-950" : "text-[var(--text-muted)] hover:text-[var(--text-highlight)]"
                   )}
                 >
                   {t('macros.sequence')}
@@ -196,14 +196,14 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
 
             {macroEditMode === 'text' ? (
               <div className="flex flex-col gap-3">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">{t('macros.textSimulation')}</label>
+                <label className="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">{t('macros.textSimulation')}</label>
                 <textarea
                   value={textValue}
                   onChange={(e) => setTextValue(e.target.value)}
                   placeholder={t('macros.textPlaceholder')}
-                  className="w-full min-h-[100px] bg-zinc-950/50 border border-[var(--border-main)] rounded-lg p-3 text-xs text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-colors custom-scrollbar font-mono leading-relaxed"
+                  className="w-full min-h-[100px] bg-[var(--bg-app)] border border-[var(--border-main)] rounded-lg p-3 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/50 transition-colors custom-scrollbar font-mono leading-relaxed"
                 />
-                <div className="text-[10px] text-zinc-500 leading-relaxed bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg flex items-start gap-2">
+                <div className="text-[10px] text-[var(--text-muted)] leading-relaxed bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg flex items-start gap-2">
                   <Clock size={12} className="text-amber-500 shrink-0 mt-0.5" />
                   <span>{t('macros.textDesc')}</span>
                 </div>
@@ -220,15 +220,15 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
                   {localMacroActions.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-zinc-500">{t('macros.noActions')}</div>
+                    <div className="text-center py-8 text-xs text-[var(--text-muted)]">{t('macros.noActions')}</div>
                   ) : (
                     localMacroActions.map((action, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-zinc-900/50 border border-[var(--border-main)] hover:border-zinc-700 p-2 rounded-lg transition-all">
+                      <div key={idx} className="flex items-center gap-2 bg-[var(--bg-app)]/60 border border-[var(--border-main)] hover:border-amber-500/30 p-2 rounded-lg transition-all">
                         <div className="flex flex-col shrink-0">
-                          <button onClick={() => moveAction(idx, 'up')} className="text-zinc-500 hover:text-zinc-300">
+                          <button onClick={() => moveAction(idx, 'up')} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             <ChevronUp size={14} />
                           </button>
-                          <button onClick={() => moveAction(idx, 'down')} className="text-zinc-500 hover:text-zinc-300">
+                          <button onClick={() => moveAction(idx, 'down')} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             <ChevronDown size={14} />
                           </button>
                         </div>
@@ -237,36 +237,36 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
                           {action.action === 'delay' ? (
                             <>
                               <Clock size={13} className="text-amber-500 shrink-0" />
-                              <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('macros.delay')}</span>
+                              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{t('macros.delay')}</span>
                               <input
                                 type="number"
                                 value={action.duration || 0}
                                 onChange={(e) => updateActionDelay(idx, Number(e.target.value))}
-                                className="w-20 h-7 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-amber-500 font-semibold"
+                                className="w-20 h-7 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-amber-500 font-semibold"
                               />
-                              <span className="text-[10px] text-zinc-500 font-bold font-mono">ms</span>
+                              <span className="text-[10px] text-[var(--text-muted)] font-bold font-mono">ms</span>
                             </>
                           ) : action.action === 'text' ? (
                             <>
                               <Type size={13} className="text-amber-500 shrink-0" />
-                              <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('macros.text')}</span>
+                              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{t('macros.text')}</span>
                               <input
                                 type="text"
                                 value={action.text || ''}
                                 onChange={(e) => updateActionText(idx, e.target.value)}
-                                className="flex-1 h-7 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono"
+                                className="flex-1 h-7 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/50 font-mono"
                               />
                             </>
                           ) : (
                             <>
                               <Keyboard size={13} className="text-amber-500 shrink-0" />
-                              <span className="text-[10px] font-bold text-zinc-500 uppercase min-w-[36px]">{action.action}</span>
+                              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase min-w-[36px]">{action.action}</span>
                               {action.keycodes?.map((key, keyIdx) => (
                                 <select
                                   key={keyIdx}
                                   value={key}
                                   onChange={(e) => updateActionKey(idx, keyIdx, e.target.value)}
-                                  className="flex-1 h-7 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-zinc-200 select-arrow"
+                                  className="flex-1 h-7 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-2 text-xs focus:outline-none focus:border-amber-500/50 font-mono text-[var(--text-main)] select-arrow"
                                 >
                                   {keyOptions.map((opt) => (
                                     <option key={opt} value={opt}>{opt}</option>
@@ -291,7 +291,7 @@ export const MacroPanel: React.FC<MacroPanelProps> = ({ scope }) => {
                       key={action}
                       onClick={() => addSequenceAction(action)}
                       className={cn(
-                        "h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-zinc-300 hover:text-amber-500",
+                        "h-8 border border-[var(--border-main)] hover:border-amber-500/40 hover:bg-amber-500/5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all text-[var(--text-main)] hover:text-amber-500",
                         action === 'text' && "col-span-2 sm:col-span-1"
                       )}
                     >

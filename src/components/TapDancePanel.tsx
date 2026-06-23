@@ -95,7 +95,7 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-zinc-200">
+    <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden text-[var(--text-main)]">
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="flex min-h-full flex-col gap-4 p-4">
           {scope === 'project' && (
@@ -118,7 +118,7 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
                       "h-9 rounded-lg border text-xs font-black transition-all duration-300 flex items-center justify-center",
                       selectedTapDance?.id === entry.id
                         ? "bg-amber-500/15 border-amber-500 text-amber-500 font-extrabold shadow-[0_0_15px_rgba(245,158,11,0.1)]"
-                        : "bg-zinc-900/50 border-[var(--border-main)] hover:border-zinc-500 text-zinc-400"
+                        : "bg-[var(--bg-button)] border-[var(--border-main)] hover:border-amber-500/40 text-[var(--text-muted)] hover:text-[var(--text-main)]"
                     )}
                   >
                     TD{entry.id}
@@ -127,7 +127,7 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
               </div>
 
               {selectedTapDance && (
-                <div className="border border-[var(--border-main)] bg-zinc-950/20 rounded-xl p-4 flex flex-col gap-4">
+                <div className="border border-[var(--border-main)] bg-[var(--bg-app)]/40 rounded-xl p-4 flex flex-col gap-4">
                   <div className="flex items-center justify-between border-b border-[var(--border-main)] pb-3">
                     <span className="text-xs font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
                       <Settings size={14} />
@@ -151,11 +151,11 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
                       ['tapHoldAction', t('keycodeConfig.tapDanceTapHold'), 'none'],
                     ] as const).map(([field, label, fallback]) => (
                       <div key={field} className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{label}</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</label>
                         <select
                           value={actionToKey(selectedTapDance[field], fallback)}
                           onChange={(e) => updateSelectedTapDance({ [field]: keyToAction(e.target.value) })}
-                          className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-zinc-300 select-arrow"
+                          className="h-8 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-[var(--text-main)] select-arrow"
                         >
                           <option value="none">{t('macros.noneOption')}</option>
                           {keyOptions.map((opt) => (
@@ -167,13 +167,13 @@ export const TapDancePanel: React.FC<TapDancePanelProps> = ({ scope }) => {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{t('keycodeConfig.tappingTerm')}</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('keycodeConfig.tappingTerm')}</label>
                     <input
                       type="number"
                       min={1}
                       value={selectedTapDance.tappingTerm ?? 200}
                       onChange={(e) => updateSelectedTapDance({ tappingTerm: Number(e.target.value) })}
-                      className="h-8 bg-zinc-950 border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-amber-500/70"
+                      className="h-8 bg-[var(--bg-panel)] border border-[var(--border-main)] rounded px-2 text-[10px] font-mono text-[var(--text-main)] focus:outline-none focus:border-amber-500/70"
                     />
                   </div>
                 </div>
