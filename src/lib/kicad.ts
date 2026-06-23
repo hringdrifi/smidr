@@ -198,7 +198,7 @@ const getMatrixNetNames = (
   const colNet = `COL${col}`;
   const keyNet = `KEY_R${row}_C${col}`;
 
-  if (settings.hardware.diodeDirection === 'ROW2COL') {
+  if (settings.hardware.diodeDirection === 'COL2ROW') {
     return {
       switchA: rowNet,
       switchB: keyNet,
@@ -864,10 +864,12 @@ const generateKiCadSchematic = (
   const instances: string[] = [];
   const labels: string[] = [];
   const wires: string[] = [];
+  const keyCellWidth = 35.56;
+  const labelStub = 2.54;
   const symbols = visibleKeys.flatMap((key, index) => {
     const col = index % 8;
     const row = Math.floor(index / 8);
-    const x = 25.4 + col * 30.48;
+    const x = 25.4 + col * keyCellWidth;
     const y = 25.4 + row * 25.4;
     const nets = getMatrixNetNames(settings, key, keys, index);
     const switchSeed = `sch-sw-${index}`;
@@ -879,11 +881,11 @@ const generateKiCadSchematic = (
     const switchRightPin = x + 5.08;
     if (directPins) {
       if (key.directPin?.trim()) {
-        wires.push(makeWire(switchLeftPin - 5.08, y, switchLeftPin, y, `wire-sa-${index}`));
-        labels.push(makeLabel(nets.switchA, switchLeftPin - 5.08, y, `label-sa-${index}`));
+        wires.push(makeWire(switchLeftPin - labelStub, y, switchLeftPin, y, `wire-sa-${index}`));
+        labels.push(makeLabel(nets.switchA, switchLeftPin - labelStub, y, `label-sa-${index}`));
       }
       const gndSeed = `sch-gnd-${index}`;
-      const gndX = switchRightPin + 5.08;
+      const gndX = switchRightPin + labelStub;
       const gndY = y;
       wires.push(makeWire(switchRightPin, y, gndX, gndY, `wire-gnd-${index}`));
       instances.push(makeSymbolInstance(gndSeed, `#PWR${index + 1}`, 'GND', ''));
@@ -891,16 +893,15 @@ const generateKiCadSchematic = (
     } else {
       const diodeSeed = `sch-d-${index}`;
       instances.push(makeSymbolInstance(diodeSeed, `D${index + 1}`, nets.position, diodeChoice.footprint));
-      const diodeX = x + 15.24;
+      const diodeX = x + 12.7;
       entries.push(makeSchematicSymbol(diodeChoice.symbol, `D${index + 1}`, nets.position, diodeChoice.footprint, diodeX, y, diodeSeed));
       const diodeLeftPin = diodeX - 2.54;
       const diodeRightPin = diodeX + 2.54;
-      wires.push(makeWire(switchLeftPin - 5.08, y, switchLeftPin, y, `wire-sa-${index}`));
-      labels.push(makeLabel(nets.switchA, switchLeftPin - 5.08, y, `label-sa-${index}`));
+      wires.push(makeWire(switchLeftPin - labelStub, y, switchLeftPin, y, `wire-sa-${index}`));
+      labels.push(makeLabel(nets.switchA, switchLeftPin - labelStub, y, `label-sa-${index}`));
       wires.push(makeWire(switchRightPin, y, diodeLeftPin, y, `wire-key-${index}`));
-      labels.push(makeLabel(nets.key, x + 10.16, y - 5.08, `label-key-${index}`));
-      wires.push(makeWire(diodeRightPin, y, diodeRightPin + 5.08, y, `wire-db-${index}`));
-      labels.push(makeLabel(nets.diodeB, diodeRightPin + 5.08, y, `label-db-${index}`));
+      wires.push(makeWire(diodeRightPin, y, diodeRightPin + labelStub, y, `wire-db-${index}`));
+      labels.push(makeLabel(nets.diodeB, diodeRightPin + labelStub, y, `label-db-${index}`));
     }
     return entries;
   });

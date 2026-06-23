@@ -107,6 +107,9 @@ describe('export generation', () => {
     expect(symbolLibrary).toContain('(symbol "SW_Push"');
     expect(schematic).toContain('(label "ROW0"');
     expect(schematic).toContain('(label "COL1"');
+    expect(schematic).toContain('(label "ROW0" (at 17.780 25.400 0)');
+    expect(schematic).toContain('(label "COL0" (at 43.180 25.400 0)');
+    expect(schematic).not.toContain('(label "KEY_R');
     expect(pcb).toContain('(footprint "Smidr:SW_Smidr_MX_Hotswap"');
     expect(pcb).toContain(`(path "${sw1Path}")`);
     expect(pcb).toContain('center-origin template');
@@ -266,8 +269,9 @@ describe('export generation', () => {
     expect(schematic).toContain('(lib_id "power:GND")');
     expect(schematic).toContain('(pin "1" (uuid');
     expect(schematic).toContain('(wire');
-    expect(schematic).toContain('(pts (xy 15.240 25.400) (xy 20.320 25.400))');
-    expect(schematic).toContain('(pts (xy 30.480 25.400) (xy 35.560 25.400))');
+    expect(schematic).toContain('(pts (xy 17.780 25.400) (xy 20.320 25.400))');
+    expect(schematic).toContain('(pts (xy 30.480 25.400) (xy 33.020 25.400))');
+    expect(schematic).toContain('(pts (xy 53.340 25.400) (xy 55.880 25.400))');
     expect(schematic).not.toContain('(lib_id "Device:D")');
     expect(schematic).not.toContain('(reference "D1")');
     expect(schematic).not.toContain('(value "D1")');
