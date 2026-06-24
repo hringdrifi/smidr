@@ -5,7 +5,7 @@ import { generateQmkZip } from '../qmk';
 import { generateRmkZip } from '../rmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
-import { generateKiCadZip } from '../kicad';
+import { DEFAULT_KICAD_EXPORT_OPTIONS, generateKiCadZip, getKiCadLedPreviewInfo } from '../kicad';
 import { validateFirmwareExport } from '../export-validation';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
@@ -34,6 +34,32 @@ const baseSettings: ProjectSettings = {
   layoutOptions: {},
   activeOptions: {},
 };
+
+describe('KiCad export defaults', () => {
+  it('uses the standard diode placement', () => {
+    expect(DEFAULT_KICAD_EXPORT_OPTIONS).toMatchObject({
+      diodeOffsetX: 6.746875,
+      diodeOffsetY: 3.96875,
+      diodeRotation: -90,
+    });
+  });
+
+  it('provides switch-specific LED preview templates and offsets', () => {
+    const mx = getKiCadLedPreviewInfo('Smidr:SW_Smidr_MX_Solder');
+    expect(mx.offset).toEqual({ x: 0, y: 5.08 });
+    expect(mx.backlightBack).toBe(false);
+    expect(mx.backlightTemplate).toContain('(footprint "LED_Smidr_Backlight"');
+
+    const choc = getKiCadLedPreviewInfo('Smidr:SW_Smidr_Choc_Solder');
+    expect(choc.offset).toEqual({ x: 0, y: -4.7 });
+    expect(choc.backlightBack).toBe(true);
+    expect(choc.backlightTemplate).toContain('(footprint "LED_Smidr_Backlight_1206_Reverse"');
+
+    const gateronLp = getKiCadLedPreviewInfo('Smidr:SW_Smidr_Gateron_LP_Solder');
+    expect(gateronLp.offset).toEqual({ x: 0, y: -5.175 });
+    expect(gateronLp.rgbTemplate).toContain('(footprint "LED_Smidr_SK6812MINI_E"');
+  });
+});
 
 describe('export generation', () => {
   it('exports KiCad schematic and PCB data with selected footprints and matrix nets', async () => {
@@ -88,6 +114,7 @@ describe('export generation', () => {
     expect(zip.file('smidr.pretty/D_Smidr_SOD323.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/D_Smidr_DO35.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/LED_Smidr_Backlight.kicad_mod')).toBeTruthy();
+    expect(zip.file('smidr.pretty/LED_Smidr_Backlight_1206_Reverse.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/LED_Smidr_SK6812MINI_E.kicad_mod')).toBeTruthy();
     expect(zip.file('smidr.pretty/Plate_Smidr_Key_Hole.kicad_mod')).toBeTruthy();
     expect(zip.file('NOTICE.md')).toBeNull();
@@ -442,6 +469,47 @@ describe('export generation', () => {
 
     expect(pcb).toContain('(footprint "Smidr:LED_Smidr_SK6812MINI_E"');
     expect(pcb).toContain('(at 9.525 4.825 180.000)');
+  });
+
+  it('places per-key KiCad backlight LEDs using switch-specific footprints and RGB offsets', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Backlight KiCad',
+      matrix: { rows: 1, cols: 1 },
+      features: { ...baseSettings.features, backlight: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+    ];
+
+    const mxBlob = await generateKiCadZip({ settings, keys });
+    const mxZip = await JSZip.loadAsync(await mxBlob.arrayBuffer());
+    const mxSchematic = await mxZip.file('backlight_kicad.kicad_sch')!.async('string');
+    const mxPcb = await mxZip.file('backlight_kicad.kicad_pcb')!.async('string');
+    expect(mxSchematic).toContain('(lib_id "Device:LED")');
+    expect(mxSchematic).toContain('(footprint "Smidr:LED_Smidr_Backlight")');
+    expect(mxPcb).toMatch(/\(footprint "Smidr:LED_Smidr_Backlight"[\s\S]*?\(at 9\.525 14\.605 0\.000\)/);
+    expect(mxPcb).toContain('"BACKLIGHT"');
+    expect(mxPcb).toContain('"GND"');
+
+    for (const switchFootprint of [
+      'Smidr:SW_Smidr_Choc_Solder',
+      'Smidr:SW_Smidr_Gateron_LP_Solder',
+    ]) {
+      const blob = await generateKiCadZip(
+        { settings, keys },
+        { ...DEFAULT_KICAD_EXPORT_OPTIONS, switchFootprint }
+      );
+      const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+      const pcb = await zip.file('backlight_kicad.kicad_pcb')!.async('string');
+      expect(pcb).toContain('(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"');
+      expect(pcb).toMatch(/\(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"[\s\S]*?\(layer "B\.Cu"\)/);
+      const backlightFootprint = pcb.match(/\(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"[\s\S]*?(?=\n  \(footprint|\n  \(gr_|\n\))/)?.[0];
+      expect(backlightFootprint).toBeTruthy();
+      expect(backlightFootprint).toContain('"B.Cu"');
+      expect(backlightFootprint).toContain('"B.Paste"');
+      expect(backlightFootprint).toContain('"B.Mask"');
+    }
   });
 
   it('exports QMK direct pins from per-key assignments', async () => {

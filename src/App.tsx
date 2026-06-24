@@ -34,6 +34,7 @@ import {
   DEFAULT_KICAD_EXPORT_OPTIONS,
   generateKiCadZip,
   getKiCadFootprintPreviewTemplate,
+  getKiCadLedPreviewInfo,
   KICAD_DIODE_FOOTPRINTS,
   KICAD_SWITCH_FOOTPRINTS,
   KiCadExportOptions,
@@ -357,6 +358,9 @@ export default function App() {
   const switchPreviewBack = switchPreviewChoice?.mountType === 'smd';
   const diodePreviewBack = diodePreviewChoice?.mountType === 'smd';
   const diodePreviewRotation = (diodePreviewBack ? 180 : 0) + diodeRotation;
+  const ledPreview = getKiCadLedPreviewInfo(kicadExportOptions.switchFootprint);
+  const ledPreviewX = 90 + ledPreview.offset.x * diodePreviewScale;
+  const ledPreviewY = 90 + ledPreview.offset.y * diodePreviewScale;
   const updateKiCadNumberOption = (key: 'diodeOffsetX' | 'diodeOffsetY' | 'diodeRotation', value: string) => {
     const parsed = Number.parseFloat(value);
     setKiCadExportOptions(options => ({ ...options, [key]: Number.isFinite(parsed) ? parsed : 0 }));
@@ -1448,7 +1452,7 @@ export default function App() {
 
                 <div className="flex min-h-[360px] flex-col rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-4">
                   <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    {isKiCadDirectPin ? t('kicad.switchFootprint') : t('kicad.diodePreview')}
+                    {t('kicad.placementPreview')}
                   </div>
                   <svg viewBox="0 0 180 180" className="min-h-[320px] w-full flex-1 lg:min-h-[440px]">
                     <rect x="42" y="42" width="96" height="96" rx="4" fill="rgba(245, 158, 11, 0.06)" stroke="rgba(245, 158, 11, 0.65)" strokeWidth="2" />
@@ -1457,6 +1461,24 @@ export default function App() {
                     <circle cx="90" cy="90" r="3" fill="rgb(245, 158, 11)" />
                     {renderKiCadFootprintPreview(switchPreviewTemplate, 'switch', 90, 90, switchPreviewBack ? 180 : 0, diodePreviewScale, switchPreviewBack)}
                     {!isKiCadDirectPin && renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, diodePreviewRotation, diodePreviewScale, diodePreviewBack)}
+                    {settings.features.rgbMatrix && renderKiCadFootprintPreview(
+                      ledPreview.rgbTemplate,
+                      'rgb-led',
+                      ledPreviewX,
+                      ledPreviewY,
+                      180,
+                      diodePreviewScale,
+                      ledPreview.rgbBack
+                    )}
+                    {settings.features.backlight && renderKiCadFootprintPreview(
+                      ledPreview.backlightTemplate,
+                      'backlight-led',
+                      ledPreviewX,
+                      ledPreviewY,
+                      ledPreview.backlightBack ? 180 : 0,
+                      diodePreviewScale,
+                      ledPreview.backlightBack
+                    )}
                   </svg>
                 </div>
               </div>

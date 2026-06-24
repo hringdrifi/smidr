@@ -4,6 +4,7 @@ import diodeDo35Raw from './kicad-assets/smidr.pretty/D_Smidr_DO35.kicad_mod?raw
 import diodeSod123Raw from './kicad-assets/smidr.pretty/D_Smidr_SOD123.kicad_mod?raw';
 import diodeSod323Raw from './kicad-assets/smidr.pretty/D_Smidr_SOD323.kicad_mod?raw';
 import ledBacklightRaw from './kicad-assets/smidr.pretty/LED_Smidr_Backlight.kicad_mod?raw';
+import ledBacklight1206ReverseRaw from './kicad-assets/smidr.pretty/LED_Smidr_Backlight_1206_Reverse.kicad_mod?raw';
 import ledRgbRaw from './kicad-assets/smidr.pretty/LED_Smidr_SK6812MINI_E.kicad_mod?raw';
 import plateKeyHoleRaw from './kicad-assets/smidr.pretty/Plate_Smidr_Key_Hole.kicad_mod?raw';
 import switchChocHotswapRaw from './kicad-assets/smidr.pretty/SW_Smidr_Choc_Hotswap.kicad_mod?raw';
@@ -55,6 +56,7 @@ export const KICAD_DIODE_FOOTPRINTS: KiCadFootprintChoice[] = [
 
 const LED_FOOTPRINTS = {
   backlight: 'Smidr:LED_Smidr_Backlight',
+  backlight1206Reverse: 'Smidr:LED_Smidr_Backlight_1206_Reverse',
   rgb: 'Smidr:LED_Smidr_SK6812MINI_E',
 };
 const PLATE_FOOTPRINT = 'Smidr:Plate_Smidr_Key_Hole';
@@ -71,15 +73,16 @@ const KICAD_FOOTPRINT_TEMPLATE_FILES: Record<string, string> = {
   'D_Smidr_SOD323.kicad_mod': diodeSod323Raw,
   'D_Smidr_DO35.kicad_mod': diodeDo35Raw,
   'LED_Smidr_Backlight.kicad_mod': ledBacklightRaw,
+  'LED_Smidr_Backlight_1206_Reverse.kicad_mod': ledBacklight1206ReverseRaw,
   'LED_Smidr_SK6812MINI_E.kicad_mod': ledRgbRaw,
 };
 
 export const DEFAULT_KICAD_EXPORT_OPTIONS: KiCadExportOptions = {
   switchFootprint: KICAD_SWITCH_FOOTPRINTS[0].footprint,
   diodeFootprint: KICAD_DIODE_FOOTPRINTS[0].footprint,
-  diodeOffsetX: 5.08,
-  diodeOffsetY: 4,
-  diodeRotation: 90,
+  diodeOffsetX: 6.746875,
+  diodeOffsetY: 3.96875,
+  diodeRotation: -90,
 };
 
 const UNIT_MM = 19.05;
@@ -113,6 +116,32 @@ const getSwitchLedOffset = (choice: KiCadFootprintChoice) => {
   return kind.startsWith('choc')
     ? { x: 0, y: -4.7 }
     : { x: 0, y: 5.08 };
+};
+const getBacklightFootprint = (choice: KiCadFootprintChoice) => {
+  const kind = (choice.kind ?? 'mx-solder') as SwitchFootprintKind;
+  return kind.startsWith('choc') || kind.startsWith('gateron-lp')
+    ? {
+        libId: LED_FOOTPRINTS.backlight1206Reverse,
+        source: 'LED_Smidr_Backlight_1206_Reverse.kicad_mod',
+        side: 'back' as FootprintSide,
+      }
+    : {
+        libId: LED_FOOTPRINTS.backlight,
+        source: 'LED_Smidr_Backlight.kicad_mod',
+        side: 'front' as FootprintSide,
+      };
+};
+export const getKiCadLedPreviewInfo = (switchFootprint: string) => {
+  const switchChoice = getSwitchChoice(switchFootprint);
+  const offset = getSwitchLedOffset(switchChoice);
+  const backlight = getBacklightFootprint(switchChoice);
+  return {
+    offset,
+    rgbTemplate: getFootprintTemplate('LED_Smidr_SK6812MINI_E.kicad_mod'),
+    rgbBack: true,
+    backlightTemplate: getFootprintTemplate(backlight.source),
+    backlightBack: backlight.side === 'back',
+  };
 };
 const sideLayer = (side: FootprintSide, frontLayer: string) => (
   side === 'back' && frontLayer.startsWith('F.') ? `B.${frontLayer.slice(2)}` : frontLayer
@@ -227,7 +256,8 @@ const getRgbLedKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
 
 const collectNets = (
   matrixItems: Array<{ switchA: string; switchB: string; diodeA: string; diodeB: string }>,
-  rgbKeys: PhysicalKey[]
+  rgbKeys: PhysicalKey[],
+  hasBacklight: boolean
 ) => {
   const names = new Set<string>();
   matrixItems.forEach(item => {
@@ -242,6 +272,10 @@ const collectNets = (
     rgbKeys.forEach(key => {
       names.add(`RGB_DOUT_${key.ledIndex}`);
     });
+  }
+  if (hasBacklight) {
+    names.add('BACKLIGHT');
+    names.add('GND');
   }
   return ['', ...Array.from(names).sort()];
 };
@@ -858,6 +892,7 @@ const generateKiCadSchematic = (
   const visibleKeys = getVisibleKeys(settings, keys).filter(key => !key.decal);
   const title = escapeString(settings.name || 'Smiðr Keyboard');
   const switchChoice = getSwitchChoice(options.switchFootprint);
+  const backlightFootprint = getBacklightFootprint(switchChoice);
   const diodeChoice = getDiodeChoice(options.diodeFootprint);
   const rgbKeys = getRgbLedKeys(settings, visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
   const directPins = isDirectPinMatrix(settings);
@@ -913,6 +948,23 @@ const generateKiCadSchematic = (
     instances.push(makeSymbolInstance(ledSeed, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb));
     symbols.push(makeSchematicSymbol('Smidr:SK6812MINI_E', `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, ledSeed));
   });
+
+  if (settings.features.backlight) {
+    visibleKeys.forEach((_key, index) => {
+      const x = 25.4 + (index % 8) * keyCellWidth;
+      const y = 25.4 + Math.ceil(visibleKeys.length / 8) * 25.4
+        + 25.4 + Math.ceil(rgbKeys.length / 6) * 25.4
+        + Math.floor(index / 8) * 15.24;
+      const ledSeed = `sch-backlight-${index}`;
+      const reference = `BL${index + 1}`;
+      instances.push(makeSymbolInstance(ledSeed, reference, 'Backlight', backlightFootprint.libId));
+      symbols.push(makeSchematicSymbol('Device:LED', reference, 'Backlight', backlightFootprint.libId, x, y, ledSeed));
+      wires.push(makeWire(x - 2.54 - labelStub, y, x - 2.54, y, `wire-backlight-gnd-${index}`));
+      labels.push(makeLabel('GND', x - 2.54 - labelStub, y, `label-backlight-gnd-${index}`));
+      wires.push(makeWire(x + 2.54, y, x + 2.54 + labelStub, y, `wire-backlight-power-${index}`));
+      labels.push(makeLabel('BACKLIGHT', x + 2.54 + labelStub, y, `label-backlight-power-${index}`));
+    });
+  }
 
   rgbKeys.forEach((key, index) => {
     const x = 25.4 + (index % 6) * 35.56;
@@ -1061,6 +1113,41 @@ const makeRgbLedFootprint = (
   );
 };
 
+const makeBacklightFootprint = (
+  key: PhysicalKey,
+  index: number,
+  netIds: Map<string, number>,
+  options: KiCadExportOptions
+) => {
+  const center = getKeyCenter(key);
+  const switchChoice = getSwitchChoice(options.switchFootprint);
+  const ledChoice = getBacklightFootprint(switchChoice);
+  const ledOffset = getSwitchLedOffset(switchChoice);
+  const ledPosition = rotatePoint(
+    center.x + ledOffset.x,
+    center.y + ledOffset.y,
+    center.x,
+    center.y,
+    center.r
+  );
+  return instantiateFootprintTemplate(
+    getFootprintTemplate(ledChoice.source),
+    ledChoice.libId,
+    `BL${index + 1}`,
+    'Backlight',
+    ledPosition.x,
+    ledPosition.y,
+    -center.r,
+    seededUuid(`pcb-backlight-${index}`),
+    {
+      1: footprintNet(netIds.get('GND') ?? 0, 'GND'),
+      2: footprintNet(netIds.get('BACKLIGHT') ?? 0, 'BACKLIGHT'),
+    },
+    ledChoice.side,
+    makeSchematicPath(`sch-backlight-${index}`)
+  );
+};
+
 const makePlateHoleFootprint = (index: number, key: PhysicalKey) => {
   const center = getKeyCenter(key);
   return instantiateFootprintTemplate(
@@ -1121,7 +1208,7 @@ const generateKiCadPcb = (
   const visibleKeys = getVisibleKeys(settings, keys).filter(key => !key.decal);
   const keyNets = visibleKeys.map((key, index) => getMatrixNetNames(settings, key, keys, index));
   const rgbKeys = getRgbLedKeys(settings, visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
-  const netNames = collectNets(keyNets, rgbKeys);
+  const netNames = collectNets(keyNets, rgbKeys, settings.features.backlight === true);
   const netIds = new Map(netNames.map((name, index) => [name, index]));
   const nets = netNames.map((name, index) => `  (net ${index} "${escapeString(name)}")`).join('\n');
   const switchFootprints = visibleKeys.map((key, index) => {
@@ -1131,6 +1218,9 @@ const generateKiCadPcb = (
     return `${sw}${diode}`;
   }).join('\n');
   const rgbFootprints = rgbKeys.map((key, index) => makeRgbLedFootprint(key, index, rgbKeys, netIds, options)).join('\n');
+  const backlightFootprints = settings.features.backlight
+    ? visibleKeys.map((key, index) => makeBacklightFootprint(key, index, netIds, options)).join('\n')
+    : '';
 
   return `(kicad_pcb
   (version 20230121)
@@ -1160,6 +1250,7 @@ const generateKiCadPcb = (
 ${nets}
 ${switchFootprints}
 ${rgbFootprints}
+${backlightFootprints}
 ${makeEdgeCuts(visibleKeys)}
 )`;
 };
@@ -1236,6 +1327,7 @@ This MVP export places center-origin Smiðr switch footprints from the physical 
 - Footprint library: smidr.pretty is included in this ZIP and referenced by fp-lib-table.
 - Switch outlines: keycap, fab, and courtyard geometry are generated from each key's w/h.
 - RGB Matrix: ${getRgbLedKeys(state.settings, state.keys).length > 0 ? `${getRgbLedKeys(state.settings, state.keys).length} SK6812MINI-E LED footprints are placed with switch-specific LED offsets.` : 'no per-key RGB LEDs placed.'}
+- Backlight: ${state.settings.features.backlight ? `per-key backlight LEDs are placed with switch-specific LED offsets (${getBacklightFootprint(switchChoice).libId}).` : 'no per-key backlight LEDs placed.'}
 - Direct-pin projects connect each switch between its direct GPIO net and GND.
 - Matrix projects connect switches and diodes using ROWn/COLn nets.
 `);
