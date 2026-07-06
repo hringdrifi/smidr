@@ -31,7 +31,7 @@ export interface PhysicalKey {
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
   directPin?: string; // direct GPIO pin for matrix.wiring === 'direct'
-  ledIndex?: number; // QMK/Vial RGB Matrix LED index
+  ledIndex?: number; // QMK/Vial RGB Matrix LED index, 0-based
   ledX?: number; // QMK/Vial RGB Matrix x coordinate (0-224)
   ledY?: number; // QMK/Vial RGB Matrix y coordinate (0-64)
   ledFlags?: number; // QMK/Vial RGB Matrix LED flags

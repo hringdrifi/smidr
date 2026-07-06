@@ -86,6 +86,9 @@ export const TRANSLATIONS = {
       placementPreview: 'Placement Preview',
       export: 'Export KiCad Data',
       noKeys: 'Add at least one key before exporting KiCad data.',
+      warnings: {
+        rgbMatrixNoLedAssignments: 'RGB Matrix is enabled, but no keys have LED indices. SK6812MINI-E footprints will not be placed. Assign LEDs in RGB Matrix mode before exporting.',
+      },
     },
     sidebar: {
       editorMode: 'Editor Mode',
@@ -1372,6 +1375,9 @@ export const TRANSLATIONS = {
       placementPreview: '配置プレビュー',
       export: 'KiCadデータを出力',
       noKeys: 'KiCadデータを出力するには、先にキーを1つ以上追加してください。',
+      warnings: {
+        rgbMatrixNoLedAssignments: 'RGB Matrixが有効ですが、LED番号が割り当てられたキーがありません。SK6812MINI-Eフットプリントは配置されません。出力前にRGB MatrixモードでLEDを割り当ててください。',
+      },
     },
     sidebar: {
       editorMode: 'エディタモード',

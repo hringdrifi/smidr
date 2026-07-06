@@ -115,7 +115,13 @@ export const RgbMatrixPanel = () => {
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('rgbMatrix.selectKey')}</p>
         ) : (
           <div className="space-y-3">
-            <NumberField label={t('rgbMatrix.ledIndex')} value={selectedKey.ledIndex} min={0} max={999} onChange={(ledIndex) => patchSelectedKey({ ledIndex })} />
+            <NumberField
+              label={t('rgbMatrix.ledIndex')}
+              value={selectedKey.ledIndex === undefined ? undefined : selectedKey.ledIndex + 1}
+              min={1}
+              max={1000}
+              onChange={(ledNumber) => patchSelectedKey({ ledIndex: ledNumber === undefined ? undefined : ledNumber - 1 })}
+            />
             <div className="grid grid-cols-2 gap-2">
               <NumberField label={t('rgbMatrix.ledX')} value={selectedKey.ledX} min={0} max={224} onChange={(ledX) => patchSelectedKey({ ledX })} />
               <NumberField label={t('rgbMatrix.ledY')} value={selectedKey.ledY} min={0} max={64} onChange={(ledY) => patchSelectedKey({ ledY })} />

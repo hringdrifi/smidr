@@ -274,9 +274,10 @@ export const getKeyLabel = (
   if (mode === 'rgbMatrix') {
     if (k.ledIndex === undefined) return { type: 'empty' };
     const hasPosition = k.ledX !== undefined && k.ledY !== undefined;
+    const ledNumber = k.ledIndex + 1;
     return {
       type: 'text',
-      text: hasPosition ? `LED${k.ledIndex}\n${k.ledX},${k.ledY}` : `LED${k.ledIndex}`,
+      text: hasPosition ? `LED${ledNumber}\n${k.ledX},${k.ledY}` : `LED${ledNumber}`,
     };
   }
   return { type: 'empty' };

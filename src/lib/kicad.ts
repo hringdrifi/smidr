@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import smidrSymbolsRaw from './kicad-assets/smidr.kicad_sym?raw';
 import diodeDo35Raw from './kicad-assets/smidr.pretty/D_Smidr_DO35.kicad_mod?raw';
 import diodeSod123Raw from './kicad-assets/smidr.pretty/D_Smidr_SOD123.kicad_mod?raw';
 import diodeSod323Raw from './kicad-assets/smidr.pretty/D_Smidr_SOD323.kicad_mod?raw';
@@ -58,7 +59,7 @@ const LED_FOOTPRINTS = {
   backlight1206Reverse: 'Smidr:LED_Smidr_Backlight_1206_Reverse',
   rgb: 'Smidr:LED_Smidr_SK6812MINI_E',
 };
-const RGB_LED_SYMBOL = 'LED:SK6812MINI-E';
+const RGB_LED_SYMBOL = 'Smidr:SK6812MINI_E';
 const PLATE_FOOTPRINT = 'Smidr:Plate_Smidr_Key_Hole';
 
 const KICAD_FOOTPRINT_TEMPLATE_FILES: Record<string, string> = {
@@ -202,6 +203,17 @@ const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
   keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
 );
 
+export type KiCadExportWarningCode = 'rgbMatrixNoLedAssignments';
+
+export const getKiCadExportWarnings = (state: { settings: ProjectSettings; keys: PhysicalKey[] }): KiCadExportWarningCode[] => {
+  const visibleKeys = getVisibleKeys(state.settings, state.keys);
+  const warnings: KiCadExportWarningCode[] = [];
+  if (state.settings.features.rgbMatrix && getRgbLedKeys(state.settings, visibleKeys).length === 0) {
+    warnings.push('rgbMatrixNoLedAssignments');
+  }
+  return warnings;
+};
+
 const getMatrixNetNames = (
   settings: ProjectSettings,
   key: PhysicalKey,
@@ -313,6 +325,7 @@ const generateFpLibTable = () => `(fp_lib_table
 )`;
 
 const generateSymLibTable = () => `(sym_lib_table
+  (lib (name "Smidr")(type "KiCad")(uri "\${KIPRJMOD}/smidr.kicad_sym")(options "")(descr "Smiðr generated symbols"))
 )`;
 
 const footprintNet = (netId?: number, netName?: string) => (
@@ -332,7 +345,8 @@ const makeSchematicSymbol = (
   footprint: string,
   x: number,
   y: number,
-  seed: string
+  seed: string,
+  options: { referenceOffsetY?: number; valueHidden?: boolean } = {}
 ) => `
   (symbol
     (lib_id "${libId}")
@@ -342,7 +356,7 @@ const makeSchematicSymbol = (
     (in_bom yes)
     (on_board yes)
     (dnp no)
-    (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y - 2.54)}${makeProperty('Value', value, x, y + 2.54)}${makeProperty('Footprint', footprint, x, y + 5.08, true)}
+    (uuid "${seededUuid(seed)}")${makeProperty('Reference', reference, x, y + (options.referenceOffsetY ?? -2.54))}${makeProperty('Value', value, x, y + 2.54, options.valueHidden === true)}${makeProperty('Footprint', footprint, x, y + 5.08, true)}
   )`;
 
 const makePowerSymbol = (
@@ -499,7 +513,7 @@ const DEVICE_LED_SYMBOL = `  (symbol "Device:LED"
     )
   )`;
 
-const RGB_LED_STANDARD_SYMBOL = `  (symbol "${RGB_LED_SYMBOL}"
+const RGB_LED_SYMBOL_DEFINITION = `  (symbol "${RGB_LED_SYMBOL}"
     (pin_names (offset 1.016))
     (exclude_from_sim no)
     (in_bom yes)
@@ -509,14 +523,14 @@ const RGB_LED_STANDARD_SYMBOL = `  (symbol "${RGB_LED_SYMBOL}"
     (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
     (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
     (property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-    (symbol "SK6812MINI-E_0_1"
+    (symbol "SK6812MINI_E_0_1"
       (rectangle (start -6.35 3.81) (end 6.35 -3.81) (stroke (width 0.254) (type default)) (fill (type background)))
     )
-    (symbol "SK6812MINI-E_1_1"
+    (symbol "SK6812MINI_E_1_1"
       (pin power_in line (at -8.89 2.54 0) (length 2.54) (name "VDD" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
       (pin output line (at -8.89 -2.54 0) (length 2.54) (name "DOUT" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
-      (pin input line (at 8.89 2.54 180) (length 2.54) (name "DIN" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))
       (pin power_in line (at 8.89 -2.54 180) (length 2.54) (name "GND" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
+      (pin input line (at 8.89 2.54 180) (length 2.54) (name "DIN" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))
     )
   )`;
 
@@ -546,7 +560,7 @@ const generateEmbeddedSymbols = () => [
   POWER_GND_SYMBOL,
   DEVICE_D_SYMBOL,
   DEVICE_LED_SYMBOL,
-  RGB_LED_STANDARD_SYMBOL,
+  RGB_LED_SYMBOL_DEFINITION,
   SWITCH_PUSH_SYMBOL,
 ].join('\n');
 
@@ -1013,8 +1027,12 @@ const generateKiCadSchematic = (
     const x = 25.4 + (index % 6) * 35.56;
     const y = 25.4 + Math.ceil(visibleKeys.length / 8) * 25.4 + 25.4 + Math.floor(index / 6) * 25.4;
     const ledSeed = `sch-rgb-${key.ledIndex}`;
-    instances.push(makeSymbolInstance(ledSeed, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb));
-    symbols.push(makeSchematicSymbol(RGB_LED_SYMBOL, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, ledSeed));
+    const ledNumber = (key.ledIndex ?? index) + 1;
+    instances.push(makeSymbolInstance(ledSeed, `LED${ledNumber}`, `RGB${ledNumber}`, LED_FOOTPRINTS.rgb));
+    symbols.push(makeSchematicSymbol(RGB_LED_SYMBOL, `LED${ledNumber}`, `RGB${ledNumber}`, LED_FOOTPRINTS.rgb, x, y, ledSeed, {
+      referenceOffsetY: -6.35,
+      valueHidden: true,
+    }));
   });
 
   if (settings.features.backlight) {
@@ -1040,17 +1058,23 @@ const generateKiCadSchematic = (
     const din = index === 0 ? 'RGB_DIN' : `RGB_DOUT_${rgbKeys[index - 1].ledIndex}`;
     const dout = `RGB_DOUT_${key.ledIndex}`;
     const gndSeed = `sch-rgb-gnd-${key.ledIndex}`;
-    const gndX = x + 15.24;
-    const gndY = y - 2.54;
-    wires.push(makeWire(x - 11.43, y + 2.54, x - 15.24, y + 2.54, `wire-rgb-vcc-${key.ledIndex}`));
-    labels.push(makeLabel('VCC', x - 15.24, y + 2.54, `label-rgb-vcc-${key.ledIndex}`));
-    wires.push(makeWire(x + 11.43, y - 2.54, gndX, gndY, `wire-rgb-gnd-${key.ledIndex}`));
+    const leftPinX = x - 8.89;
+    const rightPinX = x + 8.89;
+    const stubLeftX = x - 12.7;
+    const stubRightX = x + 12.7;
+    const upperPinY = y - 2.54;
+    const lowerPinY = y + 2.54;
+    const gndX = stubRightX;
+    const gndY = lowerPinY;
+    wires.push(makeWire(leftPinX, upperPinY, stubLeftX, upperPinY, `wire-rgb-vcc-${key.ledIndex}`));
+    labels.push(makeLabel('VCC', stubLeftX, upperPinY, `label-rgb-vcc-${key.ledIndex}`));
+    wires.push(makeWire(rightPinX, lowerPinY, gndX, gndY, `wire-rgb-gnd-${key.ledIndex}`));
     instances.push(makeSymbolInstance(gndSeed, `#PWR${visibleKeys.length + index + 1}`, 'GND', ''));
     symbols.push(makePowerSymbol(`#PWR${visibleKeys.length + index + 1}`, gndX, gndY, gndSeed));
-    wires.push(makeWire(x + 11.43, y + 2.54, x + 15.24, y + 2.54, `wire-rgb-din-${key.ledIndex}`));
-    labels.push(makeLabel(din, x + 15.24, y + 2.54, `label-rgb-din-${key.ledIndex}`));
-    wires.push(makeWire(x - 11.43, y - 2.54, x - 15.24, y - 2.54, `wire-rgb-dout-${key.ledIndex}`));
-    labels.push(makeLabel(dout, x - 15.24, y - 2.54, `label-rgb-dout-${key.ledIndex}`));
+    wires.push(makeWire(rightPinX, upperPinY, stubRightX, upperPinY, `wire-rgb-din-${key.ledIndex}`));
+    labels.push(makeLabel(din, stubRightX, upperPinY, `label-rgb-din-${key.ledIndex}`));
+    wires.push(makeWire(leftPinX, lowerPinY, stubLeftX, lowerPinY, `wire-rgb-dout-${key.ledIndex}`));
+    labels.push(makeLabel(dout, stubLeftX, lowerPinY, `label-rgb-dout-${key.ledIndex}`));
   });
 
   return `(kicad_sch
@@ -1164,8 +1188,8 @@ const makeRgbLedFootprint = (
   return instantiateFootprintTemplate(
     getFootprintTemplate('LED_Smidr_SK6812MINI_E.kicad_mod'),
     LED_FOOTPRINTS.rgb,
-    `LED${key.ledIndex}`,
-    `RGB${key.ledIndex}`,
+    `LED${(key.ledIndex ?? index) + 1}`,
+    `RGB${(key.ledIndex ?? index) + 1}`,
     ledPosition.x,
     ledPosition.y,
     pcbRotation,
@@ -1376,6 +1400,7 @@ export const generateKiCadZip = async (
   zip.file(`${projectName}.kicad_pro`, generateKiCadProject(state.settings));
   zip.file('sym-lib-table', generateSymLibTable());
   zip.file('fp-lib-table', generateFpLibTable());
+  zip.file('smidr.kicad_sym', smidrSymbolsRaw.trim());
   zip.file(`${projectName}.kicad_sch`, generateKiCadSchematic(state.settings, state.keys, options));
   zip.file(`${projectName}.kicad_pcb`, generateKiCadPcb(state.settings, state.keys, options));
   zip.file(`${projectName}_plate.kicad_pcb`, generateKiCadPlatePcb(state.settings, state.keys));

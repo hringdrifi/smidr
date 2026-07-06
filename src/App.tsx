@@ -34,6 +34,7 @@ import {
   DEFAULT_KICAD_EXPORT_OPTIONS,
   generateKiCadZip,
   getKiCadFootprintPreviewTemplate,
+  getKiCadExportWarnings,
   getKiCadLedPreviewInfo,
   KICAD_DIODE_FOOTPRINTS,
   KICAD_SWITCH_FOOTPRINTS,
@@ -546,6 +547,12 @@ export default function App() {
     if (keys.length === 0) {
       alert(t('kicad.noKeys'));
       return;
+    }
+
+    const warnings = getKiCadExportWarnings({ settings, keys });
+    if (warnings.length > 0) {
+      const message = warnings.map(warning => t(`kicad.warnings.${warning}`)).join('\n');
+      if (!confirm(`${message}\n\n${t('common.continueExport')}`)) return;
     }
 
     const zipBlob = await generateKiCadZip({ settings, keys }, kicadExportOptions);

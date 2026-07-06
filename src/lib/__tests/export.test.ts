@@ -5,7 +5,7 @@ import { generateQmkZip } from '../qmk';
 import { generateRmkZip } from '../rmk';
 import { generateVialZip } from '../vial';
 import { generateZmkZip } from '../zmk';
-import { DEFAULT_KICAD_EXPORT_OPTIONS, generateKiCadZip, getKiCadLedPreviewInfo } from '../kicad';
+import { DEFAULT_KICAD_EXPORT_OPTIONS, generateKiCadZip, getKiCadExportWarnings, getKiCadLedPreviewInfo } from '../kicad';
 import { validateFirmwareExport } from '../export-validation';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
@@ -120,8 +120,8 @@ describe('export generation', () => {
     expect(zip.file('NOTICE.md')).toBeNull();
     expect(zip.file('LICENSE-marbastlib.txt')).toBeNull();
     expect(schematic).toContain('Switch footprint: Smidr:SW_Smidr_MX_Hotswap');
-    expect(schematic).toContain('(symbol "Smidr:SW_Push"');
-    expect(schematic).toContain('(lib_id "Smidr:SW_Push")');
+    expect(schematic).toContain('(symbol "Switch:SW_Push"');
+    expect(schematic).toContain('(lib_id "Switch:SW_Push")');
     expect(schematic).toContain('(property "Footprint" "Smidr:SW_Smidr_MX_Hotswap"');
     expect(schematic).toContain('(symbol "Device:D"');
     expect(schematic).toContain('(lib_id "Device:D")');
@@ -130,8 +130,9 @@ describe('export generation', () => {
     const d1Path = schematic.match(/\(path "(\/[^"]+)"\s+\(reference "D1"\)[\s\S]*?\(footprint "Smidr:D_Smidr_SOD323"\)/)?.[1];
     expect(sw1Path).toBeTruthy();
     expect(d1Path).toBeTruthy();
-    expect(symbolLibrary).toContain('(symbol "D"');
-    expect(symbolLibrary).toContain('(symbol "SW_Push"');
+    expect(symbolLibrary).toContain('(symbol "SK6812MINI_E"');
+    expect(symbolLibrary).not.toContain('(symbol "D"');
+    expect(symbolLibrary).not.toContain('(symbol "SW_Push"');
     expect(schematic).toContain('(label "ROW0"');
     expect(schematic).toContain('(label "COL1"');
     expect(schematic).toContain('(label "ROW0" (at 17.780 25.400 0)');
@@ -421,12 +422,29 @@ describe('export generation', () => {
     const ledTemplate = await zip.file('smidr.pretty/LED_Smidr_SK6812MINI_E.kicad_mod')!.async('string');
 
     expect(schematic).toContain('(lib_id "Smidr:SK6812MINI_E")');
+    expect(schematic).toContain('(symbol "SK6812MINI_E_0_1"');
+    expect(schematic).not.toContain('SK6812MINI-E_0_1');
     expect(schematic).toContain('(property "Footprint" "Smidr:LED_Smidr_SK6812MINI_E"');
-    const led0Path = schematic.match(/\(path "(\/[^"]+)"\s+\(reference "LED0"\)[\s\S]*?\(footprint "Smidr:LED_Smidr_SK6812MINI_E"\)/)?.[1];
+    expect(schematic).toMatch(/\(property "Reference" "LED1"\s+\(at 25\.400 69\.850 0\)/);
+    expect(schematic).toMatch(/\(property "Value" "RGB1"[\s\S]*?\(effects \(font \(size 1\.27 1\.27\)\) hide\)/);
+    expect(schematic).toContain('(pts (xy 16.510 73.660) (xy 12.700 73.660))');
+    expect(schematic).toContain('(label "VCC" (at 12.700 73.660 0)');
+    expect(schematic).toContain('(pts (xy 16.510 78.740) (xy 12.700 78.740))');
+    expect(schematic).toContain('(label "RGB_DOUT_0" (at 12.700 78.740 0)');
+    expect(schematic).toContain('(pts (xy 34.290 73.660) (xy 38.100 73.660))');
+    expect(schematic).toContain('(label "RGB_DIN" (at 38.100 73.660 0)');
+    expect(schematic).toContain('(pts (xy 34.290 78.740) (xy 38.100 78.740))');
+    expect(schematic).toMatch(/\(symbol\s+\(lib_id "power:GND"\)\s+\(at 38\.100 78\.740 0\)/);
+    const led0Path = schematic.match(/\(path "(\/[^"]+)"\s+\(reference "LED1"\)[\s\S]*?\(footprint "Smidr:LED_Smidr_SK6812MINI_E"\)/)?.[1];
     expect(led0Path).toBeTruthy();
     expect(pcb).toContain('(footprint "Smidr:LED_Smidr_SK6812MINI_E"');
     expect(pcb).toContain(`(path "${led0Path}")`);
     expect(pcb).toMatch(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(layer "B\.Cu"\)/);
+    const led0Footprint = pcb.match(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(path "[^"]+"\)[\s\S]*?(?=\n  \(footprint|\n  \(gr_|\n\))/)?.[0] ?? '';
+    expect(led0Footprint).toMatch(/\(pad "1"[\s\S]*?\(net \d+ "VCC"\)/);
+    expect(led0Footprint).toMatch(/\(pad "2"[\s\S]*?\(net \d+ "RGB_DOUT_0"\)/);
+    expect(led0Footprint).toMatch(/\(pad "3"[\s\S]*?\(net \d+ "GND"\)/);
+    expect(led0Footprint).toMatch(/\(pad "4"[\s\S]*?\(net \d+ "RGB_DIN"\)/);
     expect(pcb).toContain('(pad "1" smd roundrect');
     expect(pcb).toContain('(layers "B.Cu" "B.Mask" "B.Paste")');
     expect(pcb).toContain('"RGB_DIN"');
@@ -441,6 +459,31 @@ describe('export generation', () => {
     expect(ledTemplate).toContain('(footprint "LED_Smidr_SK6812MINI_E"');
     expect(ledTemplate).toMatch(/\(footprint "LED_Smidr_SK6812MINI_E"[\s\S]*?\(layer "F\.Cu"\)/);
     expect(ledTemplate).toContain('(layers "F.Cu"');
+  });
+
+  it('warns before KiCad export when RGB Matrix has no LED assignments', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: { ...baseSettings.features, rgbMatrix: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B' },
+    ];
+
+    expect(getKiCadExportWarnings({ settings, keys })).toEqual(['rgbMatrixNoLedAssignments']);
+  });
+
+  it('does not warn before KiCad export when RGB Matrix has LED assignments', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: { ...baseSettings.features, rgbMatrix: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
+    ];
+
+    expect(getKiCadExportWarnings({ settings, keys })).toEqual([]);
   });
 
   it('places KiCad RGB Matrix LEDs with Choc switch offsets', async () => {
