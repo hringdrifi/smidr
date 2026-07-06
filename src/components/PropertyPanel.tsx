@@ -14,6 +14,7 @@ import {
   AlignCenterHorizontal as AlignCenterVertical,
   AlignHorizontalDistributeCenter as DistributeHorizontal,
   AlignVerticalDistributeCenter as DistributeVertical,
+  FlipHorizontal2,
   Move,
   MoveHorizontal,
   MoveVertical,
@@ -48,7 +49,8 @@ export const PropertyPanel = () => {
   const { 
     keys, settings, editorSettings, selectedKeyIds, 
     updateKey, batchUpdateKeys, removeKey, 
-    alignSelectedKeys, distributeSelectedKeys 
+    alignSelectedKeys, distributeSelectedKeys,
+    mirrorCopyAxisMode, setMirrorCopyAxisMode
   } = useKeyboardStore();
   const { t } = useTranslation();
 
@@ -153,6 +155,26 @@ export const PropertyPanel = () => {
                   <span className="text-[8px] uppercase font-bold tracking-tighter">{t('properties.vertical')}</span>
                 </button>
               </div>
+            </PropertySection>
+
+            <Divider orientation="horizontal" />
+
+            <PropertySection title={t('properties.mirrorCopy')} icon={FlipHorizontal2} className="w-full">
+              <button
+                onClick={() => setMirrorCopyAxisMode(!mirrorCopyAxisMode)}
+                className={cn(
+                  "flex w-full flex-col items-center justify-center gap-1.5 p-3 rounded border text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all active:scale-95 group",
+                  mirrorCopyAxisMode
+                    ? "bg-amber-500/15 border-amber-500/50 text-amber-500"
+                    : "bg-[var(--bg-panel)] hover:bg-[var(--bg-hover)] border-[var(--border-main)]"
+                )}
+                title={mirrorCopyAxisMode ? t('properties.cancelMirrorCopy') : t('properties.pickMirrorAxis')}
+              >
+                <FlipHorizontal2 size={16} className="group-hover:text-amber-500 transition-colors" />
+                <span className="text-[8px] uppercase font-bold tracking-tighter">
+                  {mirrorCopyAxisMode ? t('properties.cancel') : t('properties.pickMirrorAxis')}
+                </span>
+              </button>
             </PropertySection>
 
             <Divider orientation="horizontal" />

@@ -32,7 +32,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const { 
     keys, previewKeys, settings, editorSettings, selectedKeyIds, focusedKeyId, selectionAnchorId,
     transform, editorMode, currentLayer, appMode, remoteKeymap,
-    matrixPaintMode, painter,
+    matrixPaintMode, painter, mirrorCopyAxisMode,
     setSelectedKeyIds, toggleKeySelection, setFocusedKeyId, setSelectionAnchorId,
     batchUpdateKeys, removeKey, undo, redo, setTransform, paintKey,
     setPreviewKeys, commitPreviewKeys, copyKeys, pasteKeys,
@@ -40,7 +40,8 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     setCanvasDimensions,
     connectedDevice, currentProjectId,
     zmkLocked, isKeymapSyncing,
-    setKeycode, updateDeviceKeycode
+    setKeycode, updateDeviceKeycode,
+    setMirrorCopyAxisMode, mirrorCopySelectedKeys
   } = useKeyboardStore();
   
   const { t } = useTranslation();
@@ -51,14 +52,15 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   const stageRef = useRef<any>(null);
   const [selBox, setSelBox] = useState<{ start: { x: number, y: number }, end: { x: number, y: number }, isRealDrag: boolean } | null>(null);
   const [paintHintPos, setPaintHintPos] = useState<{ x: number; y: number } | null>(null);
+  const [mirrorAxisPreviewX, setMirrorAxisPreviewX] = useState<number | null>(null);
   const [hoveredSortKeyId, setHoveredSortKeyId] = useState<string | null>(null);
 
   React.useEffect(() => {
     const container = containerRef.current;
     if (container) {
-      container.style.cursor = (appMode === 'design' && editorMode === 'matrix' && matrixPaintMode) ? 'crosshair' : 'default';
+      container.style.cursor = mirrorCopyAxisMode || (appMode === 'design' && editorMode === 'matrix' && matrixPaintMode) ? 'crosshair' : 'default';
     }
-  }, [appMode, editorMode, matrixPaintMode]);
+  }, [appMode, editorMode, matrixPaintMode, mirrorCopyAxisMode]);
   const transformRef = useRef(transform);
   const touchGestureRef = useRef<{
     mode: 'pan' | 'pinch' | 'select';
@@ -125,6 +127,13 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   }, [appMode, editorMode, matrixPaintMode, readonlyGeometry]);
 
   useEffect(() => {
+    if (!mirrorCopyAxisMode || readonlyGeometry || appMode !== 'design' || editorMode !== 'layout' || selectedKeyIds.length < 2) {
+      setMirrorAxisPreviewX(null);
+      if (mirrorCopyAxisMode) setMirrorCopyAxisMode(false);
+    }
+  }, [appMode, editorMode, mirrorCopyAxisMode, readonlyGeometry, selectedKeyIds.length, setMirrorCopyAxisMode]);
+
+  useEffect(() => {
     transformRef.current = transform;
   }, [transform]);
 
@@ -188,6 +197,11 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
       }
 
       if (e.key === 'Escape') {
+        if (mirrorCopyAxisMode) {
+          e.preventDefault();
+          setMirrorCopyAxisMode(false);
+          return;
+        }
         setSelectedKeyIds([]);
         setFocusedKeyId(null);
         setSelectionAnchorId(null);
@@ -266,7 +280,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, [setSelectedKeyIds, setFocusedKeyId, setSelectionAnchorId, selectedKeyIds, removeKey, visKeys, focusedKeyId, undo, redo, copyKeys, pasteKeys, editorSettings.gridSnap, editorSettings.syncOrigin, batchUpdateKeys, readonlyGeometry, appMode]);
+  }, [setSelectedKeyIds, setFocusedKeyId, setSelectionAnchorId, selectedKeyIds, removeKey, visKeys, focusedKeyId, undo, redo, copyKeys, pasteKeys, editorSettings.gridSnap, editorSettings.syncOrigin, batchUpdateKeys, readonlyGeometry, appMode, mirrorCopyAxisMode, setMirrorCopyAxisMode]);
 
   const lastCenteredRef = useRef<{ deviceId: string | null, projectId: string | null, width: number }>({ deviceId: null, projectId: null, width: 0 });
 
@@ -375,7 +389,38 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     setTransform({ scale: newScale, x: newPos.x - PADDING_X, y: newPos.y - PADDING_Y });
   };
 
+  const getMirrorAxisFromEvent = useCallback((e: any) => {
+    const stage = e.target?.getStage?.() || stageRef.current;
+    const pointer = stage?.getPointerPosition?.();
+    if (!pointer) return null;
+    const axisX = ((pointer.x - stage.x()) / stage.scaleX()) / UNIT;
+    return e.evt?.altKey
+      ? roundCoord(axisX)
+      : roundCoord(Math.round(axisX / editorSettings.gridSnap) * editorSettings.gridSnap);
+  }, [editorSettings.gridSnap]);
+
+  const updateMirrorAxisPreview = useCallback((e: any) => {
+    if (!mirrorCopyAxisMode) return;
+    const axisX = getMirrorAxisFromEvent(e);
+    if (axisX === null) return;
+    setMirrorAxisPreviewX(axisX);
+  }, [getMirrorAxisFromEvent, mirrorCopyAxisMode]);
+
+  const handleMirrorAxisClick = useCallback((e: any) => {
+    if (!mirrorCopyAxisMode) return false;
+    if (e.evt?.button !== undefined && e.evt.button !== 0) return true;
+    e.evt?.preventDefault?.();
+    e.cancelBubble = true;
+    const axisX = getMirrorAxisFromEvent(e);
+    if (axisX === null) return true;
+    mirrorCopySelectedKeys(axisX);
+    setMirrorAxisPreviewX(null);
+    return true;
+  }, [getMirrorAxisFromEvent, mirrorCopyAxisMode, mirrorCopySelectedKeys]);
+
   const handleStageMouseDown = (e: any) => {
+    if (handleMirrorAxisClick(e)) return;
+
     if (e.evt.button === 1) { // Middle click for pan
       const initialPos = { x: transform.x, y: transform.y };
       const startX = e.evt.clientX, startY = e.evt.clientY;
@@ -395,6 +440,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   };
 
   const handleStageMouseMove = (e: any) => {
+    updateMirrorAxisPreview(e);
     updatePaintHintPosition(e);
     if (!selBox) return;
     const stage = e.target.getStage();
@@ -885,6 +931,7 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                 keyDragRef.current = null;
               }}
               onMouseDown={(e) => {
+                if (mirrorCopyAxisMode) return;
                 if (e.evt && e.evt.button !== 0) return;
                 if (isMatrixPaintEvent(e)) {
                   e.cancelBubble = true;
@@ -922,8 +969,12 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   }
                 }
               }}
-              onMouseMove={updatePaintHintPosition}
+              onMouseMove={(e) => {
+                updateMirrorAxisPreview(e);
+                updatePaintHintPosition(e);
+              }}
               onClick={(e) => {
+                if (mirrorCopyAxisMode) return;
                 if (handleMatrixPaintClick(e, key)) return;
                 const isM = e.evt.ctrlKey || e.evt.metaKey;
                 const isS = e.evt.shiftKey;
@@ -1040,8 +1091,9 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                 onMouseEnter={() => {
                   if (editorSettings.debugMode) setHoveredSortKeyId(key.id);
                 }}
-                onMouseLeave={() => setHoveredSortKeyId(null)}
+              onMouseLeave={() => setHoveredSortKeyId(null)}
               onMouseDown={(e) => {
+                if (mirrorCopyAxisMode) return;
                 if (e.evt && e.evt.button !== 0) return;
                 if (isMatrixPaintEvent(e)) {
                   e.cancelBubble = true;
@@ -1079,8 +1131,12 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   }
                 }
               }}
-              onMouseMove={updatePaintHintPosition}
+              onMouseMove={(e) => {
+                updateMirrorAxisPreview(e);
+                updatePaintHintPosition(e);
+              }}
               onClick={(e) => {
+                if (mirrorCopyAxisMode) return;
                 if (handleMatrixPaintClick(e, key)) return;
                 const isM = e.evt.ctrlKey || e.evt.metaKey;
                 const isS = e.evt.shiftKey;
@@ -1118,6 +1174,35 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
                   width={76}
                   fontSize={10}
                   lineHeight={1.15}
+                  fontStyle="bold"
+                  fill="#fbbf24"
+                  listening={false}
+                />
+              </Group>
+            );
+          })()}
+
+          {mirrorCopyAxisMode && mirrorAxisPreviewX !== null && (() => {
+            const x = mirrorAxisPreviewX * UNIT;
+            const y1 = -(transform.y + PADDING_Y) / transform.scale;
+            const y2 = y1 + dimensions.height / transform.scale;
+            return (
+              <Group listening={false}>
+                <Line
+                  points={[x, y1, x, y2]}
+                  stroke="#f59e0b"
+                  strokeWidth={2 / transform.scale}
+                  dash={[8 / transform.scale, 6 / transform.scale]}
+                  opacity={0.95}
+                  shadowColor="#f59e0b"
+                  shadowBlur={8}
+                  shadowOpacity={0.35}
+                />
+                <Text
+                  text={t('properties.mirrorAxis')}
+                  x={x + 8 / transform.scale}
+                  y={y1 + 16 / transform.scale}
+                  fontSize={11 / transform.scale}
                   fontStyle="bold"
                   fill="#fbbf24"
                   listening={false}

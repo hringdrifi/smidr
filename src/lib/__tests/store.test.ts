@@ -42,6 +42,7 @@ describe('useKeyboardStore', () => {
       selectedKeyIds: [],
       focusedKeyId: null,
       selectionAnchorId: null,
+      mirrorCopyAxisMode: false,
       clipboard: [],
       matrixClipboard: [],
       actionClipboard: [],
@@ -646,5 +647,30 @@ describe('useKeyboardStore', () => {
     state = useKeyboardStore.getState();
     expect(state.keys[0].x).toBe(0);
     expect(state.keys[1].x).toBe(0);
+  });
+
+  it('should mirror-copy selected keys around a specified vertical axis in layout units', () => {
+    const store = useKeyboardStore.getState();
+    store.addKeys([
+      { x: 1, y: 2, w: 1, h: 1, rx: 1.5, ry: 2.5, r: 10, label: 'A' },
+      { x: 3, y: 4, w: 2, h: 1, rx: 4, ry: 4.5, r: -15, label: 'B' }
+    ], { skipCollision: true });
+
+    let state = useKeyboardStore.getState();
+    const originalIds = state.keys.map(k => k.id);
+    store.setSelectedKeyIds(originalIds);
+    store.mirrorCopySelectedKeys(5);
+
+    state = useKeyboardStore.getState();
+    expect(state.keys).toHaveLength(4);
+    expect(state.mirrorCopyAxisMode).toBe(false);
+    expect(state.selectedKeyIds).toHaveLength(2);
+    expect(state.selectedKeyIds).not.toContain(originalIds[0]);
+    expect(state.selectedKeyIds).not.toContain(originalIds[1]);
+
+    const copiedA = state.keys.find(k => k.id === state.selectedKeyIds[0]);
+    const copiedB = state.keys.find(k => k.id === state.selectedKeyIds[1]);
+    expect(copiedA).toMatchObject({ x: 8, y: 2, w: 1, h: 1, rx: 8.5, ry: 2.5, r: -10, label: 'A' });
+    expect(copiedB).toMatchObject({ x: 5, y: 4, w: 2, h: 1, rx: 6, ry: 4.5, r: 15, label: 'B' });
   });
 });

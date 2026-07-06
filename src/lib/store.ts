@@ -148,9 +148,11 @@ export interface KeyboardState {
   selectedKeyIds: string[];
   focusedKeyId: string | null;
   selectionAnchorId: string | null;
+  mirrorCopyAxisMode: boolean;
   setSelectedKeyIds: (ids: string[]) => void;
   setFocusedKeyId: (id: string | null) => void;
   setSelectionAnchorId: (id: string | null) => void;
+  setMirrorCopyAxisMode: (enabled: boolean) => void;
   toggleKeySelection: (id: string, multi: boolean) => void;
 
   // Editor Modes & Layers
@@ -236,6 +238,7 @@ export interface KeyboardState {
   // Layout Tools
   alignSelectedKeys: (type: 'left' | 'right' | 'top' | 'bottom' | 'center-x' | 'center-y') => void;
   distributeSelectedKeys: (type: 'horizontal' | 'vertical') => void;
+  mirrorCopySelectedKeys: (axisX: number) => void;
 
   // Layout Option Group Management
   addLayoutOptionGroup: (name: string) => string;
@@ -351,6 +354,7 @@ const initialState: Partial<KeyboardState> = {
   selectedKeyIds: [],
   focusedKeyId: null,
   selectionAnchorId: null,
+  mirrorCopyAxisMode: false,
   appMode: isDemoModeEnabled() ? 'remap' : getStoredAppMode(),
   editorMode: getStoredEditorMode(),
   currentLayer: 0,
@@ -1644,24 +1648,30 @@ export const useKeyboardStore = create<KeyboardState>()(
           selectionAnchorId: null,
         }),
 
-        setSelectedKeyIds: (ids: string[]) => set({ selectedKeyIds: ids }),
+        setSelectedKeyIds: (ids: string[]) => set((s) => ({
+          selectedKeyIds: ids,
+          mirrorCopyAxisMode: ids.length > 1 ? s.mirrorCopyAxisMode : false,
+        })),
         setFocusedKeyId: (id: string | null) => set({ focusedKeyId: id }),
         setSelectionAnchorId: (id: string | null) => set({ selectionAnchorId: id }),
+        setMirrorCopyAxisMode: (enabled: boolean) => set((s) => ({
+          mirrorCopyAxisMode: enabled && s.selectedKeyIds.length > 1,
+        })),
         
         toggleKeySelection: (id: string, multi: boolean) => set((s) => {
           if (multi) {
             const isSelected = s.selectedKeyIds.includes(id);
             const newIds = isSelected ? s.selectedKeyIds.filter(i => i !== id) : [...s.selectedKeyIds, id];
-            return { selectedKeyIds: newIds, focusedKeyId: id, selectionAnchorId: id };
+            return { selectedKeyIds: newIds, focusedKeyId: id, selectionAnchorId: id, mirrorCopyAxisMode: newIds.length > 1 ? s.mirrorCopyAxisMode : false };
           } else {
-            return { selectedKeyIds: [id], focusedKeyId: id, selectionAnchorId: id };
+            return { selectedKeyIds: [id], focusedKeyId: id, selectionAnchorId: id, mirrorCopyAxisMode: false };
           }
         }),
 
         setAppMode: (m: 'design' | 'remap') => {
           if (!get().isDemoMode) setStoredAppMode(m);
           if (get().isDemoMode) {
-            set({ appMode: m, selectedKeyIds: [] });
+            set({ appMode: m, selectedKeyIds: [], mirrorCopyAxisMode: false });
             return;
           }
           if (m === 'design') {
@@ -1672,18 +1682,19 @@ export const useKeyboardStore = create<KeyboardState>()(
             set((s) => ({
               appMode: m,
               selectedKeyIds: [],
+              mirrorCopyAxisMode: false,
               connectedDevice: null,
               deviceCapabilities: null,
               activeTransport: null,
               zmkLayerMetadata: null,
             }));
           } else {
-            set({ appMode: m, selectedKeyIds: [] });
+            set({ appMode: m, selectedKeyIds: [], mirrorCopyAxisMode: false });
           }
         },
         setEditorMode: (m: EditorMode) => {
           if (!get().isDemoMode) setStoredEditorMode(m);
-          set({ editorMode: m, selectedKeyIds: [] });
+          set({ editorMode: m, selectedKeyIds: [], mirrorCopyAxisMode: false });
         },
 
         setConnectedDevice: (d: KeyboardState['connectedDevice']) => set({
@@ -2354,6 +2365,31 @@ export const useKeyboardStore = create<KeyboardState>()(
             });
           }
           return { keys: s.keys.map(k => updates[k.id] ? { ...k, ...updates[k.id] } : k) };
+        }),
+
+        mirrorCopySelectedKeys: (axisX: number) => set((s) => {
+          const selectedKeys = s.keys.filter(k => s.selectedKeyIds.includes(k.id));
+          if (selectedKeys.length < 2) return { mirrorCopyAxisMode: false };
+
+          const mirroredKeys = selectedKeys.map(key => ({
+            ...key,
+            id: crypto.randomUUID(),
+            x: roundCoord(axisX * 2 - key.x - key.w),
+            rx: roundCoord(axisX * 2 - key.rx),
+            r: roundRot(-(key.r ?? 0)),
+          }));
+          const nextKeys = [...s.keys, ...mirroredKeys];
+          const nextSelectedIds = mirroredKeys.map(key => key.id);
+          const nextFocusedId = nextSelectedIds[0] ?? null;
+
+          return {
+            keys: nextKeys,
+            baseKeys: nextKeys,
+            selectedKeyIds: nextSelectedIds,
+            focusedKeyId: nextFocusedId,
+            selectionAnchorId: nextFocusedId,
+            mirrorCopyAxisMode: false,
+          };
         }),
 
         addLayoutOptionGroup: (name: string) => {

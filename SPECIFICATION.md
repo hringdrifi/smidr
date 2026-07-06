@@ -74,6 +74,10 @@
 - **回転ハンドルドラッグ**: 選択中の全キーを、**フォーカスキーのピボットを中心**に回転。
 - **ピボットハンドルドラッグ**: フォーカスキーの回転中心（Pivot）を移動。
 - **Alt + ドラッグ**: 移動・回転・ピボット移動時のスナップ（0.25u / 15度）を一時的に無効化します。
+- **反転コピー**: レイアウトモードで複数キー選択時、PropertyPanel の反転コピー操作から反転軸指定モードに入る。キャンバス上で左クリックした位置の X 座標を垂直反転軸として、選択中キーを左右反転したコピーを作成する。コピー後は新規コピーのみを選択し、反転軸指定モードを終了する。
+  - **座標計算**: 反転軸はレイアウト単位 (`u`) で扱い、`copied.x = axisX * 2 - original.x - original.w`、`copied.rx = axisX * 2 - original.rx` とする。Y 座標および `ry` は維持し、回転角 `r` は符号反転する。
+  - **反転軸のスナップ**: 反転軸の X 座標は通常 `gridSnap` に従ってスナップする。`Alt` を押しながら指定した場合はスナップを一時的に無効化する。
+  - **キャンセル**: `Escape`、PropertyPanel の同操作の再押下、選択が2キー未満になる操作、アプリモード・エディタモード変更で反転軸指定モードを終了する。
 
 ### 6.5 キーボードショートカット
 - **Delete / Backspace**: 選択中のキーを削除。
@@ -161,12 +165,12 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **制限**: 初期実装では Split の central/peripheral matrix、Encoder、RGB/Backlight、Combo 定義、Macro 定義の RMK 固有コード生成は警告対象とし、キー上の `TD(n)` / `Macro(n)` 参照のみを出力する。
 
 ### 7.8 KiCad MVP 出力
-- **出力形式**: KiCad データは ZIP として出力し、`<project>.kicad_pro`, `<project>.kicad_sch`, `<project>.kicad_pcb`, `<project>_plate.kicad_pcb`, `sym-lib-table`, `fp-lib-table`, `README.md`, `smidr.pretty/*.kicad_mod` を含める。
+- **出力形式**: KiCad データは ZIP として出力し、`<project>.kicad_pro`, `<project>.kicad_sch`, `<project>.kicad_pcb`, `<project>_plate.kicad_pcb`, `sym-lib-table`, `fp-lib-table`, `README.md`, `smidr.kicad_sym`, `smidr.pretty/*.kicad_mod` を含める。
 - **フットプリント選択**: 出力直前に footprint を選択できるダイアログを表示する。選択値は当該エクスポートにのみ適用し、`.smidr` プロジェクト設定には保存しない。スイッチは `Smidr:SW_Smidr_MX_Solder`, `Smidr:SW_Smidr_MX_Hotswap`, `Smidr:SW_Smidr_Choc_Solder`, `Smidr:SW_Smidr_Choc_Hotswap` を選択肢とする。`matrix.wiring === 'matrix'` の場合のみダイオード設定を表示し、ダイオードは `Smidr:D_Smidr_SOD123`, `Smidr:D_Smidr_SOD323`, `Smidr:D_Smidr_DO35` を選択肢とする。
-- **ライブラリ**: 回路図シンボルは KiCad 標準ライブラリの `Switch:SW_Push`, `Device:D`, `Device:LED`, `LED:SK6812MINI-E`, `power:GND` を使用し、ZIP 内に Smiðr 独自の symbol library は同梱しない。footprint はソース管理下の `src/lib/kicad-assets/smidr.pretty/*.kicad_mod` をテンプレートとして読み込み、ZIP 内に `smidr.pretty` を同梱する。`fp-lib-table` は `${KIPRJMOD}/smidr.pretty` を `Smidr` ライブラリとして参照する。追加の git submodule やサードパーティライセンス同梱ファイルは生成しない。
+- **ライブラリ**: 回路図シンボルは KiCad 標準ライブラリの `Switch:SW_Push`, `Device:D`, `Device:LED`, `power:GND` を基本とし、KiCad 10 以前の互換性を保つため SK6812MINI-E のみ `Smidr:SK6812MINI_E` を使用する。SK6812MINI-E のピン割りは `1=GND/VSS`, `2=DIN`, `3=VCC/VDD`, `4=DOUT` とする。ZIP 内には SK6812MINI-E のみを含む `smidr.kicad_sym` と `smidr.pretty` を同梱する。`sym-lib-table` は `${KIPRJMOD}/smidr.kicad_sym`、`fp-lib-table` は `${KIPRJMOD}/smidr.pretty` を `Smidr` ライブラリとして参照する。追加の git submodule やサードパーティライセンス同梱ファイルは生成しない。
 - **スイッチ外形の生成**: スイッチ footprint はキー中心を origin とし、電気パッドおよびスイッチ本体形状は選択した方式に応じて生成する。`PhysicalKey.w/h` に応じて keycap, `F.Fab`, `F.CrtYd` の外形をキーごとに可変生成する。
 - **SMD footprint の裏面配置**: MX/Choc の hot-swap、SOD123/SOD323、SK6812MINI-E は `attr smd` の footprint として扱う。テンプレート上では `F.Cu` / `F.Paste` / `F.Mask` 側に定義し、`.kicad_pcb` へ直接展開する際は footprint layer と各要素を `B.Cu` / `B.Paste` / `B.Mask` / `B.SilkS` / `B.Fab` / `B.CrtYd` へ切り替えて裏面配置する。THT の MX/Choc solder と DO-35 は表面配置のままとする。
-- **PCB 初期表示**: `.kicad_pcb` には `src/lib/kicad-assets/smidr.pretty/*.kicad_mod` を読み込んで board footprint として直接展開する。KiCad 側の footprint 更新なしで初期表示できることを優先しつつ、`smidr.pretty` は後から更新/差し替えしやすいテンプレートとして同梱する。
+- **PCB 初期表示**: `.kicad_pcb` には `src/lib/kicad-assets/smidr.pretty/*.kicad_mod` を読み込んで board footprint として直接展開する。KiCad 側の footprint 更新なしで初期表示できることを優先しつつ、`smidr.kicad_sym` と `smidr.pretty` は後から更新/差し替えしやすいテンプレートとして同梱する。
 - **LED 出力**: `features.rgbMatrix` が有効で `ledIndex` を持つキーがある場合、選択中のスイッチ footprint 種別に応じたLED中心位置へ `Smidr:LED_Smidr_SK6812MINI_E` を配置し、`VCC`, `GND`, `RGB_DIN`, `RGB_DOUT_<index>` ネットを生成する。`features.backlight` が有効な場合は全表示キーへ単色バックライトLEDを配置し、`BACKLIGHT` と `GND` の間へ並列接続する。MXでは砲弾型の `Smidr:LED_Smidr_Backlight`、Choc/Gateron LPでは裏面実装・透光用基板開口付きの `Smidr:LED_Smidr_Backlight_1206_Reverse` を使用する。LED位置はRGB LEDと共通で、スイッチ中心から MX では下方向へ5.08mm、Chocでは上方向へ4.7mm、Gateron LPでは上方向へ5.175mmとし、キー回転に追従する。
 - **ダイオード配置**: `matrix.wiring === 'matrix'` の KiCad 出力ダイアログでは、ダイオード footprint のキー中心からの X/Y オフセットと追加回転を設定できる。オフセットはキー中心を原点とする純粋な mm 指定で、キー回転に追従する。初期値は X=6.746875mm, Y=3.96875mm, 追加回転=-90度とする。ダイアログには 1u キーとダイオード位置を示す簡易プレビューを表示する。`matrix.wiring === 'direct'` の場合、ダイオード設定とダイオード位置プレビューは表示しない。
 - **プレート PCB 出力**: `<project>_plate.kicad_pcb` には `Smidr:Plate_Smidr_Key_Hole` を各キー中心へ配置する。プレート用 footprint はネットを持たず、キー穴はテンプレート内の `Edge.Cuts` として定義する。`PhysicalKey.w/h` に応じて keycap, `F.Fab`, `F.CrtYd` の外形をキーごとに可変生成する。
