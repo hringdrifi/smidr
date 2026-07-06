@@ -1,5 +1,4 @@
 import JSZip from 'jszip';
-import smidrSymbolsRaw from './kicad-assets/smidr.kicad_sym?raw';
 import diodeDo35Raw from './kicad-assets/smidr.pretty/D_Smidr_DO35.kicad_mod?raw';
 import diodeSod123Raw from './kicad-assets/smidr.pretty/D_Smidr_SOD123.kicad_mod?raw';
 import diodeSod323Raw from './kicad-assets/smidr.pretty/D_Smidr_SOD323.kicad_mod?raw';
@@ -40,12 +39,12 @@ export interface KiCadExportOptions {
 }
 
 export const KICAD_SWITCH_FOOTPRINTS: KiCadFootprintChoice[] = [
-  { id: 'mx-solder', label: 'MX Solder', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_MX_Solder', footprintSource: 'SW_Smidr_MX_Solder.kicad_mod', kind: 'mx-solder', mountType: 'through_hole' },
-  { id: 'mx-hotswap', label: 'MX Hotswap', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_MX_Hotswap', footprintSource: 'SW_Smidr_MX_Hotswap.kicad_mod', kind: 'mx-hotswap', mountType: 'smd' },
-  { id: 'choc-solder', label: 'Choc Solder', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Choc_Solder', footprintSource: 'SW_Smidr_Choc_Solder.kicad_mod', kind: 'choc-solder', mountType: 'through_hole' },
-  { id: 'choc-hotswap', label: 'Choc Hotswap', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Choc_Hotswap', footprintSource: 'SW_Smidr_Choc_Hotswap.kicad_mod', kind: 'choc-hotswap', mountType: 'smd' },
-  { id: 'gateron-lp-solder', label: 'Gateron LP Solder', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Gateron_LP_Solder', footprintSource: 'SW_Smidr_Gateron_LP_Solder.kicad_mod', kind: 'gateron-lp-solder', mountType: 'through_hole' },
-  { id: 'gateron-lp-hotswap', label: 'Gateron LP Hotswap', symbol: 'Smidr:SW_Push', footprint: 'Smidr:SW_Smidr_Gateron_LP_Hotswap', footprintSource: 'SW_Smidr_Gateron_LP_Hotswap.kicad_mod', kind: 'gateron-lp-hotswap', mountType: 'smd' },
+  { id: 'mx-solder', label: 'MX Solder', symbol: 'Switch:SW_Push', footprint: 'Smidr:SW_Smidr_MX_Solder', footprintSource: 'SW_Smidr_MX_Solder.kicad_mod', kind: 'mx-solder', mountType: 'through_hole' },
+  { id: 'mx-hotswap', label: 'MX Hotswap', symbol: 'Switch:SW_Push', footprint: 'Smidr:SW_Smidr_MX_Hotswap', footprintSource: 'SW_Smidr_MX_Hotswap.kicad_mod', kind: 'mx-hotswap', mountType: 'smd' },
+  { id: 'choc-solder', label: 'Choc Solder', symbol: 'Switch:SW_Push', footprint: 'Smidr:SW_Smidr_Choc_Solder', footprintSource: 'SW_Smidr_Choc_Solder.kicad_mod', kind: 'choc-solder', mountType: 'through_hole' },
+  { id: 'choc-hotswap', label: 'Choc Hotswap', symbol: 'Switch:SW_Push', footprint: 'Smidr:SW_Smidr_Choc_Hotswap', footprintSource: 'SW_Smidr_Choc_Hotswap.kicad_mod', kind: 'choc-hotswap', mountType: 'smd' },
+  { id: 'gateron-lp-solder', label: 'Gateron LP Solder', symbol: 'Switch:SW_Push', footprint: 'Smidr:SW_Smidr_Gateron_LP_Solder', footprintSource: 'SW_Smidr_Gateron_LP_Solder.kicad_mod', kind: 'gateron-lp-solder', mountType: 'through_hole' },
+  { id: 'gateron-lp-hotswap', label: 'Gateron LP Hotswap', symbol: 'Switch:SW_Push', footprint: 'Smidr:SW_Smidr_Gateron_LP_Hotswap', footprintSource: 'SW_Smidr_Gateron_LP_Hotswap.kicad_mod', kind: 'gateron-lp-hotswap', mountType: 'smd' },
 ];
 
 export const KICAD_DIODE_FOOTPRINTS: KiCadFootprintChoice[] = [
@@ -59,6 +58,7 @@ const LED_FOOTPRINTS = {
   backlight1206Reverse: 'Smidr:LED_Smidr_Backlight_1206_Reverse',
   rgb: 'Smidr:LED_Smidr_SK6812MINI_E',
 };
+const RGB_LED_SYMBOL = 'LED:SK6812MINI-E';
 const PLATE_FOOTPRINT = 'Smidr:Plate_Smidr_Key_Hole';
 
 const KICAD_FOOTPRINT_TEMPLATE_FILES: Record<string, string> = {
@@ -313,7 +313,6 @@ const generateFpLibTable = () => `(fp_lib_table
 )`;
 
 const generateSymLibTable = () => `(sym_lib_table
-  (lib (name "Smidr")(type "KiCad")(uri "\${KIPRJMOD}/smidr.kicad_sym")(options "")(descr "Smiðr generated symbols"))
 )`;
 
 const footprintNet = (netId?: number, netName?: string) => (
@@ -458,29 +457,98 @@ const findMatchingParen = (value: string, start: number) => {
   return -1;
 };
 
-const generateEmbeddedSymbols = () => {
-  const embeddedNames: Record<string, string> = {
-    SW_Push: 'Smidr:SW_Push',
-    D: 'Device:D',
-    LED: 'Device:LED',
-    SK6812MINI_E: 'Smidr:SK6812MINI_E',
-  };
-  const symbols: string[] = [];
-  let index = 0;
-  while (index < smidrSymbolsRaw.length) {
-    const start = smidrSymbolsRaw.indexOf('(symbol "', index);
-    if (start === -1) break;
-    const end = findMatchingParen(smidrSymbolsRaw, start);
-    if (end === -1) break;
-    const symbol = smidrSymbolsRaw.slice(start, end + 1).trim().replace(
-      /^\(symbol "([^"]+)"/,
-      (match, name: string) => `(symbol "${embeddedNames[name] ?? name}"`
-    );
-    symbols.push(`  ${symbol}`);
-    index = end + 1;
-  }
-  return [POWER_GND_SYMBOL, ...symbols].join('\n');
-};
+const DEVICE_D_SYMBOL = `  (symbol "Device:D"
+    (pin_names (offset 1.016))
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "D" (at 0 2.54 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "D" (at 0 -2.54 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (symbol "D_0_1"
+      (polyline (pts (xy -0.762 0) (xy 0.762 0)) (stroke (width 0) (type default)) (fill (type none)))
+      (polyline (pts (xy -0.762 -1.016) (xy -0.762 1.016)) (stroke (width 0.254) (type default)) (fill (type none)))
+      (polyline (pts (xy 0.762 -1.016) (xy -0.762 0) (xy 0.762 1.016) (xy 0.762 -1.016)) (stroke (width 0.254) (type default)) (fill (type none)))
+    )
+    (symbol "D_1_1"
+      (pin passive line (at -2.54 0 0) (length 1.778) (name "K" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      (pin passive line (at 2.54 0 180) (length 1.778) (name "A" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+    )
+  )`;
+
+const DEVICE_LED_SYMBOL = `  (symbol "Device:LED"
+    (pin_names (offset 1.016))
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "LED" (at 0 2.54 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "LED" (at 0 -2.54 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (symbol "LED_0_1"
+      (polyline (pts (xy -0.762 -1.016) (xy -0.762 1.016)) (stroke (width 0.254) (type default)) (fill (type none)))
+      (polyline (pts (xy 0.762 -1.016) (xy -0.762 0) (xy 0.762 1.016) (xy 0.762 -1.016)) (stroke (width 0.254) (type default)) (fill (type none)))
+      (polyline (pts (xy 1.016 0) (xy -0.762 0)) (stroke (width 0) (type default)) (fill (type none)))
+    )
+    (symbol "LED_1_1"
+      (pin passive line (at -2.54 0 0) (length 1.778) (name "K" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      (pin passive line (at 2.54 0 180) (length 1.778) (name "A" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+    )
+  )`;
+
+const RGB_LED_STANDARD_SYMBOL = `  (symbol "${RGB_LED_SYMBOL}"
+    (pin_names (offset 1.016))
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "LED" (at 0 5.08 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "SK6812MINI-E" (at 0 -5.08 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (symbol "SK6812MINI-E_0_1"
+      (rectangle (start -6.35 3.81) (end 6.35 -3.81) (stroke (width 0.254) (type default)) (fill (type background)))
+    )
+    (symbol "SK6812MINI-E_1_1"
+      (pin power_in line (at -8.89 2.54 0) (length 2.54) (name "VDD" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      (pin output line (at -8.89 -2.54 0) (length 2.54) (name "DOUT" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+      (pin input line (at 8.89 2.54 180) (length 2.54) (name "DIN" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))
+      (pin power_in line (at 8.89 -2.54 180) (length 2.54) (name "GND" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
+    )
+  )`;
+
+const SWITCH_PUSH_SYMBOL = `  (symbol "Switch:SW_Push"
+    (pin_names (offset 1.016) (hide yes))
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (property "Reference" "SW" (at 0 3.81 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "SW_Push" (at 0 -1.524 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "" (at 0 -5.08 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+    (symbol "SW_Push_0_1"
+      (polyline (pts (xy -2.54 1.27) (xy 2.54 1.27)) (stroke (width 0.1524) (type default)) (fill (type none)))
+      (circle (center -2.032 0) (radius 0.508) (stroke (width 0) (type default)) (fill (type none)))
+      (polyline (pts (xy 0 1.27) (xy 0 3.048)) (stroke (width 0) (type default)) (fill (type none)))
+      (circle (center 2.032 0) (radius 0.508) (stroke (width 0) (type default)) (fill (type none)))
+    )
+    (symbol "SW_Push_1_1"
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "2" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+    )
+  )`;
+
+const generateEmbeddedSymbols = () => [
+  POWER_GND_SYMBOL,
+  DEVICE_D_SYMBOL,
+  DEVICE_LED_SYMBOL,
+  RGB_LED_STANDARD_SYMBOL,
+  SWITCH_PUSH_SYMBOL,
+].join('\n');
 
 const keyOutline = (key: Pick<PhysicalKey, 'w' | 'h'>, clearance = 0) => {
   const halfWidth = ((key.w || 1) * UNIT_MM / 2) + clearance;
@@ -946,7 +1014,7 @@ const generateKiCadSchematic = (
     const y = 25.4 + Math.ceil(visibleKeys.length / 8) * 25.4 + 25.4 + Math.floor(index / 6) * 25.4;
     const ledSeed = `sch-rgb-${key.ledIndex}`;
     instances.push(makeSymbolInstance(ledSeed, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb));
-    symbols.push(makeSchematicSymbol('Smidr:SK6812MINI_E', `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, ledSeed));
+    symbols.push(makeSchematicSymbol(RGB_LED_SYMBOL, `LED${key.ledIndex}`, `RGB${key.ledIndex}`, LED_FOOTPRINTS.rgb, x, y, ledSeed));
   });
 
   if (settings.features.backlight) {
@@ -993,7 +1061,7 @@ const generateKiCadSchematic = (
   (title_block
     (title "${title}")
     (company "${escapeString(settings.manufacturer || '')}")
-    (comment 1 "Generated by Smiðr KiCad MVP export")
+    (comment 1 "Generated by Smiðr KiCad export")
     (comment 2 "Switch footprint: ${escapeString(switchChoice.footprint)}")
     (comment 3 "Diode footprint: ${escapeString(diodeChoice.footprint)}")
   )
@@ -1308,7 +1376,6 @@ export const generateKiCadZip = async (
   zip.file(`${projectName}.kicad_pro`, generateKiCadProject(state.settings));
   zip.file('sym-lib-table', generateSymLibTable());
   zip.file('fp-lib-table', generateFpLibTable());
-  zip.file('smidr.kicad_sym', smidrSymbolsRaw.trim());
   zip.file(`${projectName}.kicad_sch`, generateKiCadSchematic(state.settings, state.keys, options));
   zip.file(`${projectName}.kicad_pcb`, generateKiCadPcb(state.settings, state.keys, options));
   zip.file(`${projectName}_plate.kicad_pcb`, generateKiCadPlatePcb(state.settings, state.keys));
