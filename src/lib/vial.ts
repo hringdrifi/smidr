@@ -57,6 +57,12 @@ const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
   keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
 );
 
+const hasMouseKeymap = (keys: PhysicalKey[]) => (
+  keys.some(key => Object.values(key.keymap || {}).some(action => (
+    action.action === 'tap' && action.keycode.startsWith('MOUSE_')
+  )))
+);
+
 const shouldUseMatrixMask = (settings: ProjectSettings) => {
   return settings.qmk?.matrixMasked === true;
 };
@@ -326,6 +332,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
   const useDirectPins = isDirectPinMatrix(settings);
   const rgbMatrixKeys = getRgbMatrixKeys(settings, validKeys);
   const rgbMatrixLedCount = getRgbMatrixLedCount(rgbMatrixKeys);
+  const usesMouseKeys = hasMouseKeymap(validKeys);
 
   const zip = new JSZip();
   const kbName = settings.name.replace(/\s+/g, '_').toLowerCase() || 'smidr_keyboard';
@@ -350,7 +357,7 @@ export const generateVialZip = async (state: { settings: ProjectSettings, keys: 
       command: false,
       console: false,
       extrakey: false,
-      mousekey: false,
+      mousekey: usesMouseKeys,
       nkro: true,
       encoder: encoders.length > 0,
       rgblight: settings.features.rgb,

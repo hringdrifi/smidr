@@ -247,6 +247,13 @@ export const KEYCODES: Keycode[] = [
   { code: 'MOUSE_BTN3', label: 'Btn 3', category: 'Media' },
   { code: 'MOUSE_BTN4', label: 'Btn 4', category: 'Media' },
   { code: 'MOUSE_BTN5', label: 'Btn 5', category: 'Media' },
+  { code: 'MOUSE_WHEEL_UP', label: 'Wh Up', category: 'Media' },
+  { code: 'MOUSE_WHEEL_DOWN', label: 'Wh Dn', category: 'Media' },
+  { code: 'MOUSE_WHEEL_LEFT', label: 'Wh Lt', category: 'Media' },
+  { code: 'MOUSE_WHEEL_RIGHT', label: 'Wh Rt', category: 'Media' },
+  { code: 'MOUSE_ACCEL0', label: 'Ms A0', category: 'Media' },
+  { code: 'MOUSE_ACCEL1', label: 'Ms A1', category: 'Media' },
+  { code: 'MOUSE_ACCEL2', label: 'Ms A2', category: 'Media' },
 
   ...Array.from({ length: 16 }, (_, i) => ({ code: `MACRO_${i}`, label: `M${i}`, category: 'Macro' as const })),
   ...Array.from({ length: 16 }, (_, i) => ({ code: `TD_${i}`, label: `TD${i}`, category: 'Tap Dance' as const, description: `Tap Dance ${i}` })),

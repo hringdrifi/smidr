@@ -174,6 +174,13 @@ describe('protocols conversion tests', () => {
       expect(viaCodeToAction(0x00D3)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN3' });
       expect(viaCodeToAction(0x00D4)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN4' });
       expect(viaCodeToAction(0x00D5)).toEqual({ action: 'tap', keycode: 'MOUSE_BTN5' });
+      expect(viaCodeToAction(0x00D9)).toEqual({ action: 'tap', keycode: 'MOUSE_WHEEL_UP' });
+      expect(viaCodeToAction(0x00DA)).toEqual({ action: 'tap', keycode: 'MOUSE_WHEEL_DOWN' });
+      expect(viaCodeToAction(0x00DB)).toEqual({ action: 'tap', keycode: 'MOUSE_WHEEL_LEFT' });
+      expect(viaCodeToAction(0x00DC)).toEqual({ action: 'tap', keycode: 'MOUSE_WHEEL_RIGHT' });
+      expect(viaCodeToAction(0x00DD)).toEqual({ action: 'tap', keycode: 'MOUSE_ACCEL0' });
+      expect(viaCodeToAction(0x00DE)).toEqual({ action: 'tap', keycode: 'MOUSE_ACCEL1' });
+      expect(viaCodeToAction(0x00DF)).toEqual({ action: 'tap', keycode: 'MOUSE_ACCEL2' });
 
       expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_UP' })).toBe(0x00CD);
       expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_DOWN' })).toBe(0x00CE);
@@ -184,6 +191,13 @@ describe('protocols conversion tests', () => {
       expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN3' })).toBe(0x00D3);
       expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN4' })).toBe(0x00D4);
       expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_BTN5' })).toBe(0x00D5);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_WHEEL_UP' })).toBe(0x00D9);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_WHEEL_DOWN' })).toBe(0x00DA);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_WHEEL_LEFT' })).toBe(0x00DB);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_WHEEL_RIGHT' })).toBe(0x00DC);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_ACCEL0' })).toBe(0x00DD);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_ACCEL1' })).toBe(0x00DE);
+      expect(actionToViaCode({ action: 'tap', keycode: 'MOUSE_ACCEL2' })).toBe(0x00DF);
     });
 
     it('should convert modifier combination keycodes', () => {
@@ -475,6 +489,9 @@ describe('protocols conversion tests', () => {
 
       expect(zmkStringToAction('&mmv MOVE_UP')).toEqual({ action: 'tap', keycode: 'MOUSE_UP' });
       expect(actionToZmkString({ action: 'tap', keycode: 'MOUSE_UP' })).toBe('&mmv MOVE_UP');
+      expect(zmkStringToAction('&msc SCRL_UP')).toEqual({ action: 'tap', keycode: 'MOUSE_WHEEL_UP' });
+      expect(actionToZmkString({ action: 'tap', keycode: 'MOUSE_WHEEL_UP' })).toBe('&msc SCRL_UP');
+      expect(() => actionToZmkString({ action: 'tap', keycode: 'MOUSE_ACCEL0' })).toThrow('ZMK does not support QMK mouse acceleration key MOUSE_ACCEL0.');
     });
 
     it('should parse and format ZMK lighting keys as tap actions', () => {

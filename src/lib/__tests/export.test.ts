@@ -2273,6 +2273,48 @@ describe('export generation', () => {
     expect(keyboardC).toContain('const matrix_row_t matrix_mask[MATRIX_ROWS]');
   });
 
+  it('enables mousekey in QMK and Vial only when mouse keys are assigned', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Mouse Key Board',
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: {
+          0: { action: 'tap', keycode: 'MOUSE_WHEEL_UP' },
+        },
+      },
+    ];
+
+    const qmkBlob = await generateQmkZip({ settings, keys });
+    const vialBlob = await generateVialZip({ settings, keys });
+
+    const qmkZip = await JSZip.loadAsync(await qmkBlob!.arrayBuffer());
+    const vialZip = await JSZip.loadAsync(await vialBlob!.arrayBuffer());
+    const qmkKeyboardJson = JSON.parse(await qmkZip.file('mouse_key_board/keyboard.json')!.async('string'));
+    const vialKeyboardJson = JSON.parse(await vialZip.file('mouse_key_board/keyboard.json')!.async('string'));
+
+    expect(qmkKeyboardJson.features.mousekey).toBe(true);
+    expect(vialKeyboardJson.features.mousekey).toBe(true);
+  });
+
   it('omits Vial static tap dance definitions and warns when configured', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,

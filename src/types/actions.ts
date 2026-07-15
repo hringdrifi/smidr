@@ -58,9 +58,11 @@ export type UniversalKey =
   | "RM_VALU" | "RM_VALD"
   | "RM_SPDU" | "RM_SPDD"
   | "RM_FLGN" | "RM_FLGP"
-  // マウスキー (QMK / ZMK 共通)
+  // マウスキー
   | "MOUSE_UP" | "MOUSE_DOWN" | "MOUSE_LEFT" | "MOUSE_RIGHT"
   | "MOUSE_BTN1" | "MOUSE_BTN2" | "MOUSE_BTN3" | "MOUSE_BTN4" | "MOUSE_BTN5"
+  | "MOUSE_WHEEL_UP" | "MOUSE_WHEEL_DOWN" | "MOUSE_WHEEL_LEFT" | "MOUSE_WHEEL_RIGHT"
+  | "MOUSE_ACCEL0" | "MOUSE_ACCEL1" | "MOUSE_ACCEL2"
   // システム・ファームウェア
   | "BOOTLOADER" | "SYSTEM_RESET"
   // 特別・透過・なし

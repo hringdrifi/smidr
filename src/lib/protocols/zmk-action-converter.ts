@@ -164,6 +164,13 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "MOUSE_BTN3": "MCLK",
   "MOUSE_BTN4": "MB4",
   "MOUSE_BTN5": "MB5",
+  "MOUSE_WHEEL_UP": "SCRL_UP",
+  "MOUSE_WHEEL_DOWN": "SCRL_DOWN",
+  "MOUSE_WHEEL_LEFT": "SCRL_LEFT",
+  "MOUSE_WHEEL_RIGHT": "SCRL_RIGHT",
+  "MOUSE_ACCEL0": "MS_ACL0",
+  "MOUSE_ACCEL1": "MS_ACL1",
+  "MOUSE_ACCEL2": "MS_ACL2",
 
   // System
   "BOOTLOADER": "BOOTLOADER",
@@ -249,6 +256,12 @@ export function actionToZmkString(action: UniversalAction): string {
       }
       if (action.keycode.startsWith('MOUSE_BTN')) {
         return `&mkp ${zKey}`;
+      }
+      if (action.keycode.startsWith('MOUSE_WHEEL')) {
+        return `&msc ${zKey}`;
+      }
+      if (action.keycode.startsWith('MOUSE_ACCEL')) {
+        throw new Error(`ZMK does not support QMK mouse acceleration key ${action.keycode}.`);
       }
       if (action.keycode.startsWith('MOUSE_') && (action.keycode as string) !== 'MOUSE_BTN') {
         return `&mmv ${zKey}`;
@@ -363,8 +376,8 @@ export function zmkStringToAction(zmkStr: string): UniversalAction {
     }
   }
 
-  // mouse keys (&mkp LCLK / &mmv MOVE_UP)
-  match = trimmed.match(/^&(mkp|mmv)\s+([^\s]+)$/);
+  // mouse keys (&mkp LCLK / &mmv MOVE_UP / &msc SCRL_UP)
+  match = trimmed.match(/^&(mkp|mmv|msc)\s+([^\s]+)$/);
   if (match) {
     const inner = match[2];
     if (ZMK_TO_UNIVERSAL[inner]) {

@@ -220,6 +220,13 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "MOUSE_BTN3": { qmk: "KC_BTN3", hid: 0x00D3 },
   "MOUSE_BTN4": { qmk: "KC_BTN4", hid: 0x00D4 },
   "MOUSE_BTN5": { qmk: "KC_BTN5", hid: 0x00D5 },
+  "MOUSE_WHEEL_UP": { qmk: "KC_WH_U", hid: 0x00D9 },
+  "MOUSE_WHEEL_DOWN": { qmk: "KC_WH_D", hid: 0x00DA },
+  "MOUSE_WHEEL_LEFT": { qmk: "KC_WH_L", hid: 0x00DB },
+  "MOUSE_WHEEL_RIGHT": { qmk: "KC_WH_R", hid: 0x00DC },
+  "MOUSE_ACCEL0": { qmk: "KC_ACL0", hid: 0x00DD },
+  "MOUSE_ACCEL1": { qmk: "KC_ACL1", hid: 0x00DE },
+  "MOUSE_ACCEL2": { qmk: "KC_ACL2", hid: 0x00DF },
 
   // System
   "BOOTLOADER": { qmk: "QK_BOOT", hid: 0x7C00 },
