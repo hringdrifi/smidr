@@ -250,12 +250,15 @@ export const getKeyLabel = (
   }
 
   if (mode === 'matrix') {
-    if (settings && isDirectPinMatrix(settings)) {
-      return k.directPin ? { type: 'text', text: k.directPin } : { type: 'empty' };
-    }
     const encoderIndex = k.encoderId && settings?.encoders
       ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
       : k.encoderIndex;
+    if (settings && isDirectPinMatrix(settings)) {
+      const directPinLabel = k.directPin || '';
+      const encoderLabel = encoderIndex !== undefined && encoderIndex >= 0 ? `ENC${encoderIndex}` : '';
+      const label = [directPinLabel, encoderLabel].filter(Boolean).join('\n');
+      return label ? { type: 'text', text: label } : { type: 'empty' };
+    }
     if (encoderIndex !== undefined && encoderIndex >= 0 && (k.row === undefined || k.col === undefined)) {
       return { type: 'text', text: `ENC${encoderIndex}` };
     }
