@@ -2473,6 +2473,10 @@ export const useKeyboardStore = create<KeyboardState>()(
           const runtimeEncoders = normalizeEncoders(settings.encoders, rawKeys);
           const settingsWithDefaultMatrix = {
             ...settings,
+            features: {
+              ...settings.features,
+              encoder: runtimeEncoders.length > 0,
+            },
             vendorProductId: normalizedVendorProductId,
             visualLayout: normalizeVisualLayout(s.settings.visualLayout),
             qmk: {
@@ -2644,7 +2648,11 @@ export const useKeyboardStore = create<KeyboardState>()(
                   pins: importedPins,
                   hardware: hardware ? { ...s.settings.hardware, ...hardware } : s.settings.hardware,
                   qmk: qmk ? { ...(s.settings.qmk || {}), ...qmk } : s.settings.qmk,
-                  features: features ? { ...s.settings.features, ...features } : s.settings.features,
+                  features: {
+                    ...s.settings.features,
+                    ...(features || {}),
+                    encoder: finalEncoders.length > 0,
+                  },
                   encoders: finalEncoders,
                   tapDances: s.settings.tapDances || [],
                 matrix: { ...nextMatrix, wiring: matrix?.wiring || s.settings.matrix?.wiring || 'matrix' }

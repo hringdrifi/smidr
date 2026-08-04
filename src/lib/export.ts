@@ -354,7 +354,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
  */
 export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
   const { settings, keys } = state;
-  const { matrix, pins, vendorProductId, visualLayout, ...settingsWithoutRuntimeIds } = settings;
+  const { matrix, pins, vendorProductId, visualLayout, features, ...settingsWithoutRuntimeIds } = settings;
   const isDirectMatrix = matrix?.wiring === 'direct';
   const savedEncoders = (settings.encoders || []).map(({ id, ...encoder }) => encoder);
   const encoderIndexById = new Map((settings.encoders || []).map((encoder, index) => [encoder.id, index]));
@@ -368,6 +368,10 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     id: crypto.randomUUID(),
     updatedAt: Date.now(),
     ...settingsWithoutRuntimeIds,
+    features: {
+      ...features,
+      encoder: savedEncoders.length > 0,
+    },
     vendorId: `0x${((vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     productId: `0x${(vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`,
     matrix,

@@ -1890,6 +1890,7 @@ describe('export generation', () => {
         ...baseSettings.features,
         encoder: true,
       },
+      encoders: [{}],
     };
     const keys: PhysicalKey[] = [
       {
@@ -1903,6 +1904,7 @@ describe('export generation', () => {
         rx: 0,
         ry: 0,
         label: '',
+        encoderIndex: 0,
       },
     ];
 
@@ -1914,6 +1916,20 @@ describe('export generation', () => {
         message: expect.stringContaining('may fail to compile'),
       }));
     }
+  });
+
+  it('ignores the legacy encoder feature flag when no encoder is configured', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      features: {
+        ...baseSettings.features,
+        encoder: true,
+      },
+      encoders: [],
+    };
+
+    const issues = validateFirmwareExport(settings, [], 'qmk');
+    expect(issues.some(issue => issue.code.startsWith('encoder-'))).toBe(false);
   });
 
   it('warns when encoder is enabled without a layout encoder assignment', () => {

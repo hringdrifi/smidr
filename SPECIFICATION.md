@@ -140,6 +140,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。
 
 ### 7.6 ロータリーエンコーダー (Rotary Encoders)
+- **自動有効化**: エンコーダー機能はレイアウトから参照される `ProjectSettings.encoders[]` の有無で決定し、独立したファームウェア機能トグルを持たない。エンコーダーが追加されている場合、対応する QMK/Vial/ZMK 出力を自動的に有効化する。旧 `.smidr` の `features.encoder` は読み込み互換性のため受け入れるが、出力判断には使用しない。
 - **内部表現**: アプリ実行中は `ProjectSettings.encoders[]` の各要素に runtime-only の `id` を付与し、物理配置上の `PhysicalKey.encoderId` から参照する。`.smidr` 保存時は runtime `id` を保存せず、`encoders[]` の配列添字を `keys[].encoderIndex` として保存する。読み込み時は `encoderIndex` から新しい `encoderId` を復元する。
 - **物理位置**: ボタン付きエンコーダーは通常キーと同じ `PhysicalKey` に `row` / `col` / `keymap` と `encoderId` を併せ持つ。ボタン無しエンコーダーは `row` / `col` を持たず、物理位置と `encoderId` のみを持つ `PhysicalKey` として扱う。エンコーダー物理位置は `kind: "encoder"` で明示できる。
 - **レイアウト表示**: `kind: "encoder"` またはエンコーダー参照を持つ `PhysicalKey` は、`w` / `h` だけでサイズを指定し、中心に短辺サイズの円として描画する。`w2` / `h2` / `x2` / `y2` / `stepped` はエンコーダーには適用せず、保存・KLE/VIA 出力時にも除外する。

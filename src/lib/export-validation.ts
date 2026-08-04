@@ -147,7 +147,7 @@ export const validateFirmwareExport = (
   }
 
   const encoders = getConfiguredEncoders(settings);
-  if (settings.features.encoder || encoders.length > 0) {
+  if (encoders.length > 0) {
     const missingEncoderPins = encoders.length === 0 || encoders.some(encoder => !encoder.pinA || !encoder.pinB);
     if (missingEncoderPins) {
       issues.push({
@@ -215,7 +215,7 @@ export const validateFirmwareExport = (
         message: 'RMK source export does not emit lighting hardware configuration yet.',
       });
     }
-    if ((settings.encoders || []).length > 0 || settings.features.encoder) {
+    if ((settings.encoders || []).length > 0) {
       issues.push({
         severity: 'warning',
         code: 'rmk-encoders-not-emitted',
