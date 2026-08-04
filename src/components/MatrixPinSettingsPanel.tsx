@@ -89,6 +89,92 @@ const InteractivePinSlot = ({
   );
 };
 
+const FeatureToggle = ({
+  label,
+  enabled,
+  onChange,
+}: {
+  label: string;
+  enabled: boolean;
+  onChange: () => void;
+}) => (
+  <button
+    type="button"
+    aria-pressed={enabled}
+    onClick={onChange}
+    className={cn(
+      "flex items-center justify-between gap-2 rounded border px-2.5 py-2 text-left transition-colors",
+      enabled
+        ? "border-amber-500/25 bg-amber-500/10 text-amber-500"
+        : "border-[var(--border-main)] bg-[var(--bg-app)]/40 text-[var(--text-muted)]"
+    )}
+  >
+    <span className="text-[10px] font-bold">{label}</span>
+    <span className={cn(
+      "relative h-4 w-7 shrink-0 rounded-full transition-colors",
+      enabled ? "bg-amber-500" : "bg-[var(--bg-button)]"
+    )}>
+      <span className={cn(
+        "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all",
+        enabled ? "left-3.5" : "left-0.5"
+      )} />
+    </span>
+  </button>
+);
+
+const ZmkSplitTransportSettings = ({
+  settings,
+  updateSettings,
+}: {
+  settings: ProjectSettings;
+  updateSettings: (updates: Partial<ProjectSettings>) => void;
+}) => {
+  const { t } = useTranslation();
+  const splitTransport = settings.zmk?.splitTransport || 'ble';
+  const updateZmk = (updates: NonNullable<ProjectSettings['zmk']>) => {
+    updateSettings({ zmk: { ...(settings.zmk || {}), ...updates } });
+  };
+
+  return (
+    <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">ZMK</div>
+      <div className="space-y-1">
+        <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkSplitTransport')}</label>
+        <div className="flex rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
+          {(['ble', 'wired'] as const).map(transport => (
+            <button
+              key={transport}
+              type="button"
+              onClick={() => updateZmk({ splitTransport: transport })}
+              className={cn(
+                "flex-1 rounded py-1 text-[10px] font-bold transition-all",
+                splitTransport === transport
+                  ? "bg-amber-500 text-[var(--bg-button)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+              )}
+            >
+              {transport === 'ble' ? t('hardware.zmkSplitBle') : t('hardware.zmkSplitWired')}
+            </button>
+          ))}
+        </div>
+      </div>
+      {splitTransport === 'wired' && (
+        <div className="space-y-1">
+          <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkWiredSplitDevice')}</label>
+          <input
+            type="text"
+            value={settings.zmk?.wiredSplitDevice || ''}
+            onChange={(event) => updateZmk({ wiredSplitDevice: event.target.value })}
+            placeholder="&pro_micro_serial"
+            className="w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-2 py-1.5 font-mono text-xs text-amber-500 outline-none transition-all focus:ring-1 focus:ring-amber-500"
+          />
+          <p className="text-[10px] leading-relaxed text-[var(--text-dim)]">{t('hardware.zmkWiredSplitDeviceDesc')}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const PinTagInput = ({
   type,
   pins,
@@ -484,9 +570,45 @@ export const MatrixPinInspectorPanel = () => {
       </section>
       )}
 
-      {((settings.features.rgb || settings.features.rgbMatrix || settings.features.backlight) || settings.features.oled || settings.features.split) && (
+      {settings.features.split && (
         <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">{t('hardware.splitCommunication')}</h3>
+          <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">QMK / Vial</div>
+            <InteractivePinSlot
+              label={t('hardware.splitSerial')}
+              value={settings.pins.splitSerial || ''}
+              isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
+              onFocus={() => {
+                setActiveBox('feature');
+                setFocusedFeature('splitSerial');
+              }}
+              onClear={() => setPin('feature', 'splitSerial', '')}
+            />
+          </div>
+          <ZmkSplitTransportSettings settings={settings} updateSettings={updateSettings} />
+        </section>
+      )}
+
+      <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
           <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
+          <div className="grid grid-cols-3 gap-2">
+            <FeatureToggle
+              label={t('hardware.rgb')}
+              enabled={settings.features.rgb}
+              onChange={() => updateSettings({ features: { ...settings.features, rgb: !settings.features.rgb } })}
+            />
+            <FeatureToggle
+              label={t('hardware.backlight')}
+              enabled={settings.features.backlight === true}
+              onChange={() => updateSettings({ features: { ...settings.features, backlight: !settings.features.backlight } })}
+            />
+            <FeatureToggle
+              label={t('hardware.oled')}
+              enabled={settings.features.oled}
+              onChange={() => updateSettings({ features: { ...settings.features, oled: !settings.features.oled } })}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {(settings.features.rgb || settings.features.rgbMatrix) && (
               <InteractivePinSlot
@@ -536,21 +658,8 @@ export const MatrixPinInspectorPanel = () => {
                 />
               </>
             )}
-            {settings.features.split && (
-              <InteractivePinSlot
-                label={t('hardware.splitSerial')}
-                value={settings.pins.splitSerial || ''}
-                isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
-                onFocus={() => {
-                  setActiveBox('feature');
-                  setFocusedFeature('splitSerial');
-                }}
-                onClear={() => setPin('feature', 'splitSerial', '')}
-              />
-            )}
           </div>
-        </section>
-      )}
+      </section>
 
       </div>
 
@@ -857,8 +966,45 @@ export const MatrixPinSettingsPanel = () => {
               </div>
               )}
 
+              {settings.features.split && (
+                <div className="space-y-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">{t('hardware.splitCommunication')}</h3>
+                  <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">QMK / Vial</div>
+                    <InteractivePinSlot
+                      label={t('hardware.splitSerial')}
+                      value={settings.pins.splitSerial || ''}
+                      isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
+                      onFocus={() => {
+                        setActiveBox('feature');
+                        setFocusedFeature('splitSerial');
+                      }}
+                      onClear={() => setPin('feature', 'splitSerial', '')}
+                    />
+                  </div>
+                  <ZmkSplitTransportSettings settings={settings} updateSettings={updateSettings} />
+                </div>
+              )}
+
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <FeatureToggle
+                    label={t('hardware.rgb')}
+                    enabled={settings.features.rgb}
+                    onChange={() => updateSettings({ features: { ...settings.features, rgb: !settings.features.rgb } })}
+                  />
+                  <FeatureToggle
+                    label={t('hardware.backlight')}
+                    enabled={settings.features.backlight === true}
+                    onChange={() => updateSettings({ features: { ...settings.features, backlight: !settings.features.backlight } })}
+                  />
+                  <FeatureToggle
+                    label={t('hardware.oled')}
+                    enabled={settings.features.oled}
+                    onChange={() => updateSettings({ features: { ...settings.features, oled: !settings.features.oled } })}
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {(settings.features.rgb || settings.features.rgbMatrix) && (
                     <InteractivePinSlot
@@ -908,24 +1054,7 @@ export const MatrixPinSettingsPanel = () => {
                       />
                     </>
                   )}
-                  {settings.features.split && (
-                    <InteractivePinSlot
-                      label={t('hardware.splitSerial')}
-                      value={settings.pins.splitSerial || ''}
-                      isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
-                      onFocus={() => {
-                        setActiveBox('feature');
-                        setFocusedFeature('splitSerial');
-                      }}
-                      onClear={() => setPin('feature', 'splitSerial', '')}
-                    />
-                  )}
                 </div>
-                {!(settings.features.rgb || settings.features.rgbMatrix || settings.features.backlight) && !settings.features.oled && !settings.features.split && (
-                  <div className="h-24 flex items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
-                    {t('hardware.specialPins')}
-                  </div>
-                )}
               </div>
           </div>
         </div>

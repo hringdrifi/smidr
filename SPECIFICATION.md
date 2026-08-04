@@ -129,6 +129,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **QMK/Vial ソースのレイアウトオプション**: `keyboard.json` の `layouts.LAYOUT.layout`、`keymap.c`、direct pin 配列などの firmware 実体は現在の `activeOptions` で表示されているキーだけを対象にする。VIA/Vial JSON 定義は外部アプリ上で選択肢を保持するため、全レイアウトオプションを出力する。
 - **QMK/Vial Matrix Mask**: `qmk.matrixMasked` が有効な場合、`matrix_mask` は現在の `activeOptions` ではなく全レイアウトオプションで使われる matrix position の union から生成する。どのレイアウトでも使われないセルは mask し、row pin と column pin が同じ物理ピンになるセルも mask する。
 - **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。`controllerType: 'mcu'` の場合は左右を別 custom board (`<name>_left` / `<name>_right`) として生成し、右側 board DTS で同じ `col-offset` を指定する。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52840 系ターゲットを要求する。`wired` は `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。
+- **UI 配置**: ハードウェア設定は「分割キーボード」の有効/無効のみを持つ。分割時の通信設定はピン設定内の独立した「分割通信」セクションにまとめ、QMK/Vial の物理シリアルピンと、ZMK の Bluetooth / 有線 UART 方式および有線 UART デバイスをファームウェア別に表示する。分割通信ピンは汎用の「特殊ピン」には含めない。
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
 ### 7.5.1 ダイレクトピン配線 (Direct Pin Wiring)
@@ -148,6 +149,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 
 ### 7.7 RGB Matrix
 - **内部表現**: RGB Matrix は RGB アンダーグローとは別に `ProjectSettings.features.rgbMatrix` で有効化する。RGB アンダーグローは `ProjectSettings.features.rgb` で管理し、QMK/Vial では `rgblight`、ZMK では `CONFIG_ZMK_RGB_UNDERGLOW` / `CONFIG_WS2812_STRIP` に対応する。各キーは `PhysicalKey.ledIndex`, `ledX`, `ledY`, `ledFlags` を保持する。`ledIndex` は `.smidr` 保存値およびファーム出力用の 0 始まり添字とし、画面表示および KiCad の部品リファレンスでは `ledIndex + 1` の 1 始まり番号を表示する。
+- **UI 配置**: RGB Matrix の有効/無効は RGB Matrix パネルで設定し、ハードウェア設定には重複トグルを置かない。RGB アンダーグロー、単色バックライト、OLED の有効/無効は、それぞれのデータ/I2Cピンと同じマトリクスの特殊ピン設定に配置する。
 - **バックライト**: 単色 LED バックライトは `ProjectSettings.features.backlight` で有効化し、制御ピンは `ProjectSettings.pins.backlight` に保持する。QMK/Vial では `features.backlight`, `backlight.pin`, `BACKLIGHT_PIN`, `BACKLIGHT_LEVELS` を出力する。ZMK では `CONFIG_ZMK_BACKLIGHT` を出力し、具体的な LED/PWM デバイス定義は後続段階の対象とする。
 - **編集 UI**: 設計モードに RGB Matrix エディタモードを追加する。右パネルで選択キーの LED index、QMK/Vial RGB Matrix 座標 (`x: 0..224`, `y: 0..64`) および flags を編集できる。自動割り当てでは表示中キーを物理ソート順に LED index へ割り当て、キーボード全体の左上を基準にキー中心から座標を正規化する。
 - **KLE/VIA ラベル**: KLE ラベルの LED index は `l{index}` 形式で扱う。インポート時は該当ラベルから `ledIndex` を復元し、VIA/Vial JSON エクスポート時もラベルへ再出力する。

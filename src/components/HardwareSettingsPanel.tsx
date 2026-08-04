@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Settings, Cpu, HardDrive, Lightbulb, Gauge, Monitor, ShieldCheck, Database, AlertTriangle } from 'lucide-react';
+import { Settings, Cpu, HardDrive, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -115,15 +115,6 @@ export const HardwareSettingsPanel = () => {
     });
   };
 
-  const updateZmkSettings = (zmkUpdates: NonNullable<typeof settings.zmk>) => {
-    updateSettings({
-      zmk: {
-        ...(settings.zmk || {}),
-        ...zmkUpdates,
-      },
-    });
-  };
-
   const updateHardware = (updates: Partial<typeof settings.hardware>) => {
     updateSettings({ hardware: { ...settings.hardware, ...updates } });
   };
@@ -142,10 +133,6 @@ export const HardwareSettingsPanel = () => {
         ? { board: getDefaultDevelopmentBoard(selectedMcu) }
         : {}),
     });
-  };
-
-  const toggleFeature = (key: keyof typeof settings.features) => {
-    updateSettings({ features: { ...settings.features, [key]: !settings.features[key] } });
   };
 
   return (
@@ -261,78 +248,31 @@ export const HardwareSettingsPanel = () => {
         </div>
       </Section>
 
-      {/* Features Toggles */}
-      <Section title={t('hardware.features')} icon={ShieldCheck}>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { id: 'rgb', label: t('hardware.rgb'), icon: Lightbulb },
-            { id: 'rgbMatrix', label: t('rgbMatrix.title'), icon: Lightbulb },
-            { id: 'backlight', label: t('hardware.backlight'), icon: Lightbulb },
-            { id: 'encoder', label: t('hardware.encoder'), icon: Gauge },
-            { id: 'oled', label: t('hardware.oled'), icon: Monitor },
-            { id: 'via', label: t('hardware.via'), icon: Database },
-            { id: 'split', label: t('hardware.split'), icon: HardDrive },
-          ].map(feat => (
-            <React.Fragment key={feat.id}>
-              <button
-                onClick={() => toggleFeature(feat.id as any)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md p-3 text-left transition-all",
-                  settings.features[feat.id as keyof typeof settings.features]
-                    ? "bg-amber-500/10 text-amber-500"
-                    : "text-[var(--text-muted)] grayscale opacity-60 hover:bg-[var(--bg-app)]/50"
-                )}
-              >
-                <feat.icon size={18} />
-                <span className="text-xs font-bold leading-none">{feat.label}</span>
-              </button>
-            </React.Fragment>
-          ))}
+      {/* Split keyboard topology */}
+      <Section title={t('hardware.split')} icon={HardDrive}>
+        <div>
+          <button
+            type="button"
+            aria-pressed={settings.features.split}
+            onClick={() => updateSettings({
+              features: { ...settings.features, split: !settings.features.split },
+            })}
+            className="flex w-full items-center justify-between gap-4 rounded-md bg-[var(--bg-app)]/40 p-3 text-left"
+          >
+            <span className="text-xs font-bold text-[var(--text-main)]">{t('hardware.split')}</span>
+            <span className={cn(
+              "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+              settings.features.split ? "bg-amber-500" : "bg-[var(--bg-button)]"
+            )}>
+              <span className={cn(
+                "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+                settings.features.split ? "left-[18px]" : "left-[2px]"
+              )} />
+            </span>
+          </button>
+
         </div>
       </Section>
-
-      {settings.features.split && (
-        <Section title={t('hardware.zmkDetails')} icon={Cpu}>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('hardware.zmkSplitTransport')}</label>
-              <div className="flex bg-[var(--bg-app)] p-1 rounded border border-[var(--border-main)]">
-                {(['ble', 'wired'] as const).map(transport => (
-                  <button
-                    key={transport}
-                    type="button"
-                    onClick={() => updateZmkSettings({ splitTransport: transport })}
-                    className={cn(
-                      "flex-1 py-1 text-[10px] font-bold rounded transition-all uppercase",
-                      (settings.zmk?.splitTransport || 'ble') === transport
-                        ? "bg-amber-500 text-[var(--bg-button)]"
-                        : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                    )}
-                  >
-                    {transport === 'ble' ? t('hardware.zmkSplitBle') : t('hardware.zmkSplitWired')}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {(settings.zmk?.splitTransport || 'ble') === 'wired' && (
-              <div className="space-y-1">
-                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase">{t('hardware.zmkWiredSplitDevice')}</label>
-                <input
-                  type="text"
-                  value={settings.zmk?.wiredSplitDevice || ''}
-                  onChange={(e) => updateZmkSettings({ wiredSplitDevice: e.target.value })}
-                  placeholder="&pro_micro_serial"
-                  className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-amber-500 font-mono transition-all"
-                />
-                <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
-                  {t('hardware.zmkWiredSplitDeviceDesc')}
-                </p>
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
 
       {/* QMK Details */}
       <Section title={t('hardware.qmkDetails')} icon={Settings}>
