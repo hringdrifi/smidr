@@ -2593,6 +2593,33 @@ describe('export generation', () => {
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
   });
 
+  it('emits a BLE-only nRF52832 ZMK custom board for HY0020', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'HY0020 Board',
+      hardware: { ...baseSettings.hardware, controllerType: 'mcu', mcu: 'HY0020' },
+      matrix: { rows: 1, cols: 1 },
+      pins: { rows: ['P0.06'], cols: ['P0.20'], splitRows: [], splitCols: [] },
+    };
+    const keys: PhysicalKey[] = [{ row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: '' }];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const boardDts = await zip.file('boards/arm/hy0020_board/hy0020_board.dts')!.async('string');
+    const boardDefconfig = await zip.file('boards/arm/hy0020_board/hy0020_board_defconfig')!.async('string');
+    const kconfigBoard = await zip.file('boards/arm/hy0020_board/Kconfig.board')!.async('string');
+
+    expect(kconfigBoard).toContain('select SOC_NRF52832_QFAA');
+    expect(boardDts).toContain('#include <nordic/nrf52832_qfaa.dtsi>');
+    expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
+    expect(boardDts).toContain('&gpio0 20 GPIO_ACTIVE_HIGH');
+    expect(boardDts).toContain('reg = <0x00000000 0x00078000>');
+    expect(boardDefconfig).toContain('CONFIG_BT=y');
+    expect(boardDefconfig).toContain('CONFIG_ZMK_BLE=y');
+    expect(boardDefconfig).toContain('CONFIG_BUILD_OUTPUT_HEX=y');
+    expect(boardDefconfig).not.toContain('CONFIG_USB=y');
+  });
+
   it('emits ZMK split custom boards for MCU projects', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,

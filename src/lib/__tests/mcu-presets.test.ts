@@ -50,11 +50,24 @@ describe('MCU pin presets', () => {
     expect(pins).toContain('K15');
   });
 
+  it('uses only the 16 GPIOs exposed by the HY0020 module', () => {
+    const pins = getMcuPins('HY0020');
+
+    expect(pins).toHaveLength(16);
+    expect(pins).toContain('P0.02');
+    expect(pins).toContain('P0.21');
+    expect(pins).toContain('P0.30');
+    expect(pins).not.toContain('P0.01');
+    expect(pins).not.toContain('P1.00');
+  });
+
   it('gates source exports by selected controller type', () => {
     expect(isQmkSourceExportSupported({ controllerType: 'mcu', mcu: 'STM32F103' })).toBe(true);
     expect(isZmkSourceExportSupported({ controllerType: 'mcu', mcu: 'STM32F103' })).toBe(false);
     expect(isQmkSourceExportSupported({ controllerType: 'mcu', mcu: 'nRF52840' })).toBe(false);
     expect(isZmkSourceExportSupported({ controllerType: 'mcu', mcu: 'nRF52840' })).toBe(true);
+    expect(isQmkSourceExportSupported({ controllerType: 'mcu', mcu: 'HY0020' })).toBe(false);
+    expect(isZmkSourceExportSupported({ controllerType: 'mcu', mcu: 'HY0020' })).toBe(true);
 
     expect(isQmkSourceExportSupported({ controllerType: 'development_board', board: 'kb2040' })).toBe(true);
     expect(isZmkSourceExportSupported({ controllerType: 'development_board', board: 'kb2040' })).toBe(true);

@@ -14,6 +14,7 @@ export type QmkMcu =
   | 'atmega32u4'
   | 'attiny85'
   | 'GD32VF103'
+  | 'HY0020'
   | 'MK20DX128'
   | 'MK20DX256'
   | 'MK64FX512'
@@ -45,6 +46,7 @@ export type QmkMcu =
 
 type PinSet =
   | 'rp2040'
+  | 'hy0020'
   | 'nrf52840'
   | 'avr_u4'
   | 'avr_usb2'
@@ -69,7 +71,7 @@ type PinSet =
   | 'stm32l4'
   | 'wb32fq95'
   | 'wb32f3g71';
-export type ZmkTarget = 'rp2040' | 'nrf52840';
+export type ZmkTarget = 'rp2040' | 'nrf52832' | 'nrf52840';
 
 export const QMK_DEVELOPMENT_BOARDS = [
   'bit_c_pro',
@@ -253,6 +255,11 @@ const pins = {
     ...nrfPortPins(0, 0, 31),
     ...nrfPortPins(1, 0, 15),
   ],
+  hy0020: [
+    'P0.02', 'P0.03', 'P0.04', 'P0.05', 'P0.06', 'P0.07', 'P0.08',
+    'P0.09', 'P0.10', 'P0.12', 'P0.16', 'P0.18', 'P0.20', 'P0.21',
+    'P0.28', 'P0.30',
+  ],
   avr_u4: [
     ...range('B', 0, 7),
     'C6', 'C7',
@@ -390,6 +397,7 @@ export const QMK_MCU_PRESETS: McuPreset[] = [
   { value: 'MK66FX1M0', label: 'MK66FX1M0', bootloader: 'halfkay', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
   { value: 'MKL26Z64', label: 'MKL26Z64', bootloader: 'halfkay', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
   { value: 'nRF52840', label: 'nRF52840', bootloader: 'custom', pinSet: 'nrf52840', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown', zmkTarget: 'nrf52840' },
+  { value: 'HY0020', label: 'HY0020 (nRF52832)', bootloader: 'custom', pinSet: 'hy0020', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown', zmkTarget: 'nrf52832' },
   { value: 'RP2040', label: 'RP2040', bootloader: 'rp2040', pinSet: 'rp2040', splitSerialDriver: 'vendor', zmkTarget: 'rp2040' },
   { value: 'STM32F042', label: 'STM32F042', bootloader: 'stm32-dfu', pinSet: 'stm32f042', splitSerialDriver: 'bitbang' },
   { value: 'STM32F072', label: 'STM32F072', bootloader: 'stm32-dfu', pinSet: 'stm32f072', splitSerialDriver: 'bitbang' },

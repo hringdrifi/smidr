@@ -24,8 +24,19 @@ const parseGpioNumber = (pin: string, fallback: number): number => {
   return match ? Number(match[1]) : fallback;
 };
 
+const isNordicTarget = (target: ZmkTarget) => target === 'nrf52832' || target === 'nrf52840';
+
+const getNordicSoc = (target: ZmkTarget) => target === 'nrf52832' ? 'NRF52832_QFAA' : 'NRF52840_QIAA';
+
+const getCustomBoardDtsInclude = (target: ZmkTarget) => {
+  if (target === 'nrf52832') return '#include <nordic/nrf52832_qfaa.dtsi>';
+  if (target === 'nrf52840') return '#include <nordic/nrf52840_qiaa.dtsi>';
+  return `#include <arm/rpi_pico/rp2040.dtsi>
+#include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>`;
+};
+
 const parseZmkGpio = (pin: string, fallback: number, target: ZmkTarget) => {
-  if (target === 'nrf52840') {
+  if (isNordicTarget(target)) {
     const match = pin.trim().match(/^P([01])\.(\d{1,2})$/i);
     if (match) {
       return { controller: `&gpio${match[1]}`, number: Number(match[2]) };
@@ -567,12 +578,9 @@ const generateSplitCustomBoardFiles = (
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
   const splitTransport = getZmkSplitTransport(settings);
   const wiredSplitDevice = getWiredSplitDevice(settings);
-  const processorSelect = zmkTarget === 'nrf52840' ? 'NRF52840_QIAA' : 'RP2040';
-  const dtsInclude = zmkTarget === 'nrf52840'
-    ? '#include <nordic/nrf52840_qiaa.dtsi>'
-    : `#include <arm/rpi_pico/rp2040.dtsi>
-#include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>`;
-  const dtsChosen = zmkTarget === 'nrf52840'
+  const processorSelect = isNordicTarget(zmkTarget) ? getNordicSoc(zmkTarget) : 'RP2040';
+  const dtsInclude = getCustomBoardDtsInclude(zmkTarget);
+  const dtsChosen = isNordicTarget(zmkTarget)
     ? `        zephyr,sram = &sram0;
         zephyr,flash = &flash0;
         zephyr,code-partition = &code_partition;
@@ -584,7 +592,7 @@ const generateSplitCustomBoardFiles = (
         zephyr,code-partition = &code_partition;
         zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;`;
-  const peripheralDts = zmkTarget === 'nrf52840' ? `
+  const peripheralDts = isNordicTarget(zmkTarget) ? `
 &gpio0 {
     status = "okay";
 };
@@ -599,14 +607,14 @@ const generateSplitCustomBoardFiles = (
         #address-cells = <1>;
         #size-cells = <1>;
 
-        code_partition: partition@26000 {
+        code_partition: partition@${zmkTarget === 'nrf52832' ? '0' : '26000'} {
             label = "code_partition";
-            reg = <0x00026000 0x000d2000>;
+            reg = <${zmkTarget === 'nrf52832' ? '0x00000000 0x00078000' : '0x00026000 0x000d2000'}>;
         };
 
-        storage_partition: partition@f8000 {
+        storage_partition: partition@${zmkTarget === 'nrf52832' ? '78000' : 'f8000'} {
             label = "storage";
-            reg = <0x000f8000 0x00008000>;
+            reg = <${zmkTarget === 'nrf52832' ? '0x00078000 0x00008000' : '0x000f8000 0x00008000'}>;
         };
     };
 };
@@ -688,11 +696,12 @@ config ZMK_SPLIT_ROLE_CENTRAL
 config ZMK_SPLIT
     default y
 
-${zmkTarget === 'nrf52840' ? `config ZMK_BLE
+${isNordicTarget(zmkTarget) ? `config ZMK_BLE
     default y
 
-config ZMK_USB
+${zmkTarget === 'nrf52840' ? `config ZMK_USB
     default y
+` : ''}
 ` : `config RP2_FLASH_W25Q080
     default y
 `}
@@ -702,16 +711,15 @@ endif
 
     const boardDefconfig = `CONFIG_GPIO=y
 CONFIG_ZMK=y
-CONFIG_USB=y
-${zmkTarget === 'nrf52840' ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}
+${zmkTarget !== 'nrf52832' ? 'CONFIG_USB=y\n' : ''}${isNordicTarget(zmkTarget) ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}
 CONFIG_FLASH=y
 CONFIG_SETTINGS=y
 CONFIG_SETTINGS_NVS=y
-CONFIG_BUILD_OUTPUT_UF2=y
+${zmkTarget === 'rp2040' ? 'CONFIG_BUILD_OUTPUT_UF2=y' : 'CONFIG_BUILD_OUTPUT_HEX=y'}
 CONFIG_PINCTRL=y
 CONFIG_CLOCK_CONTROL=y
 CONFIG_FLASH_PAGE_LAYOUT=y
-${zmkTarget === 'nrf52840' ? 'CONFIG_NVS=y\nCONFIG_MPU_ALLOW_FLASH_WRITE=y\n' : ''}
+${isNordicTarget(zmkTarget) ? 'CONFIG_NVS=y\nCONFIG_MPU_ALLOW_FLASH_WRITE=y\n' : ''}
 CONFIG_RETAINED_MEM=y
 CONFIG_RETENTION=y
 CONFIG_RETENTION_BOOT_MODE=y
@@ -846,7 +854,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   
   const zmkTarget = getZmkHardwareTarget(settings.hardware);
   if (!zmkTarget) {
-    throw new Error('ZMK export is currently implemented for RP2040 and nRF52840 projects only.');
+    throw new Error('ZMK export is currently implemented for RP2040 and nRF52 projects only.');
   }
 
   const boardName = getZmkDevelopmentBoard(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
@@ -854,8 +862,8 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
 
   if (settings.features.split) {
     if (settings.hardware.controllerType === 'mcu') {
-      if (getZmkSplitTransport(settings) === 'ble' && zmkTarget !== 'nrf52840') {
-        throw new Error('ZMK BLE split export currently requires an nRF52840 MCU.');
+      if (getZmkSplitTransport(settings) === 'ble' && !isNordicTarget(zmkTarget)) {
+        throw new Error('ZMK BLE split export currently requires an nRF52 MCU.');
       }
       generateSplitCustomBoardFiles(zip, settings, keys, sortedKeys, kbName, vendorName, zmkTarget);
       return await zip.generateAsync({ type: 'blob' });
@@ -894,7 +902,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
 
 config BOARD_${kbName.toUpperCase()}
     bool "${settings.name}"
-    select SOC_${zmkTarget === 'nrf52840' ? 'NRF52840_QIAA' : 'RP2040'}
+    select SOC_${isNordicTarget(zmkTarget) ? getNordicSoc(zmkTarget) : 'RP2040'}
 `;
     boardFolder.file('Kconfig.board', kconfigBoard);
 
@@ -909,11 +917,12 @@ config BOARD
 config ZMK_KEYBOARD_NAME
     default "${settings.name}"
 
-${zmkTarget === 'nrf52840' ? `config ZMK_BLE
+${isNordicTarget(zmkTarget) ? `config ZMK_BLE
     default y
 
-config ZMK_USB
+${zmkTarget === 'nrf52840' ? `config ZMK_USB
     default y
+` : ''}
 ` : `config RP2_FLASH_W25Q080
     default y
 `}
@@ -923,16 +932,15 @@ endif
 
     const boardDefconfig = `CONFIG_GPIO=y
 CONFIG_ZMK=y
-CONFIG_USB=y
-${zmkTarget === 'nrf52840' ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}
+${zmkTarget !== 'nrf52832' ? 'CONFIG_USB=y\n' : ''}${isNordicTarget(zmkTarget) ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}
 CONFIG_FLASH=y
 CONFIG_SETTINGS=y
 CONFIG_SETTINGS_NVS=y
-CONFIG_BUILD_OUTPUT_UF2=y
+${zmkTarget === 'rp2040' ? 'CONFIG_BUILD_OUTPUT_UF2=y' : 'CONFIG_BUILD_OUTPUT_HEX=y'}
 CONFIG_PINCTRL=y
 CONFIG_CLOCK_CONTROL=y
 CONFIG_FLASH_PAGE_LAYOUT=y
-${zmkTarget === 'nrf52840' ? 'CONFIG_NVS=y\nCONFIG_MPU_ALLOW_FLASH_WRITE=y\n' : ''}
+${isNordicTarget(zmkTarget) ? 'CONFIG_NVS=y\nCONFIG_MPU_ALLOW_FLASH_WRITE=y\n' : ''}
 CONFIG_RETAINED_MEM=y
 CONFIG_RETENTION=y
 CONFIG_RETENTION_BOOT_MODE=y
@@ -951,12 +959,9 @@ ${getEncoderConfigSnippet(settings)}
 `;
     boardFolder.file(`${kbName}.conf`, keyboardConf);
 
-    const dtsInclude = zmkTarget === 'nrf52840'
-      ? '#include <nordic/nrf52840_qiaa.dtsi>'
-      : `#include <arm/rpi_pico/rp2040.dtsi>
-#include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>`;
+    const dtsInclude = getCustomBoardDtsInclude(zmkTarget);
 
-    const dtsChosen = zmkTarget === 'nrf52840'
+    const dtsChosen = isNordicTarget(zmkTarget)
       ? `        zephyr,sram = &sram0;
         zephyr,flash = &flash0;
         zephyr,code-partition = &code_partition;
@@ -969,7 +974,7 @@ ${getEncoderConfigSnippet(settings)}
         zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;`;
 
-    const peripheralDts = zmkTarget === 'nrf52840' ? `
+    const peripheralDts = isNordicTarget(zmkTarget) ? `
 &gpio0 {
     status = "okay";
 };
@@ -984,14 +989,14 @@ ${getEncoderConfigSnippet(settings)}
         #address-cells = <1>;
         #size-cells = <1>;
 
-        code_partition: partition@26000 {
+        code_partition: partition@${zmkTarget === 'nrf52832' ? '0' : '26000'} {
             label = "code_partition";
-            reg = <0x00026000 0x000d2000>;
+            reg = <${zmkTarget === 'nrf52832' ? '0x00000000 0x00078000' : '0x00026000 0x000d2000'}>;
         };
 
-        storage_partition: partition@f8000 {
+        storage_partition: partition@${zmkTarget === 'nrf52832' ? '78000' : 'f8000'} {
             label = "storage";
-            reg = <0x000f8000 0x00008000>;
+            reg = <${zmkTarget === 'nrf52832' ? '0x00078000 0x00008000' : '0x000f8000 0x00008000'}>;
         };
     };
 };
