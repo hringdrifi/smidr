@@ -137,6 +137,24 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
     transformRef.current = transform;
   }, [transform]);
 
+  useEffect(() => {
+    const handleExportCanvasImage = (event: Event) => {
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const filename = (event as CustomEvent<{ filename?: string }>).detail?.filename || 'keyboard_canvas.png';
+      const link = document.createElement('a');
+      link.href = stage.toDataURL({ pixelRatio: 2 });
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    window.addEventListener('smidr:export-canvas-image', handleExportCanvasImage);
+    return () => window.removeEventListener('smidr:export-canvas-image', handleExportCanvasImage);
+  }, []);
+
   useEffect(() => { 
     setIsClient(true);
     const updateSize = () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb } from 'lucide-react';
+import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
@@ -479,6 +479,12 @@ export default function App() {
     );
     downloadJson(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_kle.json`, kleJson);
     setIsProjectMenuOpen(false);
+    setIsExportMenuOpen(false);
+  };
+
+  const handleExportCanvasImage = () => {
+    const filename = `${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_canvas.png`;
+    window.dispatchEvent(new CustomEvent('smidr:export-canvas-image', { detail: { filename } }));
     setIsExportMenuOpen(false);
   };
 
@@ -1153,6 +1159,14 @@ export default function App() {
                       >
                         <FileDown size={14} className="text-amber-500" />
                         <span>{t('header.exportKle')}</span>
+                      </button>
+
+                      <button
+                        onClick={handleExportCanvasImage}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
+                      >
+                        <ImageDown size={14} className="text-amber-500" />
+                        <span>{t('header.exportCanvasImage')}</span>
                       </button>
 
                       <button
