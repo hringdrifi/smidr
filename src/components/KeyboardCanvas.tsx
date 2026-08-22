@@ -140,20 +140,47 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
   useEffect(() => {
     const handleExportCanvasImage = (event: Event) => {
       const stage = stageRef.current;
-      if (!stage) return;
+      if (!stage || visKeys.length === 0) return;
 
       const filename = (event as CustomEvent<{ filename?: string }>).detail?.filename || 'keyboard_canvas.png';
+      const vertices = visKeys.flatMap(getKeyVertices);
+      const minX = Math.min(...vertices.map(vertex => vertex.x));
+      const maxX = Math.max(...vertices.map(vertex => vertex.x));
+      const minY = Math.min(...vertices.map(vertex => vertex.y));
+      const maxY = Math.max(...vertices.map(vertex => vertex.y));
+      const previousStageState = {
+        width: stage.width(),
+        height: stage.height(),
+        x: stage.x(),
+        y: stage.y(),
+        scaleX: stage.scaleX(),
+        scaleY: stage.scaleY(),
+      };
       const link = document.createElement('a');
-      link.href = stage.toDataURL({ pixelRatio: 2 });
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+      try {
+        // Render the full key bounds at their native scale so the export is independent of the viewport.
+        stage.size({ width: maxX - minX, height: maxY - minY });
+        stage.position({ x: -minX, y: -minY });
+        stage.scale({ x: 1, y: 1 });
+        stage.draw();
+
+        link.href = stage.toDataURL({ pixelRatio: 2 });
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        stage.size({ width: previousStageState.width, height: previousStageState.height });
+        stage.position({ x: previousStageState.x, y: previousStageState.y });
+        stage.scale({ x: previousStageState.scaleX, y: previousStageState.scaleY });
+        stage.draw();
+      }
     };
 
     window.addEventListener('smidr:export-canvas-image', handleExportCanvasImage);
     return () => window.removeEventListener('smidr:export-canvas-image', handleExportCanvasImage);
-  }, []);
+  }, [visKeys]);
 
   useEffect(() => { 
     setIsClient(true);
