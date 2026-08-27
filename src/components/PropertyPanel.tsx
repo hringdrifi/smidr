@@ -57,6 +57,11 @@ export const PropertyPanel = () => {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
+  const [specialShapeDraftKeyId, setSpecialShapeDraftKeyId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setSpecialShapeDraftKeyId(undefined);
+  }, [selectedKeyIds[0]]);
 
   const toggleMenu = (id: string, event: React.MouseEvent<HTMLButtonElement>) => {
     if (openMenuId === id) {
@@ -323,6 +328,21 @@ export const PropertyPanel = () => {
   const formatStep = (step: number) => isMm ? (step * 19.05).toString() : step.toString();
   const formatMin = (min: number) => isMm ? (min * 19.05).toString() : min.toString();
   const unitLabel = isMm ? 'mm' : 'u';
+  const hasSpecialShape =
+    (selectedKey.w2 ?? selectedKey.w) !== selectedKey.w ||
+    (selectedKey.h2 ?? selectedKey.h) !== selectedKey.h ||
+    (selectedKey.x2 ?? 0) !== 0 ||
+    (selectedKey.y2 ?? 0) !== 0;
+  const specialShapeEnabled = hasSpecialShape || specialShapeDraftKeyId === selectedKey.id;
+  const updatePrimaryDimension = (dimension: 'w' | 'h', value: number, finalize = false) => {
+    const normalizedValue = parseUnit(value);
+    updateKey(selectedKey.id, {
+      [dimension]: normalizedValue,
+      ...(!specialShapeEnabled && (dimension === 'w'
+        ? { w2: normalizedValue, h2: selectedKey.h, x2: 0, y2: 0 }
+        : { w2: selectedKey.w, h2: normalizedValue, x2: 0, y2: 0 })),
+    }, finalize);
+  };
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden animate-in fade-in duration-200" onMouseLeave={() => setFocusedField(null)}>
@@ -434,8 +454,8 @@ export const PropertyPanel = () => {
               </div>
 
               <div className="flex gap-3">
-                <PropertyInput label={t('properties.width')} value={scaleUnit(selectedKey.w)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={MoveHorizontal} onFocus={() => setFocusedField('w')} onChange={(val: number) => updateKey(selectedKey.id, { w: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w: parseUnit(val) }, true); }} />
-                <PropertyInput label={t('properties.height')} value={scaleUnit(selectedKey.h)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={MoveVertical} onFocus={() => setFocusedField('h')} onChange={(val: number) => updateKey(selectedKey.id, { h: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h: parseUnit(val) }, true); }} />
+                <PropertyInput label={t('properties.width')} value={scaleUnit(selectedKey.w)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={MoveHorizontal} onFocus={() => setFocusedField('w')} onChange={(val: number) => updatePrimaryDimension('w', val)} onFinalize={(val: number) => { updatePrimaryDimension('w', val, true); }} />
+                <PropertyInput label={t('properties.height')} value={scaleUnit(selectedKey.h)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={MoveVertical} onFocus={() => setFocusedField('h')} onChange={(val: number) => updatePrimaryDimension('h', val)} onFinalize={(val: number) => { updatePrimaryDimension('h', val, true); }} />
               </div>
             </div>
           </PropertySection>
@@ -451,16 +471,45 @@ export const PropertyPanel = () => {
                 className="w-full"
               >
                 <div className="flex flex-col h-full space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex gap-3">
-                      <PropertyInput label={t('properties.widthSub')} value={scaleUnit(selectedKey.w2 ?? selectedKey.w)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={ArrowLeftRight} onFocus={() => setFocusedField('w2')} onChange={(val: number) => updateKey(selectedKey.id, { w2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w2: parseUnit(val) }, true); }} />
-                      <PropertyInput label={t('properties.heightSub')} value={scaleUnit(selectedKey.h2 ?? selectedKey.h)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={ArrowUpDown} onFocus={() => setFocusedField('h2')} onChange={(val: number) => updateKey(selectedKey.id, { h2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h2: parseUnit(val) }, true); }} />
-                    </div>
-                    <div className="flex gap-3">
-                      <PropertyInput label={t('properties.offsetXSub')} value={scaleUnit(selectedKey.x2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: parseUnit(val) }, true); }} />
-                      <PropertyInput label={t('properties.offsetYSub')} value={scaleUnit(selectedKey.y2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: parseUnit(val) }, true); }} />
-                    </div>
+                  <div className="flex items-center justify-between gap-3 rounded border border-[var(--border-main)]/50 bg-[var(--bg-app)]/50 p-2">
+                    <span className="text-xs font-bold text-[var(--text-main)]">{t('properties.specialShapes')}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={specialShapeEnabled}
+                      aria-label={t('properties.specialShapes')}
+                      onClick={() => {
+                        if (specialShapeEnabled) {
+                          updateKey(selectedKey.id, { w2: selectedKey.w, h2: selectedKey.h, x2: 0, y2: 0 });
+                          setSpecialShapeDraftKeyId(undefined);
+                        } else {
+                          setSpecialShapeDraftKeyId(selectedKey.id);
+                        }
+                      }}
+                      className={cn(
+                        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950",
+                        specialShapeEnabled ? "bg-amber-500" : "bg-[var(--bg-button)]"
+                      )}
+                    >
+                      <span className={cn(
+                        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+                        specialShapeEnabled ? "left-[18px]" : "left-[2px]"
+                      )} />
+                    </button>
                   </div>
+
+                  {specialShapeEnabled && (
+                    <div className="space-y-3">
+                      <div className="flex gap-3">
+                        <PropertyInput label={t('properties.widthSub')} value={scaleUnit(selectedKey.w2 ?? selectedKey.w)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={ArrowLeftRight} onFocus={() => setFocusedField('w2')} onChange={(val: number) => updateKey(selectedKey.id, { w2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { w2: parseUnit(val) }, true); }} />
+                        <PropertyInput label={t('properties.heightSub')} value={scaleUnit(selectedKey.h2 ?? selectedKey.h)} step={formatStep(0.25)} min={formatMin(0.5)} unit={unitLabel} icon={ArrowUpDown} onFocus={() => setFocusedField('h2')} onChange={(val: number) => updateKey(selectedKey.id, { h2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { h2: parseUnit(val) }, true); }} />
+                      </div>
+                      <div className="flex gap-3">
+                        <PropertyInput label={t('properties.offsetXSub')} value={scaleUnit(selectedKey.x2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: parseUnit(val) }, true); }} />
+                        <PropertyInput label={t('properties.offsetYSub')} value={scaleUnit(selectedKey.y2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: parseUnit(val) }, true); }} />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-3 p-2 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/50 group hover:border-amber-500/30 transition-colors shrink-0">
                     <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors bg-[var(--bg-button)]">
