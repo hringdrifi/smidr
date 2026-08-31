@@ -76,6 +76,25 @@ const keyHasEncoder = (settings: ProjectSettings, key: PhysicalKey) => {
   return key.encoderIndex !== undefined;
 };
 
+const keyHasTrackball = (settings: ProjectSettings, key: PhysicalKey) => {
+  if (key.trackballId && (settings.trackballs || []).some(trackball => trackball.id === key.trackballId)) return true;
+  return key.trackballIndex !== undefined;
+};
+
+const isOptionalButtonKey = (settings: ProjectSettings, key: PhysicalKey) => (
+  key.kind === 'encoder' ||
+  key.kind === 'trackball' ||
+  keyHasEncoder(settings, key) ||
+  keyHasTrackball(settings, key)
+);
+
+const shouldValidateSwitchInput = (settings: ProjectSettings, key: PhysicalKey, directPins: boolean) => {
+  if (!isOptionalButtonKey(settings, key)) return true;
+  return directPins
+    ? !!key.directPin?.trim()
+    : key.row !== undefined && key.col !== undefined;
+};
+
 export const validateFirmwareExport = (
   settings: ProjectSettings,
   keys: PhysicalKey[],
@@ -86,6 +105,7 @@ export const validateFirmwareExport = (
   const directPins = isDirectPinMatrix(settings);
   const usesActiveLayoutOptions = target === 'qmk' || target === 'vial' || target === 'rmk';
   const matrixKeys = usesActiveLayoutOptions ? getVisibleKeys(settings, keys) : keys;
+  const switchInputKeys = matrixKeys.filter(key => shouldValidateSwitchInput(settings, key, directPins));
 
   if (!directPins && (!hasPins(settings.pins.rows) || !hasPins(settings.pins.cols))) {
     issues.push({
@@ -95,10 +115,10 @@ export const validateFirmwareExport = (
     });
   }
 
-  const matrixPositions = matrixKeys
-    .map(key => getFirmwareMatrixPosition(settings, key, matrixKeys))
+  const matrixPositions = switchInputKeys
+    .map(key => getFirmwareMatrixPosition(settings, key, switchInputKeys))
     .filter((pos): pos is { row: number; col: number } => !!pos && pos.row >= 0 && pos.col >= 0);
-  if (matrixPositions.length === 0) {
+  if (switchInputKeys.length > 0 && matrixPositions.length === 0) {
     issues.push({
       severity: 'error',
       code: 'matrix-keys-missing',
@@ -133,12 +153,19 @@ export const validateFirmwareExport = (
   }
 
   if (directPins) {
-    const missingDirectPins = matrixKeys.filter(key => !key.decal && !key.directPin?.trim()).length;
-    if (missingDirectPins > 0) {
+    const directPinKeys = switchInputKeys.filter(key => !key.decal);
+    const missingDirectPinKeys = directPinKeys.filter(key => !key.directPin?.trim());
+    if (missingDirectPinKeys.length > 0) {
+      const visibleDirectPinKeys = getVisibleKeys(settings, keys)
+        .filter(key => shouldValidateSwitchInput(settings, key, directPins) && !key.decal);
+      const hiddenMissingDirectPins = missingDirectPinKeys.filter(key => !visibleDirectPinKeys.includes(key)).length;
+      const zmkLayoutOptionHint = target === 'zmk' && hiddenMissingDirectPins > 0
+        ? ` ZMK exports every layout-option key: ${visibleDirectPinKeys.length} key(s) are currently visible, while ${directPinKeys.length} key(s) are export targets. ${hiddenMissingDirectPins} unassigned key(s) are hidden by the selected layout options; switch those options to assign their pins.`
+        : '';
       issues.push({
         severity: 'warning',
         code: 'direct-pins-missing',
-        message: `${missingDirectPins} key(s) have no direct pin assignment. The generated source will emit NO_PIN for those positions.`,
+        message: `${missingDirectPinKeys.length} key(s) have no direct pin assignment. The generated source will emit NO_PIN for those positions.${zmkLayoutOptionHint}`,
       });
     }
     pushInvalidPins(issues, settings, matrixKeys

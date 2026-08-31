@@ -1876,6 +1876,55 @@ describe('export generation', () => {
     expect(rulesMk).toContain('ENCODER_MAP_ENABLE = yes');
   });
 
+  it('explains when ZMK direct-pin warnings come from hidden layout-option keys', () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 3, wiring: 'direct' },
+      activeOptions: { layout: 0 },
+    };
+    const keys: PhysicalKey[] = [
+      { id: 'default', group: 'layout', option: 0, directPin: 'GP0', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'Default' },
+      { id: 'alternate', group: 'layout', option: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'Alternate' },
+      { id: 'always', directPin: 'GP2', x: 2, y: 0, w: 1, h: 1, r: 0, rx: 2, ry: 0, label: 'Always' },
+    ];
+
+    const issue = validateFirmwareExport(settings, keys, 'zmk').find(issue => issue.code === 'direct-pins-missing');
+
+    expect(issue?.message).toContain('1 key(s) have no direct pin assignment');
+    expect(issue?.message).toContain('2 key(s) are currently visible, while 3 key(s) are export targets');
+    expect(issue?.message).toContain('1 unassigned key(s) are hidden by the selected layout options');
+  });
+
+  it('does not require encoder or trackball input pins unless they are configured as buttons', () => {
+    const directSettings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+      encoders: [{}],
+      trackballs: [{}],
+    };
+    const directKeys: PhysicalKey[] = [
+      { id: 'switch', directPin: 'GP0', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'Switch' },
+      { id: 'encoder', kind: 'encoder', encoderIndex: 0, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'Encoder' },
+      { id: 'trackball', kind: 'trackball', trackballIndex: 0, x: 2, y: 0, w: 1, h: 1, r: 0, rx: 2, ry: 0, label: 'Trackball' },
+    ];
+
+    expect(validateFirmwareExport(directSettings, directKeys, 'zmk').some(issue => issue.code === 'direct-pins-missing')).toBe(false);
+
+    const matrixSettings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 1 },
+      pins: { rows: ['GP0'], cols: ['GP1'], splitRows: [], splitCols: [] },
+      encoders: [{}],
+      trackballs: [{}],
+    };
+    const peripheralOnlyKeys: PhysicalKey[] = [
+      { id: 'encoder', kind: 'encoder', encoderIndex: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'Encoder' },
+      { id: 'trackball', kind: 'trackball', trackballIndex: 0, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'Trackball' },
+    ];
+
+    expect(validateFirmwareExport(matrixSettings, peripheralOnlyKeys, 'zmk').some(issue => issue.code === 'matrix-keys-missing')).toBe(false);
+  });
+
   it('warns when encoder pins are missing during QMK and Vial export validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
