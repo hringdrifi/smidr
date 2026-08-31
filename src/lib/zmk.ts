@@ -300,7 +300,7 @@ const getEncoderConfigSnippet = (settings: ProjectSettings) => (
 
 const getTrackballConfigSnippet = (settings: ProjectSettings) => (
   (settings.trackballs || []).some(hasCompleteTrackballPins)
-    ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_ZMK_POINTING=y\nCONFIG_INPUT_PMW3610=y\n'
+    ? 'CONFIG_SPI=y\nCONFIG_ZMK_POINTING=y\nCONFIG_INPUT_PMW3610=y\n'
     : ''
 );
 
@@ -737,9 +737,6 @@ if SHIELD_${shield.toUpperCase()}
 config SPI
     default y
 
-config INPUT
-    default y
-
 config INPUT_PMW3610
     default y
 
@@ -977,7 +974,7 @@ endif
     ));
     const enablePointing = hasSideTrackball || (side === 'left' && hasPeripheralTrackball);
     const boardDefconfig = `CONFIG_GPIO=y
-${isNordicTarget(zmkTarget) ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}${settings.features.rgb ? 'CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n' : ''}${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y\n' : ''}${hasSideEncoder ? 'CONFIG_EC11=y\nCONFIG_EC11_TRIGGER_GLOBAL_THREAD=y\n' : ''}${enablePointing ? 'CONFIG_ZMK_POINTING=y\n' : ''}${hasSideTrackball ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_INPUT_PMW3610=y\n' : ''}${splitTransport === 'wired' ? 'CONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
+${isNordicTarget(zmkTarget) ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}${settings.features.rgb ? 'CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n' : ''}${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y\n' : ''}${hasSideEncoder ? 'CONFIG_EC11=y\nCONFIG_EC11_TRIGGER_GLOBAL_THREAD=y\n' : ''}${enablePointing ? 'CONFIG_ZMK_POINTING=y\n' : ''}${hasSideTrackball ? 'CONFIG_SPI=y\nCONFIG_INPUT_PMW3610=y\n' : ''}${splitTransport === 'wired' ? 'CONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 CONFIG_FLASH=y
 CONFIG_SETTINGS=y
 CONFIG_SETTINGS_NVS=y

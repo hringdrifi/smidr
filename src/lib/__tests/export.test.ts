@@ -2893,8 +2893,10 @@ describe('export generation', () => {
     expect(leftDefconfig).not.toContain('CONFIG_ZMK=y');
     expect(leftDefconfig).not.toContain('CONFIG_USB=y');
     expect(leftDefconfig).toContain('CONFIG_ZMK_POINTING=y');
+    expect(leftDefconfig).not.toContain('\nCONFIG_INPUT=y\n');
     expect(leftDefconfig).not.toContain('CONFIG_INPUT_PMW3610=y');
     expect(rightDefconfig).toContain('CONFIG_ZMK_POINTING=y');
+    expect(rightDefconfig).not.toContain('\nCONFIG_INPUT=y\n');
     expect(rightDefconfig).toContain('CONFIG_INPUT_PMW3610=y');
     expect(leftDts).toContain('compatible = "zmk,input-split"');
     expect(leftDts).toContain('device = <&trackball_split_0>');
@@ -2968,6 +2970,7 @@ describe('export generation', () => {
     expect(rightOverlay).toContain('&trackball_split_0 {\n    device = <&trackball_0>;');
     expect(kconfig).toContain('if SHIELD_SPLIT_SHIELD_TRACKBALL_LEFT || SHIELD_SPLIT_SHIELD_TRACKBALL_RIGHT\n\nconfig ZMK_POINTING');
     expect(kconfig).toContain('if SHIELD_SPLIT_SHIELD_TRACKBALL_RIGHT\n\nconfig SPI');
+    expect(kconfig).not.toContain('\nconfig INPUT\n');
     expect(conf).not.toContain('CONFIG_INPUT_PMW3610=y');
   });
 
@@ -3766,6 +3769,7 @@ describe('export generation', () => {
     const overlay = await zip.file('boards/shields/trackball_board/trackball_board.overlay')!.async('string');
     expect(await zip.file('config/west.yml')!.async('string')).toContain('revision: main');
     expect(conf).toContain('CONFIG_INPUT_PMW3610=y');
+    expect(conf).not.toContain('\nCONFIG_INPUT=y\n');
     expect(conf).not.toContain('CONFIG_PMW3610_ALT=y');
     expect(overlay).toContain('#include <zephyr/dt-bindings/input/input-event-codes.h>');
     expect(overlay).toContain('compatible = "pixart,pmw3610"');
