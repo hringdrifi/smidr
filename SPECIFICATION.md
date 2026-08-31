@@ -137,7 +137,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **キーへの割り当て**: 非分割では `PhysicalKey.directPin` のみを使う。分割では `PhysicalKey.matrixSide` (`left` / `right`) と `directPin` を併用し、同じピン名でも左右の基板では別 GPIO として扱う。
 - **マトリクス位置**: 既存の `row` / `col` はキーマップ上の位置として残す。`row` / `col` が未設定の direct pin キーは、各 side 内の物理ソート順に `0,n` としてエクスポートする。
 - **QMK/Vial 出力**: 非分割では `matrix_pins.direct` を出力する。分割では左側をトップレベル `matrix_pins.direct`、右側を `split.matrix_pins.right.direct` として出力し、右側キーの matrix position は QMK/Vial split と同様に行方向へ連結する。未割り当ての direct pin は `NO_PIN` として埋める。
-- **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。行/列またはダイレクト入力ピンが未設定の場合は、任意GPIOへフォールバックせず `kscan` を無効化する。
+- **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。行/列未設定の通常マトリクスでは任意GPIOへフォールバックせず `kscan` を無効化する。ダイレクト配線では、ピン未設定の個別スイッチとエンコーダー／トラックボールは `kscan`・matrix transform の対象外とし、残るスイッチ入力がある側だけ `kscan` を有効化する。
 
 ### 7.6 ロータリーエンコーダー (Rotary Encoders)
 - **自動有効化**: エンコーダー機能はレイアウトから参照される `ProjectSettings.encoders[]` の有無で決定し、独立したファームウェア機能トグルを持たない。エンコーダーが追加されている場合、対応する QMK/Vial/ZMK 出力を自動的に有効化する。旧 `.smidr` の `features.encoder` は読み込み互換性のため受け入れるが、出力判断には使用しない。

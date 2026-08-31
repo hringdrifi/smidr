@@ -81,6 +81,23 @@ const hasCompleteTrackballPins = (trackball: NonNullable<ProjectSettings['trackb
   && hasConfiguredPin(trackball.motion)
 );
 
+const isZmkPeripheralKey = (key: PhysicalKey) => {
+  const isEncoder = key.kind === 'encoder'
+    || !!key.encoderId
+    || key.encoderIndex !== undefined;
+  const isTrackball = key.kind === 'trackball'
+    || !!key.trackballId
+    || key.trackballIndex !== undefined;
+  return isEncoder || isTrackball;
+};
+
+const getZmkSwitchKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
+  keys.filter(key => {
+    if (isZmkPeripheralKey(key)) return false;
+    return !isDirectPinMatrix(settings) || hasConfiguredPin(key.directPin);
+  })
+);
+
 const formatDirectInputGpios = (settings: ProjectSettings, keys: PhysicalKey[], target: ZmkTarget, side?: MatrixSide) => {
   const sourceKeys = side
     ? keys.filter(key => getDirectMatrixSide(settings, key, keys) === side)
@@ -216,15 +233,16 @@ const getZmkMatrixPosition = (
 };
 
 const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
-  const matrix = getZmkMatrixDimensions(settings, keys);
+  const switchKeys = getZmkSwitchKeys(settings, keys);
+  const matrix = getZmkMatrixDimensions(settings, switchKeys);
 
-  return keys.filter((key, idx) => {
+  return switchKeys.filter((key, idx) => {
     if (!isDirectPinMatrix(settings) && (key.row === undefined || key.col === undefined)) return false;
-    const pos = getZmkMatrixPosition(settings, key, keys);
+    const pos = getZmkMatrixPosition(settings, key, switchKeys);
     if (!pos || pos.row < 0 || pos.col < 0) return false;
     if (pos.row >= matrix.rows || pos.col >= matrix.cols) return false;
-    const firstIdx = keys.findIndex(k => {
-      const other = getZmkMatrixPosition(settings, k, keys);
+    const firstIdx = switchKeys.findIndex(k => {
+      const other = getZmkMatrixPosition(settings, k, switchKeys);
       return other?.row === pos.row && other?.col === pos.col;
     });
     return firstIdx === idx;
@@ -482,24 +500,25 @@ const generateSplitShieldFiles = (
   const shieldsFolder = zip.folder('boards')?.folder('shields')?.folder(kbName);
   if (!shieldsFolder) return null;
 
-  const matrix = getZmkMatrixDimensions(settings, keys);
+  const switchKeys = getZmkSwitchKeys(settings, keys);
+  const matrix = getZmkMatrixDimensions(settings, switchKeys);
   const leftPins = getSidePins(settings, 'left');
   const rightPins = getSidePins(settings, 'right');
   const useDirectPins = isDirectPinMatrix(settings);
-  const leftDirectPins = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, 'left') : '';
-  const rightDirectPins = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, 'right') : '';
-  const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, keys, 'left').cols : 0;
+  const leftDirectPins = useDirectPins ? formatDirectInputGpios(settings, switchKeys, zmkTarget, 'left') : '';
+  const rightDirectPins = useDirectPins ? formatDirectInputGpios(settings, switchKeys, zmkTarget, 'right') : '';
+  const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, switchKeys, 'left').cols : 0;
   const leftRows = formatGpios(leftPins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Left row');
   const leftCols = formatGpios(leftPins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Left col');
   const rightRows = formatGpios(rightPins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Right row');
   const rightCols = formatGpios(rightPins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Right col');
   const leftKscanEnabled = useDirectPins
-    ? hasCompleteDirectInputPins(settings, keys, 'left')
+    ? hasCompleteDirectInputPins(settings, switchKeys, 'left')
     : hasConfiguredPins(leftPins.rows) && hasConfiguredPins(leftPins.cols);
   const rightKscanEnabled = useDirectPins
-    ? hasCompleteDirectInputPins(settings, keys, 'right')
+    ? hasCompleteDirectInputPins(settings, switchKeys, 'right')
     : hasConfiguredPins(rightPins.rows) && hasConfiguredPins(rightPins.cols);
-  const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
+  const transformMapStr = formatTransformMap(settings, sortedKeys, switchKeys);
   const leftShield = `${kbName}_left`;
   const rightShield = `${kbName}_right`;
   const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board);
@@ -689,12 +708,13 @@ const generateSplitCustomBoardFiles = (
   const arch = 'arm';
   const leftBoard = `${kbName}_left`;
   const rightBoard = `${kbName}_right`;
-  const matrix = getZmkMatrixDimensions(settings, keys);
+  const switchKeys = getZmkSwitchKeys(settings, keys);
+  const matrix = getZmkMatrixDimensions(settings, switchKeys);
   const leftPins = getSidePins(settings, 'left');
   const rightPins = getSidePins(settings, 'right');
   const useDirectPins = isDirectPinMatrix(settings);
-  const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, keys, 'left').cols : 0;
-  const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
+  const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, switchKeys, 'left').cols : 0;
+  const transformMapStr = formatTransformMap(settings, sortedKeys, switchKeys);
   const splitTransport = getZmkSplitTransport(settings);
   const wiredSplitDevice = getWiredSplitDevice(settings);
   const processorSelect = isNordicTarget(zmkTarget) ? getNordicSoc(zmkTarget) : 'RP2040';
@@ -775,9 +795,9 @@ const generateSplitCustomBoardFiles = (
 
     const rowGpios = formatGpios(sidePins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', `${side} row`);
     const colGpios = formatGpios(sidePins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', `${side} col`);
-    const directGpios = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, side) : '';
+    const directGpios = useDirectPins ? formatDirectInputGpios(settings, switchKeys, zmkTarget, side) : '';
     const kscanEnabled = useDirectPins
-      ? hasCompleteDirectInputPins(settings, keys, side)
+      ? hasCompleteDirectInputPins(settings, switchKeys, side)
       : hasConfiguredPins(sidePins.rows) && hasConfiguredPins(sidePins.cols);
     const colOffset = side === 'right' ? `
 
@@ -967,7 +987,7 @@ ${splitTransport === 'wired' ? `\n## Wired Split\nBoth board DTS files enable ZM
 export const generateZmkZip = async (state: { settings: ProjectSettings, keys: PhysicalKey[] }) => {
   const { settings, keys } = state;
 
-  // Filter only keys that have a valid, unique matrix position to prevent compiler errors
+  // Exclude peripherals and incomplete switch inputs before assigning matrix positions.
   const validKeys = getValidMatrixKeys(settings, keys);
 
   const sortedKeys = sortKeys(validKeys, 0.25);
@@ -1008,8 +1028,9 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   if (!configFolder) return null;
   if ((settings.trackballs || []).some(hasCompleteTrackballPins)) configFolder.file('west.yml', generateZmkWestManifest());
 
-  const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
-  const matrix = getZmkMatrixDimensions(settings, keys);
+  const switchKeys = getZmkSwitchKeys(settings, keys);
+  const transformMapStr = formatTransformMap(settings, sortedKeys, switchKeys);
+  const matrix = getZmkMatrixDimensions(settings, switchKeys);
   const useDirectPins = isDirectPinMatrix(settings);
 
   const rowPins = settings.pins.rows || [];
@@ -1018,10 +1039,10 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const colPins = settings.pins.cols || [];
   const colGpiosStr = formatGpios(colPins, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Col');
   const directGpiosStr = useDirectPins
-    ? formatDirectInputGpios(settings, sortedKeys, zmkTarget)
+    ? formatDirectInputGpios(settings, switchKeys, zmkTarget)
     : '';
   const kscanEnabled = useDirectPins
-    ? hasCompleteDirectInputPins(settings, sortedKeys)
+    ? hasCompleteDirectInputPins(settings, switchKeys)
     : hasConfiguredPins(rowPins) && hasConfiguredPins(colPins);
 
   if (settings.hardware.controllerType === 'mcu') {

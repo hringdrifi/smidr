@@ -165,7 +165,7 @@ export const validateFirmwareExport = (
       issues.push({
         severity: 'warning',
         code: 'direct-pins-missing',
-        message: `${missingDirectPinKeys.length} key(s) have no direct pin assignment. The generated source will emit NO_PIN for those positions.${zmkLayoutOptionHint}`,
+        message: `${missingDirectPinKeys.length} key(s) have no direct pin assignment. The generated ${target === 'zmk' ? 'ZMK source will omit those switch inputs' : 'source will emit NO_PIN for those positions'}.${zmkLayoutOptionHint}`,
       });
     }
     pushInvalidPins(issues, settings, matrixKeys

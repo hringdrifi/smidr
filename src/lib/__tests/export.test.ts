@@ -643,6 +643,33 @@ describe('export generation', () => {
     expect(readme).toContain('col-offset = <1>');
   });
 
+  it('keeps ZMK direct kscan enabled when a split half has unconfigured switches or peripherals', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+      features: { ...baseSettings.features, split: true },
+      zmk: { splitTransport: 'wired' },
+      encoders: [{}],
+      trackballs: [{}],
+    };
+    const keys: PhysicalKey[] = [
+      { x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, matrixSide: 'left', directPin: 'GP2', label: 'Left' },
+      { x: 8, y: 0, w: 1, h: 1, r: 0, rx: 8, ry: 0, matrixSide: 'right', directPin: 'GP3', label: 'Right' },
+      { x: 9, y: 0, w: 1, h: 1, r: 0, rx: 9, ry: 0, matrixSide: 'right', label: 'Unconfigured switch' },
+      { kind: 'encoder', encoderIndex: 0, x: 10, y: 0, w: 1, h: 1, r: 0, rx: 10, ry: 0, matrixSide: 'right', label: 'Encoder' },
+      { kind: 'trackball', trackballIndex: 0, x: 11, y: 0, w: 1, h: 1, r: 0, rx: 11, ry: 0, matrixSide: 'right', label: 'Trackball' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const rightOverlay = await zip.file('boards/shields/test_keyboard/test_keyboard_right.overlay')!.async('string');
+
+    expect(rightOverlay).toContain('Direct 0: GP3');
+    expect(rightOverlay).not.toContain('status = "disabled";');
+    expect(rightOverlay).not.toContain('Please configure pin');
+    expect(rightOverlay).not.toContain('Direct 1:');
+  });
+
   it('omits saved row and column assignments for direct pin projects', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
