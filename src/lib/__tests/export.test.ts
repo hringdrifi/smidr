@@ -1980,7 +1980,7 @@ describe('export generation', () => {
     expect(overlay).not.toContain('pmw3610');
     expect(conf).not.toContain('CONFIG_EC11=y');
     expect(conf).not.toContain('CONFIG_PMW3610_ALT=y');
-    expect(zip.file('config/west.yml')).toBeNull();
+    expect(await zip.file('config/west.yml')!.async('string')).toContain('revision: main');
   });
 
   it('warns when encoder pins are missing during QMK and Vial export validation', () => {
@@ -2693,14 +2693,18 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const boardDts = await zip.file('boards/arm/nordic_board/nordic_board.dts')!.async('string');
     const boardYaml = await zip.file('boards/arm/nordic_board/board.yml')!.async('string');
-    const kconfigBoard = await zip.file('boards/arm/nordic_board/Kconfig.board')!.async('string');
+    const kconfigBoard = await zip.file('boards/arm/nordic_board/Kconfig.nordic_board')!.async('string');
 
     expect(kconfigBoard).toContain('select SOC_NRF52840_QIAA');
+    expect(kconfigBoard).toContain('select ZMK_BOARD_COMPAT');
+    expect(kconfigBoard).not.toContain('bool "Nordic Board"');
     expect(boardYaml).toContain('name: nordic_board');
     expect(boardYaml).toContain('vendor: test');
     expect(boardYaml).toContain('name: nrf52840');
     expect(boardYaml).not.toContain('variants:');
     expect(boardDts).toContain('#include <nordic/nrf52840_qiaa.dtsi>');
+    expect(boardDts).toContain('#include <common/nordic/nrf52840_uf2_boot_mode.dtsi>');
+    expect(boardDts).toContain('zephyr_udc0: &usbd');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
   });
@@ -2719,9 +2723,10 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const boardDts = await zip.file('boards/arm/hy0020_board/hy0020_board.dts')!.async('string');
     const boardDefconfig = await zip.file('boards/arm/hy0020_board/hy0020_board_defconfig')!.async('string');
-    const kconfigBoard = await zip.file('boards/arm/hy0020_board/Kconfig.board')!.async('string');
+    const kconfigBoard = await zip.file('boards/arm/hy0020_board/Kconfig.hy0020_board')!.async('string');
 
     expect(kconfigBoard).toContain('select SOC_NRF52832_QFAA');
+    expect(kconfigBoard).toContain('select ZMK_BOARD_COMPAT');
     expect(boardDts).toContain('#include <nordic/nrf52832_qfaa.dtsi>');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio0 20 GPIO_ACTIVE_HIGH');
@@ -2730,6 +2735,7 @@ describe('export generation', () => {
     expect(boardDefconfig).toContain('CONFIG_ZMK_BLE=y');
     expect(boardDefconfig).toContain('CONFIG_BUILD_OUTPUT_HEX=y');
     expect(boardDefconfig).not.toContain('CONFIG_USB=y');
+    expect(boardDefconfig).not.toContain('CONFIG_ZMK=y');
   });
 
   it('emits ZMK split custom boards for MCU projects', async () => {
@@ -2798,7 +2804,7 @@ describe('export generation', () => {
     const rightBoardYaml = await zip.file('boards/arm/split_mcu_board_right/board.yml')!.async('string');
     const leftKconfig = await zip.file('boards/arm/split_mcu_board_left/Kconfig.defconfig')!.async('string');
     const rightKconfig = await zip.file('boards/arm/split_mcu_board_right/Kconfig.defconfig')!.async('string');
-    const leftConf = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.conf')!.async('string');
+    const leftDefconfig = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left_defconfig')!.async('string');
     const keymap = await zip.file('config/split_mcu_board.keymap')!.async('string');
     const readme = await zip.file('README.md')!.async('string');
     const buildYaml = await zip.file('build.yaml')!.async('string');
@@ -2820,13 +2826,80 @@ describe('export generation', () => {
     expect(leftKconfig).toContain('config ZMK_SPLIT');
     expect(rightKconfig).not.toContain('config ZMK_SPLIT_ROLE_CENTRAL');
     expect(rightKconfig).toContain('config ZMK_SPLIT');
-    expect(leftConf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
+    expect(leftDefconfig).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
+    expect(zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.conf')).toBeNull();
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('- board: split_mcu_board_left');
     expect(readme).toContain('- board: split_mcu_board_right');
     expect(buildYaml).toContain('include:');
     expect(buildYaml).toContain('- board: split_mcu_board_left');
     expect(buildYaml).toContain('- board: split_mcu_board_right');
+    expect(await zip.file('.github/workflows/build.yml')!.async('string')).toContain('build-user-config.yml@main');
+    expect(await zip.file('config/west.yml')!.async('string')).toContain('path: config');
+    expect(await zip.file('zephyr/module.yml')!.async('string')).toContain('board_root: .');
+  });
+
+  it('emits buildable current-ZMK split custom boards with side-local pointing config', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Bifrost',
+      manufacturer: 'Hringbord',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'mcu',
+        mcu: 'nRF52840',
+      },
+      matrix: { rows: 1, cols: 1, wiring: 'direct' },
+      pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+      trackballs: [{
+        id: 'trackball-right',
+        sclk: 'P0.16',
+        sdio: 'P0.14',
+        cs: 'P0.05',
+        motion: 'P0.26',
+        cpi: 1200,
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      { id: 'left-key', directPin: 'P1.00', matrixSide: 'left', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: '' },
+      { id: 'right-key', directPin: 'P1.07', matrixSide: 'right', x: 4, y: 0, w: 1, h: 1, r: 0, rx: 4, ry: 0, label: '' },
+      { id: 'trackball-key', kind: 'trackball', trackballId: 'trackball-right', matrixSide: 'right', x: 5, y: 0, w: 1, h: 1, r: 0, rx: 5, ry: 0, label: '' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const leftKconfig = await zip.file('boards/arm/bifrost_left/Kconfig.bifrost_left')!.async('string');
+    const leftKconfigDefaults = await zip.file('boards/arm/bifrost_left/Kconfig.defconfig')!.async('string');
+    const rightKconfigDefaults = await zip.file('boards/arm/bifrost_right/Kconfig.defconfig')!.async('string');
+    const leftDefconfig = await zip.file('boards/arm/bifrost_left/bifrost_left_defconfig')!.async('string');
+    const rightDefconfig = await zip.file('boards/arm/bifrost_right/bifrost_right_defconfig')!.async('string');
+    const rightDts = await zip.file('boards/arm/bifrost_right/bifrost_right.dts')!.async('string');
+
+    expect(zip.file('boards/arm/bifrost_left/Kconfig.board')).toBeNull();
+    expect(zip.file('boards/arm/bifrost_left/bifrost_left.conf')).toBeNull();
+    expect(zip.file('boards/arm/bifrost_right/bifrost_right.conf')).toBeNull();
+    expect(leftKconfig).toContain('select ZMK_BOARD_COMPAT');
+    expect(leftKconfig).toContain('imply RETENTION_BOOT_MODE');
+    expect(leftKconfig).not.toContain('bool "Bifrost left"');
+    expect(leftKconfigDefaults).toContain('config ZMK_USB');
+    expect(rightKconfigDefaults).not.toContain('config ZMK_USB');
+    expect(leftDefconfig).not.toContain('CONFIG_ZMK=y');
+    expect(leftDefconfig).not.toContain('CONFIG_USB=y');
+    expect(leftDefconfig).not.toContain('CONFIG_INPUT_PMW3610=y');
+    expect(rightDefconfig).toContain('CONFIG_INPUT_PMW3610=y');
+    expect(rightDts).toContain('#include <common/nordic/nrf52840_uf2_boot_mode.dtsi>');
+    expect(rightDts).toContain('trackball_0: pmw3610@0');
+    expect(rightDts).toContain('&gpiote');
+    expect(rightDts).toContain('zephyr_udc0: &usbd');
+    expect(await zip.file('config/bifrost_left.keymap')!.async('string')).toBe('#include "bifrost.keymap"\n');
+    expect(await zip.file('config/bifrost_right.keymap')!.async('string')).toBe('#include "bifrost.keymap"\n');
+    expect(await zip.file('.github/workflows/build.yml')!.async('string')).toContain('build-user-config.yml@main');
+    expect(await zip.file('config/west.yml')!.async('string')).toContain('revision: main');
+    expect(await zip.file('zephyr/module.yml')!.async('string')).toContain('name: zmk-keyboard-bifrost');
   });
 
   it('emits ZMK as an existing board plus shield when development board is selected', async () => {
@@ -3622,7 +3695,7 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const conf = await zip.file('boards/shields/trackball_board/trackball_board.conf')!.async('string');
     const overlay = await zip.file('boards/shields/trackball_board/trackball_board.overlay')!.async('string');
-    expect(zip.file('config/west.yml')).toBeNull();
+    expect(await zip.file('config/west.yml')!.async('string')).toContain('revision: main');
     expect(conf).toContain('CONFIG_INPUT_PMW3610=y');
     expect(conf).not.toContain('CONFIG_PMW3610_ALT=y');
     expect(overlay).toContain('#include <zephyr/dt-bindings/input/input-event-codes.h>');
