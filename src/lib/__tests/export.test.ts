@@ -634,11 +634,13 @@ describe('export generation', () => {
     const dtsi = await zip.file('boards/shields/test_keyboard/test_keyboard.dtsi')!.async('string');
     const leftOverlay = await zip.file('boards/shields/test_keyboard/test_keyboard_left.overlay')!.async('string');
     const rightOverlay = await zip.file('boards/shields/test_keyboard/test_keyboard_right.overlay')!.async('string');
+    const readme = await zip.file('README.md')!.async('string');
 
     expect(dtsi).toContain('compatible = "zmk,kscan-gpio-direct"');
     expect(leftOverlay).toContain('Direct 0: GP2');
     expect(rightOverlay).toContain('Direct 0: GP2');
     expect(rightOverlay).toContain('col-offset = <1>');
+    expect(readme).toContain('col-offset = <1>');
   });
 
   it('omits saved row and column assignments for direct pin projects', () => {
@@ -2770,8 +2772,7 @@ describe('export generation', () => {
     const leftKconfig = await zip.file('boards/arm/split_mcu_board_left/Kconfig.defconfig')!.async('string');
     const rightKconfig = await zip.file('boards/arm/split_mcu_board_right/Kconfig.defconfig')!.async('string');
     const leftConf = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.conf')!.async('string');
-    const leftKeymap = await zip.file('config/split_mcu_board_left.keymap')!.async('string');
-    const rightKeymap = await zip.file('config/split_mcu_board_right.keymap')!.async('string');
+    const keymap = await zip.file('config/split_mcu_board.keymap')!.async('string');
     const readme = await zip.file('README.md')!.async('string');
     const buildYaml = await zip.file('build.yaml')!.async('string');
 
@@ -2792,9 +2793,7 @@ describe('export generation', () => {
     expect(rightKconfig).not.toContain('config ZMK_SPLIT_ROLE_CENTRAL');
     expect(rightKconfig).toContain('config ZMK_SPLIT');
     expect(leftConf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
-    expect(leftKeymap).toContain('&kp A &kp B');
-    expect(rightKeymap).toBe(leftKeymap);
-    expect(zip.file('config/split_mcu_board.keymap')).toBeNull();
+    expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('- board: split_mcu_board_left');
     expect(readme).toContain('- board: split_mcu_board_right');
     expect(buildYaml).toContain('include:');
