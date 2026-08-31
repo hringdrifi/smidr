@@ -3601,6 +3601,8 @@ describe('export generation', () => {
     expect(overlay).toContain('cpi = <1400>');
     expect(overlay).toContain('swap-xy;');
     expect(overlay).toContain('invert-y;');
+    expect(overlay.indexOf('};\n&pinctrl {')).toBeGreaterThan(-1);
+    expect(overlay.indexOf('&pinctrl {')).toBeLessThan(overlay.indexOf('&spi0 {'));
   });
 
   it('exports RMK keyboard.toml and Vial layout data', async () => {

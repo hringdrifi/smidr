@@ -898,9 +898,9 @@ ${kscanEnabled ? (useDirectPins ? `        input-gpios
             ;`) : '        status = "disabled";'}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, index => getEncoderSide(settings, keys, index) === side ? 'okay' : 'disabled')}
-${generateZmkTrackballNodes(settings, keys, zmkTarget, side)}
 ${wiredSplitNode}
 };
+${generateZmkTrackballNodes(settings, keys, zmkTarget, side)}
 ${colOffset}
 
 ${peripheralDts}
@@ -1202,8 +1202,8 @@ ${kscanEnabled ? `        row-gpios
             ;` : '        status = "disabled";'}`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
-${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 };
+${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 
 ${peripheralDts}
 `;
@@ -1259,8 +1259,8 @@ ${kscanEnabled ? `        row-gpios
             ;` : '        status = "disabled";'}`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
-${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 };
+${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 `;
     shieldsFolder.file(`${kbName}.overlay`, shieldOverlay);
 
