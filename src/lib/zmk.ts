@@ -150,8 +150,12 @@ const getZmkLightingConfigSnippet = (settings: ProjectSettings) => `${settings.f
 CONFIG_WS2812_STRIP=y` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
 ${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y' : '# CONFIG_ZMK_BACKLIGHT is not set'}`;
 
+const getZmkBuildBoard = (board: string) => (
+  board.endsWith('/zmk') ? board : `${board}${board.includes('/') ? '/' : '//'}zmk`
+);
+
 const generateZmkBuildYaml = (entries: Array<{ board: string; shield?: string }>) => `include:
-${entries.map(entry => `  - board: ${entry.board}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
+${entries.map(entry => `  - board: ${getZmkBuildBoard(entry.board)}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
 `;
 
 const generateZmkBoardYaml = (boardName: string, vendorName: string, target: ZmkTarget) => `board:
@@ -680,9 +684,9 @@ To build ZMK firmware using this configuration:
 3. Configure your GitHub Actions \`build.yaml\` file:
    \`\`\`yaml
    include:
-     - board: ${boardName}
+     - board: ${getZmkBuildBoard(boardName)}
        shield: ${leftShield}
-     - board: ${boardName}
+     - board: ${getZmkBuildBoard(boardName)}
        shield: ${rightShield}
    \`\`\`
 4. Push the changes to GitHub and download the compiled firmware binaries from the GitHub Actions tab.
@@ -967,8 +971,8 @@ To build ZMK firmware using this configuration:
 3. Configure your GitHub Actions \`build.yaml\` file:
    \`\`\`yaml
    include:
-     - board: ${leftBoard}
-     - board: ${rightBoard}
+     - board: ${getZmkBuildBoard(leftBoard)}
+     - board: ${getZmkBuildBoard(rightBoard)}
    \`\`\`
 4. Push the changes to GitHub and download the compiled firmware binaries from the GitHub Actions tab.
 
@@ -1389,8 +1393,8 @@ ${generateZmkEncoderBehaviors(settings)}
     ? `- \`boards/arm/${kbName}/\`: Contains the custom board definition files.`
     : `- \`boards/shields/${kbName}/\`: Contains the shield overlay, config, metadata, and Kconfig files.`;
   const buildExample = usesCustomBoard
-    ? `     - board: ${kbName}`
-    : `     - board: ${boardName}
+    ? `     - board: ${getZmkBuildBoard(kbName)}`
+    : `     - board: ${getZmkBuildBoard(boardName)}
        shield: ${kbName}`;
   const gpioFile = usesCustomBoard ? `${kbName}.dts` : `${kbName}.overlay`;
   const gpioKind = usesCustomBoard ? 'custom board' : 'shield';

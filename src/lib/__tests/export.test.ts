@@ -2821,11 +2821,11 @@ describe('export generation', () => {
     expect(rightKconfig).toContain('config ZMK_SPLIT');
     expect(leftConf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
     expect(keymap).toContain('&kp A &kp B');
-    expect(readme).toContain('- board: split_mcu_board_left');
-    expect(readme).toContain('- board: split_mcu_board_right');
+    expect(readme).toContain('- board: split_mcu_board_left//zmk');
+    expect(readme).toContain('- board: split_mcu_board_right//zmk');
     expect(buildYaml).toContain('include:');
-    expect(buildYaml).toContain('- board: split_mcu_board_left');
-    expect(buildYaml).toContain('- board: split_mcu_board_right');
+    expect(buildYaml).toContain('- board: split_mcu_board_left//zmk');
+    expect(buildYaml).toContain('- board: split_mcu_board_right//zmk');
   });
 
   it('emits ZMK as an existing board plus shield when development board is selected', async () => {
@@ -2875,9 +2875,9 @@ describe('export generation', () => {
     expect(shieldOverlay).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(shieldOverlay).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
     expect(zmkYml).toContain('requires:\n  - pro_micro');
-    expect(readme).toContain('- board: nice_nano');
+    expect(readme).toContain('- board: nice_nano//zmk');
     expect(readme).toContain('shield: shield_board');
-    expect(buildYaml).toContain('- board: nice_nano');
+    expect(buildYaml).toContain('- board: nice_nano//zmk');
     expect(buildYaml).toContain('shield: shield_board');
   });
 
@@ -2922,7 +2922,7 @@ describe('export generation', () => {
     const buildYaml = await zip.file('build.yaml')!.async('string');
 
     expect(zmkYml).toContain('requires:\n  - seeed_xiao');
-    expect(buildYaml).toContain('- board: seeeduino_xiao_ble');
+    expect(buildYaml).toContain('- board: seeeduino_xiao_ble//zmk');
     expect(buildYaml).toContain('shield: xiao_shield');
   });
 
@@ -3147,7 +3147,7 @@ describe('export generation', () => {
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('shield: split_zmk_board_left');
     expect(readme).toContain('shield: split_zmk_board_right');
-    expect(buildYaml).toContain('- board: nice_nano');
+    expect(buildYaml).toContain('- board: nice_nano//zmk');
     expect(buildYaml).toContain('shield: split_zmk_board_left');
     expect(buildYaml).toContain('shield: split_zmk_board_right');
   });
@@ -3196,7 +3196,7 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const readme = await zip.file('README.md')!.async('string');
 
-    expect(readme).toContain('- board: nice_nano');
+    expect(readme).toContain('- board: nice_nano//zmk');
     expect(readme).toContain('shield: nice_nano_split_left');
     expect(readme).toContain('shield: nice_nano_split_right');
   });
@@ -3380,7 +3380,7 @@ describe('export generation', () => {
     expect(conf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
     expect(readme).toContain('ZMK wired split firmware');
     expect(readme).toContain('using `&uart0`');
-    expect(readme).toContain('- board: adafruit_kb2040');
+    expect(readme).toContain('- board: adafruit_kb2040//zmk');
     expect(readme).toContain('shield: wired_zmk_split_left');
     expect(readme).toContain('shield: wired_zmk_split_right');
   });
@@ -3600,7 +3600,7 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const readme = await zip.file('README.md')!.async('string');
 
-    expect(readme).toContain('- board: adafruit_kb2040');
+    expect(readme).toContain('- board: adafruit_kb2040//zmk');
     expect(readme).toContain('shield: shared_board');
   });
 
