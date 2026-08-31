@@ -2634,9 +2634,14 @@ describe('export generation', () => {
 
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const boardDts = await zip.file('boards/arm/nordic_board/nordic_board.dts')!.async('string');
+    const boardYaml = await zip.file('boards/arm/nordic_board/board.yml')!.async('string');
     const kconfigBoard = await zip.file('boards/arm/nordic_board/Kconfig.board')!.async('string');
 
     expect(kconfigBoard).toContain('select SOC_NRF52840_QIAA');
+    expect(boardYaml).toContain('name: nordic_board');
+    expect(boardYaml).toContain('vendor: test');
+    expect(boardYaml).toContain('name: nrf52840');
+    expect(boardYaml).toContain('name: zmk');
     expect(boardDts).toContain('#include <nordic/nrf52840_qiaa.dtsi>');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
@@ -2731,14 +2736,21 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const leftDts = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.dts')!.async('string');
     const rightDts = await zip.file('boards/arm/split_mcu_board_right/split_mcu_board_right.dts')!.async('string');
+    const leftBoardYaml = await zip.file('boards/arm/split_mcu_board_left/board.yml')!.async('string');
+    const rightBoardYaml = await zip.file('boards/arm/split_mcu_board_right/board.yml')!.async('string');
     const leftKconfig = await zip.file('boards/arm/split_mcu_board_left/Kconfig.defconfig')!.async('string');
     const rightKconfig = await zip.file('boards/arm/split_mcu_board_right/Kconfig.defconfig')!.async('string');
     const leftConf = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.conf')!.async('string');
-    const keymap = await zip.file('config/split_mcu_board.keymap')!.async('string');
+    const leftKeymap = await zip.file('config/split_mcu_board_left.keymap')!.async('string');
+    const rightKeymap = await zip.file('config/split_mcu_board_right.keymap')!.async('string');
     const readme = await zip.file('README.md')!.async('string');
     const buildYaml = await zip.file('build.yaml')!.async('string');
 
     expect(leftDts).toContain('model = "Split MCU Board left"');
+    expect(leftBoardYaml).toContain('name: split_mcu_board_left');
+    expect(leftBoardYaml).toContain('name: rp2040');
+    expect(rightBoardYaml).toContain('name: split_mcu_board_right');
+    expect(rightBoardYaml).toContain('name: rp2040');
     expect(leftDts).toContain('RC(0,0) RC(0,1)');
     expect(leftDts).toContain('compatible = "zmk,wired-split"');
     expect(leftDts).toContain('device = <&uart0>;');
@@ -2751,7 +2763,9 @@ describe('export generation', () => {
     expect(rightKconfig).not.toContain('config ZMK_SPLIT_ROLE_CENTRAL');
     expect(rightKconfig).toContain('config ZMK_SPLIT');
     expect(leftConf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
-    expect(keymap).toContain('&kp A &kp B');
+    expect(leftKeymap).toContain('&kp A &kp B');
+    expect(rightKeymap).toBe(leftKeymap);
+    expect(zip.file('config/split_mcu_board.keymap')).toBeNull();
     expect(readme).toContain('- board: split_mcu_board_left');
     expect(readme).toContain('- board: split_mcu_board_right');
     expect(buildYaml).toContain('include:');
