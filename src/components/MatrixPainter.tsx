@@ -29,7 +29,8 @@ export const MatrixPainter = () => {
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [focusedEncoderPin, setFocusedEncoderPin] = React.useState<'pinA' | 'pinB'>('pinA');
-  const [focusedPinTarget, setFocusedPinTarget] = React.useState<'direct' | 'encoder'>('direct');
+  const [focusedTrackballPin, setFocusedTrackballPin] = React.useState<'sclk' | 'sdio' | 'cs' | 'motion'>('sclk');
+  const [focusedPinTarget, setFocusedPinTarget] = React.useState<'direct' | 'encoder' | 'trackball'>('direct');
   const [preventDuplicatePins, setPreventDuplicatePins] = React.useState<boolean>(true);
   const [customEncoderPinText, setCustomEncoderPinText] = React.useState<string>('');
 
@@ -121,8 +122,13 @@ export const MatrixPainter = () => {
 
   const encoderPinPlaceholder = t('matrix.encoderPinPlaceholder');
   const currentEncoderPin = focusedEncoderPin === 'pinA' ? selectedEncoder?.pinA : selectedEncoder?.pinB;
-  const activePinTarget = isDirectMode && (focusedPinTarget === 'direct' || !selectedEncoder) ? 'direct' : 'encoder';
-  const activePinValue = activePinTarget === 'direct' ? selectedKey?.directPin : currentEncoderPin;
+  const currentTrackballPin = selectedTrackball?.[focusedTrackballPin];
+  const activePinTarget = focusedPinTarget === 'trackball' && selectedTrackball
+    ? 'trackball'
+    : isDirectMode && (focusedPinTarget === 'direct' || !selectedEncoder) ? 'direct' : 'encoder';
+  const activePinValue = activePinTarget === 'direct'
+    ? selectedKey?.directPin
+    : activePinTarget === 'trackball' ? currentTrackballPin : currentEncoderPin;
 
   const assignEncoderPin = (pinName: string) => {
     if (!selectedEncoder) return;
@@ -138,9 +144,19 @@ export const MatrixPainter = () => {
     updateKey(selectedKeyId, { directPin: pinName, row: undefined, col: undefined });
   };
 
+  const assignTrackballPin = (pinName: string) => {
+    if (!selectedTrackball) return;
+    if (preventDuplicatePins && assignedPins.has(pinName) && currentTrackballPin !== pinName) return;
+    updateTrackball(selectedTrackball.id!, { [focusedTrackballPin]: pinName });
+  };
+
   const assignActivePin = (pinName: string) => {
     if (activePinTarget === 'direct') {
       assignDirectPin(pinName);
+      return;
+    }
+    if (activePinTarget === 'trackball') {
+      assignTrackballPin(pinName);
       return;
     }
     assignEncoderPin(pinName);
@@ -392,7 +408,7 @@ export const MatrixPainter = () => {
           </div>
           {selectedTrackball && <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              {(['sclk', 'sdio', 'cs', 'motion'] as const).map(field => <label key={field} className="space-y-1.5"><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t(`matrix.trackball${field[0].toUpperCase()}${field.slice(1)}` as any)}</span><input type="text" value={selectedTrackball[field] || ''} onChange={e => updateTrackball(selectedTrackball.id!, { [field]: e.target.value.toUpperCase() })} placeholder={t('matrix.encoderPinPlaceholder')} className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50" /></label>)}
+              {(['sclk', 'sdio', 'cs', 'motion'] as const).map(field => <label key={field} className="space-y-1.5"><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t(`matrix.trackball${field[0].toUpperCase()}${field.slice(1)}` as any)}</span><input type="text" value={selectedTrackball[field] || ''} onFocus={() => { setFocusedPinTarget('trackball'); setFocusedTrackballPin(field); }} onChange={e => updateTrackball(selectedTrackball.id!, { [field]: e.target.value.toUpperCase() })} placeholder={t('matrix.encoderPinPlaceholder')} className={cn("h-9 w-full rounded border bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none transition-all placeholder:text-[var(--text-dim)]", focusedPinTarget === 'trackball' && focusedTrackballPin === field ? "border-amber-500/50 ring-1 ring-amber-500/50" : "border-[var(--border-main)] focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50")} /></label>)}
             </div>
             <label className="block space-y-1.5"><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.trackballCpi')}</span><input type="number" min="100" step="100" value={selectedTrackball.cpi || 1200} onChange={e => updateTrackball(selectedTrackball.id!, { cpi: Number(e.target.value) || 1200 })} className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none" /></label>
             <div className="grid grid-cols-3 gap-2">{(['swapXy', 'invertX', 'invertY'] as const).map(field => <label key={field} className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]"><input type="checkbox" checked={!!selectedTrackball[field]} onChange={e => updateTrackball(selectedTrackball.id!, { [field]: e.target.checked })} />{t(`matrix.trackball${field[0].toUpperCase()}${field.slice(1)}` as any)}</label>)}</div>
@@ -400,19 +416,21 @@ export const MatrixPainter = () => {
         </div>
       </div>
 
-      {(isDirectMode || selectedEncoder) && (
+      {(isDirectMode || selectedEncoder || selectedTrackball) && (
         <AvailablePinPool
           title={`${t('matrix.availablePins')} (${pinPoolLabel})`}
           activeLabel={activePinTarget === 'direct'
             ? t('matrix.directPin')
-            : focusedEncoderPin === 'pinA' ? t('matrix.encoderPinA') : t('matrix.encoderPinB')}
+            : activePinTarget === 'trackball'
+              ? t(`matrix.trackball${focusedTrackballPin[0].toUpperCase()}${focusedTrackballPin.slice(1)}` as any)
+              : focusedEncoderPin === 'pinA' ? t('matrix.encoderPinA') : t('matrix.encoderPinB')}
           pins={pinPool}
           assignedPins={assignedPins}
           preventDuplicates={preventDuplicatePins}
           onPreventDuplicatesChange={setPreventDuplicatePins}
           onAssignPin={assignActivePin}
           isCurrentPin={isCurrentActivePin}
-          isActive={activePinTarget === 'direct' || !!selectedEncoder}
+          isActive={activePinTarget === 'direct' || !!selectedEncoder || !!selectedTrackball}
           isListTarget={false}
           customPinText={customEncoderPinText}
           onCustomPinTextChange={(value) => setCustomEncoderPinText(value.toUpperCase())}
