@@ -66,6 +66,21 @@ const formatGpio = (pin: string | undefined, target: ZmkTarget, flags: string, f
   return `${parsed.controller} ${parsed.number} ${flags} /* ${label}: ${pin} */`;
 };
 
+const hasConfiguredPin = (pin: string | undefined) => !!pin?.trim();
+
+const hasConfiguredPins = (pins: string[]) => pins.length > 0 && pins.every(hasConfiguredPin);
+
+const hasCompleteEncoderPins = (encoder: NonNullable<ProjectSettings['encoders']>[number]) => (
+  hasConfiguredPin(encoder.pinA) && hasConfiguredPin(encoder.pinB)
+);
+
+const hasCompleteTrackballPins = (trackball: NonNullable<ProjectSettings['trackballs']>[number]) => (
+  hasConfiguredPin(trackball.sclk)
+  && hasConfiguredPin(trackball.sdio)
+  && hasConfiguredPin(trackball.cs)
+  && hasConfiguredPin(trackball.motion)
+);
+
 const formatDirectInputGpios = (settings: ProjectSettings, keys: PhysicalKey[], target: ZmkTarget, side?: MatrixSide) => {
   const sourceKeys = side
     ? keys.filter(key => getDirectMatrixSide(settings, key, keys) === side)
@@ -88,6 +103,26 @@ const formatDirectInputGpios = (settings: ProjectSettings, keys: PhysicalKey[], 
     const parsed = pin ? parseZmkGpio(pin, index, target) : { controller: '&gpio0', number: index };
     return `<${parsed.controller} ${parsed.number} (GPIO_ACTIVE_LOW | GPIO_PULL_UP)> /* Direct ${index}: ${pin || 'Please configure pin'} */`;
   }).join('\n            , ');
+};
+
+const hasCompleteDirectInputPins = (settings: ProjectSettings, keys: PhysicalKey[], side?: MatrixSide) => {
+  const sourceKeys = side
+    ? keys.filter(key => getDirectMatrixSide(settings, key, keys) === side)
+    : keys;
+  const matrix = side
+    ? getDirectSideDimensions(settings, keys, side)
+    : getMatrixDimensionsFromPositions(
+      sourceKeys.map(key => getDirectLocalMatrixPosition(settings, key, keys)).filter((pos): pos is { row: number; col: number } => !!pos),
+      settings.matrix
+    );
+  const pins = new Map<number, string | undefined>();
+
+  sourceKeys.forEach(key => {
+    const pos = getDirectLocalMatrixPosition(settings, key, keys);
+    if (pos) pins.set(pos.col, key.directPin);
+  });
+
+  return matrix.cols > 0 && Array.from({ length: matrix.cols }, (_, index) => pins.get(index)).every(hasConfiguredPin);
 };
 
 const getZmkSplitTransport = (settings: ProjectSettings) => settings.zmk?.splitTransport || 'ble';
@@ -213,13 +248,13 @@ const getEncoderSide = (settings: ProjectSettings, keys: PhysicalKey[], encoderI
 };
 
 const getEncoderConfigSnippet = (settings: ProjectSettings) => (
-  (settings.encoders || []).length > 0
+  (settings.encoders || []).some(hasCompleteEncoderPins)
     ? 'CONFIG_EC11=y\nCONFIG_EC11_TRIGGER_GLOBAL_THREAD=y\n'
     : ''
 );
 
 const getTrackballConfigSnippet = (settings: ProjectSettings) => (
-  (settings.trackballs || []).length > 0
+  (settings.trackballs || []).some(hasCompleteTrackballPins)
     ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_ZMK_POINTING=y\nCONFIG_PMW3610_ALT=y\n'
     : ''
 );
@@ -238,6 +273,7 @@ const formatNordicPsel = (pin: string | undefined, fallback: number, signal: str
 
 const generateZmkTrackballNodes = (settings: ProjectSettings, keys: PhysicalKey[], target: ZmkTarget, side?: MatrixSide) => {
   const trackballs = (settings.trackballs || []).map((trackball, index) => ({ trackball, index }))
+    .filter(item => hasCompleteTrackballPins(item.trackball))
     .filter(item => !side || getTrackballSide(settings, keys, item.index) === side);
   if (trackballs.length === 0) return '';
   return `${trackballs.map(({ trackball, index }) => `&pinctrl {
@@ -285,10 +321,11 @@ const generateZmkEncoderNodes = (
   zmkTarget: ZmkTarget,
   statusForEncoder: (index: number) => 'okay' | 'disabled',
 ) => {
-  const encoders = settings.encoders || [];
+  const encoders = (settings.encoders || []).map((encoder, index) => ({ encoder, index }))
+    .filter(({ encoder }) => hasCompleteEncoderPins(encoder));
   if (encoders.length === 0) return '';
 
-  return `${encoders.map((encoder, index) => `    encoder_${index}: encoder_${index} {
+  return `${encoders.map(({ encoder, index }) => `    encoder_${index}: encoder_${index} {
         compatible = "alps,ec11";
         a-gpios = <${formatGpio(encoder.pinA, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_UP)', index * 2, `Encoder ${index} A`)}>;
         b-gpios = <${formatGpio(encoder.pinB, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_UP)', index * 2 + 1, `Encoder ${index} B`)}>;
@@ -298,7 +335,7 @@ const generateZmkEncoderNodes = (
 
     sensors: sensors {
         compatible = "zmk,keymap-sensors";
-        sensors = <${encoders.map((_, index) => `&encoder_${index}`).join(' ')}>;
+        sensors = <${encoders.map(({ index }) => `&encoder_${index}`).join(' ')}>;
         triggers-per-rotation = <20>;
     };
 `;
@@ -310,6 +347,7 @@ const generateZmkEncoderStatusOverrides = (settings: ProjectSettings, keys: Phys
 
   const matching = encoders
     .map((_, index) => ({ index, side: getEncoderSide(settings, keys, index) }))
+    .filter(({ index }) => hasCompleteEncoderPins(encoders[index]))
     .filter(item => !side || item.side === side);
 
   if (matching.length === 0) return '';
@@ -328,13 +366,14 @@ const zmkActionForEncoder = (settings: ProjectSettings, action?: UniversalAction
 };
 
 const generateZmkEncoderBehaviors = (settings: ProjectSettings) => {
-  const encoders = settings.encoders || [];
+  const encoders = (settings.encoders || []).map((encoder, index) => ({ encoder, index }))
+    .filter(({ encoder }) => hasCompleteEncoderPins(encoder));
   if (encoders.length === 0) return '';
 
   const layersCount = settings.layers || 4;
   const behaviors: string[] = [];
   for (let layer = 0; layer < layersCount; layer++) {
-    encoders.forEach((encoder, index) => {
+    encoders.forEach(({ encoder, index }) => {
       const clockwise = zmkActionForEncoder(settings, encoder.keymap?.[layer]?.clockwise);
       const counterClockwise = zmkActionForEncoder(settings, encoder.keymap?.[layer]?.counterClockwise);
       behaviors.push(`        smidr_encoder_${index}_layer_${layer}: smidr_encoder_${index}_layer_${layer} {
@@ -353,12 +392,13 @@ ${behaviors.join('\n\n')}
 };
 
 const generateZmkEncoderSensorBindings = (settings: ProjectSettings, layer: number) => {
-  const encoders = settings.encoders || [];
+  const encoders = (settings.encoders || []).map((encoder, index) => ({ encoder, index }))
+    .filter(({ encoder }) => hasCompleteEncoderPins(encoder));
   if (encoders.length === 0) return '';
 
   return `
             sensor-bindings = <
-                ${encoders.map((_, index) => `&smidr_encoder_${index}_layer_${layer}`).join(' ')}
+                ${encoders.map(({ index }) => `&smidr_encoder_${index}_layer_${layer}`).join(' ')}
             >;`;
 };
 
@@ -453,6 +493,12 @@ const generateSplitShieldFiles = (
   const leftCols = formatGpios(leftPins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Left col');
   const rightRows = formatGpios(rightPins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', 'Right row');
   const rightCols = formatGpios(rightPins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', 'Right col');
+  const leftKscanEnabled = useDirectPins
+    ? hasCompleteDirectInputPins(settings, keys, 'left')
+    : hasConfiguredPins(leftPins.rows) && hasConfiguredPins(leftPins.cols);
+  const rightKscanEnabled = useDirectPins
+    ? hasCompleteDirectInputPins(settings, keys, 'right')
+    : hasConfiguredPins(rightPins.rows) && hasConfiguredPins(rightPins.cols);
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
   const leftShield = `${kbName}_left`;
   const rightShield = `${kbName}_right`;
@@ -497,7 +543,7 @@ ${wiredSplitNode}
   const leftOverlay = `#include "${kbName}.dtsi"
 
 &kscan0 {
-${useDirectPins ? `    input-gpios
+${leftKscanEnabled ? (useDirectPins ? `    input-gpios
         = ${leftDirectPins}
         ;` : `    row-gpios
         = ${leftRows}
@@ -505,7 +551,7 @@ ${useDirectPins ? `    input-gpios
 
     col-gpios
         = ${leftCols}
-        ;`}
+        ;`) : '    status = "disabled";'}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'left')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget, 'left')}
@@ -519,7 +565,7 @@ ${generateZmkTrackballNodes(settings, keys, zmkTarget, 'left')}
 };
 
 &kscan0 {
-${useDirectPins ? `    input-gpios
+${rightKscanEnabled ? (useDirectPins ? `    input-gpios
         = ${rightDirectPins}
         ;` : `    row-gpios
         = ${rightRows}
@@ -527,7 +573,7 @@ ${useDirectPins ? `    input-gpios
 
     col-gpios
         = ${rightCols}
-        ;`}
+        ;`) : '    status = "disabled";'}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget, 'right')}
@@ -730,6 +776,9 @@ const generateSplitCustomBoardFiles = (
     const rowGpios = formatGpios(sidePins.rows, zmkTarget, '(GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)', `${side} row`);
     const colGpios = formatGpios(sidePins.cols, zmkTarget, 'GPIO_ACTIVE_HIGH', `${side} col`);
     const directGpios = useDirectPins ? formatDirectInputGpios(settings, keys, zmkTarget, side) : '';
+    const kscanEnabled = useDirectPins
+      ? hasCompleteDirectInputPins(settings, keys, side)
+      : hasConfiguredPins(sidePins.rows) && hasConfiguredPins(sidePins.cols);
     const colOffset = side === 'right' ? `
 
 &default_transform {
@@ -838,7 +887,7 @@ ${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";` : `        com
         diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";`}
         wakeup-source;
 
-${useDirectPins ? `        input-gpios
+${kscanEnabled ? (useDirectPins ? `        input-gpios
             = ${directGpios}
             ;` : `        row-gpios
             = ${rowGpios}
@@ -846,7 +895,7 @@ ${useDirectPins ? `        input-gpios
 
         col-gpios
             = ${colGpios}
-            ;`}
+            ;`) : '        status = "disabled";'}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, index => getEncoderSide(settings, keys, index) === side ? 'okay' : 'disabled')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget, side)}
@@ -932,7 +981,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   if (!zmkTarget) {
     throw new Error('ZMK export is currently implemented for RP2040 and nRF52 projects only.');
   }
-  if ((settings.trackballs || []).length > 0 && !isNordicTarget(zmkTarget)) {
+  if ((settings.trackballs || []).some(hasCompleteTrackballPins) && !isNordicTarget(zmkTarget)) {
     throw new Error('PMW3610 trackball export currently requires an nRF52 target because the generated SPI pinctrl overlay uses Nordic pin bindings.');
   }
 
@@ -940,7 +989,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
 
   if (settings.features.split) {
-    if ((settings.trackballs || []).length > 0) zip.folder('config')?.file('west.yml', generateZmkWestManifest());
+    if ((settings.trackballs || []).some(hasCompleteTrackballPins)) zip.folder('config')?.file('west.yml', generateZmkWestManifest());
     if (settings.hardware.controllerType === 'mcu') {
       if (getZmkSplitTransport(settings) === 'ble' && !isNordicTarget(zmkTarget)) {
         throw new Error('ZMK BLE split export currently requires an nRF52 MCU.');
@@ -958,7 +1007,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   // ZMK configs are typically inside a config/ folder
   const configFolder = zip.folder('config');
   if (!configFolder) return null;
-  if ((settings.trackballs || []).length > 0) configFolder.file('west.yml', generateZmkWestManifest());
+  if ((settings.trackballs || []).some(hasCompleteTrackballPins)) configFolder.file('west.yml', generateZmkWestManifest());
 
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
   const matrix = getZmkMatrixDimensions(settings, keys);
@@ -972,6 +1021,9 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const directGpiosStr = useDirectPins
     ? formatDirectInputGpios(settings, sortedKeys, zmkTarget)
     : '';
+  const kscanEnabled = useDirectPins
+    ? hasCompleteDirectInputPins(settings, sortedKeys)
+    : hasConfiguredPins(rowPins) && hasConfiguredPins(colPins);
 
   if (settings.hardware.controllerType === 'mcu') {
     const arch = 'arm';
@@ -1135,20 +1187,20 @@ ${dtsChosen}
     };
 
     kscan0: kscan {
-${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";
+${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";${kscanEnabled ? `
 
         input-gpios
             = ${directGpiosStr}
-            ;` : `        compatible = "zmk,kscan-gpio-matrix";
+            ;` : '\n        status = "disabled";'}` : `        compatible = "zmk,kscan-gpio-matrix";
         diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
 
-        row-gpios
+${kscanEnabled ? `        row-gpios
             = ${rowGpiosStr}
             ;
 
         col-gpios
             = ${colGpiosStr}
-            ;`}
+            ;` : '        status = "disabled";'}`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget)}
@@ -1192,20 +1244,20 @@ features:
     };
 
     kscan0: kscan {
-${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";
+${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";${kscanEnabled ? `
 
         input-gpios
             = ${directGpiosStr}
-            ;` : `        compatible = "zmk,kscan-gpio-matrix";
+            ;` : '\n        status = "disabled";'}` : `        compatible = "zmk,kscan-gpio-matrix";
         diode-direction = "${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col' : 'col2row'}";
 
-        row-gpios
+${kscanEnabled ? `        row-gpios
             = ${rowGpiosStr}
             ;
 
         col-gpios
             = ${colGpiosStr}
-            ;`}
+            ;` : '        status = "disabled";'}`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget)}

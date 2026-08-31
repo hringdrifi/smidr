@@ -137,7 +137,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **キーへの割り当て**: 非分割では `PhysicalKey.directPin` のみを使う。分割では `PhysicalKey.matrixSide` (`left` / `right`) と `directPin` を併用し、同じピン名でも左右の基板では別 GPIO として扱う。
 - **マトリクス位置**: 既存の `row` / `col` はキーマップ上の位置として残す。`row` / `col` が未設定の direct pin キーは、各 side 内の物理ソート順に `0,n` としてエクスポートする。
 - **QMK/Vial 出力**: 非分割では `matrix_pins.direct` を出力する。分割では左側をトップレベル `matrix_pins.direct`、右側を `split.matrix_pins.right.direct` として出力し、右側キーの matrix position は QMK/Vial split と同様に行方向へ連結する。未割り当ての direct pin は `NO_PIN` として埋める。
-- **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。
+- **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。行/列またはダイレクト入力ピンが未設定の場合は、任意GPIOへフォールバックせず `kscan` を無効化する。
 
 ### 7.6 ロータリーエンコーダー (Rotary Encoders)
 - **自動有効化**: エンコーダー機能はレイアウトから参照される `ProjectSettings.encoders[]` の有無で決定し、独立したファームウェア機能トグルを持たない。エンコーダーが追加されている場合、対応する QMK/Vial/ZMK 出力を自動的に有効化する。旧 `.smidr` の `features.encoder` は読み込み互換性のため受け入れるが、出力判断には使用しない。
@@ -145,13 +145,14 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **物理位置**: ボタン付きエンコーダーは通常キーと同じ `PhysicalKey` に `row` / `col` / `keymap` と `encoderId` を併せ持つ。ボタン無しエンコーダーは `row` / `col` を持たず、物理位置と `encoderId` のみを持つ `PhysicalKey` として扱う。エンコーダー物理位置は `kind: "encoder"` で明示できる。
 - **レイアウト表示**: `kind: "encoder"` またはエンコーダー参照を持つ `PhysicalKey` は、`w` / `h` だけでサイズを指定し、中心に短辺サイズの円として描画する。`w2` / `h2` / `x2` / `y2` / `stepped` はエンコーダーには適用せず、保存・KLE/VIA 出力時にも除外する。
 - **ピン設定**: エンコーダーの A/B ピンはグローバルな row / col ピン設定ではなく、選択中のエンコーダー物理位置に紐付く `ProjectSettings.encoders[]` で管理する。複数エンコーダーでは各 encoder 定義が独立した `pinA` / `pinB` を持つ。
+- **ZMK 未設定ピン**: A/B のいずれかが未設定のエンコーダーは、ZMK node・sensor binding・Kconfig を出力しない。
 - **KLE/VIA ラベル**: VIA/Vial 互換 JSON へ出力する際は、エンコーダー位置の KLE ラベルに `e{index}` を埋め込む。`row,col` がある場合は押し込みスイッチのマトリクス位置として同じキーに保持し、`e{index}` は回転部の位置メタデータとして併記する。
 - **QMK/Vial 出力**: エンコーダーの物理ピンは `keyboard.json` の `encoder.rotary` に配列で出力する。回転時のレイヤー別アクションは `keymap.c` の `encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]` として生成し、対象 keymap の `rules.mk` に `ENCODER_MAP_ENABLE = yes` を出力する。
 
 ### 7.7 PMW3610 トラックボール
 - **内部表現**: トラックボールは `ProjectSettings.trackballs[]` で保持し、実行中は runtime-only の `id` と `PhysicalKey.trackballId` で物理配置を参照する。保存時は `trackballIndex` に変換し、読み込み時に新しい `trackballId` を復元する。
 - **設定**: 各 PMW3610 は `SCLK`、単線 SPI の `SDIO`、`CS`、`MOTION` (IRQ)、CPI、軸交換、X/Y 反転を持つ。4ピンはピンプールおよびハードウェアの使用済みピンとして扱う。
-- **ZMK 出力**: PMW3610 のあるプロジェクトは `config/west.yml` に `badjeff/zmk-pmw3610-driver` モジュールを追加し、`pixart,pmw3610-alt` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_PMW3610_ALT` を生成する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。分割ではトラックボールが配置された側の overlay にのみ出力する。
+- **ZMK 出力**: PMW3610 のあるプロジェクトは `config/west.yml` に `badjeff/zmk-pmw3610-driver` モジュールを追加し、`pixart,pmw3610-alt` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_PMW3610_ALT` を生成する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。分割ではトラックボールが配置された側の overlay にのみ出力する。SCLK/SDIO/CS/MOTION のいずれかが未設定なら、これらの出力を生成しない。
 - **QMK/Vial 出力**: 初期実装では対象外とし、ZMK 専用の周辺機器として扱う。
 
 ### 7.7 RGB Matrix

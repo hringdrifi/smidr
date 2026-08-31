@@ -1925,6 +1925,35 @@ describe('export generation', () => {
     expect(validateFirmwareExport(matrixSettings, peripheralOnlyKeys, 'zmk').some(issue => issue.code === 'matrix-keys-missing')).toBe(false);
   });
 
+  it('disables unconfigured ZMK switch input and omits incomplete peripherals', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'ZMK Unconfigured Inputs',
+      matrix: { rows: 1, cols: 1 },
+      encoders: [{}],
+      trackballs: [{}],
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { kind: 'encoder', encoderIndex: 0, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'Encoder' },
+      { kind: 'trackball', trackballIndex: 0, x: 2, y: 0, w: 1, h: 1, r: 0, rx: 2, ry: 0, label: 'Trackball' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const overlay = await zip.file('boards/shields/zmk_unconfigured_inputs/zmk_unconfigured_inputs.overlay')!.async('string');
+    const conf = await zip.file('boards/shields/zmk_unconfigured_inputs/zmk_unconfigured_inputs.conf')!.async('string');
+
+    expect(overlay).toContain('status = "disabled";');
+    expect(overlay).not.toContain('row-gpios');
+    expect(overlay).not.toContain('col-gpios');
+    expect(overlay).not.toContain('encoder_0');
+    expect(overlay).not.toContain('pmw3610');
+    expect(conf).not.toContain('CONFIG_EC11=y');
+    expect(conf).not.toContain('CONFIG_PMW3610_ALT=y');
+    expect(zip.file('config/west.yml')).toBeNull();
+  });
+
   it('warns when encoder pins are missing during QMK and Vial export validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
