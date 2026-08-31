@@ -107,8 +107,10 @@ const isEncoderKey = (key: PhysicalKey) => (
   key.kind === 'encoder' || !!key.encoderId || key.encoderIndex !== undefined
 );
 
+const isRoundPeripheralKey = (key: PhysicalKey) => isEncoderKey(key) || key.kind === 'trackball' || !!key.trackballId || key.trackballIndex !== undefined;
+
 const stripEncoderSecondaryShape = (key: PhysicalKey): PhysicalKey => {
-  if (!isEncoderKey(key)) return { ...key };
+  if (!isRoundPeripheralKey(key)) return { ...key };
   const { w2, h2, x2, y2, stepped, ...rest } = key;
   return rest;
 };
@@ -357,7 +359,9 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
   const { matrix, pins, vendorProductId, visualLayout, features, ...settingsWithoutRuntimeIds } = settings;
   const isDirectMatrix = matrix?.wiring === 'direct';
   const savedEncoders = (settings.encoders || []).map(({ id, ...encoder }) => encoder);
+  const savedTrackballs = (settings.trackballs || []).map(({ id, ...trackball }) => trackball);
   const encoderIndexById = new Map((settings.encoders || []).map((encoder, index) => [encoder.id, index]));
+  const trackballIndexById = new Map((settings.trackballs || []).map((trackball, index) => [trackball.id, index]));
   const savedPins = settings.features.split ? pins : { ...pins };
   if (!settings.features.split) {
     delete savedPins.splitRows;
@@ -377,9 +381,10 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     matrix,
     pins: savedPins,
     encoders: savedEncoders,
+    trackballs: savedTrackballs,
     // Strip runtime-only 'id' field before persisting
     keys: keys.map((key) => {
-      const { id, encoderId, encoderIndex, ...keyData } = stripEncoderSecondaryShape(key);
+      const { id, encoderId, encoderIndex, trackballId, trackballIndex, ...keyData } = stripEncoderSecondaryShape(key);
       const savedKey = { ...keyData } as PhysicalKey;
       if (isDirectMatrix) {
         delete savedKey.row;
@@ -390,6 +395,8 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
       } else if (encoderIndex !== undefined) {
         savedKey.encoderIndex = encoderIndex;
       }
+      if (trackballId && trackballIndexById.has(trackballId)) savedKey.trackballIndex = trackballIndexById.get(trackballId);
+      else if (trackballIndex !== undefined) savedKey.trackballIndex = trackballIndex;
       return savedKey;
     })
   } as unknown as SmidrProject;

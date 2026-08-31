@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge, CornerDownLeft
+  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge, CircleDot, CornerDownLeft
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
   const { 
     settings, keys, editorMode,
-    addKeys, addEncoderKey, loadProject, resetProject,
+    addKeys, addEncoderKey, addTrackballKey, loadProject, resetProject,
     selectedKeyIds, removeKey, generateMatrix,
     matrixPaintMode, setMatrixPaintMode,
     painter, setPainter, clearMatrixMap
@@ -157,6 +157,7 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
               onClick={addEncoderKey}
               className="active:scale-90"
             />
+            <FloatingButton icon={CircleDot} label={t('tools.addTrackball')} onClick={addTrackballKey} className="active:scale-90" />
 
             {/* Add Multiple */}
             <div className="relative">

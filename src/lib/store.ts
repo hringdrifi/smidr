@@ -1,6 +1,6 @@
 import { create, StateCreator } from 'zustand';
 import { temporal } from 'zundo';
-import { EncoderDefinition, PhysicalKey, ProjectSettings, EditorSettings, SmidrProject } from '@/types/keyboard';
+import { EncoderDefinition, TrackballDefinition, PhysicalKey, ProjectSettings, EditorSettings, SmidrProject } from '@/types/keyboard';
 import { UniversalAction, MacroAction, ComboEntry, TapDanceEntry } from '@/types/actions';
 import { deserializeMacros, serializeMacros } from './protocols/vial-macro-converter';
 import { Language } from './i18n';
@@ -45,6 +45,7 @@ export { getMatrixFromPins } from './matrix-utils';
 
 export type RuntimeKey = PhysicalKey & { id: string };
 type RuntimeEncoder = EncoderDefinition & { id: string };
+type RuntimeTrackball = TrackballDefinition & { id: string };
 type EditorMode = 'layout' | 'matrix' | 'hardware' | 'keymap' | 'rgbMatrix';
 
 const createEmptyMacros = (count = 16): MacroAction[][] => Array.from({ length: count }, () => []);
@@ -85,6 +86,26 @@ const getReferencedEncoders = (
 ): RuntimeEncoder[] => {
   const referencedEncoderIds = new Set(keys.map(key => key.encoderId).filter(Boolean));
   return encoders.filter(encoder => referencedEncoderIds.has(encoder.id));
+};
+
+const normalizeTrackballs = (trackballs?: TrackballDefinition[], keys: PhysicalKey[] = []): RuntimeTrackball[] => {
+  const maxIndex = keys.reduce((max, key) => key.trackballIndex !== undefined ? Math.max(max, key.trackballIndex) : max, -1);
+  return Array.from({ length: Math.max(trackballs?.length || 0, maxIndex + 1) }, (_, index) => ({
+    ...(trackballs?.[index] || {}), id: trackballs?.[index]?.id || crypto.randomUUID(),
+  }));
+};
+
+const assignRuntimeTrackballIds = <T extends PhysicalKey>(keys: T[], trackballs: RuntimeTrackball[]) => keys.map(key => {
+  if (key.trackballId || key.trackballIndex === undefined) return key;
+  const trackball = trackballs[key.trackballIndex];
+  if (!trackball) return key;
+  const { trackballIndex, ...rest } = key;
+  return { ...rest, trackballId: trackball.id };
+}) as T[];
+
+const getReferencedTrackballs = (trackballs: RuntimeTrackball[] = [], keys: PhysicalKey[] = []) => {
+  const ids = new Set(keys.map(key => key.trackballId).filter(Boolean));
+  return trackballs.filter(trackball => ids.has(trackball.id));
 };
 
 export const getCenteredTransform = (keys: PhysicalKey[], activeOptions: Record<string, number> = {}) => {
@@ -226,6 +247,9 @@ export interface KeyboardState {
   addEncoderToKey: (keyId: string) => void;
   addEncoderKey: () => void;
   updateEncoder: (encoderId: string, updates: Partial<EncoderDefinition>) => void;
+  addTrackballToKey: (keyId: string) => void;
+  addTrackballKey: () => void;
+  updateTrackball: (trackballId: string, updates: Partial<TrackballDefinition>) => void;
   painter: { currentRow: number; currentCol: number; currentSide: MatrixSide; autoIncrement: 'matrix' | 'col' | 'row'; };
   setPainter: (painter: Partial<KeyboardState['painter']>) => void;
   paintKey: (id: string) => void;
@@ -328,6 +352,7 @@ const initialState: Partial<KeyboardState> = {
     features: { rgb: false, backlight: false, rgbMatrix: false, encoder: false, oled: false, via: true, split: false },
     layers: 4,
     encoders: [],
+    trackballs: [],
     macros: createEmptyMacros(),
     combos: [],
     tapDances: [],
@@ -1626,12 +1651,17 @@ export const useKeyboardStore = create<KeyboardState>()(
           const encoders = removedEncoderId && !newKeys.some(k => k.encoderId === removedEncoderId)
             ? (s.settings.encoders || []).filter(encoder => encoder.id !== removedEncoderId)
             : s.settings.encoders || [];
+          const removedTrackballId = removedKey?.trackballId;
+          const trackballs = removedTrackballId && !newKeys.some(k => k.trackballId === removedTrackballId)
+            ? (s.settings.trackballs || []).filter(trackball => trackball.id !== removedTrackballId)
+            : s.settings.trackballs || [];
           return { 
             keys: newKeys,
             baseKeys: newKeys,
             settings: {
               ...s.settings,
               encoders,
+              trackballs,
               features: { ...s.settings.features, encoder: encoders.length > 0 },
             },
             selectedKeyIds: s.selectedKeyIds.filter(i => i !== id),
@@ -2189,12 +2219,17 @@ export const useKeyboardStore = create<KeyboardState>()(
 
           const encoder: RuntimeEncoder = { id: crypto.randomUUID(), keymap: {} };
           const referencedEncoders = getReferencedEncoders(s.settings.encoders as RuntimeEncoder[], s.keys);
+          const trackballs = key.trackballId
+            ? (s.settings.trackballs || []).filter(trackball => trackball.id !== key.trackballId)
+            : s.settings.trackballs || [];
           return {
             keys: s.keys.map(k => k.id === keyId ? {
               ...k,
               kind: 'encoder',
               encoderId: encoder.id,
               encoderIndex: undefined,
+              trackballId: undefined,
+              trackballIndex: undefined,
               w2: undefined,
               h2: undefined,
               x2: undefined,
@@ -2205,6 +2240,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               ...s.settings,
               features: { ...s.settings.features, encoder: true },
               encoders: [...referencedEncoders, encoder],
+              trackballs,
             },
           };
         }),
@@ -2245,6 +2281,36 @@ export const useKeyboardStore = create<KeyboardState>()(
             };
           });
         },
+
+        addTrackballToKey: (keyId: string) => set((s) => {
+          const key = s.keys.find(k => k.id === keyId);
+          if (!key || (key.trackballId && (s.settings.trackballs || []).some(item => item.id === key.trackballId))) return s;
+          const trackball: RuntimeTrackball = { id: crypto.randomUUID(), cpi: 1200 };
+          const referenced = getReferencedTrackballs(s.settings.trackballs as RuntimeTrackball[], s.keys);
+          const encoders = key.encoderId
+            ? (s.settings.encoders || []).filter(encoder => encoder.id !== key.encoderId)
+            : s.settings.encoders || [];
+          return {
+            keys: s.keys.map(k => k.id === keyId ? { ...k, kind: 'trackball', trackballId: trackball.id, trackballIndex: undefined, encoderId: undefined, encoderIndex: undefined, w2: undefined, h2: undefined, x2: undefined, y2: undefined, stepped: undefined } : k),
+            settings: { ...s.settings, encoders, features: { ...s.settings.features, encoder: encoders.length > 0 }, trackballs: [...referenced, trackball] },
+          };
+        }),
+
+        addTrackballKey: () => set((s) => {
+          const focused = s.focusedKeyId ? s.keys.find(item => item.id === s.focusedKeyId) : null;
+          const id = crypto.randomUUID();
+          const trackballId = crypto.randomUUID();
+          const x = focused ? roundCoord(focused.x + (focused.w || 1)) : 0;
+          const y = focused ? roundCoord(focused.y) : 0;
+          const key: RuntimeKey = { id, kind: 'trackball', trackballId, label: '', x, y, w: 1, h: 1, r: 0, rx: x, ry: y };
+          const keys = [...s.keys, key];
+          return { keys, baseKeys: keys, selectedKeyIds: [id], focusedKeyId: id, selectionAnchorId: id,
+            settings: { ...s.settings, trackballs: [...getReferencedTrackballs(s.settings.trackballs as RuntimeTrackball[], s.keys), { id: trackballId, cpi: 1200 }] } };
+        }),
+
+        updateTrackball: (trackballId: string, updates: Partial<TrackballDefinition>) => set((s) => ({
+          settings: { ...s.settings, trackballs: (s.settings.trackballs || []).map(item => item.id === trackballId ? { ...item, ...updates, id: item.id } : item) },
+        })),
 
         updateEncoder: (encoderId: string, updates: Partial<EncoderDefinition>) => set((s) => ({
           settings: {
@@ -2471,6 +2537,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const { id, updatedAt, keys: rawKeys, vendorId, productId, vendorProductId, ...settings } = project;
           const normalizedVendorProductId = getProjectVendorProductId(project) ?? s.settings.vendorProductId;
           const runtimeEncoders = normalizeEncoders(settings.encoders, rawKeys);
+          const runtimeTrackballs = normalizeTrackballs(settings.trackballs, rawKeys);
           const settingsWithDefaultMatrix = {
             ...settings,
             features: {
@@ -2488,6 +2555,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             zmk: settings.zmk || {},
             macros: normalizeMacros(settings.macros),
             encoders: runtimeEncoders,
+            trackballs: runtimeTrackballs,
             combos: settings.combos || [],
             tapDances: settings.tapDances || [],
             matrix: {
@@ -2500,7 +2568,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           };
 
           // Assign fresh runtime IDs to all keys (id is not persisted)
-          let newKeys = assignRuntimeEncoderIds(rawKeys, runtimeEncoders).map(k => ({
+          let newKeys = assignRuntimeTrackballIds(assignRuntimeEncoderIds(rawKeys, runtimeEncoders), runtimeTrackballs).map(k => ({
             ...k,
             id: crypto.randomUUID(),
             keymap: k.keymap as Record<number, UniversalAction> | undefined
@@ -2633,7 +2701,8 @@ export const useKeyboardStore = create<KeyboardState>()(
               }
 
               const finalEncoders = normalizeEncoders(encoders || s.settings.encoders, appliedKeys);
-              const finalKeys = assignRuntimeEncoderIds(appliedKeys, finalEncoders).filter(k => !k.decal);
+              const finalTrackballs = normalizeTrackballs((input as any).trackballs || s.settings.trackballs, appliedKeys);
+              const finalKeys = assignRuntimeTrackballIds(assignRuntimeEncoderIds(appliedKeys, finalEncoders), finalTrackballs).filter(k => !k.decal);
 
               return {
                 keys: finalKeys,
@@ -2654,6 +2723,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                     encoder: finalEncoders.length > 0,
                   },
                   encoders: finalEncoders,
+                  trackballs: finalTrackballs,
                   tapDances: s.settings.tapDances || [],
                 matrix: { ...nextMatrix, wiring: matrix?.wiring || s.settings.matrix?.wiring || 'matrix' }
                 },

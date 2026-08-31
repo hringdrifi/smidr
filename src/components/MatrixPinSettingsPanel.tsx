@@ -29,6 +29,10 @@ const getEncoderAssignedPins = (
 ) => {
   const pins = new Set<string>();
   keys.forEach(key => {
+    if (key.trackballId) {
+      const trackball = (settings.trackballs || []).find(item => item.id === key.trackballId);
+      if (trackball) [trackball.sclk, trackball.sdio, trackball.cs, trackball.motion].forEach(pin => pin && pins.add(pin));
+    }
     if (!key.encoderId) return;
     if (settings.features.split && side) {
       const encoderSide = getLocalMatrixPosition(settings, key, keys)?.side || key.matrixSide || inferMatrixSideFromGeometry(key, keys);

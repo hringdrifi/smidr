@@ -64,6 +64,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
   const matrixPaintMode = useKeyboardStore(s => s.matrixPaintMode);
   const { t } = useTranslation();
   const isEncoder = keyData.kind === 'encoder' || !!keyData.encoderId || keyData.encoderIndex !== undefined;
+  const isTrackball = keyData.kind === 'trackball' || !!keyData.trackballId || keyData.trackballIndex !== undefined;
   
   if (isDebug && (x2 !== undefined || y2 !== undefined || w2 !== undefined || h2 !== undefined)) {
     console.log(`[KeyComponent] Rendering secondary shape for "${keyData.label}":`, { x2, y2, w2, h2 });
@@ -394,7 +395,7 @@ export const KeyComponent: React.FC<KeyComponentProps> = ({
     >
       {showKeycap && (
         <>
-          {isEncoder ? (
+          {isEncoder || isTrackball ? (
             <>
               <Circle
                 x={centerX}

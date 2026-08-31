@@ -253,10 +253,14 @@ export const getKeyLabel = (
     const encoderIndex = k.encoderId && settings?.encoders
       ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
       : k.encoderIndex;
+    const trackballIndex = k.trackballId && settings?.trackballs
+      ? settings.trackballs.findIndex(trackball => trackball.id === k.trackballId)
+      : k.trackballIndex;
     if (settings && isDirectPinMatrix(settings)) {
       const directPinLabel = k.directPin || '';
       const encoderLabel = encoderIndex !== undefined && encoderIndex >= 0 ? `ENC${encoderIndex}` : '';
-      const label = [directPinLabel, encoderLabel].filter(Boolean).join('\n');
+      const trackballLabel = trackballIndex !== undefined && trackballIndex >= 0 ? `TRK${trackballIndex}` : '';
+      const label = [directPinLabel, encoderLabel, trackballLabel].filter(Boolean).join('\n');
       return label ? { type: 'text', text: label } : { type: 'empty' };
     }
     if (encoderIndex !== undefined && encoderIndex >= 0 && (k.row === undefined || k.col === undefined)) {
@@ -268,7 +272,8 @@ export const getKeyLabel = (
   }
   if (mode === 'keymap') {
     const isEncoder = k.kind === 'encoder' || !!k.encoderId || k.encoderIndex !== undefined;
-    if (isEncoder && (k.row === undefined || k.col === undefined)) {
+    if ((isEncoder || k.kind === 'trackball' || !!k.trackballId || k.trackballIndex !== undefined) && (k.row === undefined || k.col === undefined)) {
+      if (trackballIndex !== undefined && trackballIndex >= 0) return { type: 'text', text: `TRK${trackballIndex}` };
       return { type: 'empty' };
     }
     const action = k.keymap?.[currentLayer];

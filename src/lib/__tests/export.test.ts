@@ -3486,6 +3486,32 @@ describe('export generation', () => {
     expect(readme).toContain('shield: shared_board');
   });
 
+  it('exports a PMW3610 ZMK module, configuration, and Nordic overlay', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Trackball Board',
+      hardware: { ...baseSettings.hardware, controllerType: 'development_board', mcu: 'nrf52840', board: 'nice_nano_v2' },
+      matrix: { rows: 1, cols: 1 },
+      pins: { rows: ['P0.02'], cols: ['P0.03'], splitRows: [], splitCols: [] },
+      trackballs: [{ id: 'trackball-1', sclk: 'P0.05', sdio: 'P0.06', cs: 'P0.07', motion: 'P0.08', cpi: 1400, swapXy: true, invertY: true }],
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: '' },
+      { kind: 'trackball', trackballId: 'trackball-1', x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: '' },
+    ];
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const west = await zip.file('config/west.yml')!.async('string');
+    const conf = await zip.file('boards/shields/trackball_board/trackball_board.conf')!.async('string');
+    const overlay = await zip.file('boards/shields/trackball_board/trackball_board.overlay')!.async('string');
+    expect(west).toContain('zmk-pmw3610-driver');
+    expect(conf).toContain('CONFIG_PMW3610_ALT=y');
+    expect(overlay).toContain('compatible = "pixart,pmw3610-alt"');
+    expect(overlay).toContain('cpi = <1400>');
+    expect(overlay).toContain('swap-xy;');
+    expect(overlay).toContain('invert-y;');
+  });
+
   it('exports RMK keyboard.toml and Vial layout data', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,

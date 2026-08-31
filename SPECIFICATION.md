@@ -148,6 +148,12 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **KLE/VIA ラベル**: VIA/Vial 互換 JSON へ出力する際は、エンコーダー位置の KLE ラベルに `e{index}` を埋め込む。`row,col` がある場合は押し込みスイッチのマトリクス位置として同じキーに保持し、`e{index}` は回転部の位置メタデータとして併記する。
 - **QMK/Vial 出力**: エンコーダーの物理ピンは `keyboard.json` の `encoder.rotary` に配列で出力する。回転時のレイヤー別アクションは `keymap.c` の `encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS]` として生成し、対象 keymap の `rules.mk` に `ENCODER_MAP_ENABLE = yes` を出力する。
 
+### 7.7 PMW3610 トラックボール
+- **内部表現**: トラックボールは `ProjectSettings.trackballs[]` で保持し、実行中は runtime-only の `id` と `PhysicalKey.trackballId` で物理配置を参照する。保存時は `trackballIndex` に変換し、読み込み時に新しい `trackballId` を復元する。
+- **設定**: 各 PMW3610 は `SCLK`、単線 SPI の `SDIO`、`CS`、`MOTION` (IRQ)、CPI、軸交換、X/Y 反転を持つ。4ピンはピンプールおよびハードウェアの使用済みピンとして扱う。
+- **ZMK 出力**: PMW3610 のあるプロジェクトは `config/west.yml` に `badjeff/zmk-pmw3610-driver` モジュールを追加し、`pixart,pmw3610-alt` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_PMW3610_ALT` を生成する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。分割ではトラックボールが配置された側の overlay にのみ出力する。
+- **QMK/Vial 出力**: 初期実装では対象外とし、ZMK 専用の周辺機器として扱う。
+
 ### 7.7 RGB Matrix
 - **内部表現**: RGB Matrix は RGB アンダーグローとは別に `ProjectSettings.features.rgbMatrix` で有効化する。RGB アンダーグローは `ProjectSettings.features.rgb` で管理し、QMK/Vial では `rgblight`、ZMK では `CONFIG_ZMK_RGB_UNDERGLOW` / `CONFIG_WS2812_STRIP` に対応する。各キーは `PhysicalKey.ledIndex`, `ledX`, `ledY`, `ledFlags` を保持する。`ledIndex` は `.smidr` 保存値およびファーム出力用の 0 始まり添字とし、画面表示および KiCad の部品リファレンスでは `ledIndex + 1` の 1 始まり番号を表示する。
 - **UI 配置**: RGB Matrix の有効/無効は RGB Matrix パネルで設定し、ハードウェア設定には重複トグルを置かない。RGB アンダーグロー、単色バックライト、OLED の有効/無効は、それぞれのデータ/I2Cピンと同じマトリクスの特殊ピン設定に配置する。

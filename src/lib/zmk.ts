@@ -209,6 +209,68 @@ const getEncoderConfigSnippet = (settings: ProjectSettings) => (
     : ''
 );
 
+const getTrackballConfigSnippet = (settings: ProjectSettings) => (
+  (settings.trackballs || []).length > 0
+    ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_ZMK_POINTING=y\nCONFIG_PMW3610_ALT=y\n'
+    : ''
+);
+
+const getTrackballSide = (settings: ProjectSettings, keys: PhysicalKey[], index: number): MatrixSide => {
+  const key = keys.find(item => item.trackballId
+    ? (settings.trackballs || []).findIndex(trackball => trackball.id === item.trackballId) === index
+    : item.trackballIndex === index);
+  return !settings.features.split || !key ? 'left' : getLocalMatrixPosition(settings, key, keys)?.side || key.matrixSide || inferMatrixSideFromGeometry(key, keys);
+};
+
+const formatNordicPsel = (pin: string | undefined, fallback: number, signal: string) => {
+  const match = pin?.trim().match(/^P([01])\.(\d{1,2})$/i);
+  return `NRF_PSEL(${signal}, ${match?.[1] || 0}, ${match?.[2] || fallback})`;
+};
+
+const generateZmkTrackballNodes = (settings: ProjectSettings, keys: PhysicalKey[], target: ZmkTarget, side?: MatrixSide) => {
+  const trackballs = (settings.trackballs || []).map((trackball, index) => ({ trackball, index }))
+    .filter(item => !side || getTrackballSide(settings, keys, item.index) === side);
+  if (trackballs.length === 0) return '';
+  return `${trackballs.map(({ trackball, index }) => `&pinctrl {
+    smidr_pmw3610_spi${index}_default: smidr_pmw3610_spi${index}_default {
+        group1 {
+            psels = <${formatNordicPsel(trackball.sclk, index * 4, 'SPIM_SCK')}>, <${formatNordicPsel(trackball.sdio, index * 4 + 1, 'SPIM_MOSI')}>;
+        };
+    };
+};
+
+&spi${index} {
+    status = "okay";
+    pinctrl-0 = <&smidr_pmw3610_spi${index}_default>;
+    pinctrl-names = "default";
+    cs-gpios = <${formatGpio(trackball.cs, target, 'GPIO_ACTIVE_LOW', index * 4 + 2, `Trackball ${index} CS`)}>;
+    trackball_${index}: pmw3610_${index} {
+        compatible = "pixart,pmw3610-alt";
+        reg = <0>;
+        irq-gpios = <${formatGpio(trackball.motion, target, '(GPIO_ACTIVE_LOW | GPIO_PULL_UP)', index * 4 + 3, `Trackball ${index} MOTION`)}>;
+        cpi = <${trackball.cpi || 1200}>;${trackball.swapXy ? '\n        swap-xy;' : ''}${trackball.invertX ? '\n        invert-x;' : ''}${trackball.invertY ? '\n        invert-y;' : ''}
+    };
+};`).join('\n\n')}`;
+};
+
+const generateZmkWestManifest = () => `manifest:
+  remotes:
+    - name: zmkfirmware
+      url-base: https://github.com/zmkfirmware
+    - name: badjeff
+      url-base: https://github.com/badjeff
+  projects:
+    - name: zmk
+      remote: zmkfirmware
+      revision: main
+      import: app/west.yml
+    - name: zmk-pmw3610-driver
+      remote: badjeff
+      revision: zmk-0.4
+  self:
+    path: config
+`;
+
 const generateZmkEncoderNodes = (
   settings: ProjectSettings,
   zmkTarget: ZmkTarget,
@@ -437,6 +499,7 @@ ${useDirectPins ? `    input-gpios
         ;`}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'left')}
+${generateZmkTrackballNodes(settings, keys, zmkTarget, 'left')}
 `;
   shieldsFolder.file(`${leftShield}.overlay`, leftOverlay);
 
@@ -458,6 +521,7 @@ ${useDirectPins ? `    input-gpios
         ;`}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
+${generateZmkTrackballNodes(settings, keys, zmkTarget, 'right')}
 `;
   shieldsFolder.file(`${rightShield}.overlay`, rightOverlay);
 
@@ -469,7 +533,7 @@ ${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
 
 # Lighting features
 ${getZmkLightingConfigSnippet(settings)}
-${getEncoderConfigSnippet(settings)}
+${getEncoderConfigSnippet(settings)}${getTrackballConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
   shieldsFolder.file(`${kbName}.conf`, sharedConf);
@@ -734,7 +798,7 @@ CONFIG_RETENTION_BOOT_MODE=y
 
 # Lighting features
 ${getZmkLightingConfigSnippet(settings)}
-${getEncoderConfigSnippet(settings)}
+${getEncoderConfigSnippet(settings)}${getTrackballConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
     boardFolder.file(`${boardName}.conf`, boardConf);
@@ -776,6 +840,7 @@ ${useDirectPins ? `        input-gpios
             ;`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, index => getEncoderSide(settings, keys, index) === side ? 'okay' : 'disabled')}
+${generateZmkTrackballNodes(settings, keys, zmkTarget, side)}
 ${wiredSplitNode}
 };
 ${colOffset}
@@ -856,11 +921,15 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   if (!zmkTarget) {
     throw new Error('ZMK export is currently implemented for RP2040 and nRF52 projects only.');
   }
+  if ((settings.trackballs || []).length > 0 && !isNordicTarget(zmkTarget)) {
+    throw new Error('PMW3610 trackball export currently requires an nRF52 target because the generated SPI pinctrl overlay uses Nordic pin bindings.');
+  }
 
   const boardName = getZmkDevelopmentBoard(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
   const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
 
   if (settings.features.split) {
+    if ((settings.trackballs || []).length > 0) zip.folder('config')?.file('west.yml', generateZmkWestManifest());
     if (settings.hardware.controllerType === 'mcu') {
       if (getZmkSplitTransport(settings) === 'ble' && !isNordicTarget(zmkTarget)) {
         throw new Error('ZMK BLE split export currently requires an nRF52 MCU.');
@@ -878,6 +947,7 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   // ZMK configs are typically inside a config/ folder
   const configFolder = zip.folder('config');
   if (!configFolder) return null;
+  if ((settings.trackballs || []).length > 0) configFolder.file('west.yml', generateZmkWestManifest());
 
   const transformMapStr = formatTransformMap(settings, sortedKeys, keys);
   const matrix = getZmkMatrixDimensions(settings, keys);
@@ -1070,6 +1140,7 @@ ${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";
             ;`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
+${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 };
 
 ${peripheralDts}
@@ -1125,6 +1196,7 @@ ${useDirectPins ? `        compatible = "zmk,kscan-gpio-direct";
             ;`}
     };
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
+${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 };
 `;
     shieldsFolder.file(`${kbName}.overlay`, shieldOverlay);
@@ -1137,7 +1209,7 @@ ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 
 # Lighting features
 ${getZmkLightingConfigSnippet(settings)}
-${getEncoderConfigSnippet(settings)}
+${getEncoderConfigSnippet(settings)}${getTrackballConfigSnippet(settings)}
 `;
     shieldsFolder.file(`${kbName}.conf`, shieldConf);
 

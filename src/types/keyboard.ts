@@ -23,10 +23,23 @@ export interface EncoderDefinition {
   };
 }
 
+export interface TrackballDefinition {
+  id?: string; // runtime only - generated on load, stripped on save
+  sclk?: string;
+  sdio?: string;
+  cs?: string;
+  motion?: string;
+  cpi?: number;
+  swapXy?: boolean;
+  invertX?: boolean;
+  invertY?: boolean;
+}
+
 export interface PhysicalKey {
   id?: string;   // runtime only - generated on load, stripped on save
   encoderId?: string; // runtime only - links to ProjectSettings.encoders
-  kind?: 'key' | 'encoder';
+  trackballId?: string; // runtime only - links to ProjectSettings.trackballs
+  kind?: 'key' | 'encoder' | 'trackball';
   row?: number;  // matrix row (undefined if unassigned)
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
@@ -60,6 +73,7 @@ export interface PhysicalKey {
   keymap?: KeymapData;
   decal?: boolean;
   encoderIndex?: number; // persisted/exported encoder index, converted to encoderId at runtime
+  trackballIndex?: number; // persisted/exported trackball index, converted to trackballId at runtime
 }
 
 export interface ProjectSettings {
@@ -109,6 +123,7 @@ export interface ProjectSettings {
   };
   layers: number;
   encoders?: EncoderDefinition[];
+  trackballs?: TrackballDefinition[];
   macros?: MacroAction[][];
   combos?: ComboEntry[];
   tapDances?: TapDanceEntry[];

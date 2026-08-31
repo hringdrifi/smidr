@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Gauge, MousePointer2, PlugZap, Trash2 } from 'lucide-react';
+import { CircleDot, Gauge, MousePointer2, PlugZap, Trash2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide } from '@/lib/matrix-utils';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -24,6 +24,8 @@ export const MatrixPainter = () => {
     setMatrixPosition,
     addEncoderToKey,
     updateEncoder,
+    addTrackballToKey,
+    updateTrackball,
   } = useKeyboardStore();
   const { t } = useTranslation();
   const [focusedEncoderPin, setFocusedEncoderPin] = React.useState<'pinA' | 'pinB'>('pinA');
@@ -40,6 +42,12 @@ export const MatrixPainter = () => {
     : null;
   const selectedEncoderIndex = selectedEncoder
     ? (settings.encoders || []).findIndex(encoder => encoder.id === selectedEncoder.id)
+    : -1;
+  const selectedTrackball = selectedKey?.trackballId
+    ? (settings.trackballs || []).find(trackball => trackball.id === selectedKey.trackballId)
+    : null;
+  const selectedTrackballIndex = selectedTrackball
+    ? (settings.trackballs || []).findIndex(trackball => trackball.id === selectedTrackball.id)
     : -1;
 
   const selectedMcu = settings.hardware.mcu || 'RP2040';
@@ -62,6 +70,10 @@ export const MatrixPainter = () => {
           ? key.matrixSide || inferMatrixSideFromGeometry(key, keys)
           : 'left';
         if (keySide === selectedMatrixSide && key.directPin) pins.add(key.directPin);
+        if (key.trackballId) {
+          const trackball = (settings.trackballs || []).find(item => item.id === key.trackballId);
+          if (trackball) [trackball.sclk, trackball.sdio, trackball.cs, trackball.motion].forEach(pin => pin && pins.add(pin));
+        }
         if (!key.encoderId) return;
         const encoderSide = settings.features.split
           ? keySide
@@ -90,6 +102,10 @@ export const MatrixPainter = () => {
 
     keys.forEach(key => {
       if (key.directPin) pins.add(key.directPin);
+      if (key.trackballId) {
+        const trackball = (settings.trackballs || []).find(item => item.id === key.trackballId);
+        if (trackball) [trackball.sclk, trackball.sdio, trackball.cs, trackball.motion].forEach(pin => pin && pins.add(pin));
+      }
       if (!key.encoderId) return;
       const encoderSide = settings.features.split
         ? getLocalMatrixPosition(settings, key, keys)?.side || key.matrixSide || inferMatrixSideFromGeometry(key, keys)
@@ -361,6 +377,26 @@ export const MatrixPainter = () => {
               </button>
             </div>
           )}
+        </div>
+
+        <div className="rounded border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CircleDot size={14} className="text-[var(--text-dim)]" />
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.trackball')}</div>
+                {selectedTrackball && <div className="mt-0.5 font-mono text-[10px] text-amber-500">TRK{selectedTrackballIndex}</div>}
+              </div>
+            </div>
+            {!selectedTrackball && <button type="button" onClick={() => addTrackballToKey(selectedKeyId)} className="h-8 rounded border border-amber-500/25 bg-amber-500/10 px-3 text-[10px] font-bold uppercase text-amber-500 transition-all hover:bg-amber-500 hover:text-zinc-950">{t('matrix.addTrackball')}</button>}
+          </div>
+          {selectedTrackball && <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              {(['sclk', 'sdio', 'cs', 'motion'] as const).map(field => <label key={field} className="space-y-1.5"><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t(`matrix.trackball${field[0].toUpperCase()}${field.slice(1)}` as any)}</span><input type="text" value={selectedTrackball[field] || ''} onChange={e => updateTrackball(selectedTrackball.id!, { [field]: e.target.value.toUpperCase() })} placeholder={t('matrix.encoderPinPlaceholder')} className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50" /></label>)}
+            </div>
+            <label className="block space-y-1.5"><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.trackballCpi')}</span><input type="number" min="100" step="100" value={selectedTrackball.cpi || 1200} onChange={e => updateTrackball(selectedTrackball.id!, { cpi: Number(e.target.value) || 1200 })} className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none" /></label>
+            <div className="grid grid-cols-3 gap-2">{(['swapXy', 'invertX', 'invertY'] as const).map(field => <label key={field} className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]"><input type="checkbox" checked={!!selectedTrackball[field]} onChange={e => updateTrackball(selectedTrackball.id!, { [field]: e.target.checked })} />{t(`matrix.trackball${field[0].toUpperCase()}${field.slice(1)}` as any)}</label>)}</div>
+          </div>}
         </div>
       </div>
 
