@@ -150,12 +150,8 @@ const getZmkLightingConfigSnippet = (settings: ProjectSettings) => `${settings.f
 CONFIG_WS2812_STRIP=y` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
 ${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y' : '# CONFIG_ZMK_BACKLIGHT is not set'}`;
 
-const getZmkBuildBoard = (board: string) => (
-  board.endsWith('/zmk') ? board : `${board}${board.includes('/') ? '/' : '//'}zmk`
-);
-
 const generateZmkBuildYaml = (entries: Array<{ board: string; shield?: string }>) => `include:
-${entries.map(entry => `  - board: ${getZmkBuildBoard(entry.board)}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
+${entries.map(entry => `  - board: ${entry.board}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
 `;
 
 const generateZmkBoardYaml = (boardName: string, vendorName: string, target: ZmkTarget) => `board:
@@ -163,8 +159,6 @@ const generateZmkBoardYaml = (boardName: string, vendorName: string, target: Zmk
   vendor: ${vendorName}
   socs:
     - name: ${target}
-      variants:
-        - name: zmk
 `;
 
 const getSidePins = (settings: ProjectSettings, side: MatrixSide) => {
@@ -277,7 +271,7 @@ const getEncoderConfigSnippet = (settings: ProjectSettings) => (
 
 const getTrackballConfigSnippet = (settings: ProjectSettings) => (
   (settings.trackballs || []).some(hasCompleteTrackballPins)
-    ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_ZMK_POINTING=y\nCONFIG_PMW3610_ALT=y\n'
+    ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_ZMK_POINTING=y\nCONFIG_INPUT_PMW3610=y\n'
     : ''
 );
 
@@ -298,10 +292,17 @@ const generateZmkTrackballNodes = (settings: ProjectSettings, keys: PhysicalKey[
     .filter(item => hasCompleteTrackballPins(item.trackball))
     .filter(item => !side || getTrackballSide(settings, keys, item.index) === side);
   if (trackballs.length === 0) return '';
-  return `${trackballs.map(({ trackball, index }) => `&pinctrl {
+  return `#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+${trackballs.map(({ trackball, index }) => {
+    const axisX = trackball.swapXy ? 'INPUT_REL_Y' : 'INPUT_REL_X';
+    const axisY = trackball.swapXy ? 'INPUT_REL_X' : 'INPUT_REL_Y';
+    const invertPhysicalX = trackball.swapXy ? trackball.invertY : trackball.invertX;
+    const invertPhysicalY = trackball.swapXy ? trackball.invertX : trackball.invertY;
+    return `&pinctrl {
     smidr_pmw3610_spi${index}_default: smidr_pmw3610_spi${index}_default {
         group1 {
-            psels = <${formatNordicPsel(trackball.sclk, index * 4, 'SPIM_SCK')}>, <${formatNordicPsel(trackball.sdio, index * 4 + 1, 'SPIM_MOSI')}>;
+            psels = <${formatNordicPsel(trackball.sclk, index * 4, 'SPIM_SCK')}>, <${formatNordicPsel(trackball.sdio, index * 4 + 1, 'SPIM_MOSI')}>, <${formatNordicPsel(trackball.sdio, index * 4 + 1, 'SPIM_MISO')}>;
         };
     };
 };
@@ -312,31 +313,26 @@ const generateZmkTrackballNodes = (settings: ProjectSettings, keys: PhysicalKey[
     pinctrl-names = "default";
     cs-gpios = <${formatGpio(trackball.cs, target, 'GPIO_ACTIVE_LOW', index * 4 + 2, `Trackball ${index} CS`)}>;
     trackball_${index}: pmw3610_${index} {
-        compatible = "pixart,pmw3610-alt";
+        compatible = "pixart,pmw3610";
         reg = <0>;
-        irq-gpios = <${formatGpio(trackball.motion, target, '(GPIO_ACTIVE_LOW | GPIO_PULL_UP)', index * 4 + 3, `Trackball ${index} MOTION`)}>;
-        cpi = <${trackball.cpi || 1200}>;${trackball.swapXy ? '\n        swap-xy;' : ''}${trackball.invertX ? '\n        invert-x;' : ''}${trackball.invertY ? '\n        invert-y;' : ''}
+        spi-max-frequency = <2000000>;
+        spi-cpol;
+        spi-cpha;
+        motion-gpios = <${formatGpio(trackball.motion, target, '(GPIO_ACTIVE_LOW | GPIO_PULL_UP)', index * 4 + 3, `Trackball ${index} MOTION`)}>;
+        zephyr,axis-x = <${axisX}>;
+        zephyr,axis-y = <${axisY}>;
+        res-cpi = <${trackball.cpi || 1200}>;${invertPhysicalX ? '\n        invert-x;' : ''}${invertPhysicalY ? '\n        invert-y;' : ''}
     };
-};`).join('\n\n')}`;
 };
 
-const generateZmkWestManifest = () => `manifest:
-  remotes:
-    - name: zmkfirmware
-      url-base: https://github.com/zmkfirmware
-    - name: badjeff
-      url-base: https://github.com/badjeff
-  projects:
-    - name: zmk
-      remote: zmkfirmware
-      revision: main
-      import: app/west.yml
-    - name: zmk-pmw3610-driver
-      remote: badjeff
-      revision: zmk-0.4
-  self:
-    path: config
-`;
+/ {
+    trackball_listener_${index} {
+        compatible = "zmk,input-listener";
+        device = <&trackball_${index}>;
+    };
+};`;
+  }).join('\n\n')}`;
+};
 
 const generateZmkEncoderNodes = (
   settings: ProjectSettings,
@@ -684,9 +680,9 @@ To build ZMK firmware using this configuration:
 3. Configure your GitHub Actions \`build.yaml\` file:
    \`\`\`yaml
    include:
-     - board: ${getZmkBuildBoard(boardName)}
+     - board: ${boardName}
        shield: ${leftShield}
-     - board: ${getZmkBuildBoard(boardName)}
+     - board: ${boardName}
        shield: ${rightShield}
    \`\`\`
 4. Push the changes to GitHub and download the compiled firmware binaries from the GitHub Actions tab.
@@ -971,8 +967,8 @@ To build ZMK firmware using this configuration:
 3. Configure your GitHub Actions \`build.yaml\` file:
    \`\`\`yaml
    include:
-     - board: ${getZmkBuildBoard(leftBoard)}
-     - board: ${getZmkBuildBoard(rightBoard)}
+     - board: ${leftBoard}
+     - board: ${rightBoard}
    \`\`\`
 4. Push the changes to GitHub and download the compiled firmware binaries from the GitHub Actions tab.
 
@@ -1012,7 +1008,6 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board || getDefaultZmkBoard(settings.hardware.mcu));
 
   if (settings.features.split) {
-    if ((settings.trackballs || []).some(hasCompleteTrackballPins)) zip.folder('config')?.file('west.yml', generateZmkWestManifest());
     if (settings.hardware.controllerType === 'mcu') {
       if (getZmkSplitTransport(settings) === 'ble' && !isNordicTarget(zmkTarget)) {
         throw new Error('ZMK BLE split export currently requires an nRF52 MCU.');
@@ -1030,8 +1025,6 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
   // ZMK configs are typically inside a config/ folder
   const configFolder = zip.folder('config');
   if (!configFolder) return null;
-  if ((settings.trackballs || []).some(hasCompleteTrackballPins)) configFolder.file('west.yml', generateZmkWestManifest());
-
   const switchKeys = getZmkSwitchKeys(settings, keys);
   const transformMapStr = formatTransformMap(settings, sortedKeys, switchKeys);
   const matrix = getZmkMatrixDimensions(settings, switchKeys);
@@ -1393,8 +1386,8 @@ ${generateZmkEncoderBehaviors(settings)}
     ? `- \`boards/arm/${kbName}/\`: Contains the custom board definition files.`
     : `- \`boards/shields/${kbName}/\`: Contains the shield overlay, config, metadata, and Kconfig files.`;
   const buildExample = usesCustomBoard
-    ? `     - board: ${getZmkBuildBoard(kbName)}`
-    : `     - board: ${getZmkBuildBoard(boardName)}
+    ? `     - board: ${kbName}`
+    : `     - board: ${boardName}
        shield: ${kbName}`;
   const gpioFile = usesCustomBoard ? `${kbName}.dts` : `${kbName}.overlay`;
   const gpioKind = usesCustomBoard ? 'custom board' : 'shield';

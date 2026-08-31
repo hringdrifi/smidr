@@ -2699,7 +2699,7 @@ describe('export generation', () => {
     expect(boardYaml).toContain('name: nordic_board');
     expect(boardYaml).toContain('vendor: test');
     expect(boardYaml).toContain('name: nrf52840');
-    expect(boardYaml).toContain('name: zmk');
+    expect(boardYaml).not.toContain('variants:');
     expect(boardDts).toContain('#include <nordic/nrf52840_qiaa.dtsi>');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
@@ -2805,6 +2805,7 @@ describe('export generation', () => {
 
     expect(leftDts).toContain('model = "Split MCU Board left"');
     expect(leftBoardYaml).toContain('name: split_mcu_board_left');
+    expect(leftBoardYaml).not.toContain('variants:');
     expect(leftBoardYaml).toContain('name: rp2040');
     expect(rightBoardYaml).toContain('name: split_mcu_board_right');
     expect(rightBoardYaml).toContain('name: rp2040');
@@ -2821,11 +2822,11 @@ describe('export generation', () => {
     expect(rightKconfig).toContain('config ZMK_SPLIT');
     expect(leftConf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
     expect(keymap).toContain('&kp A &kp B');
-    expect(readme).toContain('- board: split_mcu_board_left//zmk');
-    expect(readme).toContain('- board: split_mcu_board_right//zmk');
+    expect(readme).toContain('- board: split_mcu_board_left');
+    expect(readme).toContain('- board: split_mcu_board_right');
     expect(buildYaml).toContain('include:');
-    expect(buildYaml).toContain('- board: split_mcu_board_left//zmk');
-    expect(buildYaml).toContain('- board: split_mcu_board_right//zmk');
+    expect(buildYaml).toContain('- board: split_mcu_board_left');
+    expect(buildYaml).toContain('- board: split_mcu_board_right');
   });
 
   it('emits ZMK as an existing board plus shield when development board is selected', async () => {
@@ -2875,9 +2876,9 @@ describe('export generation', () => {
     expect(shieldOverlay).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(shieldOverlay).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
     expect(zmkYml).toContain('requires:\n  - pro_micro');
-    expect(readme).toContain('- board: nice_nano//zmk');
+    expect(readme).toContain('- board: nice_nano');
     expect(readme).toContain('shield: shield_board');
-    expect(buildYaml).toContain('- board: nice_nano//zmk');
+    expect(buildYaml).toContain('- board: nice_nano');
     expect(buildYaml).toContain('shield: shield_board');
   });
 
@@ -2922,7 +2923,7 @@ describe('export generation', () => {
     const buildYaml = await zip.file('build.yaml')!.async('string');
 
     expect(zmkYml).toContain('requires:\n  - seeed_xiao');
-    expect(buildYaml).toContain('- board: seeeduino_xiao_ble//zmk');
+    expect(buildYaml).toContain('- board: seeeduino_xiao_ble');
     expect(buildYaml).toContain('shield: xiao_shield');
   });
 
@@ -3147,7 +3148,7 @@ describe('export generation', () => {
     expect(keymap).toContain('&kp A &kp B');
     expect(readme).toContain('shield: split_zmk_board_left');
     expect(readme).toContain('shield: split_zmk_board_right');
-    expect(buildYaml).toContain('- board: nice_nano//zmk');
+    expect(buildYaml).toContain('- board: nice_nano');
     expect(buildYaml).toContain('shield: split_zmk_board_left');
     expect(buildYaml).toContain('shield: split_zmk_board_right');
   });
@@ -3196,7 +3197,7 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const readme = await zip.file('README.md')!.async('string');
 
-    expect(readme).toContain('- board: nice_nano//zmk');
+    expect(readme).toContain('- board: nice_nano');
     expect(readme).toContain('shield: nice_nano_split_left');
     expect(readme).toContain('shield: nice_nano_split_right');
   });
@@ -3380,7 +3381,7 @@ describe('export generation', () => {
     expect(conf).toContain('CONFIG_ZMK_SPLIT_WIRED=y');
     expect(readme).toContain('ZMK wired split firmware');
     expect(readme).toContain('using `&uart0`');
-    expect(readme).toContain('- board: adafruit_kb2040//zmk');
+    expect(readme).toContain('- board: adafruit_kb2040');
     expect(readme).toContain('shield: wired_zmk_split_left');
     expect(readme).toContain('shield: wired_zmk_split_right');
   });
@@ -3600,11 +3601,11 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
     const readme = await zip.file('README.md')!.async('string');
 
-    expect(readme).toContain('- board: adafruit_kb2040//zmk');
+    expect(readme).toContain('- board: adafruit_kb2040');
     expect(readme).toContain('shield: shared_board');
   });
 
-  it('exports a PMW3610 ZMK module, configuration, and Nordic overlay', async () => {
+  it('exports the Zephyr PMW3610 driver configuration and Nordic overlay', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       name: 'Trackball Board',
@@ -3619,15 +3620,20 @@ describe('export generation', () => {
     ];
     const blob = await generateZmkZip({ settings, keys });
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
-    const west = await zip.file('config/west.yml')!.async('string');
     const conf = await zip.file('boards/shields/trackball_board/trackball_board.conf')!.async('string');
     const overlay = await zip.file('boards/shields/trackball_board/trackball_board.overlay')!.async('string');
-    expect(west).toContain('zmk-pmw3610-driver');
-    expect(conf).toContain('CONFIG_PMW3610_ALT=y');
-    expect(overlay).toContain('compatible = "pixart,pmw3610-alt"');
-    expect(overlay).toContain('cpi = <1400>');
-    expect(overlay).toContain('swap-xy;');
-    expect(overlay).toContain('invert-y;');
+    expect(zip.file('config/west.yml')).toBeNull();
+    expect(conf).toContain('CONFIG_INPUT_PMW3610=y');
+    expect(conf).not.toContain('CONFIG_PMW3610_ALT=y');
+    expect(overlay).toContain('#include <zephyr/dt-bindings/input/input-event-codes.h>');
+    expect(overlay).toContain('compatible = "pixart,pmw3610"');
+    expect(overlay).toContain('spi-max-frequency = <2000000>');
+    expect(overlay).toContain('motion-gpios = <&gpio0 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>');
+    expect(overlay).toContain('zephyr,axis-x = <INPUT_REL_Y>');
+    expect(overlay).toContain('zephyr,axis-y = <INPUT_REL_X>');
+    expect(overlay).toContain('res-cpi = <1400>');
+    expect(overlay).toContain('invert-x;');
+    expect(overlay).toContain('compatible = "zmk,input-listener"');
     expect(overlay.indexOf('};\n&pinctrl {')).toBeGreaterThan(-1);
     expect(overlay.indexOf('&pinctrl {')).toBeLessThan(overlay.indexOf('&spi0 {'));
   });

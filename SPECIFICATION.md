@@ -128,7 +128,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **QMK/Vial 出力**: QMK/Vial の split matrix では右側を行方向に連結するため、右側キーは `row + leftRows`, `col` に変換して出力する。例: 左右各 `4x6` の場合、内部は左右とも `0..3 x 0..5`、QMK/Vial 出力は `8x6`。
 - **QMK/Vial ソースのレイアウトオプション**: `keyboard.json` の `layouts.LAYOUT.layout`、`keymap.c`、direct pin 配列などの firmware 実体は現在の `activeOptions` で表示されているキーだけを対象にする。VIA/Vial JSON 定義は外部アプリ上で選択肢を保持するため、全レイアウトオプションを出力する。
 - **QMK/Vial Matrix Mask**: `qmk.matrixMasked` が有効な場合、`matrix_mask` は現在の `activeOptions` ではなく全レイアウトオプションで使われる matrix position の union から生成する。どのレイアウトでも使われないセルは mask し、row pin と column pin が同じ物理ピンになるセルも mask する。
-- **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。`controllerType: 'mcu'` の場合は左右を別 custom board (`<name>_left` / `<name>_right`) として生成し、右側 board DTS で同じ `col-offset` を指定する。生成する `board.yml` には `zmk` バリアントを定義し、`build.yaml` と README の board 指定は単純な board ID では `<board>//zmk`、SoC を含む board ID では `<board>/<soc>/zmk` として出力する。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52 系ターゲットを要求する。`wired` は `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。HY0020 は nRF52832 ベースのBLE専用モジュールとして扱い、露出する16 GPIOとSWD書き込み用のHEX出力を使用する。
+- **ZMK 出力**: ZMK の split shield では左右を別 shield part として生成する。共有 `.dtsi` には左右を横方向に連結した matrix transform を配置し、右側 overlay で `col-offset = <leftCols>` を指定して右側ローカル matrix event を共有 transform の右側列へ対応付ける。`controllerType: 'mcu'` の場合は左右を別 custom board (`<name>_left` / `<name>_right`) として生成し、右側 board DTS で同じ `col-offset` を指定する。生成する custom board の `board.yml` は board 名・vendor・SoC のみを定義し、`zmk` バリアントは定義しない。`build.yaml` と README には board 名をそのまま出力する。`ProjectSettings.zmk.splitTransport` は `ble`（既定）または `wired` を保持する。`ble` は nRF52 系ターゲットを要求する。`wired` は `zmk,wired-split` ノードを生成し、`ProjectSettings.zmk.wiredSplitDevice`（未指定時は `&pro_micro_serial`）を UART device として出力する。HY0020 は nRF52832 ベースのBLE専用モジュールとして扱い、露出する16 GPIOとSWD書き込み用のHEX出力を使用する。
 - **UI 配置**: ハードウェア設定は「分割キーボード」の有効/無効のみを持つ。分割時の通信設定はピン設定内の独立した「分割通信」セクションにまとめ、QMK/Vial の物理シリアルピンと、ZMK の Bluetooth / 有線 UART 方式および有線 UART デバイスをファームウェア別に表示する。分割通信ピンは汎用の「特殊ピン」には含めない。
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
@@ -152,7 +152,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 ### 7.7 PMW3610 トラックボール
 - **内部表現**: トラックボールは `ProjectSettings.trackballs[]` で保持し、実行中は runtime-only の `id` と `PhysicalKey.trackballId` で物理配置を参照する。保存時は `trackballIndex` に変換し、読み込み時に新しい `trackballId` を復元する。
 - **設定**: 各 PMW3610 は `SCLK`、単線 SPI の `SDIO`、`CS`、`MOTION` (IRQ)、CPI、軸交換、X/Y 反転を持つ。4ピンはピンプールおよびハードウェアの使用済みピンとして扱う。
-- **ZMK 出力**: PMW3610 のあるプロジェクトは `config/west.yml` に `badjeff/zmk-pmw3610-driver` モジュールを追加し、`pixart,pmw3610-alt` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_PMW3610_ALT` を生成する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。分割ではトラックボールが配置された側の overlay にのみ出力する。SCLK/SDIO/CS/MOTION のいずれかが未設定なら、これらの出力を生成しない。
+- **ZMK 出力**: PMW3610 は Zephyr 標準ドライバを使用し、外部モジュールおよび `config/west.yml` は生成しない。`pixart,pmw3610` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_INPUT_PMW3610` を生成する。node には `spi-max-frequency`、`motion-gpios`、`zephyr,axis-x`、`zephyr,axis-y`、`res-cpi` を設定し、`zmk,input-listener` で ZMK のポインティング入力へ接続する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。分割ではトラックボールが配置された側の overlay にのみ出力する。SCLK/SDIO/CS/MOTION のいずれかが未設定なら、これらの出力を生成しない。
 - **QMK/Vial 出力**: 初期実装では対象外とし、ZMK 専用の周辺機器として扱う。
 
 ### 7.7 RGB Matrix
