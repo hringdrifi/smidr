@@ -236,6 +236,10 @@ export const getKeyLabel = (
   settings?: ProjectSettings,
   keys: Array<Pick<PhysicalKey, 'x' | 'w'>> = []
 ): LabelNode => {
+  const trackballIndex = k.trackballId && settings?.trackballs
+    ? settings.trackballs.findIndex(trackball => trackball.id === k.trackballId)
+    : k.trackballIndex;
+
   if (appMode === 'remap') {
     const qmkPosition = settings ? getQmkMatrixPosition(settings, k, keys) : undefined;
     const flatIndex = k.zmkPosition ?? (
@@ -253,9 +257,6 @@ export const getKeyLabel = (
     const encoderIndex = k.encoderId && settings?.encoders
       ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
       : k.encoderIndex;
-    const trackballIndex = k.trackballId && settings?.trackballs
-      ? settings.trackballs.findIndex(trackball => trackball.id === k.trackballId)
-      : k.trackballIndex;
     if (settings && isDirectPinMatrix(settings)) {
       const directPinLabel = k.directPin || '';
       const encoderLabel = encoderIndex !== undefined && encoderIndex >= 0 ? `ENC${encoderIndex}` : '';
