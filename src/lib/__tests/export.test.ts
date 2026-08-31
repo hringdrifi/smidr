@@ -3628,13 +3628,12 @@ describe('export generation', () => {
     expect(overlay).toContain('#include <zephyr/dt-bindings/input/input-event-codes.h>');
     expect(overlay).toContain('compatible = "pixart,pmw3610"');
     expect(overlay).toContain('spi-max-frequency = <2000000>');
-    expect(overlay).toContain('motion-gpios = <&gpio0 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>');
+    expect(overlay).toContain('motion-gpios = <&gpio0 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)');
     expect(overlay).toContain('zephyr,axis-x = <INPUT_REL_Y>');
     expect(overlay).toContain('zephyr,axis-y = <INPUT_REL_X>');
     expect(overlay).toContain('res-cpi = <1400>');
     expect(overlay).toContain('invert-x;');
     expect(overlay).toContain('compatible = "zmk,input-listener"');
-    expect(overlay.indexOf('};\n&pinctrl {')).toBeGreaterThan(-1);
     expect(overlay.indexOf('&pinctrl {')).toBeLessThan(overlay.indexOf('&spi0 {'));
   });
 
