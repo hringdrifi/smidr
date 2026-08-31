@@ -164,8 +164,6 @@ jobs:
 `);
 
   zip.folder('config')?.file('west.yml', `manifest:
-  defaults:
-    revision: v0.3
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
@@ -318,10 +316,52 @@ const formatNordicPsel = (pin: string | undefined, fallback: number, signal: str
   return `NRF_PSEL(${signal}, ${match?.[1] || 0}, ${match?.[2] || fallback})`;
 };
 
-const generateZmkTrackballNodes = (settings: ProjectSettings, keys: PhysicalKey[], target: ZmkTarget, side?: MatrixSide) => {
-  const trackballs = (settings.trackballs || []).map((trackball, index) => ({ trackball, index }))
+const getCompleteTrackballs = (settings: ProjectSettings, keys: PhysicalKey[], side?: MatrixSide) => (
+  (settings.trackballs || []).map((trackball, index) => ({ trackball, index }))
     .filter(item => hasCompleteTrackballPins(item.trackball))
-    .filter(item => !side || getTrackballSide(settings, keys, item.index) === side);
+    .filter(item => !side || getTrackballSide(settings, keys, item.index) === side)
+);
+
+const generateZmkSplitTrackballSharedNodes = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  const peripheralTrackballs = getCompleteTrackballs(settings, keys, 'right');
+  if (peripheralTrackballs.length === 0) return '';
+
+  return `/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+${peripheralTrackballs.map(({ index }) => `        trackball_split_${index}: trackball_split_${index}@${index} {
+            compatible = "zmk,input-split";
+            reg = <${index}>;
+        };`).join('\n\n')}
+    };
+
+${peripheralTrackballs.map(({ index }) => `    trackball_listener_${index}: trackball_listener_${index} {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&trackball_split_${index}>;
+    };`).join('\n\n')}
+};`;
+};
+
+const generateZmkSplitTrackballCentralOverrides = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  const peripheralTrackballs = getCompleteTrackballs(settings, keys, 'right');
+  if (peripheralTrackballs.length === 0) return '';
+
+  return peripheralTrackballs.map(({ index }) => `&trackball_listener_${index} {
+    status = "okay";
+};`).join('\n\n');
+};
+
+const generateZmkTrackballNodes = (
+  settings: ProjectSettings,
+  keys: PhysicalKey[],
+  target: ZmkTarget,
+  side?: MatrixSide,
+  listenerMode: 'direct' | 'split-peripheral' = 'direct',
+) => {
+  const trackballs = getCompleteTrackballs(settings, keys, side);
   if (trackballs.length === 0) return '';
   return `#include <zephyr/dt-bindings/input/input-event-codes.h>
 
@@ -356,12 +396,14 @@ ${trackballs.map(({ trackball, index }) => {
     };
 };
 
-/ {
+${listenerMode === 'direct' ? `/ {
     trackball_listener_${index} {
         compatible = "zmk,input-listener";
         device = <&trackball_${index}>;
     };
-};`;
+};` : `&trackball_split_${index} {
+    device = <&trackball_${index}>;
+};`}`;
   }).join('\n\n')}`;
 };
 
@@ -552,6 +594,8 @@ const generateSplitShieldFiles = (
   const transformMapStr = formatTransformMap(settings, sortedKeys, switchKeys);
   const leftShield = `${kbName}_left`;
   const rightShield = `${kbName}_right`;
+  const leftHasTrackball = getCompleteTrackballs(settings, keys, 'left').length > 0;
+  const rightHasTrackball = getCompleteTrackballs(settings, keys, 'right').length > 0;
   const requiredInterconnect = getZmkDevelopmentBoardInterconnect(settings.hardware.board);
   const splitTransport = getZmkSplitTransport(settings);
   const wiredSplitDevice = getWiredSplitDevice(settings);
@@ -587,6 +631,7 @@ ${useDirectPins ? '' : `        diode-direction = "${settings.hardware.diodeDire
 ${generateZmkEncoderNodes(settings, zmkTarget, () => 'disabled')}
 ${wiredSplitNode}
 };
+${generateZmkSplitTrackballSharedNodes(settings, keys)}
 `;
   shieldsFolder.file(`${kbName}.dtsi`, sharedDtsi);
 
@@ -605,6 +650,7 @@ ${leftKscanEnabled ? (useDirectPins ? `    input-gpios
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'left')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget, 'left')}
+${generateZmkSplitTrackballCentralOverrides(settings, keys)}
 `;
   shieldsFolder.file(`${leftShield}.overlay`, leftOverlay);
 
@@ -626,7 +672,7 @@ ${rightKscanEnabled ? (useDirectPins ? `    input-gpios
         ;`) : '    status = "disabled";'}
 };
 ${generateZmkEncoderStatusOverrides(settings, keys, 'right')}
-${generateZmkTrackballNodes(settings, keys, zmkTarget, 'right')}
+${generateZmkTrackballNodes(settings, keys, zmkTarget, 'right', 'split-peripheral')}
 `;
   shieldsFolder.file(`${rightShield}.overlay`, rightOverlay);
 
@@ -638,7 +684,7 @@ ${generateZmkTrackballNodes(settings, keys, zmkTarget, 'right')}
 
 # Lighting features
 ${getZmkLightingConfigSnippet(settings)}
-${getEncoderConfigSnippet(settings)}${getTrackballConfigSnippet(settings)}
+${getEncoderConfigSnippet(settings)}
 ${splitTransport === 'wired' ? '\nCONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 `;
   shieldsFolder.file(`${kbName}.conf`, sharedConf);
@@ -673,6 +719,32 @@ config ZMK_SPLIT
     default y
 
 endif
+${leftHasTrackball || rightHasTrackball ? `
+if ${rightHasTrackball
+    ? `SHIELD_${leftShield.toUpperCase()} || SHIELD_${rightShield.toUpperCase()}`
+    : `SHIELD_${leftShield.toUpperCase()}`}
+
+config ZMK_POINTING
+    default y
+
+endif
+` : ''}${[
+      leftHasTrackball ? leftShield : undefined,
+      rightHasTrackball ? rightShield : undefined,
+    ].filter((shield): shield is string => !!shield).map(shield => `
+if SHIELD_${shield.toUpperCase()}
+
+config SPI
+    default y
+
+config INPUT
+    default y
+
+config INPUT_PMW3610
+    default y
+
+endif
+`).join('')}
 `;
   shieldsFolder.file('Kconfig.defconfig', kconfigDefconfig);
 
@@ -746,6 +818,7 @@ const generateSplitCustomBoardFiles = (
   const rightPins = getSidePins(settings, 'right');
   const useDirectPins = isDirectPinMatrix(settings);
   const leftDirectCols = useDirectPins ? getDirectSideDimensions(settings, switchKeys, 'left').cols : 0;
+  const hasPeripheralTrackball = getCompleteTrackballs(settings, keys, 'right').length > 0;
   const transformMapStr = formatTransformMap(settings, sortedKeys, switchKeys);
   const splitTransport = getZmkSplitTransport(settings);
   const wiredSplitDevice = getWiredSplitDevice(settings);
@@ -902,8 +975,9 @@ endif
     const hasSideTrackball = (settings.trackballs || []).some((trackball, index) => (
       hasCompleteTrackballPins(trackball) && getTrackballSide(settings, keys, index) === side
     ));
+    const enablePointing = hasSideTrackball || (side === 'left' && hasPeripheralTrackball);
     const boardDefconfig = `CONFIG_GPIO=y
-${isNordicTarget(zmkTarget) ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}${settings.features.rgb ? 'CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n' : ''}${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y\n' : ''}${hasSideEncoder ? 'CONFIG_EC11=y\nCONFIG_EC11_TRIGGER_GLOBAL_THREAD=y\n' : ''}${hasSideTrackball ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_ZMK_POINTING=y\nCONFIG_INPUT_PMW3610=y\n' : ''}${splitTransport === 'wired' ? 'CONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
+${isNordicTarget(zmkTarget) ? 'CONFIG_BT=y\nCONFIG_ZMK_BLE=y\n' : ''}${settings.features.rgb ? 'CONFIG_ZMK_RGB_UNDERGLOW=y\nCONFIG_WS2812_STRIP=y\n' : ''}${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y\n' : ''}${hasSideEncoder ? 'CONFIG_EC11=y\nCONFIG_EC11_TRIGGER_GLOBAL_THREAD=y\n' : ''}${enablePointing ? 'CONFIG_ZMK_POINTING=y\n' : ''}${hasSideTrackball ? 'CONFIG_SPI=y\nCONFIG_INPUT=y\nCONFIG_INPUT_PMW3610=y\n' : ''}${splitTransport === 'wired' ? 'CONFIG_ZMK_SPLIT_BLE=n\nCONFIG_ZMK_SPLIT_WIRED=y\n' : ''}
 CONFIG_FLASH=y
 CONFIG_SETTINGS=y
 CONFIG_SETTINGS_NVS=y
@@ -957,7 +1031,9 @@ ${kscanEnabled ? (useDirectPins ? `        input-gpios
 ${generateZmkEncoderNodes(settings, zmkTarget, index => getEncoderSide(settings, keys, index) === side ? 'okay' : 'disabled')}
 ${wiredSplitNode}
 };
-${generateZmkTrackballNodes(settings, keys, zmkTarget, side)}
+${generateZmkSplitTrackballSharedNodes(settings, keys)}
+${generateZmkTrackballNodes(settings, keys, zmkTarget, side, side === 'right' ? 'split-peripheral' : 'direct')}
+${side === 'left' ? generateZmkSplitTrackballCentralOverrides(settings, keys) : ''}
 ${colOffset}
 
 ${peripheralDts}

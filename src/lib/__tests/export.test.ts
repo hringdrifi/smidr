@@ -1980,7 +1980,9 @@ describe('export generation', () => {
     expect(overlay).not.toContain('pmw3610');
     expect(conf).not.toContain('CONFIG_EC11=y');
     expect(conf).not.toContain('CONFIG_PMW3610_ALT=y');
-    expect(await zip.file('config/west.yml')!.async('string')).toContain('revision: main');
+    const westManifest = await zip.file('config/west.yml')!.async('string');
+    expect(westManifest).toContain('revision: main');
+    expect(westManifest).not.toContain('revision: v0.3');
   });
 
   it('warns when encoder pins are missing during QMK and Vial export validation', () => {
@@ -2877,6 +2879,7 @@ describe('export generation', () => {
     const rightKconfigDefaults = await zip.file('boards/arm/bifrost_right/Kconfig.defconfig')!.async('string');
     const leftDefconfig = await zip.file('boards/arm/bifrost_left/bifrost_left_defconfig')!.async('string');
     const rightDefconfig = await zip.file('boards/arm/bifrost_right/bifrost_right_defconfig')!.async('string');
+    const leftDts = await zip.file('boards/arm/bifrost_left/bifrost_left.dts')!.async('string');
     const rightDts = await zip.file('boards/arm/bifrost_right/bifrost_right.dts')!.async('string');
 
     expect(zip.file('boards/arm/bifrost_left/Kconfig.board')).toBeNull();
@@ -2889,17 +2892,83 @@ describe('export generation', () => {
     expect(rightKconfigDefaults).not.toContain('config ZMK_USB');
     expect(leftDefconfig).not.toContain('CONFIG_ZMK=y');
     expect(leftDefconfig).not.toContain('CONFIG_USB=y');
+    expect(leftDefconfig).toContain('CONFIG_ZMK_POINTING=y');
     expect(leftDefconfig).not.toContain('CONFIG_INPUT_PMW3610=y');
+    expect(rightDefconfig).toContain('CONFIG_ZMK_POINTING=y');
     expect(rightDefconfig).toContain('CONFIG_INPUT_PMW3610=y');
+    expect(leftDts).toContain('compatible = "zmk,input-split"');
+    expect(leftDts).toContain('device = <&trackball_split_0>');
+    expect(leftDts).toContain('&trackball_listener_0 {\n    status = "okay";');
+    expect(leftDts).not.toContain('trackball_0: pmw3610@0');
     expect(rightDts).toContain('#include <common/nordic/nrf52840_uf2_boot_mode.dtsi>');
     expect(rightDts).toContain('trackball_0: pmw3610@0');
+    expect(rightDts).toContain('compatible = "zmk,input-split"');
+    expect(rightDts).toContain('&trackball_split_0 {\n    device = <&trackball_0>;');
+    expect(rightDts).not.toContain('&trackball_listener_0 {\n    status = "okay";');
     expect(rightDts).toContain('&gpiote');
     expect(rightDts).toContain('zephyr_udc0: &usbd');
     expect(await zip.file('config/bifrost_left.keymap')!.async('string')).toBe('#include "bifrost.keymap"\n');
     expect(await zip.file('config/bifrost_right.keymap')!.async('string')).toBe('#include "bifrost.keymap"\n');
     expect(await zip.file('.github/workflows/build.yml')!.async('string')).toContain('build-user-config.yml@main');
-    expect(await zip.file('config/west.yml')!.async('string')).toContain('revision: main');
+    const westManifest = await zip.file('config/west.yml')!.async('string');
+    expect(westManifest).toContain('revision: main');
+    expect(westManifest).not.toContain('revision: v0.3');
     expect(await zip.file('zephyr/module.yml')!.async('string')).toContain('name: zmk-keyboard-bifrost');
+  });
+
+  it('proxies a split shield peripheral trackball to the central listener', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Split Shield Trackball',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'],
+        cols: ['P0.08'],
+        splitRows: ['P1.06'],
+        splitCols: ['P1.08'],
+      },
+      features: {
+        ...baseSettings.features,
+        split: true,
+      },
+      trackballs: [{
+        id: 'trackball-right',
+        sclk: 'P0.05',
+        sdio: 'P0.06',
+        cs: 'P0.07',
+        motion: 'P0.08',
+      }],
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, matrixSide: 'left', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: '' },
+      { row: 0, col: 0, matrixSide: 'right', x: 4, y: 0, w: 1, h: 1, r: 0, rx: 4, ry: 0, label: '' },
+      { kind: 'trackball', trackballId: 'trackball-right', matrixSide: 'right', x: 5, y: 0, w: 1, h: 1, r: 0, rx: 5, ry: 0, label: '' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const sharedDtsi = await zip.file('boards/shields/split_shield_trackball/split_shield_trackball.dtsi')!.async('string');
+    const leftOverlay = await zip.file('boards/shields/split_shield_trackball/split_shield_trackball_left.overlay')!.async('string');
+    const rightOverlay = await zip.file('boards/shields/split_shield_trackball/split_shield_trackball_right.overlay')!.async('string');
+    const kconfig = await zip.file('boards/shields/split_shield_trackball/Kconfig.defconfig')!.async('string');
+    const conf = await zip.file('boards/shields/split_shield_trackball/split_shield_trackball.conf')!.async('string');
+
+    expect(sharedDtsi).toContain('compatible = "zmk,input-split"');
+    expect(sharedDtsi).toContain('status = "disabled";');
+    expect(sharedDtsi).toContain('device = <&trackball_split_0>');
+    expect(leftOverlay).toContain('&trackball_listener_0 {\n    status = "okay";');
+    expect(leftOverlay).not.toContain('trackball_0: pmw3610@0');
+    expect(rightOverlay).toContain('trackball_0: pmw3610@0');
+    expect(rightOverlay).toContain('&trackball_split_0 {\n    device = <&trackball_0>;');
+    expect(kconfig).toContain('if SHIELD_SPLIT_SHIELD_TRACKBALL_LEFT || SHIELD_SPLIT_SHIELD_TRACKBALL_RIGHT\n\nconfig ZMK_POINTING');
+    expect(kconfig).toContain('if SHIELD_SPLIT_SHIELD_TRACKBALL_RIGHT\n\nconfig SPI');
+    expect(conf).not.toContain('CONFIG_INPUT_PMW3610=y');
   });
 
   it('emits ZMK as an existing board plus shield when development board is selected', async () => {

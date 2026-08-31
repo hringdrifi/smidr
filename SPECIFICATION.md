@@ -152,7 +152,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 ### 7.7 PMW3610 トラックボール
 - **内部表現**: トラックボールは `ProjectSettings.trackballs[]` で保持し、実行中は runtime-only の `id` と `PhysicalKey.trackballId` で物理配置を参照する。保存時は `trackballIndex` に変換し、読み込み時に新しい `trackballId` を復元する。
 - **設定**: 各 PMW3610 は `SCLK`、単線 SPI の `SDIO`、`CS`、`MOTION` (IRQ)、CPI、軸交換、X/Y 反転を持つ。4ピンはピンプールおよびハードウェアの使用済みピンとして扱う。
-- **ZMK 出力**: PMW3610 は Zephyr 標準ドライバを使用し、外部PMW3610モジュールは追加しない。自己完結ビルド用の `config/west.yml` はZMK本体だけを参照する。`pixart,pmw3610` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_INPUT_PMW3610` を生成する。node には unit addressと一致する `pmw3610@<reg>` 名、`spi-max-frequency`、`motion-gpios`、`zephyr,axis-x`、`zephyr,axis-y`、`res-cpi` を設定し、`zmk,input-listener` で ZMK のポインティング入力へ接続する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。分割ではトラックボールが配置された側の overlay / board DTS のみにnodeを出力し、custom boardでは対応する側の `_defconfig` のみにドライバ設定を出力する。SCLK/SDIO/CS/MOTION のいずれかが未設定なら、これらの出力を生成しない。
+- **ZMK 出力**: PMW3610 は Zephyr 標準ドライバを使用し、外部PMW3610モジュールは追加しない。自己完結ビルド用の `config/west.yml` はZMK本体だけを参照する。`pixart,pmw3610` node と `CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_ZMK_POINTING`、`CONFIG_INPUT_PMW3610` を生成する。node には unit addressと一致する `pmw3610@<reg>` 名、`spi-max-frequency`、`motion-gpios`、`zephyr,axis-x`、`zephyr,axis-y`、`res-cpi` を設定する。初期対応は Nordic nRF52 の pinctrl 出力に限定する。非分割またはcentral側のトラックボールは `zmk,input-listener` へ直接接続する。split peripheral側のトラックボールは、左右共通の `zmk,input-split` nodeを経由してcentralへ転送し、central側でのみsplit deviceを参照する `zmk,input-listener` を有効化する。この場合は `CONFIG_ZMK_POINTING` を左右両方で有効化し、`CONFIG_SPI`、`CONFIG_INPUT`、`CONFIG_INPUT_PMW3610` は実デバイスが配置されたperipheral側だけで有効化する。分割では物理PMW3610 nodeを配置側の overlay / board DTS のみに出力する。SCLK/SDIO/CS/MOTION のいずれかが未設定なら、これらの出力を生成しない。
 - **QMK/Vial 出力**: 初期実装では対象外とし、ZMK 専用の周辺機器として扱う。
 
 ### 7.7 RGB Matrix
