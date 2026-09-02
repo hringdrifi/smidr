@@ -150,9 +150,55 @@ const getZmkLightingConfigSnippet = (settings: ProjectSettings) => `${settings.f
 CONFIG_WS2812_STRIP=y` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
 ${settings.features.backlight ? 'CONFIG_ZMK_BACKLIGHT=y' : '# CONFIG_ZMK_BACKLIGHT is not set'}`;
 
-const generateZmkBuildYaml = (entries: Array<{ board: string; shield?: string }>) => `include:
-${entries.map(entry => `  - board: ${entry.board}${entry.shield ? `\n    shield: ${entry.shield}` : ''}`).join('\n')}
+export interface ZmkExportOptions {
+  studio?: boolean;
+}
+
+const generateZmkBuildYaml = (entries: Array<{ board: string; shield?: string; studio?: boolean }>) => `include:
+${entries.map(entry => `  - board: ${entry.board}${entry.shield ? `\n    shield: ${entry.shield}` : ''}${entry.studio ? '\n    snippet: studio-rpc-usb-uart\n    cmake-args: -DCONFIG_ZMK_STUDIO=y' : ''}`).join('\n')}
 `;
+
+const formatDevicetreeCell = (value: number) => value < 0 ? `(${value})` : `${value}`;
+
+const generateZmkPhysicalLayoutDtsi = (sortedKeys: PhysicalKey[]) => {
+  const minX = sortedKeys.length > 0 ? Math.min(...sortedKeys.flatMap(key => [key.x, key.rx])) : 0;
+  const minY = sortedKeys.length > 0 ? Math.min(...sortedKeys.flatMap(key => [key.y, key.ry])) : 0;
+  const keyAttributes = sortedKeys.map(key => [
+    Math.max(1, Math.round(key.w * 100)),
+    Math.max(1, Math.round(key.h * 100)),
+    Math.round((key.x - minX) * 100),
+    Math.round((key.y - minY) * 100),
+    Math.round(key.r * 100),
+    Math.round((key.rx - minX) * 100),
+    Math.round((key.ry - minY) * 100),
+  ].map(formatDevicetreeCell).join(' '));
+
+  return `#include <physical_layouts.dtsi>
+
+/ {
+    default_layout: default_layout {
+        compatible = "zmk,physical-layout";
+        display-name = "Default Layout";
+        transform = <&default_transform>;
+        kscan = <&kscan0>;
+        keys
+            = ${keyAttributes.map((attrs, index) => `${index === 0 ? '' : ', '}<&key_physical_attrs ${attrs}>`).join('\n            ')}
+            ;
+    };
+};
+`;
+};
+
+const getZmkLayoutChosen = (studio: boolean) => studio
+  ? '        zmk,physical-layout = &default_layout;'
+  : '        zmk,matrix-transform = &default_transform;';
+
+const getZmkStudioReadme = (studio: boolean) => studio ? `
+## ZMK Studio
+The central firmware is built with \`CONFIG_ZMK_STUDIO=y\` and the \`studio-rpc-usb-uart\` snippet. The generated physical layout contains each switch's size, position, rotation, and rotation origin.
+
+Assign \`&studio_unlock\` to an accessible key or key combination before flashing. Connect through the same USB or BLE output selected on the keyboard, then unlock it before editing in ZMK Studio.
+` : '';
 
 const addZmkRepositorySupportFiles = (zip: JSZip, kbName: string) => {
   zip.folder('.github')?.folder('workflows')?.file('build.yml', `name: Build ZMK firmware
@@ -569,7 +615,9 @@ const generateSplitShieldFiles = (
   kbName: string,
   zmkTarget: ZmkTarget,
   boardName: string,
+  options: ZmkExportOptions,
 ) => {
+  const studio = options.studio === true;
   const shieldsFolder = zip.folder('boards')?.folder('shields')?.folder(kbName);
   if (!shieldsFolder) return null;
 
@@ -606,12 +654,12 @@ const generateSplitShieldFiles = (
     };
 ` : '';
 
-  const sharedDtsi = `#include <dt-bindings/zmk/matrix_transform.h>
+  const sharedDtsi = `${studio ? `#include "${kbName}-layouts.dtsi"\n` : ''}#include <dt-bindings/zmk/matrix_transform.h>
 
 / {
     chosen {
         zmk,kscan = &kscan0;
-        zmk,matrix-transform = &default_transform;
+${getZmkLayoutChosen(studio)}
     };
 
     default_transform: keymap_transform_0 {
@@ -634,6 +682,9 @@ ${wiredSplitNode}
 ${generateZmkSplitTrackballSharedNodes(settings, keys)}
 `;
   shieldsFolder.file(`${kbName}.dtsi`, sharedDtsi);
+  if (studio) {
+    shieldsFolder.file(`${kbName}-layouts.dtsi`, generateZmkPhysicalLayoutDtsi(sortedKeys));
+  }
 
   const leftOverlay = `#include "${kbName}.dtsi"
 
@@ -753,7 +804,7 @@ requires:
   - ${requiredInterconnect}
 features:
   - keys
-siblings:
+${studio ? '  - studio\n' : ''}siblings:
   - ${leftShield}
   - ${rightShield}
 `;
@@ -762,7 +813,7 @@ siblings:
   const keymap = generateKeymapDts(settings, sortedKeys, kbName);
   shieldsFolder.file(keymap.filename, keymap.content);
   zip.file('build.yaml', generateZmkBuildYaml([
-    { board: boardName, shield: leftShield },
+    { board: boardName, shield: leftShield, studio },
     { board: boardName, shield: rightShield },
   ]));
   addZmkRepositorySupportFiles(zip, kbName);
@@ -791,6 +842,7 @@ To build ZMK firmware using this configuration:
 ## Split Matrix
 The shared \`${kbName}.dtsi\` file defines the full matrix transform. The right half overlay applies \`col-offset = <${useDirectPins ? leftDirectCols : leftPins.cols.length}>\` so local right-side matrix events map into the right side of the shared transform.
 ${splitTransport === 'wired' ? `\n## Wired Split\nThe shared \`${kbName}.dtsi\` file enables ZMK wired split using \`${wiredSplitDevice}\`. Verify this UART device exists for the selected board before building.\n` : ''}
+${getZmkStudioReadme(studio)}
 `;
   zip.file('README.md', readmeContent);
 
@@ -805,7 +857,9 @@ const generateSplitCustomBoardFiles = (
   kbName: string,
   vendorName: string,
   zmkTarget: ZmkTarget,
+  options: ZmkExportOptions,
 ) => {
+  const studio = options.studio === true;
   const arch = 'arm';
   const leftBoard = `${kbName}_left`;
   const rightBoard = `${kbName}_right`;
@@ -828,13 +882,13 @@ const generateSplitCustomBoardFiles = (
         zephyr,flash = &flash0;
         zephyr,code-partition = &code_partition;
         zmk,kscan = &kscan0;
-        zmk,matrix-transform = &default_transform;`
+${getZmkLayoutChosen(studio)}`
     : `        zephyr,sram = &sram0;
         zephyr,flash = &flash0;
         zephyr,flash-controller = &ssi;
         zephyr,code-partition = &code_partition;
         zmk,kscan = &kscan0;
-        zmk,matrix-transform = &default_transform;`;
+${getZmkLayoutChosen(studio)}`;
   const peripheralDts = isNordicTarget(zmkTarget) ? `
 &gpio0 {
     status = "okay";
@@ -991,7 +1045,7 @@ CONFIG_RETENTION_BOOT_MODE=y
 
     const boardDts = `/dts-v1/;
 ${dtsInclude}
-#include <dt-bindings/zmk/matrix_transform.h>
+${studio ? `#include "${kbName}-layouts.dtsi"\n` : ''}#include <dt-bindings/zmk/matrix_transform.h>
 
 / {
     model = "${settings.name} ${side}";
@@ -1036,6 +1090,9 @@ ${colOffset}
 ${peripheralDts}
 `;
     boardFolder.file(`${boardName}.dts`, boardDts);
+    if (studio) {
+      boardFolder.file(`${kbName}-layouts.dtsi`, generateZmkPhysicalLayoutDtsi(sortedKeys));
+    }
     boardFolder.file('board.yml', generateZmkBoardYaml(boardName, vendorName, zmkTarget));
 
     const zmkYml = `file_format: "1"
@@ -1044,7 +1101,7 @@ name: "${settings.name} ${side}"
 type: board
 features:
   - keys
-`;
+${studio && side === 'left' ? '  - studio\n' : ''}`;
     boardFolder.file(`${boardName}.zmk.yml`, zmkYml);
   };
 
@@ -1059,7 +1116,7 @@ features:
     configFolder.file(`${rightBoard}.keymap`, `#include "${keymap.filename}"\n`);
   }
   zip.file('build.yaml', generateZmkBuildYaml([
-    { board: leftBoard },
+    { board: leftBoard, studio },
     { board: rightBoard },
   ]));
   addZmkRepositorySupportFiles(zip, kbName);
@@ -1088,6 +1145,7 @@ To build ZMK firmware using this configuration:
 ## Split Matrix
 Both custom board DTS files define the full matrix transform. The right board applies \`col-offset = <${useDirectPins ? leftDirectCols : leftPins.cols.length}>\` so local right-side matrix events map into the right side of the shared transform.
 ${splitTransport === 'wired' ? `\n## Wired Split\nBoth board DTS files enable ZMK wired split using \`${wiredSplitDevice}\`. Verify this UART device exists on both generated boards before building.\n` : ''}
+${getZmkStudioReadme(studio)}
 `;
   zip.file('README.md', readmeContent);
 
@@ -1097,8 +1155,12 @@ ${splitTransport === 'wired' ? `\n## Wired Split\nBoth board DTS files enable ZM
 /**
  * Generates a full standard ZMK config source code ZIP as a custom Board definition (architecture-based).
  */
-export const generateZmkZip = async (state: { settings: ProjectSettings, keys: PhysicalKey[] }) => {
+export const generateZmkZip = async (
+  state: { settings: ProjectSettings, keys: PhysicalKey[] },
+  options: ZmkExportOptions = {},
+) => {
   const { settings, keys } = state;
+  const studio = options.studio === true;
 
   // Exclude peripherals and incomplete switch inputs before assigning matrix positions.
   const validKeys = getValidMatrixKeys(settings, keys);
@@ -1125,13 +1187,13 @@ export const generateZmkZip = async (state: { settings: ProjectSettings, keys: P
       if (getZmkSplitTransport(settings) === 'ble' && !isNordicTarget(zmkTarget)) {
         throw new Error('ZMK BLE split export currently requires an nRF52 MCU.');
       }
-      generateSplitCustomBoardFiles(zip, settings, keys, sortedKeys, kbName, vendorName, zmkTarget);
+      generateSplitCustomBoardFiles(zip, settings, keys, sortedKeys, kbName, vendorName, zmkTarget, options);
       return await zip.generateAsync({ type: 'blob' });
     }
     if (getZmkSplitTransport(settings) === 'ble' && zmkTarget !== 'nrf52840') {
       throw new Error('ZMK split export currently requires an nRF52840 BLE-capable development board.');
     }
-    generateSplitShieldFiles(zip, settings, keys, sortedKeys, kbName, zmkTarget, boardName);
+    generateSplitShieldFiles(zip, settings, keys, sortedKeys, kbName, zmkTarget, boardName, options);
     return await zip.generateAsync({ type: 'blob' });
   }
   
@@ -1221,13 +1283,13 @@ CONFIG_RETENTION_BOOT_MODE=y
         zephyr,flash = &flash0;
         zephyr,code-partition = &code_partition;
         zmk,kscan = &kscan0;
-        zmk,matrix-transform = &default_transform;`
+${getZmkLayoutChosen(studio)}`
       : `        zephyr,sram = &sram0;
         zephyr,flash = &flash0;
         zephyr,flash-controller = &ssi;
         zephyr,code-partition = &code_partition;
         zmk,kscan = &kscan0;
-        zmk,matrix-transform = &default_transform;`;
+${getZmkLayoutChosen(studio)}`;
 
     const peripheralDts = isNordicTarget(zmkTarget) ? `
 &gpio0 {
@@ -1297,7 +1359,7 @@ zephyr_udc0: &usbd {
 
     const keyboardDts = `/dts-v1/;
 ${dtsInclude}
-#include <dt-bindings/zmk/matrix_transform.h>
+${studio ? `#include "${kbName}-layouts.dtsi"\n` : ''}#include <dt-bindings/zmk/matrix_transform.h>
 
 / {
     model = "${settings.name}";
@@ -1339,6 +1401,9 @@ ${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 ${peripheralDts}
 `;
     boardFolder.file(`${kbName}.dts`, keyboardDts);
+    if (studio) {
+      boardFolder.file(`${kbName}-layouts.dtsi`, generateZmkPhysicalLayoutDtsi(sortedKeys));
+    }
     boardFolder.file('board.yml', generateZmkBoardYaml(kbName, vendorName, zmkTarget));
 
     const zmkYml = `file_format: "1"
@@ -1347,13 +1412,13 @@ name: "${settings.name}"
 type: board
 features:
   - keys
-`;
+${studio ? '  - studio\n' : ''}`;
     boardFolder.file(`${kbName}.zmk.yml`, zmkYml);
   } else {
     const shieldsFolder = zip.folder('boards')?.folder('shields')?.folder(kbName);
     if (!shieldsFolder) return null;
 
-    const shieldOverlay = `#include <dt-bindings/zmk/matrix_transform.h>
+    const shieldOverlay = `${studio ? `#include "${kbName}-layouts.dtsi"\n` : ''}#include <dt-bindings/zmk/matrix_transform.h>
 
 / {
     model = "${settings.name}";
@@ -1361,7 +1426,7 @@ features:
 
     chosen {
         zmk,kscan = &kscan0;
-        zmk,matrix-transform = &default_transform;
+${getZmkLayoutChosen(studio)}
     };
 
     default_transform: keymap_transform_0 {
@@ -1394,6 +1459,9 @@ ${generateZmkEncoderNodes(settings, zmkTarget, () => 'okay')}
 ${generateZmkTrackballNodes(settings, keys, zmkTarget)}
 `;
     shieldsFolder.file(`${kbName}.overlay`, shieldOverlay);
+    if (studio) {
+      shieldsFolder.file(`${kbName}-layouts.dtsi`, generateZmkPhysicalLayoutDtsi(sortedKeys));
+    }
 
     const shieldConf = `# Copyright (c) 2026 ${settings.manufacturer || 'Smidr User'}
 # SPDX-License-Identifier: MIT
@@ -1435,13 +1503,13 @@ requires:
   - ${requiredInterconnect}
 features:
   - keys
-`;
+${studio ? '  - studio\n' : ''}`;
     shieldsFolder.file(`${kbName}.zmk.yml`, zmkYml);
   }
   zip.file('build.yaml', generateZmkBuildYaml(
     settings.hardware.controllerType === 'mcu'
-      ? [{ board: kbName }]
-      : [{ board: boardName, shield: kbName }]
+      ? [{ board: kbName, studio }]
+      : [{ board: boardName, shield: kbName, studio }]
   ));
 
   const layersCount = settings.layers || 4;
@@ -1530,6 +1598,7 @@ The \`${gpioFile}\` file has been populated with a standard \`gpio-matrix\` ${gp
 For RP2040 boards, Smidr converts pin names like \`GP2\` or \`GPIO2\` to \`&gpio0 2\`.
 For nRF52840 boards, Smidr converts pin names like \`P0.06\` and \`P1.02\` to \`&gpio0 6\` and \`&gpio1 2\`.
 Please verify the generated GPIO numbers before flashing.
+${getZmkStudioReadme(studio)}
 `;
   zip.file('README.md', readmeContent);
   addZmkRepositorySupportFiles(zip, kbName);

@@ -1985,6 +1985,53 @@ describe('export generation', () => {
     expect(westManifest).not.toContain('revision: v0.3');
   });
 
+  it('optionally exports a normalized physical layout and ZMK Studio build settings', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Studio Board',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 1, cols: 2 },
+      pins: { rows: ['P0.06'], cols: ['P0.07', 'P0.08'], splitRows: [], splitCols: [] },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, x: -1, y: 2, w: 1.5, h: 2, r: -15, rx: -1, ry: 2, label: 'A' },
+      { row: 0, col: 1, x: 1, y: 2, w: 1, h: 1, r: 0, rx: 1, ry: 2, label: 'B' },
+    ];
+
+    const studioBlob = await generateZmkZip({ settings, keys }, { studio: true });
+    const studioZip = await JSZip.loadAsync(await studioBlob!.arrayBuffer());
+    const overlay = await studioZip.file('boards/shields/studio_board/studio_board.overlay')!.async('string');
+    const layout = await studioZip.file('boards/shields/studio_board/studio_board-layouts.dtsi')!.async('string');
+    const metadata = await studioZip.file('boards/shields/studio_board/studio_board.zmk.yml')!.async('string');
+    const buildYaml = await studioZip.file('build.yaml')!.async('string');
+    const readme = await studioZip.file('README.md')!.async('string');
+
+    expect(overlay).toContain('#include "studio_board-layouts.dtsi"');
+    expect(overlay).toContain('zmk,physical-layout = &default_layout;');
+    expect(overlay).not.toContain('zmk,matrix-transform = &default_transform;');
+    expect(layout).toContain('#include <physical_layouts.dtsi>');
+    expect(layout).toContain('compatible = "zmk,physical-layout";');
+    expect(layout).toContain('<&key_physical_attrs 150 200 0 0 (-1500) 0 0>');
+    expect(layout).toContain('<&key_physical_attrs 100 100 200 0 0 200 0>');
+    expect(metadata).toContain('  - studio');
+    expect(buildYaml).toContain('snippet: studio-rpc-usb-uart');
+    expect(buildYaml).toContain('cmake-args: -DCONFIG_ZMK_STUDIO=y');
+    expect(readme).toContain('&studio_unlock');
+
+    const standardBlob = await generateZmkZip({ settings, keys });
+    const standardZip = await JSZip.loadAsync(await standardBlob!.arrayBuffer());
+    const standardOverlay = await standardZip.file('boards/shields/studio_board/studio_board.overlay')!.async('string');
+    const standardBuildYaml = await standardZip.file('build.yaml')!.async('string');
+    expect(standardZip.file('boards/shields/studio_board/studio_board-layouts.dtsi')).toBeNull();
+    expect(standardOverlay).toContain('zmk,matrix-transform = &default_transform;');
+    expect(standardBuildYaml).not.toContain('CONFIG_ZMK_STUDIO');
+  });
+
   it('warns when encoder pins are missing during QMK and Vial export validation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
@@ -2709,6 +2756,16 @@ describe('export generation', () => {
     expect(boardDts).toContain('zephyr_udc0: &usbd');
     expect(boardDts).toContain('&gpio0 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)');
     expect(boardDts).toContain('&gpio1 2 GPIO_ACTIVE_HIGH');
+
+    const studioBlob = await generateZmkZip({ settings, keys }, { studio: true });
+    const studioZip = await JSZip.loadAsync(await studioBlob!.arrayBuffer());
+    const studioBoardDts = await studioZip.file('boards/arm/nordic_board/nordic_board.dts')!.async('string');
+    const studioLayout = await studioZip.file('boards/arm/nordic_board/nordic_board-layouts.dtsi')!.async('string');
+    const studioBuildYaml = await studioZip.file('build.yaml')!.async('string');
+    expect(studioBoardDts).toContain('#include "nordic_board-layouts.dtsi"');
+    expect(studioBoardDts).toContain('zmk,physical-layout = &default_layout;');
+    expect(studioLayout).toContain('<&key_physical_attrs 100 100 0 0 0 0 0>');
+    expect(studioBuildYaml).toContain('snippet: studio-rpc-usb-uart');
   });
 
   it('emits a BLE-only nRF52832 ZMK custom board for HY0020', async () => {
@@ -3296,6 +3353,41 @@ describe('export generation', () => {
     expect(buildYaml).toContain('- board: nice_nano');
     expect(buildYaml).toContain('shield: split_zmk_board_left');
     expect(buildYaml).toContain('shield: split_zmk_board_right');
+  });
+
+  it('enables ZMK Studio only for the central half of a split export', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Studio Split',
+      hardware: {
+        ...baseSettings.hardware,
+        controllerType: 'development_board',
+        mcu: 'nRF52840',
+        board: 'nice_nano',
+      },
+      matrix: { rows: 1, cols: 1 },
+      pins: {
+        rows: ['P0.06'], cols: ['P0.07'],
+        splitRows: ['P1.06'], splitCols: ['P1.07'],
+      },
+      features: { ...baseSettings.features, split: true },
+    };
+    const keys: PhysicalKey[] = [
+      { row: 0, col: 0, matrixSide: 'left', x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'L' },
+      { row: 0, col: 0, matrixSide: 'right', x: 4, y: 0, w: 1, h: 1, r: 0, rx: 4, ry: 0, label: 'R' },
+    ];
+
+    const blob = await generateZmkZip({ settings, keys }, { studio: true });
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const dtsi = await zip.file('boards/shields/studio_split/studio_split.dtsi')!.async('string');
+    const layout = await zip.file('boards/shields/studio_split/studio_split-layouts.dtsi')!.async('string');
+    const buildYaml = await zip.file('build.yaml')!.async('string');
+
+    expect(dtsi).toContain('zmk,physical-layout = &default_layout;');
+    expect(layout.match(/key_physical_attrs/g)).toHaveLength(2);
+    expect(buildYaml).toContain('shield: studio_split_left\n    snippet: studio-rpc-usb-uart');
+    expect(buildYaml).toContain('shield: studio_split_right');
+    expect(buildYaml.match(/CONFIG_ZMK_STUDIO/g)).toHaveLength(1);
   });
 
   it('uses the selected ZMK development board target during split source export', async () => {

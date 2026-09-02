@@ -325,6 +325,7 @@ export default function App() {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
   const [isKiCadDialogOpen, setIsKiCadDialogOpen] = React.useState(false);
+  const [isZmkExportDialogOpen, setIsZmkExportDialogOpen] = React.useState(false);
   const [kicadExportOptions, setKiCadExportOptions] = React.useState<KiCadExportOptions>(DEFAULT_KICAD_EXPORT_OPTIONS);
   const [isLangMenuOpen, setIsLangMenuOpen] = React.useState(false);
   const [isEditorModeMenuOpen, setIsEditorModeMenuOpen] = React.useState(false);
@@ -523,13 +524,20 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
-  const handleExportZmkZip = async () => {
+  const handleOpenZmkExportDialog = () => {
+    if (!isZmkSourceExportSupported(settings.hardware)) return;
+    setIsExportMenuOpen(false);
+    setIsZmkExportDialogOpen(true);
+  };
+
+  const handleExportZmkZip = async (studio: boolean) => {
     if (!isZmkSourceExportSupported(settings.hardware)) return;
     if (!confirmFirmwareExportValidation('zmk')) return;
-    const zipBlob = await generateZmkZip({ settings, keys });
+    const zipBlob = await generateZmkZip({ settings, keys }, { studio });
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_zmk.zip`, zipBlob);
     }
+    setIsZmkExportDialogOpen(false);
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
   };
@@ -1217,7 +1225,7 @@ export default function App() {
                       {(() => {
                         return (
                           <button
-                            onClick={handleExportZmkZip}
+                            onClick={handleOpenZmkExportDialog}
                             disabled={zmkSourceUnsupported}
                             className={cn(
                               "w-full flex items-center justify-between px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
@@ -1518,6 +1526,53 @@ export default function App() {
               >
                 {t('kicad.export')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isZmkExportDialogOpen && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsZmkExportDialogOpen(false)} />
+          <div className="relative w-full max-w-xl overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <Cpu size={18} className="text-amber-500" />
+                <div>
+                  <h2 className="text-sm font-bold text-[var(--text-highlight)]">{t('zmkExport.title')}</h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('zmkExport.desc')}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsZmkExportDialogOpen(false)}
+                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid gap-3 p-4 sm:grid-cols-2">
+              <button
+                onClick={() => handleExportZmkZip(false)}
+                className="group rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] p-4 text-left transition-all hover:border-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+              >
+                <Download size={20} className="mb-3 text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]" />
+                <div className="text-xs font-bold text-[var(--text-highlight)]">{t('zmkExport.standard')}</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{t('zmkExport.standardDesc')}</p>
+              </button>
+
+              <button
+                onClick={() => handleExportZmkZip(true)}
+                className="group rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-left transition-all hover:border-amber-400 hover:bg-amber-500/10"
+              >
+                <Sparkles size={20} className="mb-3 text-amber-500" />
+                <div className="text-xs font-bold text-[var(--text-highlight)]">{t('zmkExport.studio')}</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{t('zmkExport.studioDesc')}</p>
+              </button>
+            </div>
+
+            <div className="border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 px-4 py-3 text-[10px] leading-relaxed text-[var(--text-muted)]">
+              {t('zmkExport.unlockNote')}
             </div>
           </div>
         </div>
