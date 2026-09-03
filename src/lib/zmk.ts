@@ -6,7 +6,7 @@ import { actionToZmkSourceStringWithMacros, generateZmkMacroBehaviors } from './
 import { generateZmkComboBehaviors } from './combo-codegen';
 import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkDevelopmentBoardInterconnect, getZmkHardwareTarget, ZmkTarget } from './mcu-presets';
-import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getLocalMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, inferMatrixSideFromGeometry, isDirectPinMatrix, MatrixSide } from './matrix-utils';
+import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getLocalMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, inferMatrixSideFromGeometry, isDirectPinMatrix, MatrixSide, resolveDirectPin } from './matrix-utils';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
@@ -94,7 +94,7 @@ const isZmkPeripheralKey = (key: PhysicalKey) => {
 const getZmkSwitchKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
   keys.filter(key => {
     if (isZmkPeripheralKey(key)) return false;
-    return !isDirectPinMatrix(settings) || hasConfiguredPin(key.directPin);
+    return !isDirectPinMatrix(settings) || hasConfiguredPin(resolveDirectPin(settings, key, keys));
   })
 );
 
@@ -113,7 +113,7 @@ const formatDirectInputGpios = (settings: ProjectSettings, keys: PhysicalKey[], 
   sourceKeys.forEach(key => {
     const pos = getDirectLocalMatrixPosition(settings, key, keys);
     if (!pos) return;
-    pins[pos.col] = key.directPin;
+    pins[pos.col] = resolveDirectPin(settings, key, keys);
   });
 
   return pins.map((pin, index) => {
@@ -136,7 +136,7 @@ const hasCompleteDirectInputPins = (settings: ProjectSettings, keys: PhysicalKey
 
   sourceKeys.forEach(key => {
     const pos = getDirectLocalMatrixPosition(settings, key, keys);
-    if (pos) pins.set(pos.col, key.directPin);
+    if (pos) pins.set(pos.col, resolveDirectPin(settings, key, keys));
   });
 
   return matrix.cols > 0 && Array.from({ length: matrix.cols }, (_, index) => pins.get(index)).every(hasConfiguredPin);
@@ -285,8 +285,8 @@ const getZmkMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[] =
 
 const getZmkMatrixPosition = (
   settings: ProjectSettings,
-  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>,
-  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>> = []
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin'>> = []
 ) => {
   if (isDirectPinMatrix(settings)) {
     const local = getDirectLocalMatrixPosition(settings, key, keys);

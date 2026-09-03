@@ -42,8 +42,12 @@
 - **テーマ:** Zinc (900/950) を基調としたダークモード。
 - **アクセント:** Amber (500) を選択状態や Pivot の強調に使用。
 - **操作性:** 複数選択は `Ctrl/Cmd + Click`。削除は `Delete/Backspace`。Undo は `Ctrl + Z`。ドラッグ・回転時のスナップ無効化は `Alt` キー。
-- **モード選択の保持:** 最後に選択したアプリモード（リマップ / 設計）および設計内モード（レイアウト / マトリクス / ハードウェア / キーマップ）は `localStorage` に保存し、次回起動時に復元する。
+- **モード選択の保持:** ハードウェア／ファームウェア内の最後の工程は `localStorage` に保存できるが、通常起動時はプロジェクトホームを入口とする。
 - **Visual Layout（論理配列）:** キーマップ表示およびキーコードパレットのキートップレジェンドはユーザー設定の `visualLayout` に従って切り替える。値は `qwerty-us` 形式（例: `qwerty-us`, `qwerty-jp`, `qwerty-kr`, `qwerty-es`, `qwertz-de`, `azerty-fr`）で管理し、キーコード自体やエクスポート値は変更しない。この設定はテーマや言語と同様に `localStorage` へ保存し、`.smidr` プロジェクトファイルには保存しない。
+- **0.5 ワークスペース:** 起動時はプロジェクトホームを表示し、トップレベルの作業を「ハードウェア」「ファームウェア」「リマップ」に分ける。プロジェクト編集では名称付き左工程ナビ、中央キャンバス、右編集パネルを使用する。プロジェクト全体に関わるピン設定は工程ナビからモーダルで開き、キー単位のマトリクス割り当ては右編集パネルで行う。
+- **レスポンシブ:** 1280px以上では左右パネルを常設する。768〜1279pxでは工程ナビと編集パネルをオーバーレイドロワーとして開閉可能にする。768px未満はプロジェクトホームと閲覧を優先する。
+- **操作サイズ:** 主要な操作対象は40px以上、本文は14px、補助ラベルは12pxを基準とする。キーボードフォーカスにはアクセント色の可視リングを表示する。
+- **保存と復元用ドラフト:** 編集内容は保存ボタンを押すまで正式なプロジェクトへ反映しない。確定済み変更は800msのデバウンス後、正式データとは別の復元用ドラフトとしてローカルに保持し、`previewKeys` と一時的UI状態は含めない。保存済みプロジェクトを次回開く際、対応するドラフトがあれば未保存変更を復元するか保存版を開くか確認する。正式保存時または保存版を選択した時点でドラフトを削除し、ヘッダーには保存中・保存済み・未保存・保存失敗を表示する。
 
 ## 6. 操作仕様 (Mouse & Keyboard Shortcuts)
 
@@ -125,6 +129,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 ### 7.5 分割キーボードのマトリクス座標 (Split Matrix Coordinates)
 - **内部表現**: 分割キーボードでは `matrixSide` (`left` / `right`) と、各半分ごとのローカル `row`, `col` を保持する。左右どちらも `0,0` から始まる。
 - **編集 UI**: マトリクスエディタは左右を別マトリクスとして扱い、右側キーも右側内のローカル座標で編集する。分割時のペイントモードでは、割り当て先の `left` / `right` をユーザーが明示選択する。
+- **ピン範囲と完了判定**: 分割マトリクスでは左側キーを `pins.rows` / `pins.cols`、右側キーを `pins.splitRows` / `pins.splitCols` の範囲で個別に検証する。対応する行・列ピンが未設定または範囲外のキーは警告表示とし、そのキーが残る間はマトリクス工程を完了扱いにしない。ピン設定工程は左右両方の行・列ピンが設定された場合のみ完了扱いにする。
 - **QMK/Vial 出力**: QMK/Vial の split matrix では右側を行方向に連結するため、右側キーは `row + leftRows`, `col` に変換して出力する。例: 左右各 `4x6` の場合、内部は左右とも `0..3 x 0..5`、QMK/Vial 出力は `8x6`。
 - **QMK/Vial ソースのレイアウトオプション**: `keyboard.json` の `layouts.LAYOUT.layout`、`keymap.c`、direct pin 配列などの firmware 実体は現在の `activeOptions` で表示されているキーだけを対象にする。VIA/Vial JSON 定義は外部アプリ上で選択肢を保持するため、全レイアウトオプションを出力する。
 - **QMK/Vial Matrix Mask**: `qmk.matrixMasked` が有効な場合、`matrix_mask` は現在の `activeOptions` ではなく全レイアウトオプションで使われる matrix position の union から生成する。どのレイアウトでも使われないセルは mask し、row pin と column pin が同じ物理ピンになるセルも mask する。
@@ -134,8 +139,10 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **互換性**: 旧データのように右側キーが `col >= leftCols` で保存されている場合は、読み取り・エクスポート時に右側ローカル列へ正規化する。
 
 ### 7.5.1 ダイレクトピン配線 (Direct Pin Wiring)
-- **配線方式**: `ProjectSettings.matrix.wiring` は `matrix`（既定）または `direct` を保持する。`direct` の場合、行/列ピンではなく各 `PhysicalKey.directPin` に 1 キー 1 GPIO を割り当てる。
-- **キーへの割り当て**: 非分割では `PhysicalKey.directPin` のみを使う。分割では `PhysicalKey.matrixSide` (`left` / `right`) と `directPin` を併用し、同じピン名でも左右の基板では別 GPIO として扱う。
+- **配線方式**: `ProjectSettings.matrix.wiring` は `matrix`（既定）または `direct` を保持する。`direct` の場合、ピン設定で実 GPIO を `pins.direct`（分割右手は `pins.splitDirect`）へ順序付きで登録し、各 `PhysicalKey.directIndex` に論理番号 `D0`、`D1`…を割り当てる。画面上の表示・ペイント・自動割り当てはこの論理番号を使い、ファームウェアや KiCad の出力時に同じ側のピン配列から実 GPIO を解決する。
+- **キーへの割り当て**: 非分割では `pins.direct` を候補一覧として使う。分割では左側を `pins.direct`、右側を `pins.splitDirect` で管理し、`PhysicalKey.matrixSide` (`left` / `right`) に対応する候補だけを割り当てる。同じピン名でも左右の基板では別 GPIO として扱う。
+- **方式切り替え**: `matrix` から `direct` へ切り替えると行・列ピンとキーの行列位置をクリアする。`direct` から `matrix` へ切り替えるとダイレクトピン候補とキーのダイレクトピン割り当てをクリアし、旧方式のピンを使用可能な候補へ戻す。
+- **旧データの移行**: `PhysicalKey.directPin` に実 GPIO を保持する既存の direct pin プロジェクトは、読み込み時に `directPin` と `matrixSide` から左右の候補一覧を復元し、対応する `directIndex` へ変換する。以後の保存では `directPin` を出力しない。
 - **マトリクス位置**: 既存の `row` / `col` はキーマップ上の位置として残す。`row` / `col` が未設定の direct pin キーは、各 side 内の物理ソート順に `0,n` としてエクスポートする。
 - **QMK/Vial 出力**: 非分割では `matrix_pins.direct` を出力する。分割では左側をトップレベル `matrix_pins.direct`、右側を `split.matrix_pins.right.direct` として出力し、右側キーの matrix position は QMK/Vial split と同様に行方向へ連結する。未割り当ての direct pin は `NO_PIN` として埋める。
 - **ZMK 出力**: `zmk,kscan-gpio-direct` の `input-gpios` として出力する。分割では左右それぞれの shield / board が side ごとの `input-gpios` を持ち、右側は matrix transform 上で左側の direct pin 数だけ `col-offset` する。行/列未設定の通常マトリクスでは任意GPIOへフォールバックせず `kscan` を無効化する。ダイレクト配線では、ピン未設定の個別スイッチとエンコーダー／トラックボールは `kscan`・matrix transform の対象外とし、残るスイッチ入力がある側だけ `kscan` を有効化する。
@@ -189,8 +196,14 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **物理配置**: PCB 上のスイッチ footprint は `PhysicalKey.x/y/w/h/r/rx/ry` から算出した物理レイアウトに合わせて配置する。単位変換は `1u = 19.05mm` とする。PCB footprint の回転角は KiCad の座標系に合わせ、Smiðr 上の回転値を反転して出力する。
 - **回路図**: `.kicad_sch` には各キーのスイッチ、マトリクス配線時のダイオード、および `ROWn` / `COLn` / `KEY_Rn_Cn` ネットラベルを出力する。回路図上の部品配置は読みやすさ優先の自動整列とし、物理レイアウトとは一致させない。
 - **マトリクス配線**: `matrix.wiring === 'matrix'` の場合、スイッチとダイオードを `hardware.diodeDirection` に従って `ROWn` / `COLn` / `KEY_Rn_Cn` ネットへ接続する。
-- **ダイレクトピン配線**: `matrix.wiring === 'direct'` の場合、各スイッチを `PIN_<directPin>` と `GND` の間に接続する。ダイオードは出力しない。
+- **ダイレクトピン配線**: `matrix.wiring === 'direct'` の場合、各スイッチの `directIndex` を同じ側のダイレクトピン配列で実 GPIO に解決し、`PIN_<実GPIO>` と `GND` の間に接続する。ダイオードは出力しない。
 - **基板外形**: MVP では、表示対象キーの配置範囲に一定余白を加えた簡易矩形を `Edge.Cuts` として出力する。キー形状に沿った外形生成、自動配線、MCU/コネクタの実装は次段階の対象とする。
+
+### 7.9 Smiðr 0.5 プロジェクト形式
+- `.smidr` は `schemaVersion: "0.5"` を持ち、`metadata`、`layout`、`hardware`、`firmware` の用途別オブジェクトへ設定を保存する。
+- 保存DTOと実行時の `ProjectSettings` は変換層で分離し、各ファームウェア／KiCadエクスポーターは共通の実行時モデルを利用する。
+- バージョンなしの旧 `.smidr` は読込時に実行時モデルへ変換する。書き出しは常に0.5形式とする。
+- 旧localStorageは初回読込時に元JSONを `smidr_projects_backup_pre_0_5` へ退避し、`smidr_projects_v0_5` へ自動移行する。
 
 ## 9. デバイス通信 & プロトコル統合仕様 (Device Protocol & ZMK Studio Integration)
 

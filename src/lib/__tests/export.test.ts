@@ -444,7 +444,7 @@ describe('export generation', () => {
     expect(pcb).toContain('(footprint "Smidr:LED_Smidr_SK6812MINI_E"');
     expect(pcb).toContain(`(path "${led0Path}")`);
     expect(pcb).toMatch(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(layer "B\.Cu"\)/);
-    const led0Footprint = pcb.match(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(path "[^"]+"\)[\s\S]*?(?=\n  \(footprint|\n  \(gr_|\n\))/)?.[0] ?? '';
+    const led0Footprint = pcb.match(/\(footprint "Smidr:LED_Smidr_SK6812MINI_E"[\s\S]*?\(path "[^"]+"\)[\s\S]*?(?=\n {2}\(footprint|\n {2}\(gr_|\n\))/)?.[0] ?? '';
     expect(led0Footprint).toMatch(/\(pad "1"[\s\S]*?\(net \d+ "VCC"\)/);
     expect(led0Footprint).toMatch(/\(pad "2"[\s\S]*?\(net \d+ "RGB_DOUT_0"\)/);
     expect(led0Footprint).toMatch(/\(pad "3"[\s\S]*?\(net \d+ "GND"\)/);
@@ -551,7 +551,7 @@ describe('export generation', () => {
       const pcb = await zip.file('backlight_kicad.kicad_pcb')!.async('string');
       expect(pcb).toContain('(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"');
       expect(pcb).toMatch(/\(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"[\s\S]*?\(layer "B\.Cu"\)/);
-      const backlightFootprint = pcb.match(/\(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"[\s\S]*?(?=\n  \(footprint|\n  \(gr_|\n\))/)?.[0];
+      const backlightFootprint = pcb.match(/\(footprint "Smidr:LED_Smidr_Backlight_1206_Reverse"[\s\S]*?(?=\n {2}\(footprint|\n {2}\(gr_|\n\))/)?.[0];
       expect(backlightFootprint).toBeTruthy();
       expect(backlightFootprint).toContain('"B.Cu"');
       expect(backlightFootprint).toContain('"B.Paste"');
@@ -681,9 +681,11 @@ describe('export generation', () => {
 
     const project = generateSmidrProjectJson({ settings, keys });
 
-    expect(project.keys[0].directPin).toBe('GP2');
-    expect(project.keys[0].row).toBeUndefined();
-    expect(project.keys[0].col).toBeUndefined();
+    expect(project.hardware.pins.direct).toEqual(['GP2']);
+    expect(project.layout.keys[0].directIndex).toBe(0);
+    expect(project.layout.keys[0]).not.toHaveProperty('directPin');
+    expect(project.layout.keys[0].row).toBeUndefined();
+    expect(project.layout.keys[0].col).toBeUndefined();
   });
 
   it('exports KLE JSON for only the currently visible layout option', () => {
@@ -785,7 +787,7 @@ describe('export generation', () => {
 
     const project = generateSmidrProjectJson({ settings, keys: [] });
 
-    expect(project.pins).toEqual({
+    expect(project.hardware.pins).toEqual({
       rows: ['GP0'],
       cols: ['GP1'],
     });
@@ -794,8 +796,8 @@ describe('export generation', () => {
   it('stores USB IDs in .smidr as vendorId/productId instead of vendorProductId', () => {
     const project = generateSmidrProjectJson({ settings: baseSettings, keys: [] });
 
-    expect(project.vendorId).toBe('0xFEED');
-    expect(project.productId).toBe('0x0001');
+    expect(project.firmware.vendorId).toBe('0xFEED');
+    expect(project.firmware.productId).toBe('0x0001');
     expect(project).not.toHaveProperty('vendorProductId');
   });
 
@@ -807,7 +809,7 @@ describe('export generation', () => {
 
     const project = generateSmidrProjectJson({ settings, keys: [] });
 
-    expect(project.macros?.[0]).toEqual([{ action: 'text', text: 'Hello' }]);
+    expect(project.firmware.macros?.[0]).toEqual([{ action: 'text', text: 'Hello' }]);
   });
 
   it('keeps project combos in saved projects', () => {
@@ -821,7 +823,7 @@ describe('export generation', () => {
 
     const project = generateSmidrProjectJson({ settings, keys: [] });
 
-    expect(project.combos?.[0]).toEqual({
+    expect(project.firmware.combos?.[0]).toEqual({
       inputs: [{ action: 'tap', keycode: 'A' }, { action: 'tap', keycode: 'B' }],
       output: { action: 'tap', keycode: 'ESC' },
     });
@@ -838,7 +840,7 @@ describe('export generation', () => {
 
     const project = generateSmidrProjectJson({ settings, keys: [] });
 
-    expect(project.zmk).toEqual({
+    expect(project.firmware.zmk).toEqual({
       splitTransport: 'wired',
       wiredSplitDevice: '&uart0',
     });
@@ -862,9 +864,9 @@ describe('export generation', () => {
 
     const project = generateSmidrProjectJson({ settings, keys: [] });
 
-    expect(project.pins.splitRows).toEqual(['GP2']);
-    expect(project.pins.splitCols).toEqual(['GP3']);
-    expect(project.pins.splitSerial).toBe('GP4');
+    expect(project.hardware.pins.splitRows).toEqual(['GP2']);
+    expect(project.hardware.pins.splitCols).toEqual(['GP3']);
+    expect(project.hardware.pins.splitSerial).toBe('GP4');
   });
 
   it('derives VIA matrix dimensions from key row/col assignments when pins are not available', () => {
@@ -1773,7 +1775,7 @@ describe('export generation', () => {
 
     const saved = generateSmidrProjectJson({ settings, keys });
 
-    expect(saved.encoders?.[0]).toEqual({
+    expect(saved.hardware.encoders?.[0]).toEqual({
       pinA: 'GP2',
       pinB: 'GP3',
       keymap: {
@@ -1783,15 +1785,15 @@ describe('export generation', () => {
         },
       },
     });
-    expect((saved.encoders?.[0] as any).id).toBeUndefined();
-    expect(saved.keys[0].kind).toBe('encoder');
-    expect(saved.keys[0].encoderIndex).toBe(0);
-    expect((saved.keys[0] as any).encoderId).toBeUndefined();
-    expect(saved.keys[0].w2).toBeUndefined();
-    expect(saved.keys[0].h2).toBeUndefined();
-    expect(saved.keys[0].x2).toBeUndefined();
-    expect(saved.keys[0].y2).toBeUndefined();
-    expect(saved.keys[0].stepped).toBeUndefined();
+    expect((saved.hardware.encoders?.[0] as any).id).toBeUndefined();
+    expect(saved.layout.keys[0].kind).toBe('encoder');
+    expect(saved.layout.keys[0].encoderIndex).toBe(0);
+    expect((saved.layout.keys[0] as any).encoderId).toBeUndefined();
+    expect(saved.layout.keys[0].w2).toBeUndefined();
+    expect(saved.layout.keys[0].h2).toBeUndefined();
+    expect(saved.layout.keys[0].x2).toBeUndefined();
+    expect(saved.layout.keys[0].y2).toBeUndefined();
+    expect(saved.layout.keys[0].stepped).toBeUndefined();
   });
 
   it('omits secondary shape properties from VIA encoder layout entries', () => {

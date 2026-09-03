@@ -158,10 +158,14 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
       // Parse QMK hardware configuration
       let pins: any = undefined;
       const directPins = Array.isArray(input.matrix_pins?.direct) ? input.matrix_pins.direct : undefined;
+      const directPinPool = directPins
+        ? [...new Set(directPins.flat().filter((pin: unknown) => pin && pin !== 'NO_PIN').map(String))]
+        : [];
       if (input.matrix_pins) {
         pins = {
           rows: Array.isArray(input.matrix_pins.rows) ? input.matrix_pins.rows.map(String) : [],
           cols: Array.isArray(input.matrix_pins.cols) ? input.matrix_pins.cols.map(String) : [],
+          direct: directPinPool,
         };
         
         // Parse RGB light pin if present
@@ -246,6 +250,9 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
           const directPin = directPins && Number.isInteger(row) && Number.isInteger(col)
             ? directPins[row]?.[col]
             : undefined;
+          const directIndex = directPin && directPin !== 'NO_PIN'
+            ? directPinPool.indexOf(String(directPin))
+            : -1;
           const rgbLed = Array.isArray(input.rgb_matrix?.layout)
             ? input.rgb_matrix.layout.find((led: any) => Number(led.matrix?.[0]) === row && Number(led.matrix?.[1]) === col)
             : undefined;
@@ -259,13 +266,13 @@ export function parseKeyboardDefinition(input: any, options?: { debug?: boolean 
             rx: k.rx ?? (k.x ?? 0),
             ry: k.ry ?? (k.y ?? 0),
             label: k.label || '',
-            row,
-            col,
+            row: directPins ? undefined : row,
+            col: directPins ? undefined : col,
             ledIndex: Number.isInteger(rgbLed?.index) ? rgbLed.index : undefined,
             ledX: Number.isFinite(rgbLed?.x) ? Number(rgbLed.x) : undefined,
             ledY: Number.isFinite(rgbLed?.y) ? Number(rgbLed.y) : undefined,
             ledFlags: Number.isInteger(rgbLed?.flags) ? Number(rgbLed.flags) : undefined,
-            directPin: directPin && directPin !== 'NO_PIN' ? String(directPin) : undefined,
+            directIndex: directIndex >= 0 ? directIndex : undefined,
             keymap: {}
           };
         });

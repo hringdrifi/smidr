@@ -13,14 +13,14 @@ import {
   getMcuPins,
 } from '@/lib/mcu-presets';
 import { AvailablePinPool } from './AvailablePinPool';
-import { getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide } from '@/lib/matrix-utils';
+import { getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide, resolveDirectPin } from '@/lib/matrix-utils';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type PinTarget = 'row' | 'col' | 'splitRow' | 'splitCol' | 'feature';
+type PinTarget = 'row' | 'col' | 'splitRow' | 'splitCol' | 'direct' | 'splitDirect' | 'feature';
 
 const getEncoderAssignedPins = (
   settings: ProjectSettings,
@@ -187,7 +187,7 @@ const PinTagInput = ({
   onFocus,
   onUpdatePins
 }: {
-  type: 'row' | 'col' | 'splitRow' | 'splitCol';
+  type: 'row' | 'col' | 'splitRow' | 'splitCol' | 'direct' | 'splitDirect';
   pins: string[];
   isActive: boolean;
   isSplitKeyboard: boolean;
@@ -197,7 +197,11 @@ const PinTagInput = ({
   const { t } = useTranslation();
   const [inputValue, setInputValue] = React.useState('');
   const [draggedIdx, setDraggedIdx] = React.useState<number | null>(null);
-  const label = type === 'row'
+  const label = type === 'direct'
+    ? (isSplitKeyboard ? t('hardware.leftDirectPins') : t('hardware.directPins'))
+    : type === 'splitDirect'
+    ? t('hardware.rightDirectPins')
+    : type === 'row'
     ? (isSplitKeyboard ? t('hardware.leftRowPins') : t('hardware.rowPins'))
     : type === 'col'
     ? (isSplitKeyboard ? t('hardware.leftColPins') : t('hardware.colPins'))
@@ -304,7 +308,7 @@ const PinTagInput = ({
   );
 };
 
-export const MatrixPinInspectorPanel = () => {
+export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: 'inspector' | 'dialog' }) => {
   const { settings, updateSettings, setPin, keys, batchUpdateKeys } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
@@ -329,8 +333,13 @@ export const MatrixPinInspectorPanel = () => {
     : getMcuPins(selectedMcu);
   const effectiveMatrix = getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
   const wiringMode = settings.matrix?.wiring || 'matrix';
+  const directPinCount = (settings.pins.direct?.length || 0)
+    + (settings.features.split ? settings.pins.splitDirect?.length || 0 : 0);
+  const isDialog = variant === 'dialog';
 
   const getPinGroupLabel = (box: PinTarget | null, feature: string | null) => {
+    if (box === 'direct') return settings.features.split ? t('hardware.leftDirectPins') : t('hardware.directPins');
+    if (box === 'splitDirect') return t('hardware.rightDirectPins');
     if (box === 'row') return settings.features.split ? t('hardware.leftRowPins') : t('hardware.rowPins');
     if (box === 'col') return settings.features.split ? t('hardware.leftColPins') : t('hardware.colPins');
     if (box === 'splitRow') return t('hardware.rightRowPins');
@@ -340,16 +349,27 @@ export const MatrixPinInspectorPanel = () => {
 
   const getAssignedPins = () => {
     const pins = new Set<string>();
-    if (activeBox === 'splitRow' || activeBox === 'splitCol') {
+    if (activeBox === 'splitRow' || activeBox === 'splitCol' || activeBox === 'splitDirect') {
       settings.pins.splitRows?.forEach(p => p && pins.add(p));
       settings.pins.splitCols?.forEach(p => p && pins.add(p));
+      settings.pins.splitDirect?.forEach(p => p && pins.add(p));
+      keys.forEach(key => {
+        const side = key.matrixSide || inferMatrixSideFromGeometry(key, keys);
+        const directPin = resolveDirectPin(settings, key, keys);
+        if (side === 'right' && directPin) pins.add(directPin);
+      });
       getEncoderAssignedPins(settings, keys, 'right').forEach(pin => pins.add(pin));
       return pins;
     }
 
     settings.pins.rows.forEach(p => p && pins.add(p));
     settings.pins.cols.forEach(p => p && pins.add(p));
-    keys.forEach(key => key.directPin && pins.add(key.directPin));
+    settings.pins.direct?.forEach(p => p && pins.add(p));
+    keys.forEach(key => {
+      const side = settings.features.split ? key.matrixSide || inferMatrixSideFromGeometry(key, keys) : 'left';
+      const directPin = resolveDirectPin(settings, key, keys);
+      if (side !== 'right' && directPin) pins.add(directPin);
+    });
     if (settings.pins.rgb) pins.add(settings.pins.rgb);
     if (settings.pins.backlight) pins.add(settings.pins.backlight);
     if (settings.pins.sda) pins.add(settings.pins.sda);
@@ -372,24 +392,43 @@ export const MatrixPinInspectorPanel = () => {
       if (matrixKeys.length > 0) {
         batchUpdateKeys(matrixKeys.map(key => key.id!), { row: undefined, col: undefined });
       }
+      updateSettings({
+        matrix: { ...settings.matrix, wiring: mode },
+        pins: {
+          ...settings.pins,
+          rows: [],
+          cols: [],
+          splitRows: [],
+          splitCols: [],
+        },
+      });
     } else {
-      const directKeys = keys.filter(key => !!key.directPin);
+      const directKeys = keys.filter(key => key.directIndex !== undefined || !!key.directPin);
       if (directKeys.length > 0 && !window.confirm(format('matrix.confirmSwitchToMatrix', { count: directKeys.length }))) {
         return;
       }
       if (directKeys.length > 0) {
-        batchUpdateKeys(directKeys.map(key => key.id!), { directPin: undefined });
+        batchUpdateKeys(directKeys.map(key => key.id!), { directIndex: undefined, directPin: undefined });
       }
+      updateSettings({
+        matrix: { ...settings.matrix, wiring: mode },
+        pins: {
+          ...settings.pins,
+          direct: [],
+          splitDirect: [],
+        },
+      });
     }
 
-    updateSettings({ matrix: { ...settings.matrix, wiring: mode } });
+    setActiveBox(mode === 'direct' ? 'direct' : null);
+    setFocusedFeature(null);
   };
   const updateDiodeDirection = (diodeDirection: 'COL2ROW' | 'ROW2COL') => {
     updateSettings({ hardware: { ...settings.hardware, diodeDirection } });
   };
 
   const handleAssignPin = (pinName: string) => {
-    const applyPinList = (key: 'rows' | 'cols' | 'splitRows' | 'splitCols', currentPins: string[] = []) => {
+    const applyPinList = (key: 'rows' | 'cols' | 'splitRows' | 'splitCols' | 'direct' | 'splitDirect', currentPins: string[] = []) => {
       if (preventDuplicates && currentPins.includes(pinName)) return;
       if (preventDuplicates && assignedPins.has(pinName) && !currentPins.includes(pinName)) return;
       updateSettings({ pins: { ...settings.pins, [key]: [...currentPins, pinName] } });
@@ -399,6 +438,8 @@ export const MatrixPinInspectorPanel = () => {
     if (activeBox === 'col') applyPinList('cols', settings.pins.cols);
     if (activeBox === 'splitRow') applyPinList('splitRows', settings.pins.splitRows || []);
     if (activeBox === 'splitCol') applyPinList('splitCols', settings.pins.splitCols || []);
+    if (activeBox === 'direct') applyPinList('direct', settings.pins.direct || []);
+    if (activeBox === 'splitDirect') applyPinList('splitDirect', settings.pins.splitDirect || []);
     if (activeBox === 'feature' && focusedFeature) {
       if (preventDuplicates && assignedPins.has(pinName) && (settings.pins as any)[focusedFeature] !== pinName) return;
       setPin('feature', focusedFeature, pinName);
@@ -406,12 +447,16 @@ export const MatrixPinInspectorPanel = () => {
   };
 
   const handleClearAllPins = () => {
+    const directKeyIds = keys.filter(key => key.directIndex !== undefined || !!key.directPin).map(key => key.id!);
+    if (directKeyIds.length > 0) batchUpdateKeys(directKeyIds, { directIndex: undefined, directPin: undefined });
     updateSettings({
       pins: {
         rows: [],
         cols: [],
         splitRows: [],
         splitCols: [],
+        direct: [],
+        splitDirect: [],
         rgb: '',
         backlight: '',
         sda: '',
@@ -423,16 +468,30 @@ export const MatrixPinInspectorPanel = () => {
     setFocusedFeature(null);
   };
 
+  const updateDirectPins = (side: 'left' | 'right', newPins: string[]) => {
+    const pinKey = side === 'right' ? 'splitDirect' : 'direct';
+    updateSettings({ pins: { ...settings.pins, [pinKey]: newPins } });
+  };
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-panel)]">
-      <div className="mx-4 mt-4 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
+    <div className={cn(
+      "flex h-full flex-col overflow-hidden bg-[var(--bg-panel)]",
+      isDialog && "md:grid md:grid-cols-[minmax(0,1fr)_320px] md:grid-rows-[auto_minmax(0,1fr)]"
+    )}>
+      <div className={cn(
+        "mx-4 mt-4 flex shrink-0 items-center justify-between gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3",
+        isDialog && "md:col-span-2"
+      )}>
         <div className="flex items-center gap-2 min-w-0">
           <Hash size={15} className="text-amber-500 shrink-0" />
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-main)]">{t('hardware.pins')}</div>
             <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-              <span className="font-mono text-[var(--text-highlight)]">{effectiveMatrix.rows} x {effectiveMatrix.cols}</span>
-              <span className="ml-1">{format('hardware.keyCount', { count: effectiveMatrix.rows * effectiveMatrix.cols })}</span>
+              {wiringMode === 'direct' ? (
+                <span>{format('hardware.directPinCount', { count: directPinCount })}</span>
+              ) : (
+                <><span className="font-mono text-[var(--text-highlight)]">{effectiveMatrix.rows} x {effectiveMatrix.cols}</span><span className="ml-1">{format('hardware.keyCount', { count: effectiveMatrix.rows * effectiveMatrix.cols })}</span></>
+              )}
             </div>
           </div>
         </div>
@@ -446,7 +505,10 @@ export const MatrixPinInspectorPanel = () => {
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 space-y-4 overflow-y-auto bg-[var(--bg-app)]/20 p-4 custom-scrollbar">
+      <div className={cn(
+        "flex-1 min-h-0 space-y-4 overflow-y-auto bg-[var(--bg-app)]/20 p-4 custom-scrollbar",
+        isDialog && "md:row-start-2 md:p-5"
+      )}>
       <section className="space-y-3">
         <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('matrix.wiringMode')}</h3>
         <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
@@ -493,58 +555,90 @@ export const MatrixPinInspectorPanel = () => {
         )}
       </section>
       {wiringMode === 'direct' ? (
-        <section className="flex min-h-24 items-center justify-center rounded-lg border border-dashed border-[var(--border-main)] text-center text-[10px] text-[var(--text-dim)] uppercase tracking-wider">
-          {t('matrix.directPinPrompt')}
+        <section className="space-y-3">
+          <div className={cn(isDialog && settings.features.split && "grid grid-cols-2 gap-4")}>
+            <PinTagInput
+              type="direct"
+              pins={settings.pins.direct || []}
+              isActive={activeBox === 'direct'}
+              isSplitKeyboard={settings.features.split}
+              onFocus={() => {
+                setActiveBox('direct');
+                setFocusedFeature(null);
+              }}
+              onUpdatePins={(newPins) => updateDirectPins('left', newPins)}
+            />
+            {settings.features.split && (
+              <PinTagInput
+                type="splitDirect"
+                pins={settings.pins.splitDirect || []}
+                isActive={activeBox === 'splitDirect'}
+                isSplitKeyboard
+                onFocus={() => {
+                  setActiveBox('splitDirect');
+                  setFocusedFeature(null);
+                }}
+                onUpdatePins={(newPins) => updateDirectPins('right', newPins)}
+              />
+            )}
+          </div>
+          <p className="rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[10px] leading-relaxed text-[var(--text-muted)]">
+            {t('matrix.directPinPoolHint')}
+          </p>
         </section>
       ) : (
       <section className="space-y-3">
         {settings.features.split ? (
-          <>
-            <PinTagInput
-              type="row"
-              pins={settings.pins.rows}
-              isActive={activeBox === 'row'}
-              isSplitKeyboard={settings.features.split}
-              onFocus={() => {
-                setActiveBox('row');
-                setFocusedFeature(null);
-              }}
-              onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, rows: newPins } })}
-            />
-            <PinTagInput
-              type="col"
-              pins={settings.pins.cols}
-              isActive={activeBox === 'col'}
-              isSplitKeyboard={settings.features.split}
-              onFocus={() => {
-                setActiveBox('col');
-                setFocusedFeature(null);
-              }}
-              onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, cols: newPins } })}
-            />
-            <PinTagInput
-              type="splitRow"
-              pins={settings.pins.splitRows || []}
-              isActive={activeBox === 'splitRow'}
-              isSplitKeyboard={settings.features.split}
-              onFocus={() => {
-                setActiveBox('splitRow');
-                setFocusedFeature(null);
-              }}
-              onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, splitRows: newPins } })}
-            />
-            <PinTagInput
-              type="splitCol"
-              pins={settings.pins.splitCols || []}
-              isActive={activeBox === 'splitCol'}
-              isSplitKeyboard={settings.features.split}
-              onFocus={() => {
-                setActiveBox('splitCol');
-                setFocusedFeature(null);
-              }}
-              onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, splitCols: newPins } })}
-            />
-          </>
+          <div className={cn("space-y-3", isDialog && "grid grid-cols-2 gap-4 space-y-0")}>
+            <div className="space-y-3">
+              <PinTagInput
+                type="row"
+                pins={settings.pins.rows}
+                isActive={activeBox === 'row'}
+                isSplitKeyboard={settings.features.split}
+                onFocus={() => {
+                  setActiveBox('row');
+                  setFocusedFeature(null);
+                }}
+                onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, rows: newPins } })}
+              />
+              <PinTagInput
+                type="col"
+                pins={settings.pins.cols}
+                isActive={activeBox === 'col'}
+                isSplitKeyboard={settings.features.split}
+                onFocus={() => {
+                  setActiveBox('col');
+                  setFocusedFeature(null);
+                }}
+                onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, cols: newPins } })}
+              />
+            </div>
+            <div className="space-y-3">
+              <PinTagInput
+                type="splitRow"
+                pins={settings.pins.splitRows || []}
+                isActive={activeBox === 'splitRow'}
+                isSplitKeyboard={settings.features.split}
+                onFocus={() => {
+                  setActiveBox('splitRow');
+                  setFocusedFeature(null);
+                }}
+                onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, splitRows: newPins } })}
+              />
+              <PinTagInput
+                type="splitCol"
+                pins={settings.pins.splitCols || []}
+                isActive={activeBox === 'splitCol'}
+                isSplitKeyboard={settings.features.split}
+                onFocus={() => {
+                  setActiveBox('splitCol');
+                  setFocusedFeature(null);
+                }}
+                onUpdatePins={(newPins) => updateSettings({ pins: { ...settings.pins, splitCols: newPins } })}
+              />
+            </div>
+          </div>
         ) : (
           <>
             <PinTagInput
@@ -680,14 +774,17 @@ export const MatrixPinInspectorPanel = () => {
           (activeBox === 'col' && settings.pins.cols.includes(pinName)) ||
           (activeBox === 'splitRow' && (settings.pins.splitRows || []).includes(pinName)) ||
           (activeBox === 'splitCol' && (settings.pins.splitCols || []).includes(pinName)) ||
+          (activeBox === 'direct' && (settings.pins.direct || []).includes(pinName)) ||
+          (activeBox === 'splitDirect' && (settings.pins.splitDirect || []).includes(pinName)) ||
           (activeBox === 'feature' && !!focusedFeature && (settings.pins as any)[focusedFeature] === pinName)
         )}
         isActive={!!activeBox}
-        isListTarget={activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol'}
+        isListTarget={activeBox === 'row' || activeBox === 'col' || activeBox === 'splitRow' || activeBox === 'splitCol' || activeBox === 'direct' || activeBox === 'splitDirect'}
         customPinText={customPinText}
         onCustomPinTextChange={(value) => setCustomPinText(value.toUpperCase())}
         showCustomPinInput
         pinListClassName="max-h-36 p-2"
+        className={cn(isDialog && "md:col-start-2 md:row-start-2 md:h-full md:overflow-y-auto md:border-l md:border-t-0 md:px-5 md:py-5")}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, Layers, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown } from 'lucide-react';
+import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown, Hammer, Braces, Home, Menu, PanelRight } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
@@ -22,6 +22,8 @@ import { ComboPanel } from '@/components/ComboPanel';
 import { TapDancePanel } from '@/components/TapDancePanel';
 import { UnlockModal } from '@/components/UnlockModal';
 import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
+import { ProjectHome } from '@/components/ProjectHome';
+import { NewProjectSetup } from '@/components/NewProjectSetup';
 import { useKeyboardStore } from '@/lib/store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -45,13 +47,25 @@ import { isQmkSourceExportSupported, isZmkSourceExportSupported } from '@/lib/mc
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
 import { UniversalAction } from '@/types/actions';
 import { SmidrProject, PhysicalKey } from '@/types/keyboard';
-import { saveProject, listProjects, deleteProject } from '@/lib/storage';
+import {
+  deleteProject,
+  deleteProjectDraft,
+  getProjectDraft,
+  listProjects,
+  saveProject,
+  saveProjectDraft,
+} from '@/lib/storage';
+import { fromSmidrProjectFile } from '@/lib/project-format';
+import { PRESET_LAYOUTS } from '@/lib/presets';
+import { parseKeyboardDefinition } from '@/lib/parser';
+import { isMatrixPositionWithinConfiguredPins, isMatrixSwitchKey, resolveDirectPin } from '@/lib/matrix-utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type RightPanelKind = 'settings' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'pins' | 'rgbMatrix' | AdvancedPanelKind;
+type RightPanelKind = 'settings' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'rgbMatrix' | AdvancedPanelKind;
+type ProjectWorkspace = 'hardware' | 'firmware';
 
 const findMatchingParenInText = (value: string, start: number) => {
   let depth = 0;
@@ -324,6 +338,7 @@ export default function App() {
   const { t, language, setLanguage } = useTranslation();
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
+  const [isPinSettingsDialogOpen, setIsPinSettingsDialogOpen] = React.useState(false);
   const [isKiCadDialogOpen, setIsKiCadDialogOpen] = React.useState(false);
   const [isZmkExportDialogOpen, setIsZmkExportDialogOpen] = React.useState(false);
   const [kicadExportOptions, setKiCadExportOptions] = React.useState<KiCadExportOptions>(DEFAULT_KICAD_EXPORT_OPTIONS);
@@ -331,11 +346,21 @@ export default function App() {
   const [isEditorModeMenuOpen, setIsEditorModeMenuOpen] = React.useState(false);
   const [savedProjects, setSavedProjects] = React.useState<any[]>([]);
   const [activeRightPanel, setActiveRightPanel] = React.useState<RightPanelKind>('settings');
+  const [projectWorkspace, setProjectWorkspace] = React.useState<ProjectWorkspace>(
+    editorMode === 'keymap' || editorMode === 'rgbMatrix' ? 'firmware' : 'hardware'
+  );
+  const [isHomeVisible, setIsHomeVisible] = React.useState(!storeState.isDemoMode);
+  const [isLeftNavOpen, setIsLeftNavOpen] = React.useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = React.useState(false);
+  const [newProjectPreset, setNewProjectPreset] = React.useState('Blank Layout');
 
   const [lastSavedHistoryLength, setLastSavedHistoryLength] = React.useState(0);
+  const [currentSavedUpdatedAt, setCurrentSavedUpdatedAt] = React.useState<number | null>(null);
+  const [restoredDraftDirty, setRestoredDraftDirty] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [showSavedFeedback, setShowSavedFeedback] = React.useState(false);
-  const isDirty = pastStates.length !== lastSavedHistoryLength;
+  const [saveError, setSaveError] = React.useState(false);
+  const isDirty = restoredDraftDirty || pastStates.length !== lastSavedHistoryLength;
   const [isRestoring, setIsRestoring] = React.useState(false);
   const remapFileInputRef = React.useRef<HTMLInputElement>(null);
   const keyboardFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -409,10 +434,16 @@ export default function App() {
   };
 
   const handleNewProject = () => {
-    if (keys.length > 0 && !confirm(t('common.discardConfirm'))) return;
-    storeState.resetProject(true);
+    if (isDirty && !confirm(t('common.discardConfirm'))) return;
+    storeState.setAppMode('design');
+    storeState.resetProject(false);
     storeState.setIsHardwareModalOpen(true);
+    setIsHomeVisible(false);
+    setProjectWorkspace('hardware');
+    setNewProjectPreset('Blank Layout');
     setLastSavedHistoryLength(0);
+    setCurrentSavedUpdatedAt(null);
+    setRestoredDraftDirty(false);
   };
 
   React.useEffect(() => {
@@ -430,10 +461,6 @@ export default function App() {
 
   const handleSaveProject = async () => {
     setIsSaving(true);
-    
-    // Slight delay to show the spinner and feel "pro"
-    await new Promise(r => setTimeout(r, 600));
-
     const id = currentProjectId || crypto.randomUUID();
     const project: SmidrProject = {
       id,
@@ -441,21 +468,109 @@ export default function App() {
       ...settings,
       keys
     };
-    if (!storeState.isDemoMode) {
-      saveProject(project);
-      loadProject(project, true);
-      refreshProjectList();
+    try {
+      if (!storeState.isDemoMode) {
+        const savedProject = saveProject(project);
+        deleteProjectDraft(savedProject.id);
+        setCurrentSavedUpdatedAt(savedProject.updatedAt);
+        setRestoredDraftDirty(false);
+        if (!currentProjectId) loadProject(savedProject, true);
+        refreshProjectList();
+      }
+      setSaveError(false);
+      setLastSavedHistoryLength(pastStates.length);
+      setShowSavedFeedback(true);
+      setTimeout(() => setShowSavedFeedback(false), 1600);
+    } catch (error) {
+      console.error('Failed to save project', error);
+      setSaveError(true);
+    } finally {
+      setIsSaving(false);
     }
-    setLastSavedHistoryLength(pastStates.length);
-    
-    setIsSaving(false);
-    setShowSavedFeedback(true);
-    setTimeout(() => setShowSavedFeedback(false), 2000);
   };
 
+  React.useEffect(() => {
+    if (
+      !storeState.isProjectOpen
+      || storeState.isHardwareModalOpen
+      || storeState.isDemoMode
+      || !currentProjectId
+      || currentSavedUpdatedAt === null
+      || !isDirty
+    ) return;
+    const timer = window.setTimeout(() => {
+      try {
+        saveProjectDraft({ id: currentProjectId, updatedAt: Date.now(), ...settings, keys }, currentSavedUpdatedAt);
+      } catch (error) {
+        console.error('Failed to save project recovery draft', error);
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [
+    settings,
+    keys,
+    currentProjectId,
+    currentSavedUpdatedAt,
+    isDirty,
+    storeState.isProjectOpen,
+    storeState.isHardwareModalOpen,
+    storeState.isDemoMode,
+  ]);
+
+  React.useEffect(() => {
+    if (
+      !storeState.isProjectOpen
+      || storeState.isDemoMode
+      || !currentProjectId
+      || currentSavedUpdatedAt === null
+      || !isDirty
+    ) return;
+    const saveDraftBeforeUnload = () => {
+      try {
+        saveProjectDraft({ id: currentProjectId, updatedAt: Date.now(), ...settings, keys }, currentSavedUpdatedAt);
+      } catch (error) {
+        console.error('Failed to save project recovery draft before unload', error);
+      }
+    };
+    window.addEventListener('beforeunload', saveDraftBeforeUnload);
+    return () => window.removeEventListener('beforeunload', saveDraftBeforeUnload);
+  }, [
+    settings,
+    keys,
+    currentProjectId,
+    currentSavedUpdatedAt,
+    isDirty,
+    storeState.isProjectOpen,
+    storeState.isDemoMode,
+  ]);
+
   const handleLoadProject = (project: SmidrProject) => {
-    if (keys.length > 0 && !confirm(t('common.discardConfirm'))) return;
-    loadProject(project);
+    if (currentProjectId === project.id && isDirty) {
+      setIsHomeVisible(false);
+      setProjectWorkspace('hardware');
+      setIsProjectMenuOpen(false);
+      return;
+    }
+    if (currentProjectId !== project.id && isDirty && !confirm(t('common.discardConfirm'))) return;
+    let projectToLoad = project;
+    let restoredDraft = false;
+    const draft = getProjectDraft(project.id);
+    if (draft && draft.baseUpdatedAt === project.updatedAt) {
+      if (confirm(t('workspace.restoreDraftPrompt'))) {
+        projectToLoad = draft.project;
+        restoredDraft = true;
+      } else {
+        deleteProjectDraft(project.id);
+      }
+    } else if (draft) {
+      deleteProjectDraft(project.id);
+    }
+    storeState.setAppMode('design');
+    loadProject(projectToLoad);
+    setCurrentSavedUpdatedAt(project.updatedAt);
+    setRestoredDraftDirty(restoredDraft);
+    setIsHomeVisible(false);
+    setProjectWorkspace('hardware');
     setIsProjectMenuOpen(false);
   };
 
@@ -481,6 +596,65 @@ export default function App() {
     downloadJson(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_kle.json`, kleJson);
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
+  };
+
+  const enterWorkspace = (workspace: ProjectWorkspace | 'remap') => {
+    setIsHomeVisible(false);
+    setIsLeftNavOpen(false);
+    if (workspace === 'remap') {
+      storeState.setAppMode('remap');
+      return;
+    }
+    storeState.setAppMode('design');
+    if (!storeState.isProjectOpen) {
+      setIsHomeVisible(true);
+      return;
+    }
+    setProjectWorkspace(workspace);
+    if (workspace === 'hardware' && (editorMode === 'keymap' || editorMode === 'rgbMatrix')) {
+      setEditorMode('layout');
+      setActiveRightPanel('properties');
+    }
+    if (workspace === 'firmware' && editorMode !== 'keymap' && editorMode !== 'rgbMatrix') {
+      setEditorMode('keymap');
+      setActiveRightPanel('keymap');
+    }
+  };
+
+  const navigateDesign = (mode: typeof editorMode, panel: RightPanelKind) => {
+    setEditorMode(mode);
+    setActiveRightPanel(panel);
+    setIsLeftNavOpen(false);
+    setIsInspectorOpen(true);
+  };
+
+  const cancelNewProject = () => {
+    storeState.resetProject(false);
+    storeState.setIsHardwareModalOpen(false);
+    setIsHomeVisible(true);
+  };
+
+  const confirmNewProject = () => {
+    const preset = PRESET_LAYOUTS[newProjectPreset as keyof typeof PRESET_LAYOUTS];
+    const parsed = newProjectPreset === 'Blank Layout' ? null : parseKeyboardDefinition(preset);
+    const project: SmidrProject = {
+      id: crypto.randomUUID(),
+      updatedAt: Date.now(),
+      ...settings,
+      name: settings.name.trim() || parsed?.name || newProjectPreset || 'New Project',
+      layoutOptions: parsed?.layoutOptions || {},
+      activeOptions: parsed?.activeOptions || {},
+      matrix: parsed?.matrix || settings.matrix,
+      keys: (parsed?.keys || []).map(key => ({ ...key, id: crypto.randomUUID(), keymap: {} })),
+    };
+    const savedProject = storeState.isDemoMode ? project : saveProject(project);
+    loadProject(savedProject, true);
+    setCurrentSavedUpdatedAt(savedProject.updatedAt);
+    setRestoredDraftDirty(false);
+    refreshProjectList();
+    storeState.setIsHardwareModalOpen(false);
+    setActiveRightPanel('options');
+    setEditorMode('layout');
   };
 
   const handleExportCanvasImage = () => {
@@ -581,18 +755,12 @@ export default function App() {
     ? editorMode === 'keymap' ? 400 : 0
     : 0;
   const designCanvasBottom = `${designBottomTrayHeight}px`;
-  const designRightInspectorWidth = storeState.isProjectOpen ? 380 : 0;
+  const designRightInspectorWidth = storeState.isProjectOpen ? 360 : 0;
   const designCanvasRight = `${designRightInspectorWidth}px`;
   const designCanvasInsetShadow = [
     designRightInspectorWidth > 0 ? 'inset -18px 0 28px -24px rgba(0,0,0,0.95)' : '',
     designBottomTrayHeight > 0 ? 'inset 0 -18px 32px -26px rgba(0,0,0,0.95)' : '',
   ].filter(Boolean).join(', ');
-  const designModes = [
-    { id: 'layout', icon: Move },
-    { id: 'matrix', icon: CircuitBoard },
-    { id: 'rgbMatrix', icon: Lightbulb },
-    { id: 'keymap', icon: Keyboard },
-  ] as const;
   const rightPanelTabs: Array<
     | { type: 'tab'; id: RightPanelKind; title: string; icon: React.ComponentType<{ size?: number; className?: string }> }
     | { type: 'separator'; id: string }
@@ -602,9 +770,6 @@ export default function App() {
       : []),
     ...(editorMode === 'matrix'
       ? [{ type: 'tab' as const, id: 'matrixPainter' as RightPanelKind, title: t('matrix.keyWiring'), icon: MousePointer2 }]
-      : []),
-    ...(editorMode === 'matrix'
-      ? [{ type: 'tab' as const, id: 'pins' as RightPanelKind, title: t('hardware.pins'), icon: Hash }]
       : []),
     ...(editorMode === 'keymap'
       ? [{ type: 'tab' as const, id: 'keymap' as RightPanelKind, title: t('keycodeConfig.title') || 'Keymap Config', icon: Wrench }]
@@ -637,7 +802,6 @@ export default function App() {
     const isUnavailablePanel =
       (activeRightPanel === 'keymap' && editorMode !== 'keymap') ||
       ((activeRightPanel === 'macros' || activeRightPanel === 'combos' || activeRightPanel === 'tapDance') && editorMode !== 'keymap') ||
-      (activeRightPanel === 'pins' && editorMode !== 'matrix') ||
       (activeRightPanel === 'matrixPainter' && editorMode !== 'matrix') ||
       (activeRightPanel === 'rgbMatrix' && editorMode !== 'rgbMatrix') ||
       (activeRightPanel === 'properties' && editorMode !== 'layout');
@@ -648,8 +812,52 @@ export default function App() {
   }, [activeRightPanel, editorMode]);
 
   React.useEffect(() => {
-    setActiveRightPanel(defaultRightPanelForEditor(editorMode));
-  }, [editorMode]);
+    if (editorMode !== 'layout') return;
+    setActiveRightPanel(storeState.selectedKeyIds.length > 0 ? 'properties' : 'options');
+  }, [editorMode, storeState.selectedKeyIds.length]);
+
+  const assignableKeys = keys.filter(key => !key.decal);
+  const matrixSwitchKeys = keys.filter(isMatrixSwitchKey);
+  const wiringComplete = matrixSwitchKeys.length > 0 && matrixSwitchKeys.every(key =>
+    settings.matrix.wiring === 'direct'
+      ? !!resolveDirectPin(settings, key, keys)
+      : key.row !== undefined
+        && key.col !== undefined
+        && isMatrixPositionWithinConfiguredPins(settings, key, keys)
+  );
+  const pinsComplete = settings.matrix.wiring === 'direct'
+    ? (settings.pins.direct?.length || 0) > 0 && (!settings.features.split || (settings.pins.splitDirect?.length || 0) > 0)
+    : settings.pins.rows.some(Boolean)
+      && settings.pins.cols.some(Boolean)
+      && (!settings.features.split
+        || (!!settings.pins.splitRows?.some(Boolean) && !!settings.pins.splitCols?.some(Boolean)));
+  const workflowItems: Array<{
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    active: boolean;
+    complete: boolean | undefined;
+    action: () => void;
+  }> = projectWorkspace === 'hardware'
+    ? [
+        { id: 'setup', label: t('workspace.setup'), icon: Settings, active: activeRightPanel === 'settings', complete: !!settings.name && !!(settings.hardware.mcu || settings.hardware.board), action: () => { setActiveRightPanel('settings'); setIsInspectorOpen(true); } },
+        { id: 'layout', label: t('workspace.layout'), icon: Move, active: editorMode === 'layout' && (activeRightPanel === 'properties' || activeRightPanel === 'options'), complete: assignableKeys.length > 0, action: () => navigateDesign('layout', storeState.selectedKeyIds.length > 0 ? 'properties' : 'options') },
+        { id: 'pins', label: t('workspace.pins'), icon: Hash, active: isPinSettingsDialogOpen, complete: pinsComplete, action: () => {
+          setIsLeftNavOpen(false);
+          setIsPinSettingsDialogOpen(true);
+        } },
+        { id: 'wiring', label: t('workspace.wiring'), icon: CircuitBoard, active: editorMode === 'matrix' && activeRightPanel === 'matrixPainter', complete: wiringComplete, action: () => navigateDesign('matrix', 'matrixPainter') },
+        { id: 'pcb', label: t('workspace.pcb'), icon: LayoutGrid, active: isKiCadDialogOpen, complete: undefined, action: () => setIsKiCadDialogOpen(true) },
+      ]
+    : [
+        { id: 'setup', label: t('workspace.setup'), icon: Settings, active: activeRightPanel === 'settings', complete: settings.vendorProductId !== 0, action: () => { setActiveRightPanel('settings'); setIsInspectorOpen(true); } },
+        { id: 'keymap', label: t('workspace.keymap'), icon: Keyboard, active: editorMode === 'keymap' && activeRightPanel === 'keymap', complete: assignableKeys.some(key => !!key.keymap && Object.keys(key.keymap).length > 0), action: () => navigateDesign('keymap', 'keymap') },
+        { id: 'lighting', label: t('workspace.lighting'), icon: Lightbulb, active: editorMode === 'rgbMatrix', complete: settings.features.rgbMatrix ? assignableKeys.some(key => key.ledIndex !== undefined) : undefined, action: () => navigateDesign('rgbMatrix', 'rgbMatrix') },
+        { id: 'macros', label: t('macros.macros'), icon: ScrollText, active: activeRightPanel === 'macros', complete: settings.macros?.some(macro => macro.length > 0) || undefined, action: () => navigateDesign('keymap', 'macros') },
+        { id: 'combos', label: t('macros.combos'), icon: Workflow, active: activeRightPanel === 'combos', complete: !!settings.combos?.length || undefined, action: () => navigateDesign('keymap', 'combos') },
+        { id: 'tapDance', label: t('keycodeConfig.tapDance'), icon: WandSparkles, active: activeRightPanel === 'tapDance', complete: !!settings.tapDances?.length || undefined, action: () => navigateDesign('keymap', 'tapDance') },
+        { id: 'build', label: t('workspace.build'), icon: Download, active: isExportMenuOpen, complete: assignableKeys.length > 0 && wiringComplete, action: () => setIsExportMenuOpen(true) },
+      ];
 
   const handleImportKeyboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -676,11 +884,17 @@ export default function App() {
     if (!file) return;
     try {
       const text = await file.text();
-      const json = JSON.parse(text) as SmidrProject;
+      const json = fromSmidrProjectFile(JSON.parse(text));
       if (!json.keys || !json.name) {
         alert(t('common.invalidFile'));
       } else {
-        loadProject(json);
+        const savedProject = storeState.isDemoMode ? json : saveProject(json);
+        loadProject(savedProject);
+        setCurrentSavedUpdatedAt(savedProject.updatedAt);
+        setRestoredDraftDirty(false);
+        setIsHomeVisible(false);
+        setProjectWorkspace('hardware');
+        refreshProjectList();
       }
       setIsProjectMenuOpen(false);
     } catch (err) {
@@ -725,7 +939,7 @@ export default function App() {
     
     try {
       const text = await file.text();
-      const json = JSON.parse(text) as SmidrProject;
+      const json = fromSmidrProjectFile(JSON.parse(text));
       const importKeys = json.keys;
       if (!importKeys) {
         alert(t('common.invalidFile'));
@@ -789,12 +1003,12 @@ export default function App() {
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:h-14 md:flex-nowrap md:px-4 md:py-0 bg-[var(--bg-panel)] border-b border-[var(--border-main)] shrink-0">
         <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-2">
+          <button type="button" onClick={() => { setIsHomeVisible(true); storeState.setAppMode('design'); }} className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-[var(--bg-hover)]" title="Home">
             <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
               <img src={`${import.meta.env.BASE_URL}icon.png`} alt="Smiðr Logo" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-lg font-black tracking-tighter text-[var(--text-highlight)]">Smiðr</h1>
-          </div>
+          </button>
 
           <div className="flex items-center gap-3">
             <div className="w-px h-4 bg-[var(--border-main)]" />
@@ -804,56 +1018,45 @@ export default function App() {
           <div className="flex min-w-0 items-center gap-2">
             <div className="h-4 w-px bg-[var(--border-main)]" />
 
-            <div className="flex h-8 items-center rounded-md border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5">
+            <div className="flex h-10 items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
               <button
-                onClick={() => storeState.setAppMode('remap')}
+                onClick={() => enterWorkspace('hardware')}
                 className={cn(
-                  "flex h-full items-center justify-center gap-1.5 rounded-[4px] px-3 text-[10px] font-bold uppercase tracking-wider transition-all",
-                  storeState.appMode === 'remap'
+                  "flex h-full items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold transition-all",
+                  storeState.appMode === 'design' && projectWorkspace === 'hardware' && !isHomeVisible
                     ? "bg-amber-500 text-zinc-950 shadow-sm"
                     : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                )}
+                title={t('workspace.hardware')}
+              >
+                <Hammer size={16} />
+                <span className="hidden sm:block">{t('workspace.hardware')}</span>
+              </button>
+              <button
+                onClick={() => enterWorkspace('firmware')}
+                className={cn(
+                  "flex h-full items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold transition-all",
+                  storeState.appMode === 'design' && projectWorkspace === 'firmware' && !isHomeVisible
+                    ? "bg-amber-500 text-zinc-950 shadow-sm"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                )}
+                title={t('workspace.firmware')}
+              >
+                <Braces size={16} />
+                <span className="hidden sm:block">{t('workspace.firmware')}</span>
+              </button>
+              <button
+                onClick={() => enterWorkspace('remap')}
+                className={cn(
+                  "flex h-full items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold transition-all",
+                  storeState.appMode === 'remap' && !isHomeVisible ? "bg-amber-500 text-zinc-950 shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                 )}
                 title={t('modes.remap')}
               >
-                <Keyboard size={14} />
+                <Keyboard size={16} />
                 <span className="hidden sm:block">{t('modes.remap')}</span>
               </button>
-              <button
-                onClick={() => storeState.setAppMode('design')}
-                className={cn(
-                  "flex h-full items-center justify-center gap-1.5 rounded-[4px] px-3 text-[10px] font-bold uppercase tracking-wider transition-all",
-                  storeState.appMode === 'design'
-                    ? "bg-amber-500 text-zinc-950 shadow-sm"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                )}
-                title={t('modes.design')}
-              >
-                <SquarePen size={14} />
-                <span className="hidden sm:block">{t('modes.design')}</span>
-              </button>
             </div>
-
-            {storeState.appMode === 'design' && storeState.isProjectOpen && (
-              <div className="flex h-8 items-center rounded-md border border-[var(--border-main)] bg-[var(--bg-app)] p-0.5 animate-in fade-in slide-in-from-left-1 duration-200">
-                {designModes.map(({ id, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setEditorMode(id)}
-                    className={cn(
-                      "flex h-full items-center justify-center gap-1.5 rounded-[4px] px-3 text-[10px] font-bold uppercase tracking-wider transition-all",
-                      editorMode === id
-                        ? "bg-[var(--bg-panel)] text-amber-500 shadow-sm"
-                        : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                    )}
-                    title={t(`modes.${id}`)}
-                  >
-                    <Icon size={14} />
-                    <span className="hidden xl:block">{t(`modes.${id}`)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -916,7 +1119,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 overflow-visible border-b border-[var(--border-main)] bg-[var(--bg-app)]/80 px-3 py-1.5 md:px-4">
+      <div className={cn("min-h-12 shrink-0 items-center justify-between gap-3 overflow-visible border-b border-[var(--border-main)] bg-[var(--bg-app)]/80 px-3 py-2 md:px-4", isHomeVisible ? "hidden" : "flex")}>
         {storeState.appMode === 'remap' ? (
           <div className="flex min-w-max items-center gap-2 md:gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
             <DeviceConnector />
@@ -1103,7 +1306,7 @@ export default function App() {
               onClick={handleSaveProject}
               disabled={isSaving || !storeState.isProjectOpen}
               className={cn(
-                "flex items-center justify-center w-10 h-8 rounded-md transition-all group shrink-0 relative overflow-hidden disabled:pointer-events-none",
+                "flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all group shrink-0 relative overflow-hidden disabled:pointer-events-none",
                 storeState.isProjectOpen && showSavedFeedback
                   ? "bg-green-500/10 border border-green-500/20 text-green-500"
                   : storeState.isProjectOpen && isDirty
@@ -1122,6 +1325,15 @@ export default function App() {
                   storeState.isProjectOpen ? "group-hover:scale-110 transition-transform" : "opacity-20"
                 )} />
               )}
+              <span className="hidden xl:inline">
+                {saveError
+                  ? t('workspace.saveFailed')
+                  : isSaving
+                    ? t('workspace.saving')
+                    : isDirty
+                      ? t('workspace.unsaved')
+                      : t('workspace.saved')}
+              </span>
             </button>
 
             <div className="relative shrink-0">
@@ -1270,11 +1482,73 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* Main Workspace Area */}
-        {storeState.appMode === 'design' ? (
+        {isHomeVisible ? (
+          <ProjectHome
+            projects={savedProjects}
+            onCreate={handleNewProject}
+            onImport={handleImportProject}
+            onConnect={() => enterWorkspace('remap')}
+            onOpen={handleLoadProject}
+            onDelete={handleDeleteProject}
+            labels={{
+              eyebrow: t('workspace.homeEyebrow'),
+              title: t('workspace.homeTitle'),
+              description: t('workspace.homeDescription'),
+              create: t('workspace.createProject'),
+              createDescription: t('workspace.createProjectDescription'),
+              import: t('workspace.importProject'),
+              importDescription: t('workspace.importProjectDescription'),
+              connect: t('workspace.connectKeyboard'),
+              connectDescription: t('workspace.connectKeyboardDescription'),
+              recent: t('workspace.recentProjects'),
+              empty: t('workspace.noRecentProjects'),
+              keys: t('workspace.keys'),
+            }}
+          />
+        ) : storeState.appMode === 'design' ? (
           <main className="flex-1 relative overflow-hidden flex flex-col bg-[var(--bg-app)]">
+            {storeState.isProjectOpen && (
+              <>
+                {isLeftNavOpen && <button type="button" aria-label="Close navigation" className="absolute inset-0 z-[175] bg-black/40 lg:hidden" onClick={() => setIsLeftNavOpen(false)} />}
+                <button type="button" onClick={() => setIsLeftNavOpen(true)} className="absolute left-3 top-3 z-[170] flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] text-[var(--text-main)] shadow-lg lg:hidden" aria-label={t('workspace.navigation')}><Menu size={19} /></button>
+                <aside className={cn(
+                  "absolute inset-y-0 left-0 z-[180] flex w-[216px] flex-col border-r border-[var(--border-main)] bg-[var(--bg-panel)] transition-transform lg:translate-x-0",
+                  isLeftNavOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+                )}>
+                  <div className="border-b border-[var(--border-main)] px-4 py-4">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">{projectWorkspace === 'hardware' ? t('workspace.hardware') : t('workspace.firmware')}</span>
+                    <p className="mt-1 truncate text-sm font-semibold text-[var(--text-highlight)]">{settings.name || t('header.projectName')}</p>
+                  </div>
+                  <nav className="flex-1 space-y-1 overflow-y-auto p-3 custom-scrollbar" aria-label={t('workspace.navigation')}>
+                    {workflowItems.map(({ id, label, icon: Icon, active, complete, action }, index) => (
+                      <button key={id} type="button" onClick={action} aria-current={active ? 'page' : undefined} className={cn(
+                        "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors",
+                        active ? "bg-amber-500 text-zinc-950" : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"
+                      )}>
+                        <span className={cn("flex h-6 w-6 items-center justify-center rounded-md text-xs", active ? "bg-black/10" : "bg-[var(--bg-app)]")}>{index + 1}</span>
+                        <Icon size={17} />
+                        <span className="min-w-0 flex-1 truncate">{label}</span>
+                        <span className={cn(
+                          "flex h-3 w-3 shrink-0 items-center justify-center rounded-full",
+                          active && "bg-white/90 shadow-sm"
+                        )}>
+                          <span className={cn(
+                            "h-2 w-2 rounded-full",
+                            complete === true ? "bg-emerald-500" : complete === false ? "bg-amber-500" : "bg-[var(--text-dim)]/40"
+                          )} />
+                        </span>
+                      </button>
+                    ))}
+                  </nav>
+                  <button type="button" onClick={() => setIsHomeVisible(true)} className="m-3 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"><Home size={17} />{t('workspace.recentProjects')}</button>
+                </aside>
+
+                <button type="button" onClick={() => setIsInspectorOpen(true)} className="absolute right-3 top-3 z-[170] flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] text-[var(--text-main)] shadow-lg xl:hidden" aria-label={t('workspace.inspector')}><PanelRight size={19} /></button>
+              </>
+            )}
             {/* Canvas area stops above the bottom tray so centering and empty states use the visible workspace. */}
             <div
-              className="absolute inset-x-0 top-0 z-0 transition-all"
+              className="workspace-canvas absolute inset-x-0 top-0 z-0 transition-all"
               style={{ bottom: designCanvasBottom, right: designCanvasRight, boxShadow: designCanvasInsetShadow }}
             >
               <KeyboardCanvas />
@@ -1291,50 +1565,9 @@ export default function App() {
                 </div>
 
                 <aside
-                  className="absolute top-0 right-0 z-[90] w-[380px] bg-[var(--bg-panel)] border-l border-[var(--border-main)] overflow-visible flex animate-in fade-in slide-in-from-right-2 duration-200"
+                  className={cn("workspace-inspector absolute top-0 right-0 z-[190] w-[360px] max-w-[88vw] bg-[var(--bg-panel)] border-l border-[var(--border-main)] overflow-visible flex transition-transform duration-200 xl:translate-x-0", isInspectorOpen ? "translate-x-0 shadow-2xl" : "max-xl:translate-x-full")}
                   style={{ bottom: 0 }}
                 >
-                  <div className="shrink-0 w-12 border-r border-[var(--border-main)] bg-[var(--bg-app)]/50">
-                    <div className="flex flex-col items-center gap-1 px-1.5 py-2">
-                      {rightPanelTabs.map(item => {
-                        if (item.type === 'separator') {
-                          return <div key={item.id} className="my-1 h-px w-7 bg-[var(--border-main)]/70" />;
-                        }
-
-                        const { id, title, icon: Icon } = item;
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => setActiveRightPanel(id)}
-                            className={cn(
-                              "group relative flex h-9 w-9 items-center justify-center rounded transition-all shrink-0",
-                              activeRightPanel === id
-                                ? "bg-amber-500 text-zinc-950 shadow-sm"
-                                : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]"
-                            )}
-                            aria-label={title}
-                          >
-                            <Icon size={16} />
-                            <span className={cn(
-                              "pointer-events-none absolute right-full top-1/2 z-[220] mr-3 -translate-y-1/2 translate-x-1 whitespace-nowrap rounded px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] opacity-0 shadow-2xl transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100",
-                              editorSettings.theme === 'dark'
-                                ? "border border-white/10 bg-zinc-900/95 text-white"
-                                : "border border-white/10 bg-zinc-950/95 text-white"
-                            )}>
-                              {title}
-                              <span className={cn(
-                                "absolute left-full top-1/2 h-2 w-2 -translate-x-1 -translate-y-1/2 rotate-45 border-r border-t",
-                                editorSettings.theme === 'dark'
-                                  ? "border-white/10 bg-zinc-900/95"
-                                  : "border-white/10 bg-zinc-950/95"
-                              )} />
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                   <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
                     {activeRightPanelTab && (
                       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 px-4">
@@ -1342,11 +1575,12 @@ export default function App() {
                         <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
                           {activeRightPanelTab.title}
                         </span>
+                        <button type="button" onClick={() => setIsInspectorOpen(false)} className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] xl:hidden" aria-label="Close inspector"><X size={17} /></button>
                       </div>
                     )}
                     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                     {activeRightPanel === 'settings' && (
-                      <HardwareSettingsPanel />
+                      <HardwareSettingsPanel scope={projectWorkspace} />
                     )}
                     {activeRightPanel === 'properties' && editorMode === 'layout' && <PropertyPanel />}
                     {activeRightPanel === 'matrixPainter' && editorMode === 'matrix' && (
@@ -1357,11 +1591,6 @@ export default function App() {
                     {activeRightPanel === 'options' && <LayoutOptionsPanel />}
                     {activeRightPanel === 'keymap' && editorMode === 'keymap' && <KeycodeConfigPanel />}
                     {activeRightPanel === 'rgbMatrix' && editorMode === 'rgbMatrix' && <RgbMatrixPanel />}
-                    {activeRightPanel === 'pins' && editorMode === 'matrix' && (
-                      <div className="h-full overflow-hidden">
-                        <MatrixPinInspectorPanel />
-                      </div>
-                    )}
                     {activeRightPanel === 'macros' && <MacroPanel scope="project" />}
                     {activeRightPanel === 'combos' && <ComboPanel scope="project" />}
                     {activeRightPanel === 'tapDance' && <TapDancePanel scope="project" />}
@@ -1370,7 +1599,7 @@ export default function App() {
                 </aside>
 
                   {/* Left Side Floating Widgets */}
-                  <div className="absolute top-4 left-4 z-[100] flex flex-col gap-4">
+                  <div className="workspace-tools absolute top-4 left-4 z-[100] flex flex-col gap-4">
                     <EditorTools floating />
                   </div>
                 </>
@@ -1380,7 +1609,7 @@ export default function App() {
               {storeState.isProjectOpen && editorMode === 'keymap' && (
                 <div 
                   className={cn(
-                    "absolute bottom-0 left-0 bg-[var(--bg-panel)] border-t border-[var(--border-main)] z-[150] flex flex-col overflow-hidden transition-all h-[400px]"
+                    "workspace-bottom-tray absolute bottom-0 left-0 bg-[var(--bg-panel)] border-t border-[var(--border-main)] z-[150] flex flex-col overflow-hidden transition-all h-[400px]"
                   )}
                   style={{ right: designCanvasRight }}
                 >
@@ -1392,6 +1621,39 @@ export default function App() {
           <RemapView />
         )}
       </div>
+
+      {isPinSettingsDialogOpen && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsPinSettingsDialogOpen(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pin-settings-dialog-title"
+            className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <Hash size={18} className="text-amber-500" />
+                <div>
+                  <h2 id="pin-settings-dialog-title" className="text-sm font-bold text-[var(--text-highlight)]">{t('workspace.pins')}</h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('hardware.pinAssignHint')}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPinSettingsDialogOpen(false)}
+                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+                aria-label={t('common.cancel')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="h-[calc(92vh-73px)] min-h-0 max-h-[760px]">
+              <MatrixPinInspectorPanel variant="dialog" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {isKiCadDialogOpen && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
@@ -1581,18 +1843,18 @@ export default function App() {
       {/* Hardware Setup Modal */}
       {storeState.isHardwareModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-all" onClick={() => storeState.setIsHardwareModalOpen(false)} />
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-all" onClick={cancelNewProject} />
           <div className="relative bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between p-4 border-b border-[var(--border-main)] shrink-0 bg-[var(--bg-app)]/50">
               <div className="flex items-center gap-3">
                 <Settings size={18} className="text-amber-500" />
                 <div>
-                  <h2 className="text-sm font-bold text-[var(--text-highlight)]">{t('hardware.title')}</h2>
-                  <p className="text-xs text-[var(--text-muted)] font-medium">{t('hardware.desc')}</p>
+                  <h2 className="text-sm font-bold text-[var(--text-highlight)]">{t('workspace.createProject')}</h2>
+                  <p className="text-xs text-[var(--text-muted)] font-medium">{t('workspace.createProjectDescription')}</p>
                 </div>
               </div>
               <button 
-                onClick={() => storeState.setIsHardwareModalOpen(false)}
+                onClick={cancelNewProject}
                 className="p-2 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-highlight)] rounded transition-all active:scale-90"
               >
                 <X size={20} />
@@ -1600,16 +1862,13 @@ export default function App() {
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-panel)]">
-              <HardwareSettingsPanel />
+              <NewProjectSetup preset={newProjectPreset} onPresetChange={setNewProjectPreset} />
             </div>
             
             <div className="p-4 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 flex justify-end shrink-0 gap-3">
               <button 
-                onClick={() => {
-                  storeState.setIsProjectOpen(true);
-                  storeState.setIsHardwareModalOpen(false);
-                }}
-                className="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-md text-xs font-bold transition-all shadow-lg shadow-amber-500/10 active:scale-95"
+                onClick={confirmNewProject}
+                className="min-h-11 px-6 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-md text-sm font-bold transition-all shadow-lg shadow-amber-500/10 active:scale-95"
               >
                 {t('hardware.confirmBtn')}
               </button>

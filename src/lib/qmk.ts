@@ -6,7 +6,7 @@ import { generateQmkTapDanceC } from './tap-dance-codegen';
 import { actionToQmkSourceString, generateQmkStaticMacroC } from './macro-codegen';
 import { generateQmkComboC, hasConfiguredCombos } from './combo-codegen';
 import { getDefaultBootloader, getDefaultDevelopmentBoard, getQmkDevelopmentBoard, getQmkProcessor, getSplitSerialDriver } from './mcu-presets';
-import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getQmkMatrixFromPins, isDirectPinMatrix, MatrixSide } from './matrix-utils';
+import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getQmkMatrixFromPins, isDirectPinMatrix, MatrixSide, resolveDirectPin } from './matrix-utils';
 
 const hasPins = (pins: string[] | undefined) => (pins?.filter(Boolean).length ?? 0) > 0;
 
@@ -127,7 +127,7 @@ const generateDirectPins = (settings: ProjectSettings, validKeys: PhysicalKey[],
       ? getDirectLocalMatrixPosition(settings, key, allKeys)
       : getFirmwareMatrixPosition(settings, key, allKeys);
     if (!pos) return;
-    direct[pos.row][pos.col] = key.directPin?.trim() || 'NO_PIN';
+    direct[pos.row][pos.col] = resolveDirectPin(settings, key, allKeys) || 'NO_PIN';
   });
 
   return direct;

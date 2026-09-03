@@ -3,7 +3,7 @@ import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { generateViaJson } from './export';
 import { getDefaultDevelopmentBoard, getZmkHardwareTarget } from './mcu-presets';
-import { getDirectLocalMatrixPosition, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, isDirectPinMatrix } from './matrix-utils';
+import { getDirectLocalMatrixPosition, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
 import { sortKeys } from './sorting';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
@@ -130,7 +130,7 @@ const generateDirectPins = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   keys.forEach(key => {
     const pos = getDirectLocalMatrixPosition(settings, key, keys);
     if (!pos || pos.row >= matrix.rows || pos.col >= matrix.cols) return;
-    direct[pos.row][pos.col] = normalizeRmkPin(key.directPin, '_');
+    direct[pos.row][pos.col] = normalizeRmkPin(resolveDirectPin(settings, key, keys), '_');
   });
   return direct.map(row => `    [${row.map(quoteToml).join(', ')}]`).join(',\n');
 };

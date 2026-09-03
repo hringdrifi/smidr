@@ -2,7 +2,7 @@ import { PhysicalKey, ProjectSettings } from '../types/keyboard';
 import { UniversalAction, Modifier } from '../types/actions';
 import { actionToQmkString } from './protocols/via-action-converter';
 import { DEFAULT_VISUAL_LAYOUT, getKeycodeLegend, VisualLayoutId } from './visual-layouts';
-import { getQmkMatrixPosition, isDirectPinMatrix } from './matrix-utils';
+import { getDirectPinIndex, getQmkMatrixPosition, isDirectPinMatrix } from './matrix-utils';
 
 export const UNIT = 48;
 export const TOP_INSET = 0.08;
@@ -236,9 +236,14 @@ export const getKeyLabel = (
   settings?: ProjectSettings,
   keys: Array<Pick<PhysicalKey, 'x' | 'w'>> = []
 ): LabelNode => {
+  const encoderIndex = k.encoderId && settings?.encoders
+    ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
+    : k.encoderIndex;
   const trackballIndex = k.trackballId && settings?.trackballs
     ? settings.trackballs.findIndex(trackball => trackball.id === k.trackballId)
     : k.trackballIndex;
+  const encoderLabel = encoderIndex !== undefined && encoderIndex >= 0 ? `ENC${encoderIndex}` : '';
+  const trackballLabel = trackballIndex !== undefined && trackballIndex >= 0 ? `TRK${trackballIndex}` : '';
 
   if (appMode === 'remap') {
     const qmkPosition = settings ? getQmkMatrixPosition(settings, k, keys) : undefined;
@@ -253,23 +258,21 @@ export const getKeyLabel = (
     return formatActionLabel(action, visualLayout);
   }
 
+  if (mode === 'layout') {
+    const label = [encoderLabel, trackballLabel].filter(Boolean).join('\n');
+    return label ? { type: 'text', text: label } : { type: 'empty' };
+  }
+
   if (mode === 'matrix') {
-    const encoderIndex = k.encoderId && settings?.encoders
-      ? settings.encoders.findIndex(encoder => encoder.id === k.encoderId)
-      : k.encoderIndex;
     if (settings && isDirectPinMatrix(settings)) {
-      const directPinLabel = k.directPin || '';
-      const encoderLabel = encoderIndex !== undefined && encoderIndex >= 0 ? `ENC${encoderIndex}` : '';
-      const trackballLabel = trackballIndex !== undefined && trackballIndex >= 0 ? `TRK${trackballIndex}` : '';
-      const label = [directPinLabel, encoderLabel, trackballLabel].filter(Boolean).join('\n');
+      const directIndex = getDirectPinIndex(settings, k, keys);
+      const directLabel = directIndex !== undefined ? `D${directIndex}` : '';
+      const label = [directLabel, encoderLabel, trackballLabel].filter(Boolean).join('\n');
       return label ? { type: 'text', text: label } : { type: 'empty' };
     }
-    if (encoderIndex !== undefined && encoderIndex >= 0 && (k.row === undefined || k.col === undefined)) {
-      return { type: 'text', text: `ENC${encoderIndex}` };
-    }
-    return (k.row !== undefined && k.col !== undefined)
-      ? { type: 'text', text: encoderIndex !== undefined && encoderIndex >= 0 ? `R${k.row}:C${k.col}\nENC${encoderIndex}` : `R${k.row}:C${k.col}` }
-      : { type: 'empty' };
+    const matrixLabel = k.row !== undefined && k.col !== undefined ? `R${k.row}:C${k.col}` : '';
+    const label = [matrixLabel, encoderLabel, trackballLabel].filter(Boolean).join('\n');
+    return label ? { type: 'text', text: label } : { type: 'empty' };
   }
   if (mode === 'keymap') {
     const isEncoder = k.kind === 'encoder' || !!k.encoderId || k.encoderIndex !== undefined;

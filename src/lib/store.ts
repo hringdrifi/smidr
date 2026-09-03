@@ -34,9 +34,11 @@ import { normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
 import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, DEMO_TAP_DANCES, isDemoModeEnabled } from './demo';
 import {
   getFirmwareMatrixPosition,
+  getDirectPinPool,
   getLocalMatrixPosition,
   getMatrixFromPins,
   inferMatrixSideFromGeometry,
+  isMatrixSwitchKey,
   MatrixSide,
 } from './matrix-utils';
 import { getRgbMatrixBounds, getRgbMatrixLedPosition } from './rgb-matrix';
@@ -340,7 +342,7 @@ const initialState: Partial<KeyboardState> = {
     vendorProductId: 0xFEED0001,
     vialUid: generateRandomVialUid(),
     matrix: { rows: 0, cols: 0, wiring: 'matrix' },
-    pins: { rows: [], cols: [], splitRows: [], splitCols: [] },
+    pins: { rows: [], cols: [], splitRows: [], splitCols: [], direct: [], splitDirect: [] },
     hardware: {
       controllerType: 'development_board',
       mcu: 'RP2040',
@@ -492,8 +494,8 @@ const getGeneratedZmkProjectSettings = (
 
 const getRemoteKeymapIndex = (
   settings: ProjectSettings,
-  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin' | 'zmkPosition'>,
-  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>> = []
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin' | 'zmkPosition'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin'>> = []
 ): number | undefined => {
   if (key.zmkPosition !== undefined) return key.zmkPosition;
   const position = getFirmwareMatrixPosition(settings, key, keys);
@@ -503,8 +505,8 @@ const getRemoteKeymapIndex = (
 
 const getDeviceKeyTarget = (
   settings: ProjectSettings,
-  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin' | 'zmkPosition'>,
-  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>>,
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin' | 'zmkPosition'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin'>>,
   isZmk: boolean
 ): { row: number; col: number } | undefined => {
   if (isZmk && key.zmkPosition !== undefined) return { row: key.zmkPosition, col: -1 };
@@ -513,8 +515,8 @@ const getDeviceKeyTarget = (
 
 const hasDeviceMatrixPosition = (
   settings: ProjectSettings,
-  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin' | 'zmkPosition'>,
-  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directPin'>>,
+  key: Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin' | 'zmkPosition'>,
+  keys: Array<Pick<PhysicalKey, 'row' | 'col' | 'matrixSide' | 'x' | 'y' | 'w' | 'id' | 'directIndex' | 'directPin'>>,
   row: number,
   col: number
 ) => {
@@ -2205,6 +2207,7 @@ export const useKeyboardStore = create<KeyboardState>()(
               row,
               col,
               matrixSide,
+              directIndex: row !== undefined || col !== undefined ? undefined : k.directIndex,
               directPin: row !== undefined || col !== undefined ? undefined : k.directPin,
             };
           })
@@ -2325,6 +2328,21 @@ export const useKeyboardStore = create<KeyboardState>()(
         
         paintKey: (id: string) => set((s) => {
           const { currentRow: r, currentCol: c, currentSide, autoIncrement: a } = s.painter;
+          if (s.settings.matrix.wiring === 'direct') {
+            const directPins = getDirectPinPool(s.settings, currentSide);
+            if (!directPins[c]) return s;
+            return {
+              keys: s.keys.map(k => k.id === id ? {
+                ...k,
+                directIndex: c,
+                directPin: undefined,
+                row: undefined,
+                col: undefined,
+                matrixSide: s.settings.features.split ? currentSide : undefined,
+              } : k),
+              painter: { ...s.painter, currentRow: 0, currentCol: c + 1 },
+            };
+          }
           const matrixColCount = getMatrixFromPins(s.settings.pins, s.settings.features.split)?.cols || s.settings.matrix.cols || 1;
           const matrixNextCol = c + 1;
           const nextRow = a === 'row' || (a === 'matrix' && matrixNextCol >= matrixColCount) ? r + 1 : r;
@@ -2762,7 +2780,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         })),
 
         clearMatrixMap: () => set((s: KeyboardState) => ({
-          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined, matrixSide: undefined, directPin: undefined }))
+          keys: s.keys.map(k => ({ ...k, row: undefined, col: undefined, matrixSide: undefined, directIndex: undefined, directPin: undefined }))
         })),
 
         clearRgbMatrix: () => set((s: KeyboardState) => ({
@@ -2781,9 +2799,37 @@ export const useKeyboardStore = create<KeyboardState>()(
 
         autoAssignMatrix: () => set((s: KeyboardState) => {
           const visKeys = s.keys.filter(k => !k.group || s.settings.activeOptions[k.group] === k.option);
+          if (s.settings.matrix.wiring === 'direct') {
+            const assignments = new Map<string, { directIndex?: number; matrixSide?: MatrixSide }>();
+            const assignDirectGroup = (groupKeys: RuntimeKey[], side: MatrixSide) => {
+              const directPins = getDirectPinPool(s.settings, side);
+              sortKeys(groupKeys.filter(isMatrixSwitchKey), s.editorSettings.sortThresholdY)
+                .forEach((key, index) => assignments.set(key.id!, {
+                  directIndex: index < directPins.length ? index : undefined,
+                  matrixSide: s.settings.features.split ? side : undefined,
+                }));
+            };
+            if (s.settings.features.split) {
+              assignDirectGroup(visKeys.filter(k => inferMatrixSideFromGeometry(k, visKeys) === 'left'), 'left');
+              assignDirectGroup(visKeys.filter(k => inferMatrixSideFromGeometry(k, visKeys) === 'right'), 'right');
+            } else {
+              assignDirectGroup(visKeys, 'left');
+            }
+            return {
+              keys: s.keys.map(key => assignments.has(key.id) || !isMatrixSwitchKey(key) ? {
+                ...key,
+                ...(assignments.get(key.id) || {}),
+                directIndex: assignments.get(key.id)?.directIndex,
+                directPin: undefined,
+                row: undefined,
+                col: undefined,
+              } : key),
+              painter: { ...s.painter, currentRow: 0, currentCol: 0 },
+            };
+          }
           const idToMatrix: Record<string, { row: number, col: number, matrixSide?: MatrixSide }> = {};
           const assignGroup = (groupKeys: RuntimeKey[], matrixSide?: MatrixSide) => {
-            const sorted = sortKeys(groupKeys, s.editorSettings.sortThresholdY);
+            const sorted = sortKeys(groupKeys.filter(isMatrixSwitchKey), s.editorSettings.sortThresholdY);
             let currentRow = 0;
             let currentCol = 0;
             sorted.forEach((k: PhysicalKey, i: number) => {
@@ -2806,7 +2852,11 @@ export const useKeyboardStore = create<KeyboardState>()(
             assignGroup(visKeys);
           }
           return {
-            keys: s.keys.map(k => idToMatrix[k.id!] ? { ...k, ...idToMatrix[k.id!] } : k),
+            keys: s.keys.map(k => idToMatrix[k.id!]
+              ? { ...k, ...idToMatrix[k.id!], directIndex: undefined, directPin: undefined }
+              : !isMatrixSwitchKey(k)
+                ? { ...k, row: undefined, col: undefined, directIndex: undefined, directPin: undefined }
+                : k),
             painter: { ...s.painter, currentRow: 0, currentCol: 0 }
           };
         }),

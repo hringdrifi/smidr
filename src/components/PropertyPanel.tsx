@@ -468,9 +468,9 @@ export const PropertyPanel = () => {
               <PropertySection
                 title={t('properties.specialShapes')}
                 icon={Maximize}
-                className="w-full"
+                className={cn("w-full", specialShapeEnabled && "h-[300px]")}
               >
-                <div className="flex flex-col h-full space-y-4">
+                <div className="flex flex-col space-y-4">
                   <div className="flex items-center justify-between gap-3 rounded border border-[var(--border-main)]/50 bg-[var(--bg-app)]/50 p-2">
                     <span className="text-xs font-bold text-[var(--text-main)]">{t('properties.specialShapes')}</span>
                     <button
@@ -508,29 +508,29 @@ export const PropertyPanel = () => {
                         <PropertyInput label={t('properties.offsetXSub')} value={scaleUnit(selectedKey.x2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowRight} onFocus={() => setFocusedField('x2')} onChange={(val: number) => updateKey(selectedKey.id, { x2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { x2: parseUnit(val) }, true); }} />
                         <PropertyInput label={t('properties.offsetYSub')} value={scaleUnit(selectedKey.y2 ?? 0)} step={formatStep(editorSettings.gridSnap)} unit={unitLabel} icon={ArrowDown} onFocus={() => setFocusedField('y2')} onChange={(val: number) => updateKey(selectedKey.id, { y2: parseUnit(val) })} onFinalize={(val: number) => { updateKey(selectedKey.id, { y2: parseUnit(val) }, true); }} />
                       </div>
-                    </div>
-                  )}
 
-                  <div className="flex items-center gap-3 p-2 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/50 group hover:border-amber-500/30 transition-colors shrink-0">
-                    <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors bg-[var(--bg-button)]">
-                      <input
-                        type="checkbox"
-                        checked={selectedKey.stepped ?? false}
-                        onChange={(e) => { updateKey(selectedKey.id, { stepped: e.target.checked }); }}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div className={cn(
-                        "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all",
-                        selectedKey.stepped ? "left-[18px] bg-amber-500" : "left-[2px] bg-zinc-400"
-                      )} />
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <Layers size={10} className={cn("transition-colors", selectedKey.stepped ? "text-amber-500" : "text-[var(--text-dim)]")} />
-                        <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('properties.stepped')}</span>
+                      <div className="flex items-center gap-3 p-2 bg-[var(--bg-app)]/50 rounded border border-[var(--border-main)]/50 group hover:border-amber-500/30 transition-colors shrink-0">
+                        <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors bg-[var(--bg-button)]">
+                          <input
+                            type="checkbox"
+                            checked={selectedKey.stepped ?? false}
+                            onChange={(e) => { updateKey(selectedKey.id, { stepped: e.target.checked }); }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className={cn(
+                            "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all",
+                            selectedKey.stepped ? "left-[18px] bg-amber-500" : "left-[2px] bg-zinc-400"
+                          )} />
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <Layers size={10} className={cn("transition-colors", selectedKey.stepped ? "text-amber-500" : "text-[var(--text-dim)]")} />
+                            <span className="text-xs font-bold text-[var(--text-main)] leading-none">{t('properties.stepped')}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </PropertySection>
 

@@ -51,7 +51,7 @@ const PinInput = ({ label, value, onChange, placeholder }: { label: string, valu
   </div>
 );
 
-export const HardwareSettingsPanel = () => {
+export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 'firmware' | 'all' }) => {
   const { settings, updateSettings } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
@@ -150,7 +150,7 @@ export const HardwareSettingsPanel = () => {
               <input type="text" value={settings.manufacturer} onChange={(e) => updateSettings({ manufacturer: e.target.value })} className="w-full bg-[var(--bg-app)] border border-[var(--border-main)] rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-amber-500 outline-none text-[var(--text-highlight)]" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          {scope !== 'hardware' && <div className="grid grid-cols-2 gap-4">
             <PinInput 
               label={t('hardware.vidHex')} 
               value={`0x${(settings.vendorProductId >>> 16).toString(16).toUpperCase().padStart(4, '0')}`} 
@@ -171,10 +171,11 @@ export const HardwareSettingsPanel = () => {
               }} 
               placeholder="0x0001" 
             />
-          </div>
+          </div>}
         </div>
       </Section>
 
+      {scope !== 'firmware' && <>
       {/* Controller & Matrix */}
       <Section title={t('hardware.mcu')} icon={Cpu}>
         <div className="space-y-4">
@@ -273,7 +274,9 @@ export const HardwareSettingsPanel = () => {
 
         </div>
       </Section>
+      </>}
 
+      {scope !== 'hardware' && <>
       {/* QMK Details */}
       <Section title={t('hardware.qmkDetails')} icon={Settings}>
         <div className="space-y-3">
@@ -451,6 +454,7 @@ export const HardwareSettingsPanel = () => {
           </div>
         </div>
       </Section>
+      </>}
 
       {/* Developer Settings */}
       <Section title={t('hardware.developer')} icon={Settings}>

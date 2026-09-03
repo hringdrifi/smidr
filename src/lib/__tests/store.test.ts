@@ -444,9 +444,9 @@ describe('useKeyboardStore', () => {
     expect(key.matrixSide).toBe('right');
   });
 
-  it('should clear direct pin when assigning matrix position', () => {
+  it('should clear direct assignment when assigning matrix position', () => {
     const store = useKeyboardStore.getState();
-    store.addKey({ x: 0, y: 0, w: 1, h: 1, label: 'A', directPin: 'GP2' });
+    store.addKey({ x: 0, y: 0, w: 1, h: 1, label: 'A', directIndex: 0, directPin: 'GP2' });
 
     const keyId = useKeyboardStore.getState().keys[0].id;
     store.setMatrixPosition(keyId, 1, 2);
@@ -454,7 +454,82 @@ describe('useKeyboardStore', () => {
     const key = useKeyboardStore.getState().keys[0];
     expect(key.row).toBe(1);
     expect(key.col).toBe(2);
+    expect(key.directIndex).toBeUndefined();
     expect(key.directPin).toBeUndefined();
+  });
+
+  it('should paint direct keys using logical D indices', () => {
+    const store = useKeyboardStore.getState();
+    store.resetProject();
+    store.updateSettings({
+      matrix: { rows: 1, cols: 3, wiring: 'direct' },
+      pins: { rows: [], cols: [], direct: ['GP2', 'GP3', 'GP4'] },
+    } as any);
+    store.addKey({ x: 0, y: 0, w: 1, h: 1, label: 'A' });
+    store.setPainter({ currentRow: 0, currentCol: 1, currentSide: 'left', autoIncrement: 'col' });
+
+    const keyId = useKeyboardStore.getState().keys[0].id;
+    useKeyboardStore.getState().paintKey(keyId);
+
+    const state = useKeyboardStore.getState();
+    expect(state.keys[0].directIndex).toBe(1);
+    expect(state.keys[0].directPin).toBeUndefined();
+    expect(state.keys[0].row).toBeUndefined();
+    expect(state.keys[0].col).toBeUndefined();
+    expect(state.painter.currentCol).toBe(2);
+    useKeyboardStore.getState().resetProject();
+  });
+
+  it('should auto-assign direct keys from D0 in visual order on each split half', () => {
+    const store = useKeyboardStore.getState();
+    store.resetProject();
+    store.updateSettings({
+      matrix: { rows: 1, cols: 2, wiring: 'direct' },
+      features: { ...useKeyboardStore.getState().settings.features, split: true },
+      pins: {
+        rows: [], cols: [], direct: ['L0', 'L1'], splitDirect: ['R0', 'R1'],
+      },
+    } as any);
+    store.addKeys([
+      { x: 1, y: 0, w: 1, h: 1, matrixSide: 'left', label: 'L1' },
+      { x: 0, y: 0, w: 1, h: 1, matrixSide: 'left', label: 'L0' },
+      { x: 8, y: 0, w: 1, h: 1, matrixSide: 'right', label: 'R0' },
+      { x: 9, y: 0, w: 1, h: 1, matrixSide: 'right', label: 'R1' },
+      { x: 10, y: 0, w: 1, h: 1, kind: 'encoder', encoderIndex: 0, matrixSide: 'right', directIndex: 1, label: 'Encoder' },
+      { x: 11, y: 0, w: 1, h: 1, kind: 'trackball', trackballIndex: 0, matrixSide: 'right', directIndex: 1, label: 'Trackball' },
+    ], { skipCollision: true });
+
+    useKeyboardStore.getState().autoAssignMatrix();
+
+    const byLabel = Object.fromEntries(useKeyboardStore.getState().keys.map(key => [key.label, key]));
+    expect(byLabel.L0.directIndex).toBe(0);
+    expect(byLabel.L1.directIndex).toBe(1);
+    expect(byLabel.R0.directIndex).toBe(0);
+    expect(byLabel.R1.directIndex).toBe(1);
+    expect(byLabel.Encoder.directIndex).toBeUndefined();
+    expect(byLabel.Trackball.directIndex).toBeUndefined();
+    expect(useKeyboardStore.getState().keys.every(key => key.directPin === undefined)).toBe(true);
+    useKeyboardStore.getState().resetProject();
+  });
+
+  it('should exclude encoders and trackballs from matrix auto-assignment', () => {
+    const store = useKeyboardStore.getState();
+    store.resetProject();
+    store.addKeys([
+      { x: 0, y: 0, w: 1, h: 1, label: 'Key' },
+      { x: 1, y: 0, w: 1, h: 1, kind: 'encoder', encoderIndex: 0, row: 3, col: 3, label: 'Encoder' },
+      { x: 2, y: 0, w: 1, h: 1, kind: 'trackball', trackballIndex: 0, row: 3, col: 4, label: 'Trackball' },
+    ], { skipCollision: true });
+
+    useKeyboardStore.getState().autoAssignMatrix();
+
+    const byLabel = Object.fromEntries(useKeyboardStore.getState().keys.map(key => [key.label, key]));
+    expect(byLabel.Key).toMatchObject({ row: 0, col: 0 });
+    expect(byLabel.Encoder.row).toBeUndefined();
+    expect(byLabel.Encoder.col).toBeUndefined();
+    expect(byLabel.Trackball.row).toBeUndefined();
+    expect(byLabel.Trackball.col).toBeUndefined();
+    useKeyboardStore.getState().resetProject();
   });
 
   it('should handle copying and pasting universal actions in keymap mode (design app mode)', () => {

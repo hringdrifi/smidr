@@ -1,9 +1,14 @@
 import { SmidrProject } from '@/types/keyboard';
 import { Language } from './i18n';
 import { DEFAULT_VISUAL_LAYOUT, normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
+import { fromSmidrProjectFile, toSmidrProjectFileV05 } from './project-format';
 
 
 const STORAGE_KEY = 'smidr_projects';
+const STORAGE_V05_KEY = 'smidr_projects_v0_5';
+const STORAGE_DRAFTS_V05_KEY = 'smidr_project_drafts_v0_5';
+const STORAGE_PRE_V05_BACKUP_KEY = 'smidr_projects_backup_pre_0_5';
+const STORAGE_MIGRATION_KEY = 'smidr_projects_migrated_to_0_5';
 const THEME_STORAGE_KEY = 'smidr_theme';
 const APP_MODE_STORAGE_KEY = 'smidr_app_mode';
 const EDITOR_MODE_STORAGE_KEY = 'smidr_editor_mode';
@@ -12,6 +17,20 @@ const VISUAL_LAYOUT_STORAGE_KEY = 'smidr_visual_layout';
 export type StoredTheme = 'dark' | 'light';
 export type StoredAppMode = 'design' | 'remap';
 export type StoredEditorMode = 'layout' | 'matrix' | 'hardware' | 'keymap' | 'rgbMatrix';
+
+interface StoredProjectDraft {
+  projectId: string;
+  baseUpdatedAt: number;
+  updatedAt: number;
+  project: ReturnType<typeof toSmidrProjectFileV05>;
+}
+
+export interface ProjectDraft {
+  projectId: string;
+  baseUpdatedAt: number;
+  updatedAt: number;
+  project: SmidrProject;
+}
 
 export const getStoredTheme = (): StoredTheme | null => {
   if (typeof window === 'undefined') return null;
@@ -61,32 +80,96 @@ export const setStoredVisualLayout = (layout: VisualLayoutId): void => {
 
 export const listProjects = (): SmidrProject[] => {
   if (typeof window === 'undefined') return [];
-  const data = localStorage.getItem(STORAGE_KEY);
+  if (localStorage.getItem(STORAGE_MIGRATION_KEY) !== '1') {
+    const legacyData = localStorage.getItem(STORAGE_KEY);
+    if (legacyData && !localStorage.getItem(STORAGE_PRE_V05_BACKUP_KEY)) {
+      localStorage.setItem(STORAGE_PRE_V05_BACKUP_KEY, legacyData);
+    }
+    if (legacyData && !localStorage.getItem(STORAGE_V05_KEY)) {
+      try {
+        const legacyProjects = JSON.parse(legacyData) as SmidrProject[];
+        localStorage.setItem(STORAGE_V05_KEY, JSON.stringify(legacyProjects.map(toSmidrProjectFileV05)));
+      } catch (error) {
+        console.error('Failed to migrate projects to 0.5', error);
+      }
+    }
+    localStorage.setItem(STORAGE_MIGRATION_KEY, '1');
+  }
+
+  const data = localStorage.getItem(STORAGE_V05_KEY);
   if (!data) return [];
   try {
-    return JSON.parse(data);
+    return (JSON.parse(data) as unknown[]).map(fromSmidrProjectFile);
   } catch (e) {
     console.error('Failed to parse projects from localStorage', e);
     return [];
   }
 };
 
-export const saveProject = (project: SmidrProject) => {
+export const saveProject = (project: SmidrProject): SmidrProject => {
   const projects = listProjects();
   const index = projects.findIndex(p => p.id === project.id);
+  const savedProject = { ...project, updatedAt: Date.now() };
   
   if (index >= 0) {
-    projects[index] = { ...project, updatedAt: Date.now() };
+    projects[index] = savedProject;
   } else {
-    projects.push({ ...project, updatedAt: Date.now() });
+    projects.push(savedProject);
   }
   
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  localStorage.setItem(STORAGE_V05_KEY, JSON.stringify(projects.map(toSmidrProjectFileV05)));
+  return savedProject;
+};
+
+const listStoredProjectDrafts = (): StoredProjectDraft[] => {
+  if (typeof window === 'undefined') return [];
+  const data = localStorage.getItem(STORAGE_DRAFTS_V05_KEY);
+  if (!data) return [];
+  try {
+    return JSON.parse(data) as StoredProjectDraft[];
+  } catch (error) {
+    console.error('Failed to parse project drafts from localStorage', error);
+    return [];
+  }
+};
+
+export const saveProjectDraft = (project: SmidrProject, baseUpdatedAt: number): ProjectDraft => {
+  const drafts = listStoredProjectDrafts();
+  const updatedAt = Date.now();
+  const storedDraft: StoredProjectDraft = {
+    projectId: project.id,
+    baseUpdatedAt,
+    updatedAt,
+    project: toSmidrProjectFileV05({ ...project, updatedAt }),
+  };
+  const index = drafts.findIndex(draft => draft.projectId === project.id);
+  if (index >= 0) drafts[index] = storedDraft;
+  else drafts.push(storedDraft);
+  localStorage.setItem(STORAGE_DRAFTS_V05_KEY, JSON.stringify(drafts));
+  return { ...storedDraft, project: fromSmidrProjectFile(storedDraft.project) };
+};
+
+export const getProjectDraft = (projectId: string): ProjectDraft | undefined => {
+  const draft = listStoredProjectDrafts().find(candidate => candidate.projectId === projectId);
+  if (!draft) return undefined;
+  try {
+    return { ...draft, project: fromSmidrProjectFile(draft.project) };
+  } catch (error) {
+    console.error('Failed to restore project draft from localStorage', error);
+    return undefined;
+  }
+};
+
+export const deleteProjectDraft = (projectId: string): void => {
+  if (typeof window === 'undefined') return;
+  const drafts = listStoredProjectDrafts().filter(draft => draft.projectId !== projectId);
+  localStorage.setItem(STORAGE_DRAFTS_V05_KEY, JSON.stringify(drafts));
 };
 
 export const deleteProject = (id: string) => {
   const projects = listProjects().filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  localStorage.setItem(STORAGE_V05_KEY, JSON.stringify(projects.map(toSmidrProjectFileV05)));
+  deleteProjectDraft(id);
 };
 
 export const getProject = (id: string): SmidrProject | undefined => {

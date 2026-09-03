@@ -3,7 +3,7 @@
 import React from 'react';
 import { CircleDot, Gauge, MousePointer2, PlugZap, Trash2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
-import { getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide } from '@/lib/matrix-utils';
+import { getDirectPinIndex, getLocalMatrixPosition, inferMatrixSideFromGeometry, MatrixSide, resolveDirectPin } from '@/lib/matrix-utils';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 import { RightPanelEmptyState } from './RightPanelEmptyState';
@@ -62,6 +62,11 @@ export const MatrixPainter = () => {
     : getMcuPins(selectedMcu);
   const wiringMode = settings.matrix?.wiring || 'matrix';
   const isDirectMode = wiringMode === 'direct';
+  const configuredDirectPins = settings.features.split && selectedMatrixSide === 'right'
+    ? settings.pins.splitDirect || []
+    : settings.pins.direct || [];
+  const selectedDirectIndex = selectedKey ? getDirectPinIndex(settings, selectedKey, keys) : undefined;
+  const selectedDirectPin = selectedKey ? resolveDirectPin(settings, selectedKey, keys) : undefined;
 
   const assignedPins = React.useMemo(() => {
     const pins = new Set<string>();
@@ -70,7 +75,8 @@ export const MatrixPainter = () => {
         const keySide = settings.features.split
           ? key.matrixSide || inferMatrixSideFromGeometry(key, keys)
           : 'left';
-        if (keySide === selectedMatrixSide && key.directPin) pins.add(key.directPin);
+        const directPin = resolveDirectPin(settings, key, keys);
+        if (keySide === selectedMatrixSide && directPin) pins.add(directPin);
         if (key.trackballId) {
           const trackball = (settings.trackballs || []).find(item => item.id === key.trackballId);
           if (trackball) [trackball.sclk, trackball.sdio, trackball.cs, trackball.motion].forEach(pin => pin && pins.add(pin));
@@ -102,7 +108,8 @@ export const MatrixPainter = () => {
     }
 
     keys.forEach(key => {
-      if (key.directPin) pins.add(key.directPin);
+      const directPin = resolveDirectPin(settings, key, keys);
+      if (directPin) pins.add(directPin);
       if (key.trackballId) {
         const trackball = (settings.trackballs || []).find(item => item.id === key.trackballId);
         if (trackball) [trackball.sclk, trackball.sdio, trackball.cs, trackball.motion].forEach(pin => pin && pins.add(pin));
@@ -127,7 +134,7 @@ export const MatrixPainter = () => {
     ? 'trackball'
     : isDirectMode && (focusedPinTarget === 'direct' || !selectedEncoder) ? 'direct' : 'encoder';
   const activePinValue = activePinTarget === 'direct'
-    ? selectedKey?.directPin
+    ? selectedDirectPin
     : activePinTarget === 'trackball' ? currentTrackballPin : currentEncoderPin;
 
   const assignEncoderPin = (pinName: string) => {
@@ -140,8 +147,14 @@ export const MatrixPainter = () => {
 
   const assignDirectPin = (pinName: string) => {
     if (!selectedKeyId) return;
-    if (preventDuplicatePins && assignedPins.has(pinName) && selectedKey?.directPin !== pinName) return;
-    updateKey(selectedKeyId, { directPin: pinName, row: undefined, col: undefined });
+    if (!configuredDirectPins.includes(pinName)) return;
+    if (preventDuplicatePins && assignedPins.has(pinName) && selectedDirectPin !== pinName) return;
+    updateKey(selectedKeyId, {
+      directIndex: configuredDirectPins.indexOf(pinName),
+      directPin: undefined,
+      row: undefined,
+      col: undefined,
+    });
   };
 
   const assignTrackballPin = (pinName: string) => {
@@ -167,7 +180,14 @@ export const MatrixPainter = () => {
   const setSelectedSide = (side: MatrixSide) => {
     if (!selectedKeyId) return;
     if (isDirectMode) {
-      updateKey(selectedKeyId, { matrixSide: side, row: undefined, col: undefined });
+      const sidePins = side === 'right' ? settings.pins.splitDirect || [] : settings.pins.direct || [];
+      updateKey(selectedKeyId, {
+        matrixSide: side,
+        row: undefined,
+        col: undefined,
+        directIndex: selectedDirectIndex !== undefined && selectedDirectIndex < sidePins.length ? selectedDirectIndex : undefined,
+        directPin: undefined,
+      });
       return;
     }
     setMatrixPosition(selectedKeyId, selectedMatrixPos?.row, selectedMatrixPos?.col, side);
@@ -227,16 +247,16 @@ export const MatrixPainter = () => {
                 </div>
               </div>
             </div>
-            <input
-              type="text"
-              value={selectedKey.directPin || ''}
-              onFocus={() => setFocusedPinTarget('direct')}
-              onChange={(e) => updateKey(selectedKeyId, { directPin: e.target.value.toUpperCase(), row: undefined, col: undefined })}
-              placeholder={t('matrix.directPinPlaceholder')}
-              className="h-9 w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none transition-all placeholder:text-[var(--text-dim)] focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
-            />
+            <div className="flex min-h-9 items-center rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-3 font-mono text-xs font-bold text-[var(--text-highlight)]">
+              {selectedDirectIndex !== undefined && selectedDirectPin
+                ? `D${selectedDirectIndex} · ${selectedDirectPin}`
+                : t('matrix.chooseConfiguredDirectPin')}
+            </div>
+            {configuredDirectPins.length === 0 && (
+              <p className="mt-2 text-[10px] leading-relaxed text-amber-500">{t('matrix.configureDirectPinsFirst')}</p>
+            )}
             <button
-              onClick={() => updateKey(selectedKeyId, { directPin: undefined })}
+              onClick={() => updateKey(selectedKeyId, { directIndex: undefined, directPin: undefined })}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-red-500 transition-colors hover:bg-red-500 hover:text-white"
             >
               <Trash2 size={13} />
@@ -418,13 +438,15 @@ export const MatrixPainter = () => {
 
       {(isDirectMode || selectedEncoder || selectedTrackball) && (
         <AvailablePinPool
-          title={`${t('matrix.availablePins')} (${pinPoolLabel})`}
+          title={activePinTarget === 'direct'
+            ? t('matrix.configuredDirectPins')
+            : `${t('matrix.availablePins')} (${pinPoolLabel})`}
           activeLabel={activePinTarget === 'direct'
             ? t('matrix.directPin')
             : activePinTarget === 'trackball'
               ? t(`matrix.trackball${focusedTrackballPin[0].toUpperCase()}${focusedTrackballPin.slice(1)}` as any)
               : focusedEncoderPin === 'pinA' ? t('matrix.encoderPinA') : t('matrix.encoderPinB')}
-          pins={pinPool}
+          pins={activePinTarget === 'direct' ? configuredDirectPins : pinPool}
           assignedPins={assignedPins}
           preventDuplicates={preventDuplicatePins}
           onPreventDuplicatesChange={setPreventDuplicatePins}
@@ -434,7 +456,7 @@ export const MatrixPainter = () => {
           isListTarget={false}
           customPinText={customEncoderPinText}
           onCustomPinTextChange={(value) => setCustomEncoderPinText(value.toUpperCase())}
-          showCustomPinInput
+          showCustomPinInput={activePinTarget !== 'direct'}
           className="sticky bottom-0 z-10"
           pinListClassName="max-h-36 p-2"
         />

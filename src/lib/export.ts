@@ -1,4 +1,5 @@
-import { PhysicalKey, SmidrProject, ProjectSettings } from '@/types/keyboard';
+import { PhysicalKey, SmidrProject, SmidrProjectFileV05, ProjectSettings } from '@/types/keyboard';
+import { toSmidrProjectFileV05 } from './project-format';
 import { exportKLE } from './kle';
 import { actionToQmkString } from './protocols/via-action-converter';
 import { getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getQmkMatrixFromPins, isDirectPinMatrix } from './matrix-utils';
@@ -354,7 +355,7 @@ export const generateViaJson = (state: { settings: ProjectSettings, keys: Physic
 /**
  * Generates a full Smidr Project JSON (containing internal metadata).
  */
-export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProject => {
+export const generateSmidrProjectJson = (state: { settings: ProjectSettings, keys: PhysicalKey[] }): SmidrProjectFileV05 => {
   const { settings, keys } = state;
   const { matrix, pins, vendorProductId, visualLayout, features, ...settingsWithoutRuntimeIds } = settings;
   const isDirectMatrix = matrix?.wiring === 'direct';
@@ -368,7 +369,7 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     delete savedPins.splitCols;
     delete savedPins.splitSerial;
   }
-  return {
+  const legacyProject = {
     id: crypto.randomUUID(),
     updatedAt: Date.now(),
     ...settingsWithoutRuntimeIds,
@@ -400,6 +401,7 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
       return savedKey;
     })
   } as unknown as SmidrProject;
+  return toSmidrProjectFileV05(legacyProject);
 };
 
 export const downloadBlob = (filename: string, blob: Blob) => {

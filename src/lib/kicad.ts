@@ -14,7 +14,7 @@ import switchGateronLpHotswapRaw from './kicad-assets/smidr.pretty/SW_Smidr_Gate
 import switchGateronLpSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_Gateron_LP_Solder.kicad_mod?raw';
 import switchMxSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_MX_Solder.kicad_mod?raw';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
-import { getFirmwareMatrixPosition, isDirectPinMatrix } from './matrix-utils';
+import { getFirmwareMatrixPosition, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
 
 type SwitchFootprintKind = 'mx-solder' | 'mx-hotswap' | 'choc-solder' | 'choc-hotswap' | 'gateron-lp-solder' | 'gateron-lp-hotswap';
 type DiodeFootprintKind = 'sod123' | 'sod323' | 'do35';
@@ -221,7 +221,8 @@ const getMatrixNetNames = (
   index: number
 ) => {
   if (isDirectPinMatrix(settings)) {
-    const pin = (key.directPin || `UNASSIGNED_${index + 1}`).replace(/[^A-Za-z0-9_./-]/g, '_');
+    const resolvedPin = resolveDirectPin(settings, key, keys);
+    const pin = (resolvedPin || `UNASSIGNED_${index + 1}`).replace(/[^A-Za-z0-9_./-]/g, '_');
     return {
       switchA: `PIN_${pin}`,
       switchB: 'GND',
@@ -997,7 +998,7 @@ const generateKiCadSchematic = (
     const switchLeftPin = x - 5.08;
     const switchRightPin = x + 5.08;
     if (directPins) {
-      if (key.directPin?.trim()) {
+      if (resolveDirectPin(settings, key, keys)) {
         wires.push(makeWire(switchLeftPin - labelStub, y, switchLeftPin, y, `wire-sa-${index}`));
         labels.push(makeLabel(nets.switchA, switchLeftPin - labelStub, y, `label-sa-${index}`));
       }

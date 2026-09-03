@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Layout, ChevronDown, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge, CircleDot, CornerDownLeft
+  Plus, Layout, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge, CircleDot, CornerDownLeft, Shapes
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,12 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
   } = useKeyboardStore();
   
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
+  const [isSpecialMenuOpen, setIsSpecialMenuOpen] = React.useState(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = React.useState(false);
+  const isDirectMode = settings.matrix.wiring === 'direct';
+  const painterDirectPins = settings.features.split && painter.currentSide === 'right'
+    ? settings.pins.splitDirect || []
+    : settings.pins.direct || [];
 
   const SPECIAL_KEYS = {
     'ISO Enter': [{ w: 1.25, h: 2, w2: 1.5, h2: 1, x2: -0.25, y2: 0 }],
@@ -36,7 +41,7 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
 
   const handleAddSpecial = (name: keyof typeof SPECIAL_KEYS) => {
     addKeys(SPECIAL_KEYS[name]);
-    setIsAddMenuOpen(false);
+    setIsSpecialMenuOpen(false);
   };
 
   const handleImportKLE = () => {
@@ -151,6 +156,37 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
               className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/40 active:scale-90"
             />
 
+            {/* Special Shapes */}
+            <div className="relative">
+              <FloatingButton
+                icon={Shapes}
+                label={t('tools.specialShapes')}
+                onClick={() => {
+                  setIsSpecialMenuOpen(!isSpecialMenuOpen);
+                  setIsAddMenuOpen(false);
+                }}
+                className={isSpecialMenuOpen ? "bg-amber-500/10 text-amber-500" : ""}
+              />
+              {isSpecialMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsSpecialMenuOpen(false)} />
+                  <div className="absolute top-0 left-full ml-4 w-56 overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-3">
+                      <span className="text-[10px] font-bold uppercase tracking-tighter text-[var(--text-muted)]">{t('tools.specialShapes')}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 p-2">
+                      {Object.keys(SPECIAL_KEYS).map(name => (
+                        <button key={name} onClick={() => handleAddSpecial(name as keyof typeof SPECIAL_KEYS)} className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[10px] font-bold uppercase text-[var(--text-main)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)]">
+                          {name}
+                          <Plus size={12} className="text-amber-500 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             <FloatingButton
               icon={Gauge}
               label={t('tools.addEncoder')}
@@ -162,9 +198,12 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
             {/* Add Multiple */}
             <div className="relative">
               <FloatingButton 
-                icon={ChevronDown} 
+                icon={Grid2X2}
                 label={t('tools.addMultiple')} 
-                onClick={() => setIsAddMenuOpen(!isAddMenuOpen)} 
+                onClick={() => {
+                  setIsAddMenuOpen(!isAddMenuOpen);
+                  setIsSpecialMenuOpen(false);
+                }}
                 className={isAddMenuOpen ? "bg-amber-500/10 text-amber-500" : ""}
               />
               {isAddMenuOpen && (
@@ -182,25 +221,25 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                           </button>
                         ))}
                       </div>
-                      <div className="h-px bg-[var(--border-main)] opacity-50 my-1" />
-                      <div className="px-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">{t('tools.specialShapes')}</div>
-                      <div className="flex flex-col gap-1">
-                        {Object.keys(SPECIAL_KEYS).map(name => (
-                          <button key={name} onClick={() => handleAddSpecial(name as any)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] text-[10px] font-bold uppercase text-[var(--text-main)] hover:text-[var(--text-highlight)] transition-all flex items-center justify-between group">
-                            {name}
-                            <Plus size={12} className="opacity-0 group-hover:opacity-100 text-amber-500 transition-opacity" />
-                          </button>
-                        ))}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = prompt(t('tools.rowsPrompt'), '4');
+                          const columns = prompt(t('tools.columnsPrompt'), '12');
+                          if (rows && columns) generateMatrix(parseInt(rows), parseInt(columns));
+                          setIsAddMenuOpen(false);
+                        }}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-button)] px-3 py-2 text-[10px] font-bold text-[var(--text-main)] transition-all hover:border-amber-500 hover:bg-amber-500 hover:text-zinc-950 active:scale-95"
+                      >
+                        <Grid2X2 size={14} />
+                        {t('tools.generateMatrix')}
+                      </button>
                     </div>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Generate Matrix */}
-            <FloatingButton icon={Grid2X2} label={t('tools.generateMatrix')} onClick={() => { const r = prompt(t('tools.rowsPrompt'), '4'); const c = prompt(t('tools.columnsPrompt'), '12'); if (r && c) generateMatrix(parseInt(r), parseInt(c)); }} />
-            
             {/* Delete Selected */}
             {selectedKeyIds.length > 0 && (
               <>
@@ -264,6 +303,25 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                       </div>
                     )}
 
+                    {isDirectMode ? (
+                      <div className="rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-3">
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.directPin')}</div>
+                        <div className="mt-1 flex items-baseline gap-2">
+                          <span className="font-mono text-sm font-bold text-amber-500">D{painter.currentCol}</span>
+                          <span className="truncate font-mono text-[10px] text-[var(--text-highlight)]">
+                            {painterDirectPins[painter.currentCol] || t('matrix.configureDirectPinsFirst')}
+                          </span>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={painter.currentCol}
+                          onChange={(e) => setPainter({ currentRow: 0, currentCol: parseInt(e.target.value) || 0 })}
+                          className="mt-2 h-8 w-full rounded border border-[var(--border-main)] bg-[var(--bg-panel)] px-2 font-mono text-xs font-bold text-[var(--text-highlight)] outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    ) : (
+                    <>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="space-y-1">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t('matrix.currentRow')}</span>
@@ -315,6 +373,8 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                         ))}
                       </div>
                     </div>
+                    </>
+                    )}
                   </div>
                 </div>
               )}

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Group, Rect, Line, Circle, Text, Path as KonvaPath } from 'react-konva';
-import { getLocalMatrixPosition, getMatrixFromPins, getFirmwareMatrixPosition } from '@/lib/matrix-utils';
+import { getLocalMatrixPosition, getFirmwareMatrixPosition, isMatrixPositionWithinConfiguredPins } from '@/lib/matrix-utils';
 import { useKeyboardStore, RuntimeKey } from '@/lib/store';
 import { PhysicalKey } from '@/types/keyboard';
 import { UniversalAction } from '@/types/actions';
@@ -405,13 +405,10 @@ export const KeyboardCanvas = ({ readonlyGeometry = false }: { readonlyGeometry?
 
   const invalidMatrixIds = useMemo(() => {
     if (editorMode !== 'matrix' || readonlyGeometry) return [];
-    const matrix = getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
-    const rowCount = matrix.rows;
-    const colCount = matrix.cols;
     return visKeys
       .filter(key => {
         const local = getLocalMatrixPosition(settings, key, visKeys);
-        return !!local && (local.row >= rowCount || local.col >= colCount);
+        return !!local && !isMatrixPositionWithinConfiguredPins(settings, key, visKeys);
       })
       .map(key => key.id);
   }, [visKeys, editorMode, readonlyGeometry, settings.features.split, settings.matrix, settings.pins]);

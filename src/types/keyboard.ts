@@ -43,7 +43,8 @@ export interface PhysicalKey {
   row?: number;  // matrix row (undefined if unassigned)
   col?: number;  // matrix col (undefined if unassigned)
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
-  directPin?: string; // direct GPIO pin for matrix.wiring === 'direct'
+  directIndex?: number; // logical D0.. index for matrix.wiring === 'direct'
+  directPin?: string; // legacy direct GPIO value; migrated to directIndex on load
   ledIndex?: number; // QMK/Vial RGB Matrix LED index, 0-based
   ledX?: number; // QMK/Vial RGB Matrix x coordinate (0-224)
   ledY?: number; // QMK/Vial RGB Matrix y coordinate (0-64)
@@ -96,6 +97,8 @@ export interface ProjectSettings {
     splitSerial?: string; // Serial transport pin (e.g. GP1 for RP2040)
     splitRows?: string[]; // Right side row pins for split keyboards
     splitCols?: string[]; // Right side col pins for split keyboards
+    direct?: string[]; // Available direct pins for the primary/left side
+    splitDirect?: string[]; // Available direct pins for the right side of split keyboards
   };
   hardware: {
     controllerType?: 'mcu' | 'development_board';
@@ -175,3 +178,40 @@ export type SmidrProject = Omit<ProjectSettings, 'vendorProductId'> & {
   vendorId?: string; // .smidr external representation
   productId?: string; // .smidr external representation
 };
+
+export interface SmidrProjectFileV05 {
+  schemaVersion: '0.5';
+  id: string;
+  updatedAt: number;
+  metadata: Pick<ProjectSettings, 'name' | 'manufacturer' | 'description'>;
+  layout: {
+    keys: PhysicalKey[];
+    layoutOptions: ProjectSettings['layoutOptions'];
+    activeOptions: ProjectSettings['activeOptions'];
+  };
+  hardware: {
+    controllerType?: ProjectSettings['hardware']['controllerType'];
+    mcu: ProjectSettings['hardware']['mcu'];
+    board: ProjectSettings['hardware']['board'];
+    diodeDirection: ProjectSettings['hardware']['diodeDirection'];
+    matrix: ProjectSettings['matrix'];
+    pins: ProjectSettings['pins'];
+    split: boolean;
+    encoders?: EncoderDefinition[];
+    trackballs?: TrackballDefinition[];
+  };
+  firmware: {
+    vendorId: string;
+    productId: string;
+    bootloader?: string;
+    layers: number;
+    features: Omit<ProjectSettings['features'], 'split'>;
+    qmk?: ProjectSettings['qmk'];
+    vialUid?: string;
+    vial?: ProjectSettings['vial'];
+    zmk?: ProjectSettings['zmk'];
+    macros?: ProjectSettings['macros'];
+    combos?: ProjectSettings['combos'];
+    tapDances?: ProjectSettings['tapDances'];
+  };
+}
