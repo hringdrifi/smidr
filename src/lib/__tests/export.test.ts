@@ -2013,9 +2013,13 @@ describe('export generation', () => {
 
     expect(overlay).toContain('#include "studio_board-layouts.dtsi"');
     expect(overlay).toContain('zmk,physical-layout = &default_layout;');
+    expect(overlay).toContain('transform = <&default_transform>;');
+    expect(overlay).toContain('kscan = <&kscan0>;');
     expect(overlay).not.toContain('zmk,matrix-transform = &default_transform;');
     expect(layout).toContain('#include <physical_layouts.dtsi>');
     expect(layout).toContain('compatible = "zmk,physical-layout";');
+    expect(layout).not.toContain('transform = <&default_transform>;');
+    expect(layout).not.toContain('kscan = <&kscan0>;');
     expect(layout).toContain('<&key_physical_attrs 150 200 0 0 (-1500) 0 0>');
     expect(layout).toContain('<&key_physical_attrs 100 100 200 0 0 200 0>');
     expect(metadata).toContain('  - studio');
@@ -2764,7 +2768,10 @@ describe('export generation', () => {
     const studioBuildYaml = await studioZip.file('build.yaml')!.async('string');
     expect(studioBoardDts).toContain('#include "nordic_board-layouts.dtsi"');
     expect(studioBoardDts).toContain('zmk,physical-layout = &default_layout;');
+    expect(studioBoardDts).toContain('transform = <&default_transform>;');
+    expect(studioBoardDts).toContain('kscan = <&kscan0>;');
     expect(studioLayout).toContain('<&key_physical_attrs 100 100 0 0 0 0 0>');
+    expect(studioLayout).not.toContain('transform = <&default_transform>;');
     expect(studioBuildYaml).toContain('snippet: studio-rpc-usb-uart');
   });
 
@@ -2857,6 +2864,7 @@ describe('export generation', () => {
     expect(blob).toBeTruthy();
 
     const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const sharedDtsi = await zip.file('boards/arm/split_mcu_board/split_mcu_board.dtsi')!.async('string');
     const leftDts = await zip.file('boards/arm/split_mcu_board_left/split_mcu_board_left.dts')!.async('string');
     const rightDts = await zip.file('boards/arm/split_mcu_board_right/split_mcu_board_right.dts')!.async('string');
     const leftBoardYaml = await zip.file('boards/arm/split_mcu_board_left/board.yml')!.async('string');
@@ -2874,7 +2882,11 @@ describe('export generation', () => {
     expect(leftBoardYaml).toContain('name: rp2040');
     expect(rightBoardYaml).toContain('name: split_mcu_board_right');
     expect(rightBoardYaml).toContain('name: rp2040');
-    expect(leftDts).toContain('RC(0,0) RC(0,1)');
+    expect(sharedDtsi).toContain('RC(0,0) RC(0,1)');
+    expect(leftDts).toContain('#include "../split_mcu_board/split_mcu_board.dtsi"');
+    expect(rightDts).toContain('#include "../split_mcu_board/split_mcu_board.dtsi"');
+    expect(leftDts).not.toContain('default_transform: keymap_transform_0');
+    expect(rightDts).not.toContain('default_transform: keymap_transform_0');
     expect(leftDts).toContain('compatible = "zmk,wired-split"');
     expect(leftDts).toContain('device = <&uart0>;');
     expect(rightDts).toContain('model = "Split MCU Board right"');
@@ -2896,6 +2908,18 @@ describe('export generation', () => {
     expect(await zip.file('.github/workflows/build.yml')!.async('string')).toContain('build-user-config.yml@main');
     expect(await zip.file('config/west.yml')!.async('string')).toContain('path: config');
     expect(await zip.file('zephyr/module.yml')!.async('string')).toContain('board_root: .');
+
+    const studioBlob = await generateZmkZip({ settings, keys }, { studio: true });
+    const studioZip = await JSZip.loadAsync(await studioBlob!.arrayBuffer());
+    const studioSharedDtsi = await studioZip.file('boards/arm/split_mcu_board/split_mcu_board.dtsi')!.async('string');
+    const studioLayout = await studioZip.file('boards/arm/split_mcu_board/split_mcu_board-layouts.dtsi')!.async('string');
+    expect(studioSharedDtsi).toContain('#include "split_mcu_board-layouts.dtsi"');
+    expect(studioSharedDtsi).toContain('transform = <&default_transform>;');
+    expect(studioSharedDtsi).toContain('kscan = <&kscan0>;');
+    expect(studioLayout).toContain('compatible = "zmk,physical-layout";');
+    expect(studioLayout).not.toContain('transform = <&default_transform>;');
+    expect(studioZip.file('boards/arm/split_mcu_board_left/split_mcu_board-layouts.dtsi')).toBeNull();
+    expect(studioZip.file('boards/arm/split_mcu_board_right/split_mcu_board-layouts.dtsi')).toBeNull();
   });
 
   it('emits buildable current-ZMK split custom boards with side-local pointing config', async () => {
