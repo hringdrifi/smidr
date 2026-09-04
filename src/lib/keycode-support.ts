@@ -1,6 +1,8 @@
 import { UniversalKey } from '@/types/actions';
+import { FirmwareTarget } from '@/types/keyboard';
 
-export type KeycodeSupportTarget = 'all' | 'via' | 'vial' | 'zmk';
+export type KeycodeSupportTarget = 'all' | 'qmk' | 'via' | 'vial' | 'zmk' | 'rmk';
+export type ConnectedKeycodeProtocol = 'via' | 'vial' | 'zmk';
 
 export interface KeycodeSupportStatus {
   supported: boolean;
@@ -25,6 +27,19 @@ const isZmkUnsupportedKey = (code: string) => (
   ZMK_UNSUPPORTED_PREFIXES.some(prefix => code.startsWith(prefix))
 );
 
+export function resolveKeycodeSupportTarget({
+  appMode,
+  connectedProtocol,
+  firmwareTarget,
+}: {
+  appMode: 'design' | 'remap';
+  connectedProtocol?: ConnectedKeycodeProtocol;
+  firmwareTarget?: FirmwareTarget | null;
+}): KeycodeSupportTarget {
+  if (appMode === 'remap') return connectedProtocol ?? 'all';
+  return firmwareTarget ?? 'all';
+}
+
 export function getKeycodeSupport(
   code: string,
   target: KeycodeSupportTarget
@@ -38,7 +53,7 @@ export function getKeycodeSupport(
     return { supported: true };
   }
 
-  if (target === 'via' || target === 'vial') {
+  if (target === 'qmk' || target === 'via' || target === 'vial' || target === 'rmk') {
     return { supported: true };
   }
 

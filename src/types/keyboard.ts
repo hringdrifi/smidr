@@ -23,6 +23,8 @@ export interface EncoderDefinition {
   };
 }
 
+export type FirmwareTarget = 'qmk' | 'vial' | 'zmk' | 'rmk';
+
 export interface TrackballDefinition {
   id?: string; // runtime only - generated on load, stripped on save
   sclk?: string;
@@ -78,6 +80,7 @@ export interface PhysicalKey {
 }
 
 export interface ProjectSettings {
+  firmwareTarget?: FirmwareTarget | null;
   name: string;
   manufacturer: string;
   description: string;
@@ -147,6 +150,7 @@ export interface ProjectSettings {
     };
   };
   zmk?: {
+    studio?: boolean;
     splitTransport?: 'ble' | 'wired';
     wiredSplitDevice?: string;
   };
@@ -201,6 +205,7 @@ export interface SmidrProjectFileV05 {
     trackballs?: TrackballDefinition[];
   };
   firmware: {
+    target?: FirmwareTarget | null;
     vendorId: string;
     productId: string;
     bootloader?: string;

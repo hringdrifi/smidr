@@ -123,6 +123,7 @@ export const toSmidrProjectFileV05 = (project: SmidrProject): SmidrProjectFileV0
       trackballs,
     },
     firmware: {
+      target: project.firmwareTarget === undefined ? undefined : project.firmwareTarget,
       vendorId: project.vendorId || hex16(vendorProductId >>> 16),
       productId: project.productId || hex16(vendorProductId),
       bootloader: project.hardware.bootloader,
@@ -147,6 +148,7 @@ export const fromSmidrProjectFile = (value: unknown): SmidrProject => {
     id,
     updatedAt,
     ...metadata,
+    firmwareTarget: firmware.target === undefined ? 'qmk' : firmware.target,
     vendorId: firmware.vendorId,
     productId: firmware.productId,
     matrix: hardware.matrix,

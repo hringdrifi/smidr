@@ -10,19 +10,21 @@ import { Keyboard, ChevronLeft, ChevronRight, Layers2 as LayersIcon, MousePointe
 import { useTranslation } from '@/hooks/useTranslation';
 import { UniversalAction, UniversalKey } from '@/types/actions';
 import { applyVisualLayoutToKeycode } from '@/lib/visual-layouts';
-import { getKeycodeSupport, KeycodeSupportTarget } from '@/lib/keycode-support';
+import { getKeycodeSupport, resolveKeycodeSupportTarget } from '@/lib/keycode-support';
 import { getFirmwareMatrixPosition } from '@/lib/matrix-utils';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const SUPPORT_TARGETS: Array<{ id: KeycodeSupportTarget; label: string }> = [
-  { id: 'all', label: 'ALL' },
-  { id: 'via', label: 'VIA' },
-  { id: 'vial', label: 'Vial' },
-  { id: 'zmk', label: 'ZMK' },
-];
+const SUPPORT_TARGET_LABELS = {
+  all: 'ALL',
+  qmk: 'QMK/VIA',
+  via: 'VIA',
+  vial: 'Vial',
+  zmk: 'ZMK',
+  rmk: 'RMK',
+} as const;
 
 export const KeycodePanel = () => {
   const { 
@@ -35,9 +37,12 @@ export const KeycodePanel = () => {
   const [activeTab, setActiveTab] = useState<KeycodeCategory>('Basic');
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [tapSearchQuery, setTapSearchQuery] = useState('');
-  const [supportTarget, setSupportTarget] = useState<KeycodeSupportTarget>('all');
   const tabContainerRef = useRef<HTMLDivElement>(null);
-  const showSupportTargetFilter = appMode === 'design';
+  const supportTarget = resolveKeycodeSupportTarget({
+    appMode,
+    connectedProtocol: connectedDevice?.protocolType,
+    firmwareTarget: settings.firmwareTarget,
+  });
 
   const layerDescription = (key: string, layer: number) =>
     t(`keycodeDescriptions.${key}`).replace('{layer}', String(layer));
@@ -331,25 +336,11 @@ export const KeycodePanel = () => {
           })}
         </div>
 
-        {showSupportTargetFilter && (
-          <div className="ml-3 flex items-center rounded border border-[var(--border-main)] bg-[var(--bg-panel)] p-0.5 shrink-0">
-            {SUPPORT_TARGETS.map(target => (
-              <button
-                key={target.id}
-                type="button"
-                onClick={() => setSupportTarget(target.id)}
-                className={cn(
-                  "px-2.5 py-1 text-[10px] font-bold rounded transition-colors",
-                  supportTarget === target.id
-                    ? "bg-amber-500 text-zinc-950"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
-                )}
-              >
-                {target.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="ml-3 flex shrink-0 items-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5">
+          <span className="text-[9px] font-bold text-amber-400">
+            {SUPPORT_TARGET_LABELS[supportTarget]}
+          </span>
+        </div>
 
         {isOverflowing && (
           <div className="flex items-center border-l border-[var(--border-main)] shrink-0 bg-[var(--bg-app)]/50">
@@ -404,7 +395,7 @@ export const KeycodePanel = () => {
                       const isIsoEnter = activeTab === 'ISO/JIS' && k.code === 'ENT' && k.w2 !== undefined && k.h2 !== undefined;
                       const w = calcWidth(k.width ?? 1.0);
                       const h = isIsoEnter ? (2 * 48 + G) : 48;
-                      const support = getKeycodeSupport(k.code, showSupportTargetFilter ? supportTarget : 'all');
+                      const support = getKeycodeSupport(k.code, supportTarget);
                       const isKeyDisabled = !hasSelectedKey || !support.supported;
                       const title = getKeycodeTitle(k, support);
 
@@ -485,7 +476,7 @@ export const KeycodePanel = () => {
               ))
             ) : (
             filteredKeycodes.map(k => {
-                const support = getKeycodeSupport(k.code, showSupportTargetFilter ? supportTarget : 'all');
+                const support = getKeycodeSupport(k.code, supportTarget);
                 const isKeyDisabled = !hasSelectedKey || !support.supported;
                 const isLayersTab = activeTab === 'Layers';
 

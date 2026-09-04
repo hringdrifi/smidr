@@ -22,9 +22,7 @@ export const MatrixPainter = () => {
     keys,
     updateKey,
     setMatrixPosition,
-    addEncoderToKey,
     updateEncoder,
-    addTrackballToKey,
     updateTrackball,
   } = useKeyboardStore();
   const { t } = useTranslation();
@@ -332,6 +330,7 @@ export const MatrixPainter = () => {
           </>
         )}
 
+        {selectedEncoder && (
         <div className="rounded border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -347,15 +346,6 @@ export const MatrixPainter = () => {
                 )}
               </div>
             </div>
-            {!selectedEncoder && (
-              <button
-                type="button"
-                onClick={() => addEncoderToKey(selectedKeyId)}
-                className="h-8 rounded border border-amber-500/25 bg-amber-500/10 px-3 text-[10px] font-bold uppercase text-amber-500 transition-all hover:bg-amber-500 hover:text-zinc-950"
-              >
-                {t('matrix.addEncoder')}
-              </button>
-            )}
           </div>
 
           {selectedEncoder && (
@@ -414,7 +404,9 @@ export const MatrixPainter = () => {
             </div>
           )}
         </div>
+        )}
 
+        {selectedTrackball && (
         <div className="rounded border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -424,7 +416,6 @@ export const MatrixPainter = () => {
                 {selectedTrackball && <div className="mt-0.5 font-mono text-[10px] text-amber-500">TRK{selectedTrackballIndex}</div>}
               </div>
             </div>
-            {!selectedTrackball && <button type="button" onClick={() => addTrackballToKey(selectedKeyId)} className="h-8 rounded border border-amber-500/25 bg-amber-500/10 px-3 text-[10px] font-bold uppercase text-amber-500 transition-all hover:bg-amber-500 hover:text-zinc-950">{t('matrix.addTrackball')}</button>}
           </div>
           {selectedTrackball && <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -434,6 +425,7 @@ export const MatrixPainter = () => {
             <div className="grid grid-cols-3 gap-2">{(['swapXy', 'invertX', 'invertY'] as const).map(field => <label key={field} className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]"><input type="checkbox" checked={!!selectedTrackball[field]} onChange={e => updateTrackball(selectedTrackball.id!, { [field]: e.target.checked })} />{t(`matrix.trackball${field[0].toUpperCase()}${field.slice(1)}` as any)}</label>)}</div>
           </div>}
         </div>
+        )}
       </div>
 
       {(isDirectMode || selectedEncoder || selectedTrackball) && (

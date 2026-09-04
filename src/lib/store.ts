@@ -336,6 +336,7 @@ const generateRandomVialUid = (): string => {
 
 const initialState: Partial<KeyboardState> = {
   settings: {
+    firmwareTarget: null,
     name: 'New Project',
     manufacturer: 'Custom',
     description: 'A custom keyboard layout',
@@ -2558,6 +2559,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const runtimeTrackballs = normalizeTrackballs(settings.trackballs, rawKeys);
           const settingsWithDefaultMatrix = {
             ...settings,
+            firmwareTarget: settings.firmwareTarget === undefined ? 'qmk' : settings.firmwareTarget,
             features: {
               ...settings.features,
               encoder: runtimeEncoders.length > 0,
@@ -2727,6 +2729,7 @@ export const useKeyboardStore = create<KeyboardState>()(
                 baseKeys: finalKeys,
                 settings: {
                   ...s.settings,
+                  firmwareTarget: input?.features?.vial ? 'vial' : 'qmk',
                   name: name || s.settings.name,
                   vendorProductId: vendorProductId ?? s.settings.vendorProductId,
                   visualLayout: normalizeVisualLayout(s.settings.visualLayout),

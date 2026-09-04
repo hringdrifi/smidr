@@ -46,6 +46,7 @@ const getDemoSettings = (
   layoutOptions: ProjectSettings['layoutOptions'] = {},
   activeOptions: ProjectSettings['activeOptions'] = {}
 ): ProjectSettings => ({
+  firmwareTarget: 'vial',
   name: 'Smidr Corne',
   manufacturer: 'Smidr',
   description: 'Virtual keyboard project for demo mode',

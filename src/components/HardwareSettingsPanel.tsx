@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useKeyboardStore } from '@/lib/store';
-import { Settings, Cpu, HardDrive, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Settings, Cpu, HardDrive, ShieldCheck, AlertTriangle, Code2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -16,6 +16,7 @@ import {
   isZmkExportSupported,
   QMK_MCU_PRESETS,
 } from '@/lib/mcu-presets';
+import { getFirmwareTargetLabel } from '@/lib/firmware-targets';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -51,7 +52,15 @@ const PinInput = ({ label, value, onChange, placeholder }: { label: string, valu
   </div>
 );
 
-export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 'firmware' | 'all' }) => {
+export const HardwareSettingsPanel = ({
+  scope = 'all',
+  section = 'all',
+  variant = 'panel',
+}: {
+  scope?: 'hardware' | 'firmware' | 'all';
+  section?: 'identity' | 'target' | 'all';
+  variant?: 'panel' | 'dialog';
+}) => {
   const { settings, updateSettings } = useKeyboardStore();
   const { t } = useTranslation();
   const format = (path: string, values: Record<string, string | number>) =>
@@ -76,6 +85,9 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
     hasRowColPinOverlap(settings.pins.rows, settings.pins.cols) ||
     (settings.features.split && hasRowColPinOverlap(rightRows, rightCols));
   const qmkMatrixMasked = settings.qmk?.matrixMasked === true;
+  const firmwareTarget = settings.firmwareTarget || 'qmk';
+  const showIdentity = section !== 'target';
+  const showTargetSettings = section !== 'identity';
   const selectedMcu = settings.hardware.mcu || 'RP2040';
   const controllerType = settings.hardware.controllerType || 'development_board';
   const selectedDevelopmentBoard = settings.hardware.board || getDefaultDevelopmentBoard(selectedMcu);
@@ -136,8 +148,19 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
   };
 
   return (
-    <div className="space-y-5 p-4 pb-24">
+    <div className={cn('space-y-5 p-4', variant === 'panel' && 'pb-24')}>
+      {scope === 'firmware' && showIdentity && (
+        <Section title={t('firmwareFlow.selected')} icon={Code2}>
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <div className="text-sm font-bold text-amber-500">{getFirmwareTargetLabel(firmwareTarget)}</div>
+            <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-muted)]">
+              {t(`firmwareFlow.${firmwareTarget}Description`)}
+            </p>
+          </div>
+        </Section>
+      )}
       {/* General & USB */}
+      {showIdentity && (
       <Section title={t('hardware.identity')} icon={Settings}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -174,6 +197,7 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
           </div>}
         </div>
       </Section>
+      )}
 
       {scope !== 'firmware' && <>
       {/* Controller & Matrix */}
@@ -276,7 +300,7 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
       </Section>
       </>}
 
-      {scope !== 'hardware' && <>
+      {scope !== 'hardware' && showTargetSettings && (firmwareTarget === 'qmk' || firmwareTarget === 'vial') && <>
       {/* QMK Details */}
       <Section title={t('hardware.qmkDetails')} icon={Settings}>
         <div className="space-y-3">
@@ -376,7 +400,10 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
         </div>
       </Section>
 
+      </>}
+
       {/* Vial Settings */}
+      {scope !== 'hardware' && showTargetSettings && firmwareTarget === 'vial' && <>
       <Section title={t('hardware.vialSpec')} icon={ShieldCheck}>
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-2">
@@ -456,7 +483,73 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
       </Section>
       </>}
 
+      {scope === 'firmware' && showTargetSettings && firmwareTarget === 'zmk' && (
+        <Section title={getFirmwareTargetLabel(firmwareTarget)} icon={Code2}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-[var(--text-muted)]">{t('zmkExport.title')}</label>
+              {([false, true] as const).map((studio) => (
+                <button
+                  key={String(studio)}
+                  type="button"
+                  aria-pressed={(settings.zmk?.studio === true) === studio}
+                  onClick={() => updateSettings({ zmk: { ...(settings.zmk || {}), studio } })}
+                  className={cn(
+                    'w-full rounded-lg border p-3 text-left transition-colors',
+                    (settings.zmk?.studio === true) === studio
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-[var(--border-main)] bg-[var(--bg-app)]/40 hover:bg-[var(--bg-hover)]'
+                  )}
+                >
+                  <span className="text-xs font-bold text-[var(--text-main)]">{t(studio ? 'zmkExport.studio' : 'zmkExport.standard')}</span>
+                  <span className="mt-1 block text-[10px] leading-relaxed text-[var(--text-muted)]">{t(studio ? 'zmkExport.studioDesc' : 'zmkExport.standardDesc')}</span>
+                </button>
+              ))}
+            </div>
+            {settings.features.split && (
+              <div className="space-y-4 border-t border-[var(--border-main)] pt-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkSplitTransport')}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['ble', 'wired'] as const).map((transport) => (
+                    <button
+                      key={transport}
+                      type="button"
+                      aria-pressed={(settings.zmk?.splitTransport || 'ble') === transport}
+                      onClick={() => updateSettings({ zmk: { ...(settings.zmk || {}), splitTransport: transport } })}
+                      className={cn(
+                        'min-h-10 rounded-lg border px-3 text-xs font-bold transition-colors',
+                        (settings.zmk?.splitTransport || 'ble') === transport
+                          ? 'border-amber-500 bg-amber-500 text-zinc-950'
+                          : 'border-[var(--border-main)] bg-[var(--bg-app)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                      )}
+                    >
+                      {transport === 'ble' ? t('hardware.zmkSplitBle') : t('hardware.zmkSplitWired')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(settings.zmk?.splitTransport || 'ble') === 'wired' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkWiredSplitDevice')}</label>
+                  <input
+                    type="text"
+                    value={settings.zmk?.wiredSplitDevice || ''}
+                    onChange={(event) => updateSettings({ zmk: { ...(settings.zmk || {}), wiredSplitDevice: event.target.value } })}
+                    placeholder="&pro_micro_serial"
+                    className="w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-2 py-1.5 font-mono text-xs text-amber-500 outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <p className="text-[10px] leading-relaxed text-[var(--text-dim)]">{t('hardware.zmkWiredSplitDeviceDesc')}</p>
+                </div>
+              )}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
       {/* Developer Settings */}
+      {section === 'all' && (
       <Section title={t('hardware.developer')} icon={Settings}>
         <div className="flex items-center justify-between py-2">
           <div className="flex flex-col">
@@ -477,6 +570,7 @@ export const HardwareSettingsPanel = ({ scope = 'all' }: { scope?: 'hardware' | 
           </div>
         </div>
       </Section>
+      )}
     </div>
   );
 };

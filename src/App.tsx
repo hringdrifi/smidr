@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown, Hammer, Braces, Home, Menu, PanelRight } from 'lucide-react';
+import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown, Hammer, Braces, Home, Menu, PanelRight, Code2 } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
@@ -24,6 +24,8 @@ import { UnlockModal } from '@/components/UnlockModal';
 import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { ProjectHome } from '@/components/ProjectHome';
 import { NewProjectSetup } from '@/components/NewProjectSetup';
+import { FirmwareBuildPanel, FirmwareTargetPanel } from '@/components/FirmwarePanels';
+import { getFirmwareTargetLabel, isFirmwareTargetSupported } from '@/lib/firmware-targets';
 import { useKeyboardStore } from '@/lib/store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -46,7 +48,7 @@ import { FirmwareExportTarget, formatExportValidationIssues, validateFirmwareExp
 import { isQmkSourceExportSupported, isZmkSourceExportSupported } from '@/lib/mcu-presets';
 import { qmkStringToAction } from '@/lib/protocols/via-action-converter';
 import { UniversalAction } from '@/types/actions';
-import { SmidrProject, PhysicalKey } from '@/types/keyboard';
+import { SmidrProject, PhysicalKey, FirmwareTarget } from '@/types/keyboard';
 import {
   deleteProject,
   deleteProjectDraft,
@@ -64,7 +66,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type RightPanelKind = 'settings' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'rgbMatrix' | AdvancedPanelKind;
+type RightPanelKind = 'build' | 'properties' | 'matrixPainter' | 'options' | 'keymap' | 'rgbMatrix' | AdvancedPanelKind;
 type ProjectWorkspace = 'hardware' | 'firmware';
 
 const findMatchingParenInText = (value: string, start: number) => {
@@ -332,20 +334,26 @@ export default function App() {
     editorSettings, updateEditorSettings, connectedDevice,
     appMode, currentLayer
   } = storeState;
+  const selectedFirmwareTarget = settings.firmwareTarget ?? null;
+  const selectedFirmwareLabel = selectedFirmwareTarget ? getFirmwareTargetLabel(selectedFirmwareTarget) : null;
 
   // Use zundo temporal store for reactive undo/redo states
   const { undo, redo, pastStates, futureStates } = useStore((useKeyboardStore as any).temporal, (state: any) => state);
   const { t, language, setLanguage } = useTranslation();
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
+  const [isHardwareSettingsDialogOpen, setIsHardwareSettingsDialogOpen] = React.useState(false);
+  const [isFirmwareSettingsDialogOpen, setIsFirmwareSettingsDialogOpen] = React.useState(false);
+  const [isFirmwareDetailDialogOpen, setIsFirmwareDetailDialogOpen] = React.useState(false);
   const [isPinSettingsDialogOpen, setIsPinSettingsDialogOpen] = React.useState(false);
   const [isKiCadDialogOpen, setIsKiCadDialogOpen] = React.useState(false);
-  const [isZmkExportDialogOpen, setIsZmkExportDialogOpen] = React.useState(false);
+  const [isFirmwareTargetDialogOpen, setIsFirmwareTargetDialogOpen] = React.useState(false);
+  const [firmwareTargetDraft, setFirmwareTargetDraft] = React.useState<FirmwareTarget | null>(selectedFirmwareTarget);
   const [kicadExportOptions, setKiCadExportOptions] = React.useState<KiCadExportOptions>(DEFAULT_KICAD_EXPORT_OPTIONS);
   const [isLangMenuOpen, setIsLangMenuOpen] = React.useState(false);
   const [isEditorModeMenuOpen, setIsEditorModeMenuOpen] = React.useState(false);
   const [savedProjects, setSavedProjects] = React.useState<any[]>([]);
-  const [activeRightPanel, setActiveRightPanel] = React.useState<RightPanelKind>('settings');
+  const [activeRightPanel, setActiveRightPanel] = React.useState<RightPanelKind>('options');
   const [projectWorkspace, setProjectWorkspace] = React.useState<ProjectWorkspace>(
     editorMode === 'keymap' || editorMode === 'rgbMatrix' ? 'firmware' : 'hardware'
   );
@@ -615,11 +623,143 @@ export default function App() {
       setEditorMode('layout');
       setActiveRightPanel('properties');
     }
-    if (workspace === 'firmware' && editorMode !== 'keymap' && editorMode !== 'rgbMatrix') {
+    if (workspace === 'firmware' && projectWorkspace !== 'firmware') {
       setEditorMode('keymap');
       setActiveRightPanel('keymap');
+      setIsInspectorOpen(true);
+    }
+    if (workspace === 'firmware' && !selectedFirmwareTarget) {
+      setFirmwareTargetDraft(selectedFirmwareTarget);
+      setIsFirmwareTargetDialogOpen(true);
     }
   };
+
+  const beginSettingsDialog = (dialog: 'hardware' | 'firmware') => {
+    if (dialog === 'hardware') setIsHardwareSettingsDialogOpen(true);
+    else setIsFirmwareSettingsDialogOpen(true);
+    setIsLeftNavOpen(false);
+  };
+
+  const cancelHardwareSettings = () => {
+    setIsHardwareSettingsDialogOpen(false);
+  };
+
+  const confirmHardwareSettings = () => {
+    setIsHardwareSettingsDialogOpen(false);
+    setIsPinSettingsDialogOpen(true);
+  };
+
+  const returnToHardwareSettings = () => {
+    setIsPinSettingsDialogOpen(false);
+    beginSettingsDialog('hardware');
+  };
+
+  const continueFromPinsToLayout = () => {
+    setIsPinSettingsDialogOpen(false);
+    navigateDesign('layout', storeState.selectedKeyIds.length > 0 ? 'properties' : 'options');
+  };
+
+  const cancelFirmwareSettings = () => {
+    setIsFirmwareSettingsDialogOpen(false);
+  };
+
+  const goToFirmwareTarget = () => {
+    cancelFirmwareSettings();
+    setFirmwareTargetDraft(selectedFirmwareTarget);
+    setIsFirmwareTargetDialogOpen(true);
+  };
+
+  const confirmFirmwareSettings = () => {
+    setIsFirmwareSettingsDialogOpen(false);
+    if (selectedFirmwareTarget === 'rmk') {
+      navigateDesign('keymap', 'keymap');
+      return;
+    }
+    setIsFirmwareDetailDialogOpen(true);
+    setIsInspectorOpen(false);
+  };
+
+  const closeFirmwareDetailDialog = () => {
+    setIsFirmwareDetailDialogOpen(false);
+  };
+
+  const returnToFirmwareSettings = () => {
+    closeFirmwareDetailDialog();
+    beginSettingsDialog('firmware');
+  };
+
+  const continueFromFirmwareDetails = () => {
+    closeFirmwareDetailDialog();
+    navigateDesign('keymap', 'keymap');
+  };
+
+  const openFirmwareDetailDialog = () => {
+    if (selectedFirmwareTarget === 'rmk') {
+      navigateDesign('keymap', 'keymap');
+      return;
+    }
+    setIsFirmwareDetailDialogOpen(true);
+    setIsLeftNavOpen(false);
+    setIsInspectorOpen(false);
+  };
+
+  const openFirmwareTargetDialog = () => {
+    setFirmwareTargetDraft(selectedFirmwareTarget);
+    setIsFirmwareTargetDialogOpen(true);
+    setIsLeftNavOpen(false);
+  };
+
+  const closeFirmwareTargetDialog = () => {
+    if (!selectedFirmwareTarget) return;
+    setFirmwareTargetDraft(selectedFirmwareTarget);
+    setIsFirmwareTargetDialogOpen(false);
+  };
+
+  const confirmFirmwareTarget = () => {
+    if (!firmwareTargetDraft) return;
+    updateSettings({ firmwareTarget: firmwareTargetDraft });
+    setIsFirmwareTargetDialogOpen(false);
+    beginSettingsDialog('firmware');
+    setIsInspectorOpen(false);
+  };
+
+  React.useEffect(() => {
+    if (!isFirmwareTargetDialogOpen || !selectedFirmwareTarget) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setFirmwareTargetDraft(selectedFirmwareTarget);
+      setIsFirmwareTargetDialogOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFirmwareTargetDialogOpen, selectedFirmwareTarget]);
+
+  React.useEffect(() => {
+    if (!isHardwareSettingsDialogOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelHardwareSettings();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isHardwareSettingsDialogOpen]);
+
+  React.useEffect(() => {
+    if (!isFirmwareSettingsDialogOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelFirmwareSettings();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFirmwareSettingsDialogOpen]);
+
+  React.useEffect(() => {
+    if (!isFirmwareDetailDialogOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeFirmwareDetailDialog();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFirmwareDetailDialogOpen]);
 
   const navigateDesign = (mode: typeof editorMode, panel: RightPanelKind) => {
     setEditorMode(mode);
@@ -655,6 +795,7 @@ export default function App() {
     storeState.setIsHardwareModalOpen(false);
     setActiveRightPanel('options');
     setEditorMode('layout');
+    beginSettingsDialog('hardware');
   };
 
   const handleExportCanvasImage = () => {
@@ -698,12 +839,6 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
-  const handleOpenZmkExportDialog = () => {
-    if (!isZmkSourceExportSupported(settings.hardware)) return;
-    setIsExportMenuOpen(false);
-    setIsZmkExportDialogOpen(true);
-  };
-
   const handleExportZmkZip = async (studio: boolean) => {
     if (!isZmkSourceExportSupported(settings.hardware)) return;
     if (!confirmFirmwareExportValidation('zmk')) return;
@@ -711,7 +846,6 @@ export default function App() {
     if (zipBlob) {
       downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_zmk.zip`, zipBlob);
     }
-    setIsZmkExportDialogOpen(false);
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
   };
@@ -726,9 +860,20 @@ export default function App() {
     setIsExportMenuOpen(false);
   };
 
-  const handleOpenKiCadDialog = () => {
-    setIsExportMenuOpen(false);
-    setIsKiCadDialogOpen(true);
+  const handleBuildSelectedFirmware = () => {
+    if (selectedFirmwareTarget === 'qmk') {
+      void handleExportViaZip();
+      return;
+    }
+    if (selectedFirmwareTarget === 'vial') {
+      void handleExportVialZip();
+      return;
+    }
+    if (selectedFirmwareTarget === 'zmk') {
+      void handleExportZmkZip(settings.zmk?.studio === true);
+      return;
+    }
+    if (selectedFirmwareTarget === 'rmk') void handleExportRmkZip();
   };
 
   const handleExportKiCadZip = async () => {
@@ -749,10 +894,13 @@ export default function App() {
     setIsKiCadDialogOpen(false);
   };
 
-  const qmkSourceUnsupported = !isQmkSourceExportSupported(settings.hardware);
-  const zmkSourceUnsupported = !isZmkSourceExportSupported(settings.hardware);
+  const selectedFirmwareSupported = selectedFirmwareTarget
+    ? isFirmwareTargetSupported(selectedFirmwareTarget, settings.hardware)
+    : false;
+  const showsKeymapTray = editorMode === 'keymap'
+    && (activeRightPanel === 'keymap' || activeRightPanel === 'macros' || activeRightPanel === 'combos' || activeRightPanel === 'tapDance');
   const designBottomTrayHeight = storeState.isProjectOpen
-    ? editorMode === 'keymap' ? 400 : 0
+    ? showsKeymapTray ? 400 : 0
     : 0;
   const designCanvasBottom = `${designBottomTrayHeight}px`;
   const designRightInspectorWidth = storeState.isProjectOpen ? 360 : 0;
@@ -786,7 +934,9 @@ export default function App() {
       : []),
     { type: 'separator', id: 'global-settings' },
     { type: 'tab', id: 'options', title: t('sidebar.layoutOptions'), icon: SlidersHorizontal },
-    { type: 'tab', id: 'settings', title: t('hardware.title') || t('header.setupTooltip'), icon: Settings },
+    ...(projectWorkspace === 'firmware' && selectedFirmwareTarget
+      ? [{ type: 'tab' as const, id: 'build' as RightPanelKind, title: `${selectedFirmwareLabel} · ${t('workspace.build')}`, icon: Download }]
+      : []),
   ];
   const activeRightPanelTab = rightPanelTabs.find(
     (item): item is Extract<(typeof rightPanelTabs)[number], { type: 'tab' }> => item.type === 'tab' && item.id === activeRightPanel
@@ -804,12 +954,14 @@ export default function App() {
       ((activeRightPanel === 'macros' || activeRightPanel === 'combos' || activeRightPanel === 'tapDance') && editorMode !== 'keymap') ||
       (activeRightPanel === 'matrixPainter' && editorMode !== 'matrix') ||
       (activeRightPanel === 'rgbMatrix' && editorMode !== 'rgbMatrix') ||
-      (activeRightPanel === 'properties' && editorMode !== 'layout');
+      (activeRightPanel === 'properties' && editorMode !== 'layout') ||
+      (activeRightPanel === 'build' && projectWorkspace !== 'firmware') ||
+      (activeRightPanel === 'build' && !selectedFirmwareTarget);
 
     if (isUnavailablePanel) {
       setActiveRightPanel(defaultRightPanelForEditor(editorMode));
     }
-  }, [activeRightPanel, editorMode]);
+  }, [activeRightPanel, editorMode, projectWorkspace, selectedFirmwareTarget]);
 
   React.useEffect(() => {
     if (editorMode !== 'layout') return;
@@ -840,23 +992,33 @@ export default function App() {
     action: () => void;
   }> = projectWorkspace === 'hardware'
     ? [
-        { id: 'setup', label: t('workspace.setup'), icon: Settings, active: activeRightPanel === 'settings', complete: !!settings.name && !!(settings.hardware.mcu || settings.hardware.board), action: () => { setActiveRightPanel('settings'); setIsInspectorOpen(true); } },
-        { id: 'layout', label: t('workspace.layout'), icon: Move, active: editorMode === 'layout' && (activeRightPanel === 'properties' || activeRightPanel === 'options'), complete: assignableKeys.length > 0, action: () => navigateDesign('layout', storeState.selectedKeyIds.length > 0 ? 'properties' : 'options') },
+        { id: 'setup', label: t('workspace.setup'), icon: Settings, active: isHardwareSettingsDialogOpen, complete: !!settings.name && !!(settings.hardware.mcu || settings.hardware.board), action: () => beginSettingsDialog('hardware') },
         { id: 'pins', label: t('workspace.pins'), icon: Hash, active: isPinSettingsDialogOpen, complete: pinsComplete, action: () => {
           setIsLeftNavOpen(false);
           setIsPinSettingsDialogOpen(true);
         } },
+        { id: 'layout', label: t('workspace.layout'), icon: Move, active: editorMode === 'layout' && (activeRightPanel === 'properties' || activeRightPanel === 'options'), complete: assignableKeys.length > 0, action: () => navigateDesign('layout', storeState.selectedKeyIds.length > 0 ? 'properties' : 'options') },
         { id: 'wiring', label: t('workspace.wiring'), icon: CircuitBoard, active: editorMode === 'matrix' && activeRightPanel === 'matrixPainter', complete: wiringComplete, action: () => navigateDesign('matrix', 'matrixPainter') },
         { id: 'pcb', label: t('workspace.pcb'), icon: LayoutGrid, active: isKiCadDialogOpen, complete: undefined, action: () => setIsKiCadDialogOpen(true) },
       ]
     : [
-        { id: 'setup', label: t('workspace.setup'), icon: Settings, active: activeRightPanel === 'settings', complete: settings.vendorProductId !== 0, action: () => { setActiveRightPanel('settings'); setIsInspectorOpen(true); } },
-        { id: 'keymap', label: t('workspace.keymap'), icon: Keyboard, active: editorMode === 'keymap' && activeRightPanel === 'keymap', complete: assignableKeys.some(key => !!key.keymap && Object.keys(key.keymap).length > 0), action: () => navigateDesign('keymap', 'keymap') },
-        { id: 'lighting', label: t('workspace.lighting'), icon: Lightbulb, active: editorMode === 'rgbMatrix', complete: settings.features.rgbMatrix ? assignableKeys.some(key => key.ledIndex !== undefined) : undefined, action: () => navigateDesign('rgbMatrix', 'rgbMatrix') },
-        { id: 'macros', label: t('macros.macros'), icon: ScrollText, active: activeRightPanel === 'macros', complete: settings.macros?.some(macro => macro.length > 0) || undefined, action: () => navigateDesign('keymap', 'macros') },
-        { id: 'combos', label: t('macros.combos'), icon: Workflow, active: activeRightPanel === 'combos', complete: !!settings.combos?.length || undefined, action: () => navigateDesign('keymap', 'combos') },
-        { id: 'tapDance', label: t('keycodeConfig.tapDance'), icon: WandSparkles, active: activeRightPanel === 'tapDance', complete: !!settings.tapDances?.length || undefined, action: () => navigateDesign('keymap', 'tapDance') },
-        { id: 'build', label: t('workspace.build'), icon: Download, active: isExportMenuOpen, complete: assignableKeys.length > 0 && wiringComplete, action: () => setIsExportMenuOpen(true) },
+        { id: 'firmwareTarget', label: t('firmwareFlow.selectStep'), icon: Code2, active: isFirmwareTargetDialogOpen, complete: !!selectedFirmwareTarget, action: openFirmwareTargetDialog },
+        ...(selectedFirmwareTarget ? [
+          { id: 'setup', label: t('workspace.setup'), icon: Settings, active: isFirmwareSettingsDialogOpen, complete: !!settings.name && !!settings.manufacturer, action: () => beginSettingsDialog('firmware') },
+          ...(selectedFirmwareTarget !== 'rmk' ? [
+            { id: 'firmwareConfig', label: t('firmwareFlow.targetSettings'), icon: Code2, active: isFirmwareDetailDialogOpen, complete: selectedFirmwareSupported, action: openFirmwareDetailDialog },
+          ] : []),
+          { id: 'keymap', label: t('workspace.keymap'), icon: Keyboard, active: editorMode === 'keymap' && activeRightPanel === 'keymap', complete: assignableKeys.some(key => !!key.keymap && Object.keys(key.keymap).length > 0), action: () => navigateDesign('keymap', 'keymap') },
+          ...((selectedFirmwareTarget === 'qmk' || selectedFirmwareTarget === 'vial') ? [
+            { id: 'lighting', label: t('workspace.lighting'), icon: Lightbulb, active: editorMode === 'rgbMatrix', complete: settings.features.rgbMatrix ? assignableKeys.some(key => key.ledIndex !== undefined) : undefined, action: () => navigateDesign('rgbMatrix', 'rgbMatrix') },
+          ] : []),
+          ...(selectedFirmwareTarget !== 'rmk' ? [
+            { id: 'macros', label: t('macros.macros'), icon: ScrollText, active: activeRightPanel === 'macros', complete: settings.macros?.some(macro => macro.length > 0) || undefined, action: () => navigateDesign('keymap', 'macros') },
+            { id: 'combos', label: t('macros.combos'), icon: Workflow, active: activeRightPanel === 'combos', complete: !!settings.combos?.length || undefined, action: () => navigateDesign('keymap', 'combos') },
+            { id: 'tapDance', label: t('keycodeConfig.tapDance'), icon: WandSparkles, active: activeRightPanel === 'tapDance', complete: !!settings.tapDances?.length || undefined, action: () => navigateDesign('keymap', 'tapDance') },
+          ] : []),
+          { id: 'build', label: t('firmwareFlow.buildStep').replace('{target}', selectedFirmwareLabel || ''), icon: Download, active: activeRightPanel === 'build', complete: selectedFirmwareSupported && assignableKeys.length > 0 && wiringComplete, action: () => navigateDesign('keymap', 'build') },
+        ] : []),
       ];
 
   const handleImportKeyboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1001,7 +1163,7 @@ export default function App() {
         </div>
       )}
       {/* Header */}
-      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:h-14 md:flex-nowrap md:px-4 md:py-0 bg-[var(--bg-panel)] border-b border-[var(--border-main)] shrink-0">
+      <header className="relative z-[201] flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 md:h-14 md:flex-nowrap md:px-4 md:py-0 bg-[var(--bg-panel)] border-b border-[var(--border-main)] shrink-0">
         <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
           <button type="button" onClick={() => { setIsHomeVisible(true); storeState.setAppMode('design'); }} className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-[var(--bg-hover)]" title="Home">
             <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
@@ -1119,7 +1281,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className={cn("min-h-12 shrink-0 items-center justify-between gap-3 overflow-visible border-b border-[var(--border-main)] bg-[var(--bg-app)]/80 px-3 py-2 md:px-4", isHomeVisible ? "hidden" : "flex")}>
+      <div className={cn("relative z-[200] min-h-12 shrink-0 items-center justify-between gap-3 overflow-visible border-b border-[var(--border-main)] bg-[var(--bg-app)]/80 px-3 py-2 md:px-4", isHomeVisible ? "hidden" : "flex")}>
         {storeState.appMode === 'remap' ? (
           <div className="flex min-w-max items-center gap-2 md:gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
             <DeviceConnector />
@@ -1389,76 +1551,6 @@ export default function App() {
                         <span>{t('header.exportCanvasImage')}</span>
                       </button>
 
-                      <button
-                        onClick={handleOpenKiCadDialog}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
-                      >
-                        <CircuitBoard size={14} className="text-amber-500" />
-                        <span>{t('header.exportKiCadZip')}</span>
-                      </button>
-
-                      <button
-                        onClick={handleExportViaZip}
-                        disabled={qmkSourceUnsupported}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
-                          qmkSourceUnsupported
-                            ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]"
-                            : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
-                        )}
-                        title={qmkSourceUnsupported ? "QMK export is not supported for the selected MCU or development board." : undefined}
-                      >
-                        <Download size={14} className={qmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
-                        <span>{t('header.exportViaZip')}</span>
-                      </button>
-                      <button
-                        onClick={handleExportVialZip}
-                        disabled={qmkSourceUnsupported}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
-                          qmkSourceUnsupported
-                            ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]"
-                            : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
-                        )}
-                        title={qmkSourceUnsupported ? "Vial export is not supported for the selected MCU or development board." : undefined}
-                      >
-                        <Download size={14} className={qmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
-                        <span>{t('header.exportVialZip')}</span>
-                      </button>
-
-                      <button
-                        onClick={handleExportRmkZip}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left"
-                      >
-                        <Download size={14} className="text-amber-500" />
-                        <span>{t('header.exportRmkZip')}</span>
-                      </button>
-
-                      {(() => {
-                        return (
-                          <button
-                            onClick={handleOpenZmkExportDialog}
-                            disabled={zmkSourceUnsupported}
-                            className={cn(
-                              "w-full flex items-center justify-between px-3 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all text-left",
-                              zmkSourceUnsupported
-                                ? "opacity-40 cursor-not-allowed text-[var(--text-muted)]"
-                                : "hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] cursor-pointer"
-                            )}
-                            title={zmkSourceUnsupported ? "ZMK export is not supported for the selected MCU or development board." : undefined}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Download size={14} className={zmkSourceUnsupported ? "text-[var(--text-muted)]" : "text-amber-500"} />
-                              <span>{t('header.exportZmkZip')}</span>
-                            </div>
-                            {zmkSourceUnsupported && (
-                              <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-bold tracking-tighter">
-                                Unsupported
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })()}
                     </div>
                   </div>
                 </>
@@ -1479,7 +1571,7 @@ export default function App() {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative z-0 flex flex-1 overflow-hidden">
 
         {/* Main Workspace Area */}
         {isHomeVisible ? (
@@ -1516,7 +1608,12 @@ export default function App() {
                   isLeftNavOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
                 )}>
                   <div className="border-b border-[var(--border-main)] px-4 py-4">
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">{projectWorkspace === 'hardware' ? t('workspace.hardware') : t('workspace.firmware')}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">{projectWorkspace === 'hardware' ? t('workspace.hardware') : t('workspace.firmware')}</span>
+                      {projectWorkspace === 'firmware' && selectedFirmwareLabel && (
+                        <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold text-amber-400">{selectedFirmwareLabel}</span>
+                      )}
+                    </div>
                     <p className="mt-1 truncate text-sm font-semibold text-[var(--text-highlight)]">{settings.name || t('header.projectName')}</p>
                   </div>
                   <nav className="flex-1 space-y-1 overflow-y-auto p-3 custom-scrollbar" aria-label={t('workspace.navigation')}>
@@ -1558,7 +1655,7 @@ export default function App() {
               <>
                 {/* Position ZoomControls dynamically relative to the top of the Bottom Tray */}
                 <div 
-                  className="absolute inset-x-0 h-0 z-[160] transition-all duration-300"
+                  className="absolute inset-x-0 h-0 z-[160] transition-all duration-300 lg:left-[216px]"
                   style={{ bottom: designCanvasBottom, right: designCanvasRight }}
                 >
                   <ZoomControls />
@@ -1579,8 +1676,13 @@ export default function App() {
                       </div>
                     )}
                     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                    {activeRightPanel === 'settings' && (
-                      <HardwareSettingsPanel scope={projectWorkspace} />
+                    {activeRightPanel === 'build' && projectWorkspace === 'firmware' && selectedFirmwareTarget && (
+                      <FirmwareBuildPanel
+                        target={selectedFirmwareTarget}
+                        supported={selectedFirmwareSupported}
+                        onBuild={handleBuildSelectedFirmware}
+                        onChangeTarget={openFirmwareTargetDialog}
+                      />
                     )}
                     {activeRightPanel === 'properties' && editorMode === 'layout' && <PropertyPanel />}
                     {activeRightPanel === 'matrixPainter' && editorMode === 'matrix' && (
@@ -1606,7 +1708,7 @@ export default function App() {
                 )}
 
               {/* Bottom Tray */}
-              {storeState.isProjectOpen && editorMode === 'keymap' && (
+              {storeState.isProjectOpen && showsKeymapTray && (
                 <div 
                   className={cn(
                     "workspace-bottom-tray absolute bottom-0 left-0 bg-[var(--bg-panel)] border-t border-[var(--border-main)] z-[150] flex flex-col overflow-hidden transition-all h-[400px]"
@@ -1622,6 +1724,192 @@ export default function App() {
         )}
       </div>
 
+      {isHardwareSettingsDialogOpen && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={cancelHardwareSettings} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="hardware-settings-dialog-title"
+            className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_60px_rgba(0,0,0,0.65)] animate-in fade-in zoom-in duration-200"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <Settings size={18} className="text-amber-500" />
+                <div>
+                  <h2 id="hardware-settings-dialog-title" className="text-sm font-bold text-[var(--text-highlight)]">{t('hardware.title')}</h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('hardware.desc')}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={cancelHardwareSettings}
+                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+                aria-label={t('common.cancel')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+              <HardwareSettingsPanel scope="hardware" section="all" variant="dialog" />
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <button
+                type="button"
+                onClick={confirmHardwareSettings}
+                className="min-w-28 rounded-md bg-amber-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                {t('hardware.continuePins')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFirmwareSettingsDialogOpen && selectedFirmwareTarget && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={cancelFirmwareSettings} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="firmware-settings-dialog-title"
+            className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_60px_rgba(0,0,0,0.65)] animate-in fade-in zoom-in duration-200"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <Code2 size={18} className="text-amber-500" />
+                <div>
+                  <h2 id="firmware-settings-dialog-title" className="text-sm font-bold text-[var(--text-highlight)]">
+                    {selectedFirmwareLabel} · {t('workspace.setup')}
+                  </h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('firmwareFlow.basicSettingsDescription')}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={cancelFirmwareSettings}
+                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+                aria-label={t('common.cancel')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+              <HardwareSettingsPanel scope="firmware" section="identity" variant="dialog" />
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <button
+                type="button"
+                onClick={goToFirmwareTarget}
+                className="min-w-28 rounded-md border border-[var(--border-main)] bg-[var(--bg-panel)] px-5 py-2 text-xs font-bold text-[var(--text-main)] transition-all hover:bg-[var(--bg-hover)] active:scale-95"
+              >
+                {t('firmwareFlow.backToSelection')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmFirmwareSettings}
+                className="min-w-28 rounded-md bg-amber-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                {selectedFirmwareTarget === 'rmk'
+                  ? t('firmwareFlow.continueKeymap')
+                  : t('firmwareFlow.continueTargetSettings')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFirmwareDetailDialogOpen && selectedFirmwareTarget && selectedFirmwareTarget !== 'rmk' && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeFirmwareDetailDialog} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="firmware-detail-dialog-title"
+            className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_60px_rgba(0,0,0,0.65)] animate-in fade-in zoom-in duration-200"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <Code2 size={18} className="text-amber-500" />
+                <div>
+                  <h2 id="firmware-detail-dialog-title" className="text-sm font-bold text-[var(--text-highlight)]">
+                    {selectedFirmwareLabel} · {t('firmwareFlow.targetSettings')}
+                  </h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('firmwareFlow.targetSettingsDescription')}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeFirmwareDetailDialog}
+                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+                aria-label={t('common.cancel')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+              <HardwareSettingsPanel scope="firmware" section="target" variant="dialog" />
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <button
+                type="button"
+                onClick={returnToFirmwareSettings}
+                className="min-w-28 rounded-md border border-[var(--border-main)] bg-[var(--bg-panel)] px-5 py-2 text-xs font-bold text-[var(--text-main)] transition-all hover:bg-[var(--bg-hover)] active:scale-95"
+              >
+                {t('firmwareFlow.backToSetup')}
+              </button>
+              <button
+                type="button"
+                onClick={continueFromFirmwareDetails}
+                className="min-w-28 rounded-md bg-amber-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                {t('firmwareFlow.continueKeymap')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isFirmwareTargetDialogOpen && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeFirmwareTargetDialog} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="firmware-target-dialog-title"
+            className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_60px_rgba(0,0,0,0.65)] animate-in fade-in zoom-in duration-200"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <div className="flex items-center gap-3">
+                <Code2 size={18} className="text-amber-500" />
+                <div>
+                  <h2 id="firmware-target-dialog-title" className="text-sm font-bold text-[var(--text-highlight)]">{t('firmwareFlow.selectTitle')}</h2>
+                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('firmwareFlow.selectDescription')}</p>
+                </div>
+              </div>
+              {selectedFirmwareTarget && (
+                <button
+                  type="button"
+                  onClick={closeFirmwareTargetDialog}
+                  className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
+                  aria-label={t('common.cancel')}
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            <div className="min-h-0 overflow-y-auto custom-scrollbar">
+              <FirmwareTargetPanel
+                selected={firmwareTargetDraft}
+                hardware={settings.hardware}
+                onSelect={setFirmwareTargetDraft}
+                onContinue={confirmFirmwareTarget}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPinSettingsDialogOpen && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsPinSettingsDialogOpen(false)} />
@@ -1629,7 +1917,7 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="pin-settings-dialog-title"
-            className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200"
+            className="relative flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
               <div className="flex items-center gap-3">
@@ -1648,8 +1936,24 @@ export default function App() {
                 <X size={18} />
               </button>
             </div>
-            <div className="h-[calc(92vh-73px)] min-h-0 max-h-[760px]">
+            <div className="min-h-0 flex-1 overflow-hidden">
               <MatrixPinInspectorPanel variant="dialog" />
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
+              <button
+                type="button"
+                onClick={returnToHardwareSettings}
+                className="min-w-28 rounded-md border border-[var(--border-main)] bg-[var(--bg-panel)] px-5 py-2 text-xs font-bold text-[var(--text-main)] transition-all hover:bg-[var(--bg-hover)] active:scale-95"
+              >
+                {t('hardware.backToSetup')}
+              </button>
+              <button
+                type="button"
+                onClick={continueFromPinsToLayout}
+                className="min-w-28 rounded-md bg-amber-500 px-5 py-2 text-xs font-bold text-zinc-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                {t('hardware.continueLayout')}
+              </button>
             </div>
           </div>
         </div>
@@ -1788,53 +2092,6 @@ export default function App() {
               >
                 {t('kicad.export')}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isZmkExportDialogOpen && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsZmkExportDialogOpen(false)} />
-          <div className="relative w-full max-w-xl overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--bg-panel)] shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b border-[var(--border-main)] bg-[var(--bg-app)]/50 p-4">
-              <div className="flex items-center gap-3">
-                <Cpu size={18} className="text-amber-500" />
-                <div>
-                  <h2 className="text-sm font-bold text-[var(--text-highlight)]">{t('zmkExport.title')}</h2>
-                  <p className="text-xs font-medium text-[var(--text-muted)]">{t('zmkExport.desc')}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsZmkExportDialogOpen(false)}
-                className="rounded p-2 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] active:scale-90"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="grid gap-3 p-4 sm:grid-cols-2">
-              <button
-                onClick={() => handleExportZmkZip(false)}
-                className="group rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] p-4 text-left transition-all hover:border-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
-              >
-                <Download size={20} className="mb-3 text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]" />
-                <div className="text-xs font-bold text-[var(--text-highlight)]">{t('zmkExport.standard')}</div>
-                <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{t('zmkExport.standardDesc')}</p>
-              </button>
-
-              <button
-                onClick={() => handleExportZmkZip(true)}
-                className="group rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-left transition-all hover:border-amber-400 hover:bg-amber-500/10"
-              >
-                <Sparkles size={20} className="mb-3 text-amber-500" />
-                <div className="text-xs font-bold text-[var(--text-highlight)]">{t('zmkExport.studio')}</div>
-                <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-muted)]">{t('zmkExport.studioDesc')}</p>
-              </button>
-            </div>
-
-            <div className="border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 px-4 py-3 text-[10px] leading-relaxed text-[var(--text-muted)]">
-              {t('zmkExport.unlockNote')}
             </div>
           </div>
         </div>
