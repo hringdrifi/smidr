@@ -97,6 +97,7 @@ export interface ProjectSettings {
     backlight?: string;
     sda?: string;
     scl?: string;
+    splitSerialRx?: string; // Full-duplex UART receive pin
     splitSerial?: string; // Serial transport pin (e.g. GP1 for RP2040)
     splitRows?: string[]; // Right side row pins for split keyboards
     splitCols?: string[]; // Right side col pins for split keyboards
@@ -104,6 +105,7 @@ export interface ProjectSettings {
     splitDirect?: string[]; // Available direct pins for the right side of split keyboards
   };
   hardware: {
+    splitCommunication?: { transport: 'wired' | 'wireless'; duplex: 'half' | 'full' };
     controllerType?: 'mcu' | 'development_board';
     mcu: QmkMcu | string;
     bootloader?: string;
@@ -194,6 +196,7 @@ export interface SmidrProjectFileV05 {
     activeOptions: ProjectSettings['activeOptions'];
   };
   hardware: {
+    splitCommunication?: ProjectSettings['hardware']['splitCommunication'];
     controllerType?: ProjectSettings['hardware']['controllerType'];
     mcu: ProjectSettings['hardware']['mcu'];
     board: ProjectSettings['hardware']['board'];

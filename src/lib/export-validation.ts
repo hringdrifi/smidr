@@ -1,3 +1,4 @@
+import { getSplitCommunication, getActiveSplitPins } from './split-communication';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { getDevelopmentBoardPins, getMcuPins, getZmkHardwareTarget } from './mcu-presets';
 import { getFirmwareMatrixPosition, getQmkMatrixFromPins, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
@@ -215,10 +216,16 @@ export const validateFirmwareExport = (
       });
     }
     if (settings.features.split) {
+      if (settings.hardware.splitCommunication) {
+        const communication = getSplitCommunication(settings);
+        const chip = getZmkHardwareTarget(settings.hardware);
+        if ((communication.transport === 'wired' && chip !== 'rp2040') || (communication.transport === 'wireless' && chip !== 'nrf52840' && chip !== 'nrf52832'))
+          issues.push({ severity: 'error', code: 'rmk-split-target-unsupported', message: 'RMK split config export supports RP2040 for wired UART and nRF52 for wireless communication.' });
+      }
       issues.push({
         severity: 'warning',
         code: 'rmk-split-export-experimental',
-        message: 'RMK split source export currently emits a single keyboard.toml layout map. Verify split central/peripheral matrix sections before flashing.',
+        message: 'RMK split config export requires firmware entry points and matching chip/split Cargo features for both halves before building.',
       });
     }
     if ((settings.macros || []).some(actions => actions.length > 0)) {
@@ -288,8 +295,43 @@ export const validateFirmwareExport = (
   }
 
   if (settings.features.split) {
+    const communication = getSplitCommunication(settings, target);
+    if (communication.transport === 'wireless' && (target === 'qmk' || target === 'vial')) {
+      issues.push({ severity: 'error', code: 'split-wireless-unsupported', message: 'QMK/Vial source export does not support wireless split communication.' });
+    }
+    if (communication.transport === 'wired') {
+      const activePins = getActiveSplitPins({ ...settings, hardware: { ...settings.hardware, splitCommunication: communication } });
+      pushInvalidPins(issues, settings, activePins.map(value => ({ label: 'Split UART', value })));
+      if (settings.hardware.splitCommunication && (!settings.pins.splitSerial || (communication.duplex === 'full' && !settings.pins.splitSerialRx))) {
+        issues.push({ severity: 'error', code: 'split-uart-pins-missing', message: 'Assign the shared UART pin for half duplex, or both TX and RX pins for full duplex.' });
+      }
+      if (communication.duplex === 'full' && settings.pins.splitSerial && settings.pins.splitSerial === settings.pins.splitSerialRx) {
+        issues.push({ severity: 'error', code: 'split-uart-pins-duplicate', message: 'Full-duplex UART requires different TX and RX pins.' });
+      }
+      const otherPins = [
+        ...(directPins ? [...(settings.pins.direct || []), ...(settings.pins.splitDirect || []), ...keys.map(key => resolveDirectPin(settings, key, keys))] : [...settings.pins.rows, ...settings.pins.cols, ...(settings.pins.splitRows || []), ...(settings.pins.splitCols || [])]),
+        ...((settings.features.rgb || settings.features.rgbMatrix) ? [settings.pins.rgb] : []),
+        ...(settings.features.backlight ? [settings.pins.backlight] : []),
+        ...(settings.features.oled ? [settings.pins.sda, settings.pins.scl] : []),
+        ...(settings.encoders || []).flatMap(encoder => [encoder.pinA, encoder.pinB]),
+        ...(settings.trackballs || []).flatMap(ball => [ball.sclk, ball.sdio, ball.cs, ball.motion]),
+      ].map(normalizePinName).filter(Boolean);
+      if (activePins.some(pin => otherPins.includes(normalizePinName(pin)))) {
+        issues.push({ severity: 'error', code: 'split-uart-pin-conflict', message: 'A split UART pin is also assigned to another function on one of the halves.' });
+      }
+      if (settings.hardware.splitCommunication && target === 'zmk' && communication.duplex === 'half') {
+        issues.push({ severity: 'error', code: 'zmk-half-duplex-unsupported', message: 'ZMK source export does not yet support single-wire half-duplex UART. Select full duplex or wireless.' });
+      }
+      if ((target === 'qmk' || target === 'vial') && communication.duplex === 'full') {
+        if (String(settings.hardware.mcu).toUpperCase() !== 'RP2040' && !String(settings.hardware.mcu).toUpperCase().startsWith('STM32')) {
+          issues.push({ severity: 'error', code: 'qmk-full-duplex-target-unsupported', message: 'Full-duplex QMK/Vial export currently supports RP2040 and STM32 targets.' });
+        } else if (String(settings.hardware.mcu).toUpperCase().startsWith('STM32')) {
+          issues.push({ severity: 'warning', code: 'qmk-usart-configuration-required', message: 'STM32 USART requires matching peripheral and alternate-function settings in mcuconf.h/config.h for the selected TX/RX pins.' });
+        }
+      }
+    }
     if (target === 'zmk') {
-      const zmkSplitTransport = settings.zmk?.splitTransport || 'ble';
+      const zmkSplitTransport = getSplitCommunication(settings, 'zmk').transport === 'wired' ? 'wired' : 'ble';
       if (zmkSplitTransport === 'ble' && getZmkHardwareTarget(settings.hardware) !== 'nrf52840') {
         issues.push({
           severity: 'error',
@@ -297,7 +339,7 @@ export const validateFirmwareExport = (
           message: 'ZMK split source export currently requires an nRF52840 BLE-capable development board.',
         });
       }
-      if (zmkSplitTransport === 'wired' && !settings.zmk?.wiredSplitDevice?.trim()) {
+      if (zmkSplitTransport === 'wired' && !settings.hardware.splitCommunication && !settings.zmk?.wiredSplitDevice?.trim()) {
         issues.push({
           severity: 'warning',
           code: 'zmk-wired-split-device-missing',
@@ -305,7 +347,7 @@ export const validateFirmwareExport = (
         });
       }
     }
-    if (!directPins && target !== 'zmk' && !settings.pins.splitSerial) {
+    if (getSplitCommunication(settings, target).transport === 'wired' && target !== 'zmk' && !settings.pins.splitSerial) {
       issues.push({
         severity: 'warning',
         code: 'split-serial-missing',
@@ -331,7 +373,7 @@ export const validateFirmwareExport = (
     }
     if (!directPins) {
       pushInvalidPins(issues, settings, [
-        { label: 'Split serial', value: settings.pins.splitSerial },
+
         ...unique(settings.pins.splitRows || []).map((value, index) => ({ label: `Right row ${index + 1}`, value })),
         ...unique(settings.pins.splitCols || []).map((value, index) => ({ label: `Right column ${index + 1}`, value })),
       ]);

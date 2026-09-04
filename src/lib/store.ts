@@ -345,6 +345,7 @@ const initialState: Partial<KeyboardState> = {
     matrix: { rows: 0, cols: 0, wiring: 'matrix' },
     pins: { rows: [], cols: [], splitRows: [], splitCols: [], direct: [], splitDirect: [] },
     hardware: {
+      splitCommunication: { transport: 'wired', duplex: 'half' },
       controllerType: 'development_board',
       mcu: 'RP2040',
       bootloader: 'rp2040',

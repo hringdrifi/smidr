@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { getSplitCommunication, getActiveSplitPins } from '@/lib/split-communication';
 import { Hash, Trash2, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -65,6 +66,15 @@ const InteractivePinSlot = ({
     <div className="space-y-1">
       <label className="text-[9px] text-[var(--text-muted)] font-mono uppercase">{label}</label>
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={label}
+        onKeyDown={event => {
+          if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            onFocus();
+          }
+        }}
         onClick={onFocus}
         className={cn(
           "w-full h-8 flex items-center justify-between bg-[var(--bg-app)] border rounded px-2 text-xs font-mono cursor-pointer transition-all duration-200",
@@ -126,57 +136,45 @@ const FeatureToggle = ({
   </button>
 );
 
-const ZmkSplitTransportSettings = ({
-  settings,
-  updateSettings,
-}: {
+const SplitCommunicationSettings = ({ settings, updateSettings, focusedFeature, onFocus, onClear }: {
   settings: ProjectSettings;
   updateSettings: (updates: Partial<ProjectSettings>) => void;
+  focusedFeature: string | null;
+  onFocus: (pin: string | null) => void;
+  onClear: (pin: string) => void;
 }) => {
   const { t } = useTranslation();
-  const splitTransport = settings.zmk?.splitTransport || 'ble';
-  const updateZmk = (updates: NonNullable<ProjectSettings['zmk']>) => {
-    updateSettings({ zmk: { ...(settings.zmk || {}), ...updates } });
+  const communication = getSplitCommunication(settings);
+  const update = (changes: Partial<typeof communication>) => {
+    onFocus(null);
+    updateSettings({ hardware: { ...settings.hardware, splitCommunication: { ...communication, ...changes } } });
   };
-
-  return (
-    <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">ZMK</div>
-      <div className="space-y-1">
-        <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkSplitTransport')}</label>
-        <div className="flex rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
-          {(['ble', 'wired'] as const).map(transport => (
-            <button
-              key={transport}
-              type="button"
-              onClick={() => updateZmk({ splitTransport: transport })}
-              className={cn(
-                "flex-1 rounded py-1 text-[10px] font-bold transition-all",
-                splitTransport === transport
-                  ? "bg-amber-500 text-[var(--bg-button)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-              )}
-            >
-              {transport === 'ble' ? t('hardware.zmkSplitBle') : t('hardware.zmkSplitWired')}
-            </button>
-          ))}
-        </div>
-      </div>
-      {splitTransport === 'wired' && (
-        <div className="space-y-1">
-          <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkWiredSplitDevice')}</label>
-          <input
-            type="text"
-            value={settings.zmk?.wiredSplitDevice || ''}
-            onChange={(event) => updateZmk({ wiredSplitDevice: event.target.value })}
-            placeholder="&pro_micro_serial"
-            className="w-full rounded border border-[var(--border-main)] bg-[var(--bg-app)] px-2 py-1.5 font-mono text-xs text-amber-500 outline-none transition-all focus:ring-1 focus:ring-amber-500"
-          />
-          <p className="text-[10px] leading-relaxed text-[var(--text-dim)]">{t('hardware.zmkWiredSplitDeviceDesc')}</p>
-        </div>
-      )}
+  const choices = <T extends string,>(values: readonly T[], selected: T, label: (value: T) => string, change: (value: T) => void) => (
+    <div className="grid grid-cols-2 gap-1 rounded border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
+      {values.map(value => <button key={value} type="button" aria-pressed={selected === value}
+        onClick={() => change(value)}
+        className={cn("min-h-10 rounded px-2 text-xs font-bold transition-colors", selected === value ? "bg-amber-500 text-zinc-950" : "text-[var(--text-muted)] hover:text-[var(--text-main)]")}>
+        {label(value)}
+      </button>)}
     </div>
   );
+  return <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
+    {choices(['wired', 'wireless'] as const, communication.transport, value => t('hardware.split' + (value === 'wired' ? 'Wired' : 'Wireless')), transport => update({ transport }))}
+    {communication.transport === 'wired' && <>
+      <div className="space-y-1">
+        <div className="text-xs text-[var(--text-muted)]">UART</div>
+        {choices(['half', 'full'] as const, communication.duplex, value => t('hardware.split' + (value === 'half' ? 'HalfDuplex' : 'FullDuplex')), duplex => update({ duplex }))}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {(communication.duplex === 'full' ? ['splitSerial', 'splitSerialRx'] as const : ['splitSerial'] as const).map(pin =>
+          <InteractivePinSlot key={pin}
+            label={t('hardware.' + (pin === 'splitSerialRx' ? 'splitRx' : communication.duplex === 'half' ? 'splitData' : 'splitTx'))}
+            value={settings.pins[pin] || ''} isFocused={focusedFeature === pin}
+            onFocus={() => onFocus(pin)} onClear={() => onClear(pin)} />)}
+      </div>
+      <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('hardware.' + (communication.duplex === 'half' ? 'splitHalfHint' : 'splitFullHint'))}</p>
+    </>}
+  </div>;
 };
 
 const PinTagInput = ({
@@ -344,11 +342,13 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
     if (box === 'col') return settings.features.split ? t('hardware.leftColPins') : t('hardware.colPins');
     if (box === 'splitRow') return t('hardware.rightRowPins');
     if (box === 'splitCol') return t('hardware.rightColPins');
+    if (feature === 'splitSerialRx') return t('hardware.splitRx');
+    if (feature === 'splitSerial') return t(getSplitCommunication(settings).duplex === 'half' ? 'hardware.splitData' : 'hardware.splitTx');
     return feature || '';
   };
 
   const getAssignedPins = () => {
-    const pins = new Set<string>();
+    const pins = new Set<string>(getActiveSplitPins(settings));
     if (activeBox === 'splitRow' || activeBox === 'splitCol' || activeBox === 'splitDirect') {
       settings.pins.splitRows?.forEach(p => p && pins.add(p));
       settings.pins.splitCols?.forEach(p => p && pins.add(p));
@@ -376,7 +376,11 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
     if (settings.pins.scl) pins.add(settings.pins.scl);
     getEncoderAssignedPins(settings, keys, settings.features.split && (activeBox === 'row' || activeBox === 'col') ? 'left' : undefined)
       .forEach(pin => pins.add(pin));
-    if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
+    if (focusedFeature === 'splitSerial' || focusedFeature === 'splitSerialRx') {
+      settings.pins.splitRows?.forEach(p => p && pins.add(p));
+      settings.pins.splitCols?.forEach(p => p && pins.add(p));
+      settings.pins.splitDirect?.forEach(p => p && pins.add(p));
+    }
     return pins;
   };
 
@@ -442,7 +446,12 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
     if (activeBox === 'splitDirect') applyPinList('splitDirect', settings.pins.splitDirect || []);
     if (activeBox === 'feature' && focusedFeature) {
       if (preventDuplicates && assignedPins.has(pinName) && (settings.pins as any)[focusedFeature] !== pinName) return;
-      setPin('feature', focusedFeature, pinName);
+      if (focusedFeature === 'splitSerial' || focusedFeature === 'splitSerialRx') {
+        updateSettings({
+          hardware: { ...settings.hardware, splitCommunication: getSplitCommunication(settings) },
+          pins: { ...settings.pins, [focusedFeature]: pinName },
+        });
+      } else setPin('feature', focusedFeature, pinName);
     }
   };
 
@@ -461,7 +470,8 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
         backlight: '',
         sda: '',
         scl: '',
-        splitSerial: ''
+        splitSerial: '',
+        splitSerialRx: ''
       }
     });
     setActiveBox(null);
@@ -671,20 +681,10 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
       {settings.features.split && (
         <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
           <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">{t('hardware.splitCommunication')}</h3>
-          <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">QMK / Vial</div>
-            <InteractivePinSlot
-              label={t('hardware.splitSerial')}
-              value={settings.pins.splitSerial || ''}
-              isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
-              onFocus={() => {
-                setActiveBox('feature');
-                setFocusedFeature('splitSerial');
-              }}
-              onClear={() => setPin('feature', 'splitSerial', '')}
-            />
-          </div>
-          <ZmkSplitTransportSettings settings={settings} updateSettings={updateSettings} />
+          <SplitCommunicationSettings settings={settings} updateSettings={updateSettings}
+            focusedFeature={activeBox === 'feature' ? focusedFeature : null}
+            onFocus={pin => { setActiveBox(pin ? 'feature' : null); setFocusedFeature(pin); }}
+            onClear={pin => setPin('feature', pin, '')} />
         </section>
       )}
 
@@ -821,11 +821,13 @@ export const MatrixPinSettingsPanel = () => {
     if (box === 'col') return settings.features.split ? t('hardware.leftColPins') : t('hardware.colPins');
     if (box === 'splitRow') return t('hardware.rightRowPins');
     if (box === 'splitCol') return t('hardware.rightColPins');
+    if (feature === 'splitSerialRx') return t('hardware.splitRx');
+    if (feature === 'splitSerial') return t(getSplitCommunication(settings).duplex === 'half' ? 'hardware.splitData' : 'hardware.splitTx');
     return feature || '';
   };
 
   const getAssignedPins = () => {
-    const pins = new Set<string>();
+    const pins = new Set<string>(getActiveSplitPins(settings));
     if (activeBox === 'splitRow' || activeBox === 'splitCol') {
       settings.pins.splitRows?.forEach(p => p && pins.add(p));
       settings.pins.splitCols?.forEach(p => p && pins.add(p));
@@ -842,7 +844,11 @@ export const MatrixPinSettingsPanel = () => {
     if (settings.pins.scl) pins.add(settings.pins.scl);
     getEncoderAssignedPins(settings, keys, settings.features.split && (activeBox === 'row' || activeBox === 'col') ? 'left' : undefined)
       .forEach(pin => pins.add(pin));
-    if (settings.pins.splitSerial) pins.add(settings.pins.splitSerial);
+    if (focusedFeature === 'splitSerial' || focusedFeature === 'splitSerialRx') {
+      settings.pins.splitRows?.forEach(p => p && pins.add(p));
+      settings.pins.splitCols?.forEach(p => p && pins.add(p));
+      settings.pins.splitDirect?.forEach(p => p && pins.add(p));
+    }
     return pins;
   };
 
@@ -887,7 +893,12 @@ export const MatrixPinSettingsPanel = () => {
     if (activeBox === 'splitCol') applyPinList('splitCols', settings.pins.splitCols || []);
     if (activeBox === 'feature' && focusedFeature) {
       if (preventDuplicates && assignedPins.has(pinName) && (settings.pins as any)[focusedFeature] !== pinName) return;
-      setPin('feature', focusedFeature, pinName);
+      if (focusedFeature === 'splitSerial' || focusedFeature === 'splitSerialRx') {
+        updateSettings({
+          hardware: { ...settings.hardware, splitCommunication: getSplitCommunication(settings) },
+          pins: { ...settings.pins, [focusedFeature]: pinName },
+        });
+      } else setPin('feature', focusedFeature, pinName);
     }
   };
 
@@ -902,7 +913,8 @@ export const MatrixPinSettingsPanel = () => {
         backlight: '',
         sda: '',
         scl: '',
-        splitSerial: ''
+        splitSerial: '',
+        splitSerialRx: ''
       }
     });
     setActiveBox(null);
@@ -1070,20 +1082,10 @@ export const MatrixPinSettingsPanel = () => {
               {settings.features.split && (
                 <div className="space-y-3">
                   <h3 className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">{t('hardware.splitCommunication')}</h3>
-                  <div className="space-y-3 rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/30 p-3">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-main)]">QMK / Vial</div>
-                    <InteractivePinSlot
-                      label={t('hardware.splitSerial')}
-                      value={settings.pins.splitSerial || ''}
-                      isFocused={activeBox === 'feature' && focusedFeature === 'splitSerial'}
-                      onFocus={() => {
-                        setActiveBox('feature');
-                        setFocusedFeature('splitSerial');
-                      }}
-                      onClear={() => setPin('feature', 'splitSerial', '')}
-                    />
-                  </div>
-                  <ZmkSplitTransportSettings settings={settings} updateSettings={updateSettings} />
+                  <SplitCommunicationSettings settings={settings} updateSettings={updateSettings}
+            focusedFeature={activeBox === 'feature' ? focusedFeature : null}
+            onFocus={pin => { setActiveBox(pin ? 'feature' : null); setFocusedFeature(pin); }}
+            onClear={pin => setPin('feature', pin, '')} />
                 </div>
               )}
 

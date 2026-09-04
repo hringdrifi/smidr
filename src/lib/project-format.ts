@@ -95,6 +95,7 @@ export const toSmidrProjectFileV05 = (project: SmidrProject): SmidrProjectFileV0
     delete pins.splitRows;
     delete pins.splitCols;
     delete pins.splitSerial;
+    delete pins.splitSerialRx;
   }
 
   return {
@@ -112,6 +113,7 @@ export const toSmidrProjectFileV05 = (project: SmidrProject): SmidrProjectFileV0
       activeOptions: project.activeOptions || {},
     },
     hardware: {
+      splitCommunication: project.hardware.splitCommunication,
       controllerType: project.hardware.controllerType,
       mcu: project.hardware.mcu,
       board: project.hardware.board,
@@ -154,6 +156,7 @@ export const fromSmidrProjectFile = (value: unknown): SmidrProject => {
     matrix: hardware.matrix,
     pins: hardware.pins,
     hardware: {
+      splitCommunication: hardware.splitCommunication,
       controllerType: hardware.controllerType,
       mcu: hardware.mcu,
       board: hardware.board,

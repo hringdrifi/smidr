@@ -1,9 +1,10 @@
+import { getSplitCommunication } from './split-communication';
 import JSZip from 'jszip';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { generateViaJson } from './export';
 import { getDefaultDevelopmentBoard, getZmkHardwareTarget } from './mcu-presets';
-import { getDirectLocalMatrixPosition, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
+import { getDirectMatrixSide, getDirectSideDimensions, getQmkMatrixFromPins, getDirectLocalMatrixPosition, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
 import { sortKeys } from './sorting';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
@@ -102,7 +103,7 @@ const getRmkMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) 
       .filter((pos): pos is { row: number; col: number } => !!pos);
     return getMatrixDimensionsFromPositions(positions, settings.matrix);
   }
-  return getMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
+  return (settings.hardware.splitCommunication ? getQmkMatrixFromPins(settings.pins, settings.features.split) : getMatrixFromPins(settings.pins, settings.features.split)) || settings.matrix;
 };
 
 const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
@@ -124,8 +125,7 @@ const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   });
 };
 
-const generateDirectPins = (settings: ProjectSettings, keys: PhysicalKey[]) => {
-  const matrix = getRmkMatrixDimensions(settings, keys);
+const generateDirectPins = (settings: ProjectSettings, keys: PhysicalKey[], matrix = getRmkMatrixDimensions(settings, keys)) => {
   const direct = Array.from({ length: matrix.rows }, () => Array.from({ length: matrix.cols }, () => '_'));
   keys.forEach(key => {
     const pos = getDirectLocalMatrixPosition(settings, key, keys);
@@ -175,6 +175,39 @@ const getUnlockKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   ];
 };
 
+const generateSplitToml = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  const { transport, duplex } = getSplitCommunication(settings);
+  const chip = getRmkChip(settings);
+  if (transport === 'wired' && chip !== 'rp2040')
+    throw new Error('RMK wired split config export currently supports RP2040 (PIO).');
+  if (transport === 'wireless' && !chip.startsWith('nrf52'))
+    throw new Error('RMK wireless split config export currently supports nRF52 targets.');
+  const tx = settings.pins.splitSerial;
+  const rx = duplex === 'half' ? tx : settings.pins.splitSerialRx;
+  if (transport === 'wired' && (!tx || !rx || (duplex === 'full' && tx === rx)))
+    throw new Error('Assign valid UART pins before exporting RMK split configuration.');
+  const direct = isDirectPinMatrix(settings);
+  const leftRows = direct ? getDirectSideDimensions(settings, keys, 'left').rows : settings.pins.rows.length;
+  const section = (side: 'left' | 'right') => {
+    const rows = side === 'right' && settings.pins.splitRows?.length ? settings.pins.splitRows : settings.pins.rows;
+    const cols = side === 'right' && settings.pins.splitCols?.length ? settings.pins.splitCols : settings.pins.cols;
+    const dimensions = direct ? getDirectSideDimensions(settings, keys, side) : { rows: rows.length, cols: cols.length };
+    const name = side === 'left' ? 'central' : 'peripheral';
+    const sideKeys = keys.filter(key => getDirectMatrixSide(settings, key, keys) === side);
+    return `${side === 'left' ? '[split.central]' : '[[split.peripheral]]'}
+rows = ${dimensions.rows}
+cols = ${dimensions.cols}
+row_offset = ${side === 'left' ? 0 : leftRows}
+col_offset = 0
+${transport === 'wired' ? 'serial = [{ instance = "PIO0", tx_pin = ' + quoteToml(normalizeRmkPin(tx, '_')) + ', rx_pin = ' + quoteToml(normalizeRmkPin(rx, '_')) + ' }]' : 'ble_addr = ' + (side === 'left' ? '[0x18, 0xe2, 0x21, 0x80, 0xc0, 0xc7]' : '[0x7e, 0xfe, 0x73, 0x9e, 0x11, 0xe3]')}
+
+[split.${name}.matrix]
+${direct ? 'matrix_type = "direct_pin"\ndirect_pins = [\n' + generateDirectPins(settings, sideKeys, dimensions) + '\n]\ndirect_pin_low_active = true' : 'matrix_type = "normal"\nrow_pins = ' + tomlStringArray(rows) + '\ncol_pins = ' + tomlStringArray(cols) + (settings.hardware.diodeDirection === 'ROW2COL' ? '\nrow2col = true' : '')}
+`;
+  };
+  return '[split]\nconnection = ' + quoteToml(transport === 'wired' ? 'serial' : 'ble') + '\n\n' + section('left') + '\n' + section('right');
+};
+
 const generateKeyboardToml = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const matrix = getRmkMatrixDimensions(settings, keys);
   const layers = settings.layers || 4;
@@ -197,14 +230,14 @@ usb_enable = true
 vial_enabled = true
 unlock_keys = [[${unlockKeys[0].join(', ')}], [${unlockKeys[1].join(', ')}]]
 
-[matrix]
+${settings.features.split && settings.hardware.splitCommunication ? generateSplitToml(settings, keys) : `[matrix]
 ${useDirectPins ? `matrix_type = "direct_pin"
 direct_pins = [
 ${generateDirectPins(settings, keys)}
 ]
 direct_pin_low_active = true` : `row_pins = ${tomlStringArray(settings.pins.rows || [])}
 col_pins = ${tomlStringArray(settings.pins.cols || [])}
-${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col = true' : ''}`}
+${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col = true' : ''}`}`}
 
 [layout]
 rows = ${matrix.rows}
@@ -226,7 +259,8 @@ This source bundle was generated by Smidr.
 ## Notes
 - RMK expects \`keyboard.toml\` and \`vial.json\` to describe the same key order.
 - GPIO names are normalized for common RP2040 and nRF52 formats. Verify the pin names against the RMK/Embassy target before flashing.
-- Split, encoder, RGB Matrix, combo, and project macro definitions may require RMK-specific follow-up code beyond this initial config export.
+- Split configuration includes central/peripheral matrices and communication pins when configured in hardware settings. Separate firmware entry points and chip/split Cargo features still need to be supplied for each half.
+- Encoder, RGB Matrix, combo, and project macro definitions may require RMK-specific follow-up code beyond this initial config export.
 `;
 
 const generateCargoToml = (name: string) => `[package]
@@ -254,6 +288,7 @@ export const generateRmkZip = async (state: { settings: ProjectSettings; keys: P
   zip.file('Cargo.toml', generateCargoToml(projectName));
   zip.file('README.md', generateReadme(settings));
   zip.file('rmk.project.json', JSON.stringify({
+    splitCommunication: settings.features.split ? { ...getSplitCommunication(settings), txPin: settings.pins.splitSerial, rxPin: settings.pins.splitSerialRx } : undefined,
     generator: 'Smidr',
     target: 'rmk',
     board: settings.hardware.controllerType === 'development_board'

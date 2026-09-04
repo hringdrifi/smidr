@@ -1,3 +1,4 @@
+import { getSplitCommunication } from './split-communication';
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { UniversalAction } from '@/types/actions';
@@ -142,9 +143,56 @@ const hasCompleteDirectInputPins = (settings: ProjectSettings, keys: PhysicalKey
   return matrix.cols > 0 && Array.from({ length: matrix.cols }, (_, index) => pins.get(index)).every(hasConfiguredPin);
 };
 
-const getZmkSplitTransport = (settings: ProjectSettings) => settings.zmk?.splitTransport || 'ble';
+const getZmkSplitTransport = (settings: ProjectSettings) => getSplitCommunication(settings, 'zmk').transport === 'wired' ? 'wired' : 'ble';
 
-const getWiredSplitDevice = (settings: ProjectSettings) => settings.zmk?.wiredSplitDevice?.trim() || '&pro_micro_serial';
+const getWiredSplitDevice = (settings: ProjectSettings) => settings.hardware.splitCommunication
+  ? (getZmkHardwareTarget(settings.hardware) === 'rp2040' ? '&smidr_split_uart' : '&uart0')
+  : settings.zmk?.wiredSplitDevice?.trim() || '&pro_micro_serial';
+
+const generateSplitUart = (settings: ProjectSettings, target: ZmkTarget) => {
+  if (!settings.hardware.splitCommunication || getZmkSplitTransport(settings) !== 'wired') return '';
+  const tx = settings.pins.splitSerial!;
+  const rx = settings.pins.splitSerialRx!;
+  if (target === 'rp2040') return `#include <dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>
+&pinctrl {
+    smidr_split_uart_default: smidr_split_uart_default {
+        tx_pins { pinmux = <PIO0_P${parseGpioNumber(tx, 0)}>; };
+        rx_pins { pinmux = <PIO0_P${parseGpioNumber(rx, 1)}>; input-enable; bias-pull-up; };
+    };
+};
+&pio0 {
+    status = "okay";
+    smidr_split_uart: serial {
+        compatible = "raspberrypi,pico-uart-pio";
+        status = "okay";
+        pinctrl-0 = <&smidr_split_uart_default>;
+        pinctrl-names = "default";
+        current-speed = <115200>;
+    };
+};
+`;
+  const txGpio = parseZmkGpio(tx, 0, target);
+  const rxGpio = parseZmkGpio(rx, 1, target);
+  const psels = `<NRF_PSEL(UART_TX, ${txGpio.controller === '&gpio1' ? 1 : 0}, ${txGpio.number})>, <NRF_PSEL(UART_RX, ${rxGpio.controller === '&gpio1' ? 1 : 0}, ${rxGpio.number})>`;
+  return `#include <dt-bindings/pinctrl/nrf-pinctrl.h>
+&pinctrl {
+    smidr_split_uart_default: smidr_split_uart_default {
+        group1 { psels = ${psels}; bias-pull-up; };
+    };
+    smidr_split_uart_sleep: smidr_split_uart_sleep {
+        group1 { psels = ${psels}; low-power-enable; };
+    };
+};
+&uart0 {
+    status = "okay";
+    /delete-property/ hw-flow-control;
+    pinctrl-0 = <&smidr_split_uart_default>;
+    pinctrl-1 = <&smidr_split_uart_sleep>;
+    pinctrl-names = "default", "sleep";
+    current-speed = <115200>;
+};
+`;
+};
 
 const getZmkLightingConfigSnippet = (settings: ProjectSettings) => `${settings.features.rgb ? `CONFIG_ZMK_RGB_UNDERGLOW=y
 CONFIG_WS2812_STRIP=y` : '# CONFIG_ZMK_RGB_UNDERGLOW is not set'}
@@ -685,6 +733,7 @@ ${generateZmkEncoderNodes(settings, zmkTarget, () => 'disabled')}
 ${wiredSplitNode}
 };
 ${generateZmkSplitTrackballSharedNodes(settings, keys)}
+${generateSplitUart(settings, zmkTarget)}
 ${getZmkPhysicalLayoutAssignment(studio)}
 `;
   shieldsFolder.file(`${kbName}.dtsi`, sharedDtsi);
@@ -1105,6 +1154,7 @@ ${side === 'left' ? generateZmkSplitTrackballCentralOverrides(settings, keys) : 
 ${colOffset}
 
 ${peripheralDts}
+${generateSplitUart(settings, zmkTarget)}
 `;
     boardFolder.file(`${boardName}.dts`, boardDts);
     boardFolder.file('board.yml', generateZmkBoardYaml(boardName, vendorName, zmkTarget));
@@ -1175,6 +1225,12 @@ export const generateZmkZip = async (
   options: ZmkExportOptions = {},
 ) => {
   const { settings, keys } = state;
+  if (settings.features.split && settings.hardware.splitCommunication && getZmkSplitTransport(settings) === 'wired') {
+    if (getSplitCommunication(settings).duplex === 'half')
+      throw new Error('ZMK source export does not yet support single-wire half-duplex UART. Select full duplex or wireless.');
+    if (!settings.pins.splitSerial || !settings.pins.splitSerialRx || settings.pins.splitSerial === settings.pins.splitSerialRx)
+      throw new Error('Full-duplex UART requires two different TX and RX pins.');
+  }
   const studio = options.studio === true;
 
   // Exclude peripherals and incomplete switch inputs before assigning matrix positions.

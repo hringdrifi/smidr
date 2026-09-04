@@ -1,3 +1,4 @@
+import { getSplitCommunication } from '@/lib/split-communication';
 'use client';
 
 import React from 'react';
@@ -506,30 +507,9 @@ export const HardwareSettingsPanel = ({
                 </button>
               ))}
             </div>
-            {settings.features.split && (
+            {settings.features.split && !settings.hardware.splitCommunication && getSplitCommunication(settings).transport === 'wired' && (
               <div className="space-y-4 border-t border-[var(--border-main)] pt-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkSplitTransport')}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['ble', 'wired'] as const).map((transport) => (
-                    <button
-                      key={transport}
-                      type="button"
-                      aria-pressed={(settings.zmk?.splitTransport || 'ble') === transport}
-                      onClick={() => updateSettings({ zmk: { ...(settings.zmk || {}), splitTransport: transport } })}
-                      className={cn(
-                        'min-h-10 rounded-lg border px-3 text-xs font-bold transition-colors',
-                        (settings.zmk?.splitTransport || 'ble') === transport
-                          ? 'border-amber-500 bg-amber-500 text-zinc-950'
-                          : 'border-[var(--border-main)] bg-[var(--bg-app)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
-                      )}
-                    >
-                      {transport === 'ble' ? t('hardware.zmkSplitBle') : t('hardware.zmkSplitWired')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {(settings.zmk?.splitTransport || 'ble') === 'wired' && (
+              {getSplitCommunication(settings).transport === 'wired' && !settings.hardware.splitCommunication && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase text-[var(--text-muted)]">{t('hardware.zmkWiredSplitDevice')}</label>
                   <input

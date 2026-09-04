@@ -368,6 +368,7 @@ export const generateSmidrProjectJson = (state: { settings: ProjectSettings, key
     delete savedPins.splitRows;
     delete savedPins.splitCols;
     delete savedPins.splitSerial;
+    delete savedPins.splitSerialRx;
   }
   const legacyProject = {
     id: crypto.randomUUID(),

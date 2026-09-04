@@ -1,3 +1,4 @@
+import { getQmkSplitSerial, getQmkSplitConfig, assertQmkSplitSupported } from './split-communication';
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
 import { generateViaJson } from './export';
@@ -265,6 +266,7 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
  */
 export const generateQmkZip = async (state: { settings: ProjectSettings, keys: PhysicalKey[] }) => {
   const { settings, keys } = state;
+  assertQmkSplitSupported(settings);
   const firmwareKeys = getVisibleKeys(settings, keys);
 
   // Filter only keys that have a valid, unique matrix position to prevent compiler errors
@@ -374,10 +376,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
         transport: {
           protocol: 'serial'
         },
-        serial: {
-          driver: getSplitSerialDriver(processor),
-          pin: settings.pins.splitSerial || 'GP1'
-        }
+        serial: getQmkSplitSerial(settings, getSplitSerialDriver(processor))
       }
     } : {})
   };
@@ -389,6 +388,7 @@ export const generateQmkZip = async (state: { settings: ProjectSettings, keys: P
   // 2. config.h - config_common.h is deprecated in modern QMK
   const configH = `/* Copyright 2026 Smidr User */
 #pragma once
+${getQmkSplitConfig(settings)}
 
 /* RGB settings */
 ${(settings.features.rgb || settings.features.rgbMatrix) ? `
