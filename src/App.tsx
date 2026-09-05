@@ -3,6 +3,8 @@ import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, Folder
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
+import { hasMissingLedPins } from '@/lib/special-pins';
+import { hasRgbMatrixPosition } from '@/lib/led-settings';
 import { KeyboardCanvas } from '@/components/KeyboardCanvas';
 import { ZoomControls } from '@/components/ZoomControls';
 import { EditorTools } from '@/components/EditorTools';
@@ -25,7 +27,7 @@ import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { ProjectHome } from '@/components/ProjectHome';
 import { NewProjectSetup } from '@/components/NewProjectSetup';
 import { FirmwareBuildPanel, FirmwareTargetPanel } from '@/components/FirmwarePanels';
-import { getFirmwareTargetLabel, isFirmwareTargetSupported } from '@/lib/firmware-targets';
+import { getFirmwareTargetLabel, isFirmwareTargetSupported, isFirmwareDetailSettingsComplete } from '@/lib/firmware-targets';
 import { useKeyboardStore } from '@/lib/store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -885,7 +887,8 @@ export default function App() {
     const warnings = getKiCadExportWarnings({ settings, keys });
     if (warnings.length > 0) {
       const message = warnings.map(warning => t(`kicad.warnings.${warning}`)).join('\n');
-      if (!confirm(`${message}\n\n${t('common.continueExport')}`)) return;
+      alert(message);
+      return;
     }
 
     const zipBlob = await generateKiCadZip({ settings, keys }, kicadExportOptions);
@@ -977,12 +980,13 @@ export default function App() {
         && key.col !== undefined
         && isMatrixPositionWithinConfiguredPins(settings, key, keys)
   );
-  const pinsComplete = settings.matrix.wiring === 'direct'
+  const matrixPinsComplete = settings.matrix.wiring === 'direct'
     ? (settings.pins.direct?.length || 0) > 0 && (!settings.features.split || (settings.pins.splitDirect?.length || 0) > 0)
     : settings.pins.rows.some(Boolean)
       && settings.pins.cols.some(Boolean)
       && (!settings.features.split
         || (!!settings.pins.splitRows?.some(Boolean) && !!settings.pins.splitCols?.some(Boolean)));
+  const pinsComplete = matrixPinsComplete && !hasMissingLedPins(settings, keys);
   const workflowItems: Array<{
     id: string;
     label: string;
@@ -1002,15 +1006,15 @@ export default function App() {
         { id: 'pcb', label: t('workspace.pcb'), icon: LayoutGrid, active: isKiCadDialogOpen, complete: undefined, action: () => setIsKiCadDialogOpen(true) },
       ]
     : [
-        { id: 'firmwareTarget', label: t('firmwareFlow.selectStep'), icon: Code2, active: isFirmwareTargetDialogOpen, complete: !!selectedFirmwareTarget, action: openFirmwareTargetDialog },
+        { id: 'firmwareTarget', label: t('firmwareFlow.selectStep'), icon: Code2, active: isFirmwareTargetDialogOpen, complete: selectedFirmwareSupported, action: openFirmwareTargetDialog },
         ...(selectedFirmwareTarget ? [
           { id: 'setup', label: t('workspace.setup'), icon: Settings, active: isFirmwareSettingsDialogOpen, complete: !!settings.name && !!settings.manufacturer, action: () => beginSettingsDialog('firmware') },
           ...(selectedFirmwareTarget !== 'rmk' ? [
-            { id: 'firmwareConfig', label: t('firmwareFlow.targetSettings'), icon: Code2, active: isFirmwareDetailDialogOpen, complete: selectedFirmwareSupported, action: openFirmwareDetailDialog },
+            { id: 'firmwareConfig', label: t('firmwareFlow.targetSettings'), icon: Code2, active: isFirmwareDetailDialogOpen, complete: isFirmwareDetailSettingsComplete(selectedFirmwareTarget, settings), action: openFirmwareDetailDialog },
           ] : []),
           { id: 'keymap', label: t('workspace.keymap'), icon: Keyboard, active: editorMode === 'keymap' && activeRightPanel === 'keymap', complete: assignableKeys.some(key => !!key.keymap && Object.keys(key.keymap).length > 0), action: () => navigateDesign('keymap', 'keymap') },
           ...((selectedFirmwareTarget === 'qmk' || selectedFirmwareTarget === 'vial') ? [
-            { id: 'lighting', label: t('workspace.lighting'), icon: Lightbulb, active: editorMode === 'rgbMatrix', complete: settings.features.rgbMatrix ? assignableKeys.some(key => key.ledIndex !== undefined) : undefined, action: () => navigateDesign('rgbMatrix', 'rgbMatrix') },
+            { id: 'lighting', label: t('workspace.lighting'), icon: Lightbulb, active: editorMode === 'rgbMatrix', complete: settings.features.rgbMatrix ? assignableKeys.some(hasRgbMatrixPosition) : undefined, action: () => navigateDesign('rgbMatrix', 'rgbMatrix') },
           ] : []),
           ...(selectedFirmwareTarget !== 'rmk' ? [
             { id: 'macros', label: t('macros.macros'), icon: ScrollText, active: activeRightPanel === 'macros', complete: settings.macros?.some(macro => macro.length > 0) || undefined, action: () => navigateDesign('keymap', 'macros') },
@@ -2056,7 +2060,7 @@ export default function App() {
                     <circle cx="90" cy="90" r="3" fill="rgb(245, 158, 11)" />
                     {renderKiCadFootprintPreview(switchPreviewTemplate, 'switch', 90, 90, switchPreviewBack ? 180 : 0, diodePreviewScale, switchPreviewBack)}
                     {!isKiCadDirectPin && renderKiCadFootprintPreview(diodePreviewTemplate, 'diode', diodePreviewX, diodePreviewY, diodePreviewRotation, diodePreviewScale, diodePreviewBack)}
-                    {settings.features.rgbMatrix && renderKiCadFootprintPreview(
+                    {assignableKeys.some(key => key.backlight === 'rgb') && renderKiCadFootprintPreview(
                       ledPreview.rgbTemplate,
                       'rgb-led',
                       ledPreviewX,
@@ -2065,7 +2069,7 @@ export default function App() {
                       diodePreviewScale,
                       ledPreview.rgbBack
                     )}
-                    {settings.features.backlight && renderKiCadFootprintPreview(
+                    {assignableKeys.some(key => key.backlight === 'single') && renderKiCadFootprintPreview(
                       ledPreview.backlightTemplate,
                       'backlight-led',
                       ledPreviewX,

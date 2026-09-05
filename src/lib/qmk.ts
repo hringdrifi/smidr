@@ -1,3 +1,4 @@
+import { hasLedNumber, hasRgbMatrixPosition, isRgbLedKey } from './led-settings';
 import { getQmkSplitSerial, getQmkSplitConfig, assertQmkSplitSupported } from './split-communication';
 import JSZip from 'jszip';
 import { ProjectSettings, PhysicalKey } from '@/types/keyboard';
@@ -104,7 +105,7 @@ const isSameRowColPinPosition = (settings: ProjectSettings, row: number, col: nu
 
 const getRgbMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
   settings.features.rgbMatrix
-    ? keys.filter(key => Number.isInteger(key.ledIndex) && key.ledIndex! >= 0)
+    ? keys.filter(key => hasLedNumber(key) && isRgbLedKey(key))
     : []
 );
 
@@ -189,9 +190,10 @@ const generateRgbMatrixConfigC = (settings: ProjectSettings, validKeys: Physical
     Array.from({ length: matrix.cols }, () => 'NO_LED')
   );
   const positions = Array.from({ length: ledCount }, () => ({ x: 0, y: 0 }));
-  const flags = Array.from({ length: ledCount }, () => 4);
+  const flags = Array.from({ length: ledCount }, () => 0);
 
   rgbKeys.forEach(key => {
+    if (!hasRgbMatrixPosition(key)) return;
     const ledIndex = key.ledIndex!;
     const pos = getFirmwareMatrixPosition(settings, key, allKeys);
     if (pos && pos.row >= 0 && pos.row < matrix.rows && pos.col >= 0 && pos.col < matrix.cols) {

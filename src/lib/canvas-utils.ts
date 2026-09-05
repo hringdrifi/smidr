@@ -284,7 +284,7 @@ export const getKeyLabel = (
     return formatActionLabel(action, visualLayout);
   }
   if (mode === 'rgbMatrix') {
-    if (k.ledIndex === undefined) return { type: 'empty' };
+    if (!settings?.features.rgbMatrix || k.decal || k.backlight !== 'rgb' || k.ledIndex === undefined) return { type: 'empty' };
     const hasPosition = k.ledX !== undefined && k.ledY !== undefined;
     const ledNumber = k.ledIndex + 1;
     return {

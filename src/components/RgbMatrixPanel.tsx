@@ -3,6 +3,7 @@ import { Lightbulb, Wand2, Trash2 } from 'lucide-react';
 import { useKeyboardStore } from '@/lib/store';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getRgbMatrixBounds, getRgbMatrixLedPosition } from '@/lib/rgb-matrix';
+import { hasRgbMatrixPosition, isRgbLedKey } from '@/lib/led-settings';
 
 const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -53,17 +54,18 @@ export const RgbMatrixPanel = () => {
   const selectedKey = selectedKeyIds.length === 1
     ? keys.find(key => key.id === selectedKeyIds[0])
     : undefined;
-  const ledCount = keys.filter(key => key.ledIndex !== undefined).length;
   const rgbMatrixEnabled = settings.features.rgbMatrix === true;
+  const visibleKeys = keys.filter(key => !key.decal && (!key.group || (settings.activeOptions[key.group] ?? 0) === key.option));
+  const ledCount = rgbMatrixEnabled ? visibleKeys.filter(hasRgbMatrixPosition).length : 0;
+  const canEdit = rgbMatrixEnabled && !!selectedKey && isRgbLedKey(selectedKey);
 
   const patchSelectedKey = (updates: Parameters<typeof updateKey>[1]) => {
-    if (!selectedKey?.id) return;
+    if (!canEdit || !selectedKey?.id) return;
     updateKey(selectedKey.id, updates, false);
   };
 
   const assignSelectedCenter = () => {
-    if (!selectedKey?.id) return;
-    const visibleKeys = keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option);
+    if (!canEdit || !selectedKey?.id) return;
     const bounds = getRgbMatrixBounds(visibleKeys);
     patchSelectedKey(getRgbMatrixLedPosition(selectedKey, bounds));
   };
@@ -73,6 +75,7 @@ export const RgbMatrixPanel = () => {
       <section className="rounded-md border border-[var(--border-main)] bg-[var(--bg-app)]/40 p-3">
         <button
           type="button"
+          aria-pressed={rgbMatrixEnabled}
           onClick={() => updateSettings({ features: { ...settings.features, rgbMatrix: !rgbMatrixEnabled } })}
           className="flex w-full items-center justify-between gap-3 rounded p-1 text-left transition-colors hover:bg-[var(--bg-hover)]"
         >
@@ -91,7 +94,8 @@ export const RgbMatrixPanel = () => {
         <button
           type="button"
           onClick={autoAssignRgbMatrix}
-          className="flex items-center justify-center gap-2 rounded border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-500 transition-colors hover:bg-amber-500/15"
+          disabled={!rgbMatrixEnabled || !visibleKeys.some(isRgbLedKey)}
+          className="flex items-center justify-center gap-2 rounded border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-500 transition-colors hover:bg-amber-500/15 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Wand2 size={14} />
           {t('rgbMatrix.autoAssign')}
@@ -99,7 +103,8 @@ export const RgbMatrixPanel = () => {
         <button
           type="button"
           onClick={() => confirm(t('rgbMatrix.confirmClear')) && clearRgbMatrix()}
-          className="flex items-center justify-center gap-2 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/15"
+          disabled={!rgbMatrixEnabled}
+          className="flex items-center justify-center gap-2 rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-red-400 transition-colors hover:bg-red-500/15 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Trash2 size={14} />
           {t('rgbMatrix.clear')}
@@ -111,17 +116,18 @@ export const RgbMatrixPanel = () => {
           <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{t('rgbMatrix.assigned')}</span>
           <span className="font-mono text-xs font-bold text-amber-500">{ledCount}</span>
         </div>
-        {!selectedKey ? (
+        {!rgbMatrixEnabled ? (
+          <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('rgbMatrix.disabledHint')}</p>
+        ) : !selectedKey ? (
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('rgbMatrix.selectKey')}</p>
+        ) : !isRgbLedKey(selectedKey) ? (
+          <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('rgbMatrix.rgbKeyRequired')}</p>
         ) : (
           <div className="space-y-3">
-            <NumberField
-              label={t('rgbMatrix.ledIndex')}
-              value={selectedKey.ledIndex === undefined ? undefined : selectedKey.ledIndex + 1}
-              min={1}
-              max={1000}
-              onChange={(ledNumber) => patchSelectedKey({ ledIndex: ledNumber === undefined ? undefined : ledNumber - 1 })}
-            />
+            <p className="text-xs text-[var(--text-muted)]">
+              {t('rgbMatrix.ledIndex')}: {selectedKey.ledIndex === undefined ? '—' : selectedKey.ledIndex + 1}
+              <span className="mt-1 block">{t('rgbMatrix.numberInHardware')}</span>
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <NumberField label={t('rgbMatrix.ledX')} value={selectedKey.ledX} min={0} max={224} onChange={(ledX) => patchSelectedKey({ ledX })} />
               <NumberField label={t('rgbMatrix.ledY')} value={selectedKey.ledY} min={0} max={64} onChange={(ledY) => patchSelectedKey({ ledY })} />

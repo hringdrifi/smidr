@@ -180,8 +180,8 @@ describe('export generation', () => {
       features: { ...baseSettings.features, rgbMatrix: true },
     };
     const keys: PhysicalKey[] = [
-      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
-      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', ledIndex: 1 },
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', backlight: 'rgb', ledIndex: 0 },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', backlight: 'rgb', ledIndex: 1 },
     ];
 
     const blobHotswap = await generateKiCadZip(
@@ -414,8 +414,8 @@ describe('export generation', () => {
       features: { ...baseSettings.features, rgbMatrix: true },
     };
     const keys: PhysicalKey[] = [
-      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
-      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', ledIndex: 1 },
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', backlight: 'rgb', ledIndex: 0 },
+      { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B', backlight: 'rgb', ledIndex: 1 },
     ];
 
     const blob = await generateKiCadZip({ settings, keys });
@@ -465,17 +465,17 @@ describe('export generation', () => {
     expect(ledTemplate).toContain('(layers "F.Cu"');
   });
 
-  it('warns before KiCad export when RGB Matrix has no LED assignments', () => {
+  it('warns before KiCad export when a hardware RGB LED has no number', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       features: { ...baseSettings.features, rgbMatrix: true },
     };
     const keys: PhysicalKey[] = [
-      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', backlight: 'rgb' },
       { row: 0, col: 1, x: 1, y: 0, w: 1, h: 1, r: 0, rx: 1, ry: 0, label: 'B' },
     ];
 
-    expect(getKiCadExportWarnings({ settings, keys })).toEqual(['rgbMatrixNoLedAssignments']);
+    expect(getKiCadExportWarnings({ settings, keys })).toEqual(['rgbLedNumbersInvalid']);
   });
 
   it('does not warn before KiCad export when RGB Matrix has LED assignments', () => {
@@ -484,7 +484,7 @@ describe('export generation', () => {
       features: { ...baseSettings.features, rgbMatrix: true },
     };
     const keys: PhysicalKey[] = [
-      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', backlight: 'rgb', ledIndex: 0 },
     ];
 
     expect(getKiCadExportWarnings({ settings, keys })).toEqual([]);
@@ -498,7 +498,7 @@ describe('export generation', () => {
       features: { ...baseSettings.features, rgbMatrix: true },
     };
     const keys: PhysicalKey[] = [
-      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', ledIndex: 0 },
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', backlight: 'rgb', ledIndex: 0 },
     ];
 
     const blob = await generateKiCadZip(
@@ -526,7 +526,7 @@ describe('export generation', () => {
       features: { ...baseSettings.features, backlight: true },
     };
     const keys: PhysicalKey[] = [
-      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A' },
+      { row: 0, col: 0, x: 0, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: 'A', backlight: 'single' },
     ];
 
     const mxBlob = await generateKiCadZip({ settings, keys });

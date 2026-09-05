@@ -103,39 +103,6 @@ const InteractivePinSlot = ({
   );
 };
 
-const FeatureToggle = ({
-  label,
-  enabled,
-  onChange,
-}: {
-  label: string;
-  enabled: boolean;
-  onChange: () => void;
-}) => (
-  <button
-    type="button"
-    aria-pressed={enabled}
-    onClick={onChange}
-    className={cn(
-      "flex items-center justify-between gap-2 rounded border px-2.5 py-2 text-left transition-colors",
-      enabled
-        ? "border-amber-500/25 bg-amber-500/10 text-amber-500"
-        : "border-[var(--border-main)] bg-[var(--bg-app)]/40 text-[var(--text-muted)]"
-    )}
-  >
-    <span className="text-[10px] font-bold">{label}</span>
-    <span className={cn(
-      "relative h-4 w-7 shrink-0 rounded-full transition-colors",
-      enabled ? "bg-amber-500" : "bg-[var(--bg-button)]"
-    )}>
-      <span className={cn(
-        "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all",
-        enabled ? "left-3.5" : "left-0.5"
-      )} />
-    </span>
-  </button>
-);
-
 const SplitCommunicationSettings = ({ settings, updateSettings, focusedFeature, onFocus, onClear }: {
   settings: ProjectSettings;
   updateSettings: (updates: Partial<ProjectSettings>) => void;
@@ -690,27 +657,12 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
 
       <section className="space-y-3 border-t border-[var(--border-main)] pt-4">
           <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
-          <div className="grid grid-cols-3 gap-2">
-            <FeatureToggle
-              label={t('hardware.rgb')}
-              enabled={settings.features.rgb}
-              onChange={() => updateSettings({ features: { ...settings.features, rgb: !settings.features.rgb } })}
-            />
-            <FeatureToggle
-              label={t('hardware.backlight')}
-              enabled={settings.features.backlight === true}
-              onChange={() => updateSettings({ features: { ...settings.features, backlight: !settings.features.backlight } })}
-            />
-            <FeatureToggle
-              label={t('hardware.oled')}
-              enabled={settings.features.oled}
-              onChange={() => updateSettings({ features: { ...settings.features, oled: !settings.features.oled } })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {(settings.features.rgb || settings.features.rgbMatrix) && (
+          <p className="text-xs text-[var(--text-muted)]">{t('hardware.specialPinsAuto')}</p>
+          <div className="space-y-4">
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-xs font-bold text-[var(--text-main)]">{t('hardware.rgbLighting')}</legend>
               <InteractivePinSlot
-                label={t('hardware.rgbData')}
+                label={t('hardware.lightingDataPin')}
                 value={settings.pins.rgb || ''}
                 isFocused={activeBox === 'feature' && focusedFeature === 'rgb'}
                 onFocus={() => {
@@ -719,10 +671,11 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
                 }}
                 onClear={() => setPin('feature', 'rgb', '')}
               />
-            )}
-            {settings.features.backlight && (
+            </fieldset>
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-xs font-bold text-[var(--text-main)]">{t('hardware.singleColorBacklight')}</legend>
               <InteractivePinSlot
-                label={t('hardware.backlightPin')}
+                label={t('hardware.lightingControlPin')}
                 value={settings.pins.backlight || ''}
                 isFocused={activeBox === 'feature' && focusedFeature === 'backlight'}
                 onFocus={() => {
@@ -731,11 +684,12 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
                 }}
                 onClear={() => setPin('feature', 'backlight', '')}
               />
-            )}
-            {settings.features.oled && (
-              <>
+            </fieldset>
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-xs font-bold text-[var(--text-main)]">OLED (I2C)</legend>
+              <div className="grid grid-cols-2 gap-3">
                 <InteractivePinSlot
-                  label={t('hardware.i2cSda')}
+                  label="SDA"
                   value={settings.pins.sda || ''}
                   isFocused={activeBox === 'feature' && focusedFeature === 'sda'}
                   onFocus={() => {
@@ -745,7 +699,7 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
                   onClear={() => setPin('feature', 'sda', '')}
                 />
                 <InteractivePinSlot
-                  label={t('hardware.i2cScl')}
+                  label="SCL"
                   value={settings.pins.scl || ''}
                   isFocused={activeBox === 'feature' && focusedFeature === 'scl'}
                   onFocus={() => {
@@ -754,8 +708,8 @@ export const MatrixPinInspectorPanel = ({ variant = 'inspector' }: { variant?: '
                   }}
                   onClear={() => setPin('feature', 'scl', '')}
                 />
-              </>
-            )}
+              </div>
+            </fieldset>
           </div>
       </section>
 
@@ -1091,27 +1045,12 @@ export const MatrixPinSettingsPanel = () => {
 
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold text-[var(--text-main)] uppercase tracking-wider">{t('hardware.specialPins')}</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <FeatureToggle
-                    label={t('hardware.rgb')}
-                    enabled={settings.features.rgb}
-                    onChange={() => updateSettings({ features: { ...settings.features, rgb: !settings.features.rgb } })}
-                  />
-                  <FeatureToggle
-                    label={t('hardware.backlight')}
-                    enabled={settings.features.backlight === true}
-                    onChange={() => updateSettings({ features: { ...settings.features, backlight: !settings.features.backlight } })}
-                  />
-                  <FeatureToggle
-                    label={t('hardware.oled')}
-                    enabled={settings.features.oled}
-                    onChange={() => updateSettings({ features: { ...settings.features, oled: !settings.features.oled } })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {(settings.features.rgb || settings.features.rgbMatrix) && (
-                    <InteractivePinSlot
-                      label={t('hardware.rgbData')}
+                <p className="text-xs text-[var(--text-muted)]">{t('hardware.specialPinsAuto')}</p>
+                <div className="space-y-4">
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-xs font-bold text-[var(--text-main)]">{t('hardware.rgbLighting')}</legend>
+              <InteractivePinSlot
+                      label={t('hardware.lightingDataPin')}
                       value={settings.pins.rgb || ''}
                       isFocused={activeBox === 'feature' && focusedFeature === 'rgb'}
                       onFocus={() => {
@@ -1120,10 +1059,11 @@ export const MatrixPinSettingsPanel = () => {
                       }}
                       onClear={() => setPin('feature', 'rgb', '')}
                     />
-                  )}
-                  {settings.features.backlight && (
-                    <InteractivePinSlot
-                      label={t('hardware.backlightPin')}
+            </fieldset>
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-xs font-bold text-[var(--text-main)]">{t('hardware.singleColorBacklight')}</legend>
+              <InteractivePinSlot
+                      label={t('hardware.lightingControlPin')}
                       value={settings.pins.backlight || ''}
                       isFocused={activeBox === 'feature' && focusedFeature === 'backlight'}
                       onFocus={() => {
@@ -1132,11 +1072,12 @@ export const MatrixPinSettingsPanel = () => {
                       }}
                       onClear={() => setPin('feature', 'backlight', '')}
                     />
-                  )}
-                  {settings.features.oled && (
-                    <>
-                      <InteractivePinSlot
-                        label={t('hardware.i2cSda')}
+            </fieldset>
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-xs font-bold text-[var(--text-main)]">OLED (I2C)</legend>
+              <div className="grid grid-cols-2 gap-3">
+                <InteractivePinSlot
+                        label="SDA"
                         value={settings.pins.sda || ''}
                         isFocused={activeBox === 'feature' && focusedFeature === 'sda'}
                         onFocus={() => {
@@ -1145,8 +1086,8 @@ export const MatrixPinSettingsPanel = () => {
                         }}
                         onClear={() => setPin('feature', 'sda', '')}
                       />
-                      <InteractivePinSlot
-                        label={t('hardware.i2cScl')}
+                <InteractivePinSlot
+                        label="SCL"
                         value={settings.pins.scl || ''}
                         isFocused={activeBox === 'feature' && focusedFeature === 'scl'}
                         onFocus={() => {
@@ -1155,9 +1096,9 @@ export const MatrixPinSettingsPanel = () => {
                         }}
                         onClear={() => setPin('feature', 'scl', '')}
                       />
-                    </>
-                  )}
-                </div>
+              </div>
+            </fieldset>
+          </div>
               </div>
           </div>
         </div>

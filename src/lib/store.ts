@@ -42,6 +42,8 @@ import {
   MatrixSide,
 } from './matrix-utils';
 import { getRgbMatrixBounds, getRgbMatrixLedPosition } from './rgb-matrix';
+import { normalizeSpecialPinFeatures } from './special-pins';
+import { clearRgbMatrixPosition, isRgbLedKey } from './led-settings';
 
 export { getMatrixFromPins } from './matrix-utils';
 
@@ -583,6 +585,14 @@ const withConsistency = (config: any): any => (set: any, get: any, api: any) => 
     const currentState = get();
     const nextUpdate = typeof args === 'function' ? (args as any)(currentState) : args;
     const nextState = { ...currentState, ...nextUpdate };
+
+    if (nextState.appMode === 'design' && (nextUpdate.settings || nextUpdate.keys || nextUpdate.appMode)) {
+      const settings = normalizeSpecialPinFeatures(nextState.settings, nextState.keys);
+      if (settings !== nextState.settings) nextUpdate.settings = settings;
+      const keys = nextState.keys.map((key: RuntimeKey) =>
+        settings.features.rgbMatrix && isRgbLedKey(key) ? key : clearRgbMatrixPosition(key));
+      if (keys.some((key: RuntimeKey, index: number) => key !== nextState.keys[index])) nextUpdate.keys = keys;
+    }
 
     // Prune selections if keys changed (and not in preview mode)
     if (nextState.keys && nextState.selectedKeyIds && !nextState.previewKeys) {
@@ -2788,7 +2798,7 @@ export const useKeyboardStore = create<KeyboardState>()(
         })),
 
         clearRgbMatrix: () => set((s: KeyboardState) => ({
-          keys: s.keys.map(k => ({ ...k, ledIndex: undefined, ledX: undefined, ledY: undefined, ledFlags: undefined }))
+          keys: s.keys.map(clearRgbMatrixPosition)
         })),
 
         generateMatrix: (rows: number, cols: number) => {
@@ -2866,22 +2876,18 @@ export const useKeyboardStore = create<KeyboardState>()(
         }),
 
         autoAssignRgbMatrix: () => set((s: KeyboardState) => {
-          const visKeys = s.keys.filter(k => !k.group || s.settings.activeOptions[k.group] === k.option);
+          if (!s.settings.features.rgbMatrix) return s;
+          const visKeys = s.keys.filter(k => !k.decal && (!k.group || (s.settings.activeOptions[k.group] ?? 0) === k.option));
           const sortedKeys = sortKeys(visKeys, s.editorSettings.sortThresholdY);
-          if (sortedKeys.length === 0) return s;
+          if (!sortedKeys.some(isRgbLedKey)) return s;
           const bounds = getRgbMatrixBounds(sortedKeys);
-          const updates = new Map(sortedKeys.map((key, index) => {
+          const updates = new Map(sortedKeys.filter(isRgbLedKey).map(key => {
             return [key.id, {
-              ledIndex: index,
               ...getRgbMatrixLedPosition(key, bounds),
               ledFlags: key.ledFlags ?? 4,
             }];
           }));
           return {
-            settings: {
-              ...s.settings,
-              features: { ...s.settings.features, rgbMatrix: true },
-            },
             keys: s.keys.map(k => updates.has(k.id) ? { ...k, ...updates.get(k.id)! } : k),
           };
         }),

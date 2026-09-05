@@ -47,7 +47,8 @@ export interface PhysicalKey {
   matrixSide?: 'left' | 'right'; // split matrix half for local row/col assignments
   directIndex?: number; // logical D0.. index for matrix.wiring === 'direct'
   directPin?: string; // legacy direct GPIO value; migrated to directIndex on load
-  ledIndex?: number; // QMK/Vial RGB Matrix LED index, 0-based
+  backlight?: 'none' | 'single' | 'rgb'; // per-key hardware choice; omitted means none
+  ledIndex?: number; // Hardware RGB LED chain index, 0-based (UI number is index + 1)
   ledX?: number; // QMK/Vial RGB Matrix x coordinate (0-224)
   ledY?: number; // QMK/Vial RGB Matrix y coordinate (0-64)
   ledFlags?: number; // QMK/Vial RGB Matrix LED flags

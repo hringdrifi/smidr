@@ -30,12 +30,14 @@ import {
   ArrowRight,
   ArrowDown,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Lightbulb
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 import { PropertyInput, PropertySection, Divider } from './ui/PropertyComponents';
 import { RightPanelEmptyState } from './RightPanelEmptyState';
+import { hasLedNumber, isRgbLedKey } from '@/lib/led-settings';
 
 type MenuPosition = {
   top: number;
@@ -104,6 +106,55 @@ export const PropertyPanel = () => {
     );
   }
 
+  const selectedKeys = keys.filter(key => selectedKeyIds.includes(key.id));
+  const backlight = selectedKeys[0]?.backlight ?? 'none';
+  const mixedBacklight = selectedKeys.some(key => (key.backlight ?? 'none') !== backlight);
+  const backlightSection = (
+    <PropertySection title={t('properties.backlight')} icon={Lightbulb} className="w-full">
+      <select
+        aria-label={t('properties.backlight')}
+        value={mixedBacklight ? 'mixed' : backlight}
+        onChange={(event) => {
+          const value = event.target.value;
+          if (value === 'none' || value === 'single' || value === 'rgb') {
+            const used = new Set(keys.filter(isRgbLedKey).filter(hasLedNumber).map(key => key.ledIndex!));
+            batchUpdateKeys(selectedKeyIds, key => {
+              if (value !== 'rgb') return { backlight: value, ledIndex: undefined };
+              if (hasLedNumber(key)) return { backlight: value };
+              let ledIndex = 0;
+              while (used.has(ledIndex)) ledIndex++;
+              used.add(ledIndex);
+              return { backlight: value, ledIndex: ledIndex < 1000 ? ledIndex : undefined };
+            });
+          }
+        }}
+        className="min-h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-panel)] px-3 text-sm text-[var(--text-main)] outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+      >
+        {mixedBacklight && <option value="mixed" disabled>{t('properties.backlightMixed')}</option>}
+        <option value="none">{t('properties.backlightNone')}</option>
+        <option value="single">{t('properties.backlightSingle')}</option>
+        <option value="rgb">RGB</option>
+      </select>
+      {selectedKeys.length === 1 && isRgbLedKey(selectedKeys[0]) && (
+        <label className="mt-3 flex flex-col gap-1.5 text-xs text-[var(--text-muted)]">
+          {t('rgbMatrix.ledIndex')}
+          <input
+            type="number" min={1} max={1000} step={1}
+            value={selectedKeys[0].ledIndex === undefined ? '' : selectedKeys[0].ledIndex + 1}
+            onChange={event => {
+              const value = event.target.value;
+              const number = Number(value);
+              if (value === '' || Number.isFinite(number)) {
+                updateKey(selectedKeyIds[0], { ledIndex: value === '' ? undefined : Math.min(1000, Math.max(1, Math.round(number))) - 1 });
+              }
+            }}
+            className="min-h-10 w-full rounded border border-[var(--border-main)] bg-[var(--bg-panel)] px-3 font-mono text-sm text-[var(--text-main)] outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          />
+        </label>
+      )}
+    </PropertySection>
+  );
+
   // Batch Edit Mode
   if (selectedKeyIds.length > 1) {
     const firstKey = keys.find(k => selectedKeyIds.includes(k.id));
@@ -114,6 +165,7 @@ export const PropertyPanel = () => {
             <div className="w-fit px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-bold">
               {selectedKeyIds.length} {t('properties.keysUnit')}
             </div>
+            {backlightSection}
             <PropertySection title={t('properties.alignment')} icon={AlignLeft} className="w-full">
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -349,6 +401,7 @@ export const PropertyPanel = () => {
       {/* Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-app)]/20 p-4" key={selectedKey.id}>
         <div className="flex flex-col gap-4">
+          {backlightSection}
           {/* Placement */}
           <PropertySection 
             title={t('properties.placement')} 

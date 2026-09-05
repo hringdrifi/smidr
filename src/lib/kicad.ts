@@ -15,6 +15,7 @@ import switchGateronLpSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_Gater
 import switchMxSolderRaw from './kicad-assets/smidr.pretty/SW_Smidr_MX_Solder.kicad_mod?raw';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { getFirmwareMatrixPosition, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
+import { hasInvalidRgbLedNumbers, isRgbLedKey } from './led-settings';
 
 type SwitchFootprintKind = 'mx-solder' | 'mx-hotswap' | 'choc-solder' | 'choc-hotswap' | 'gateron-lp-solder' | 'gateron-lp-hotswap';
 type DiodeFootprintKind = 'sod123' | 'sod323' | 'do35';
@@ -203,13 +204,13 @@ const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
   keys.filter(key => !key.group || (settings.activeOptions[key.group] ?? 0) === key.option)
 );
 
-export type KiCadExportWarningCode = 'rgbMatrixNoLedAssignments';
+export type KiCadExportWarningCode = 'rgbLedNumbersInvalid';
 
 export const getKiCadExportWarnings = (state: { settings: ProjectSettings; keys: PhysicalKey[] }): KiCadExportWarningCode[] => {
   const visibleKeys = getVisibleKeys(state.settings, state.keys);
   const warnings: KiCadExportWarningCode[] = [];
-  if (state.settings.features.rgbMatrix && getRgbLedKeys(state.settings, visibleKeys).length === 0) {
-    warnings.push('rgbMatrixNoLedAssignments');
+  if (hasInvalidRgbLedNumbers(visibleKeys)) {
+    warnings.push('rgbLedNumbersInvalid');
   }
   return warnings;
 };
@@ -261,11 +262,7 @@ const getMatrixNetNames = (
   };
 };
 
-const getRgbLedKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
-  settings.features.rgbMatrix
-    ? keys.filter(key => !key.decal && Number.isInteger(key.ledIndex) && key.ledIndex! >= 0)
-    : []
-);
+const getRgbLedKeys = (keys: PhysicalKey[]) => keys.filter(isRgbLedKey);
 
 const collectNets = (
   matrixItems: Array<{ switchA: string; switchB: string; diodeA: string; diodeB: string }>,
@@ -977,7 +974,7 @@ const generateKiCadSchematic = (
   const switchChoice = getSwitchChoice(options.switchFootprint);
   const backlightFootprint = getBacklightFootprint(switchChoice);
   const diodeChoice = getDiodeChoice(options.diodeFootprint);
-  const rgbKeys = getRgbLedKeys(settings, visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
+  const rgbKeys = getRgbLedKeys(visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
   const directPins = isDirectPinMatrix(settings);
   const instances: string[] = [];
   const labels: string[] = [];
@@ -1036,8 +1033,9 @@ const generateKiCadSchematic = (
     }));
   });
 
-  if (settings.features.backlight) {
+  if (visibleKeys.some(key => key.backlight === 'single')) {
     visibleKeys.forEach((_key, index) => {
+      if (_key.backlight !== 'single') return;
       const x = 25.4 + (index % 8) * keyCellWidth;
       const y = 25.4 + Math.ceil(visibleKeys.length / 8) * 25.4
         + 25.4 + Math.ceil(rgbKeys.length / 6) * 25.4
@@ -1300,8 +1298,8 @@ const generateKiCadPcb = (
 ) => {
   const visibleKeys = getVisibleKeys(settings, keys).filter(key => !key.decal);
   const keyNets = visibleKeys.map((key, index) => getMatrixNetNames(settings, key, keys, index));
-  const rgbKeys = getRgbLedKeys(settings, visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
-  const netNames = collectNets(keyNets, rgbKeys, settings.features.backlight === true);
+  const rgbKeys = getRgbLedKeys(visibleKeys).sort((a, b) => (a.ledIndex ?? 0) - (b.ledIndex ?? 0));
+  const netNames = collectNets(keyNets, rgbKeys, visibleKeys.some(key => key.backlight === 'single'));
   const netIds = new Map(netNames.map((name, index) => [name, index]));
   const nets = netNames.map((name, index) => `  (net ${index} "${escapeString(name)}")`).join('\n');
   const switchFootprints = visibleKeys.map((key, index) => {
@@ -1311,9 +1309,8 @@ const generateKiCadPcb = (
     return `${sw}${diode}`;
   }).join('\n');
   const rgbFootprints = rgbKeys.map((key, index) => makeRgbLedFootprint(key, index, rgbKeys, netIds, options)).join('\n');
-  const backlightFootprints = settings.features.backlight
-    ? visibleKeys.map((key, index) => makeBacklightFootprint(key, index, netIds, options)).join('\n')
-    : '';
+  const backlightFootprints = visibleKeys.map((key, index) => key.backlight === 'single'
+    ? makeBacklightFootprint(key, index, netIds, options) : '').join('\n');
 
   return `(kicad_pcb
   (version 20230121)
@@ -1394,6 +1391,9 @@ export const generateKiCadZip = async (
   state: { settings: ProjectSettings; keys: PhysicalKey[] },
   options: KiCadExportOptions = DEFAULT_KICAD_EXPORT_OPTIONS
 ) => {
+  if (getKiCadExportWarnings(state).length > 0) {
+    throw new Error('Assign a unique RGB LED number (1–1000) to each RGB key in Hardware key properties before exporting KiCad.');
+  }
   const projectName = sanitizeName(state.settings.name);
   const switchChoice = getSwitchChoice(options.switchFootprint);
   const diodeChoice = getDiodeChoice(options.diodeFootprint);
@@ -1419,8 +1419,8 @@ This KiCad export places center-origin Smiðr switch footprints from the physica
 - Diode footprint: ${diodeChoice.footprint}
 - Footprint library: smidr.pretty is included in this ZIP and referenced by fp-lib-table.
 - Switch outlines: keycap, fab, and courtyard geometry are generated from each key's w/h.
-- RGB Matrix: ${getRgbLedKeys(state.settings, state.keys).length > 0 ? `${getRgbLedKeys(state.settings, state.keys).length} SK6812MINI-E LED footprints are placed with switch-specific LED offsets.` : 'no per-key RGB LEDs placed.'}
-- Backlight: ${state.settings.features.backlight ? `per-key backlight LEDs are placed with switch-specific LED offsets (${getBacklightFootprint(switchChoice).libId}).` : 'no per-key backlight LEDs placed.'}
+- RGB LEDs: ${getRgbLedKeys(getVisibleKeys(state.settings, state.keys)).length > 0 ? `${getRgbLedKeys(getVisibleKeys(state.settings, state.keys)).length} SK6812MINI-E LED footprints are placed with switch-specific LED offsets.` : 'no per-key RGB LEDs placed.'}
+- Backlight: ${getVisibleKeys(state.settings, state.keys).some(key => !key.decal && key.backlight === 'single') ? `per-key backlight LEDs are placed with switch-specific LED offsets (${getBacklightFootprint(switchChoice).libId}).` : 'no per-key backlight LEDs placed.'}
 - Direct-pin projects connect each switch between its direct GPIO net and GND.
 - Matrix projects connect switches and diodes using ROWn/COLn nets.
 `);

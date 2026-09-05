@@ -27,6 +27,17 @@ const legacyProject: SmidrProject = {
 };
 
 describe('Smiðr 0.5 project format', () => {
+  it('preserves per-key backlight choices through JSON save and reload', () => {
+    const choices = ['none', 'single', 'rgb', undefined] as const;
+    const project = {
+      ...legacyProject,
+      keys: choices.map(backlight => ({ ...legacyProject.keys[0], backlight })),
+    };
+    const restored = fromSmidrProjectFile(JSON.parse(JSON.stringify(toSmidrProjectFileV05(project))));
+    expect(restored.keys.map(key => key.backlight)).toEqual(choices);
+    expect(restored.features).toEqual(project.features);
+  });
+
   it('groups project data by purpose and removes runtime ids', () => {
     const file = toSmidrProjectFileV05(legacyProject);
 

@@ -424,7 +424,7 @@ export const HardwareSettingsPanel = ({
             label={t('hardware.vialUid')} 
             value={settings.vialUid || '0x0000000000000000'} 
             onChange={(v) => {
-              const cleanHex = v.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+              const cleanHex = v.replace(/^0x/i, '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
               updateSettings({ vialUid: `0x${cleanHex}` });
             }} 
             placeholder="e.g. 0xFB23... (Automatically derived)"
