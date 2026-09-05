@@ -5,7 +5,7 @@ import { useKeyboardStore } from '@/lib/store';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { 
-  Plus, Layout, Trash2, Grid2X2, MousePointer2, LayoutGrid, Gauge, CircleDot, CornerDownLeft, Shapes
+  Plus, Layout, Trash2, Grid2X2, Grid2X2Plus, MousePointer2, LayoutGrid, Gauge, CircleDot, CornerDownLeft, Shapes
 } from 'lucide-react';
 import { PhysicalKey } from '@/types/keyboard';
 import { cn } from '@/lib/utils';
@@ -231,7 +231,7 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
                         }}
                         className="flex items-center justify-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-button)] px-3 py-2 text-[10px] font-bold text-[var(--text-main)] transition-all hover:border-amber-500 hover:bg-amber-500 hover:text-zinc-950 active:scale-95"
                       >
-                        <Grid2X2 size={14} />
+                        <Grid2X2Plus size={14} />
                         {t('tools.generateMatrix')}
                       </button>
                     </div>

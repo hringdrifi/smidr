@@ -1583,7 +1583,7 @@ export const TRANSLATIONS = {
       specialShapes: '特殊形状',
       deleteSelection: '選択範囲を削除',
       confirmReplace: '現在のレイアウトは破棄されます。よろしいですか？',
-      generateMatrix: '格子',
+      generateMatrix: '行列',
       rowsPrompt: '行数:',
       columnsPrompt: '列数:',
       parseError: 'KLE JSONの解析に失敗しました',
