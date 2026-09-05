@@ -102,7 +102,7 @@ export const PropertySection = ({ title, icon: Icon, summary, children, classNam
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
+      <div className="flex-1 pr-2 -mr-2">
         {children}
       </div>
     </div>
