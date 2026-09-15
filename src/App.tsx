@@ -1186,6 +1186,17 @@ export default function App() {
 
             <div className="flex h-10 items-center rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] p-1">
               <button
+                onClick={() => enterWorkspace('remap')}
+                className={cn(
+                  "flex h-full items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold transition-all",
+                  storeState.appMode === 'remap' && !isHomeVisible ? "bg-amber-500 text-zinc-950 shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                )}
+                title={t('modes.remap')}
+              >
+                <Keyboard size={16} />
+                <span className="hidden sm:block">{t('modes.remap')}</span>
+              </button>
+              <button
                 onClick={() => enterWorkspace('hardware')}
                 className={cn(
                   "flex h-full items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold transition-all",
@@ -1210,17 +1221,6 @@ export default function App() {
               >
                 <Braces size={16} />
                 <span className="hidden sm:block">{t('workspace.firmware')}</span>
-              </button>
-              <button
-                onClick={() => enterWorkspace('remap')}
-                className={cn(
-                  "flex h-full items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold transition-all",
-                  storeState.appMode === 'remap' && !isHomeVisible ? "bg-amber-500 text-zinc-950 shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                )}
-                title={t('modes.remap')}
-              >
-                <Keyboard size={16} />
-                <span className="hidden sm:block">{t('modes.remap')}</span>
               </button>
             </div>
           </div>

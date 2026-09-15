@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cable, Clock3, FileUp, FolderOpen, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Cable, Clock3, FileUp, FolderOpen, Plus, Trash2 } from 'lucide-react';
 import type { SmidrProject } from '@/types/keyboard';
 
 interface ProjectHomeProps {
@@ -33,14 +33,32 @@ export const ProjectHome: React.FC<ProjectHomeProps> = ({ projects, onCreate, on
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-highlight)] sm:text-4xl">{labels.title}</h2>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-muted)] sm:text-base">{labels.description}</p>
 
-      <section className="mt-8 grid gap-4 md:grid-cols-3">
+      <section className="mt-8">
+        <button
+          type="button"
+          onClick={onConnect}
+          className="group flex w-full flex-col gap-5 rounded-2xl border border-amber-500/50 bg-gradient-to-br from-amber-500/15 via-[var(--bg-panel)] to-[var(--bg-panel)] p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-xl sm:flex-row sm:items-center sm:p-8"
+        >
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20">
+            <Cable size={28} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-semibold text-[var(--text-highlight)] sm:text-2xl">{labels.connect}</span>
+            <span className="mt-2 block max-w-2xl text-sm leading-6 text-[var(--text-muted)] sm:text-base">{labels.connectDescription}</span>
+          </span>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center self-end rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 transition-transform group-hover:translate-x-1 sm:self-auto">
+            <ArrowRight size={21} />
+          </span>
+        </button>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
         <button type="button" onClick={onCreate} className="text-left"><StartCard icon={Plus} title={labels.create} description={labels.createDescription} /></button>
         <label className="cursor-pointer">
           <StartCard icon={FileUp} title={labels.import} description={labels.importDescription}>
             <input type="file" accept=".smidr" onChange={onImport} className="absolute inset-0 cursor-pointer opacity-0" />
           </StartCard>
         </label>
-        <button type="button" onClick={onConnect} className="text-left"><StartCard icon={Cable} title={labels.connect} description={labels.connectDescription} /></button>
+        </div>
       </section>
 
       <section className="mt-12">
