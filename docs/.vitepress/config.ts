@@ -31,13 +31,20 @@ export default {
         items: [{ text: 'リマップモード', link: '/remap/' }],
       },
       {
-        text: '設計',
+        text: 'ハードウェア',
         items: [
           { text: '設計ワークフロー', link: '/design/' },
           { text: 'ハードウェア設定', link: '/design/hardware' },
           { text: 'レイアウト編集', link: '/design/layout' },
           { text: 'マトリクス編集', link: '/design/matrix' },
+        ],
+      },
+      {
+        text: 'ファームウェア',
+        items: [
           { text: 'キーマップ編集', link: '/design/keymap' },
+          { text: 'ファームウェア対応表', link: '/reference/firmware-compatibility' },
+          { text: 'アクション / キーコード', link: '/reference/actions' },
         ],
       },
       {
@@ -47,9 +54,7 @@ export default {
       {
         text: 'リファレンス',
         items: [
-          { text: 'ファームウェア対応表', link: '/reference/firmware-compatibility' },
           { text: 'ショートカット', link: '/reference/shortcuts' },
-          { text: 'アクション / キーコード', link: '/reference/actions' },
           { text: '用語集', link: '/reference/glossary' },
         ],
       },
