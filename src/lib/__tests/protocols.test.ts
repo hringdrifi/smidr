@@ -358,6 +358,9 @@ describe('protocols conversion tests', () => {
       expect(qmkStringToAction('QK_BOOTLOADER')).toEqual({ action: 'tap', keycode: 'BOOTLOADER' });
       expect(qmkStringToAction('QK_REBOOT')).toEqual({ action: 'tap', keycode: 'SYSTEM_RESET' });
       expect(qmkStringToAction('QK_RBT')).toEqual({ action: 'tap', keycode: 'SYSTEM_RESET' });
+      expect(qmkStringToAction('CW_TOGG')).toEqual({ action: 'tap', keycode: 'CAPS_WORD' });
+      expect(qmkStringToAction('QK_REP')).toEqual({ action: 'tap', keycode: 'KEY_REPEAT' });
+      expect(qmkStringToAction('QK_GESC')).toEqual({ action: 'tap', keycode: 'GRAVE_ESCAPE' });
       expect(qmkStringToAction('UG_TOGG')).toEqual({ action: 'tap', keycode: 'UG_TOGG' });
       expect(qmkStringToAction('BL_TOGG')).toEqual({ action: 'tap', keycode: 'BL_TOGG' });
       expect(qmkStringToAction('BL_BRTG')).toEqual({ action: 'tap', keycode: 'BL_BRTG' });
@@ -369,6 +372,10 @@ describe('protocols conversion tests', () => {
       expect(actionToQmkString({ action: 'tap', keycode: 'A' })).toBe('KC_A');
       expect(actionToQmkString({ action: 'tap', keycode: 'BOOTLOADER' })).toBe('QK_BOOT');
       expect(actionToQmkString({ action: 'tap', keycode: 'SYSTEM_RESET' })).toBe('QK_REBOOT');
+      expect(actionToQmkString({ action: 'tap', keycode: 'CAPS_WORD' })).toBe('CW_TOGG');
+      expect(actionToQmkString({ action: 'tap', keycode: 'KEY_REPEAT' })).toBe('QK_REP');
+      expect(actionToQmkString({ action: 'tap', keycode: 'GRAVE_ESCAPE' })).toBe('QK_GESC');
+      expect(actionToQmkString({ action: 'tap', keycode: 'OUTPUT_USB' })).toBe('QK_OUTPUT_USB');
       expect(actionToQmkString({ action: 'tap', keycode: 'UG_TOGG' })).toBe('UG_TOGG');
       expect(actionToQmkString({ action: 'tap', keycode: 'BL_TOGG' })).toBe('BL_TOGG');
       expect(actionToQmkString({ action: 'tap', keycode: 'BL_BRTG' })).toBe('BL_BRTG');
@@ -446,6 +453,32 @@ describe('protocols conversion tests', () => {
       expect(actionToZmkString({ action: 'tap', keycode: 'A' })).toBe('&kp A');
       expect(zmkStringToAction('&td 4')).toEqual({ action: 'td', tapDanceId: 4 });
       expect(actionToZmkString({ action: 'td', tapDanceId: 4 })).toBe('&td 4');
+    });
+
+    it('should parse and format ZMK press-triggered behaviors', () => {
+      const cases = [
+        ['BOOTLOADER', '&bootloader'],
+        ['SYSTEM_RESET', '&sys_reset'],
+        ['CAPS_WORD', '&caps_word'],
+        ['KEY_REPEAT', '&key_repeat'],
+        ['GRAVE_ESCAPE', '&gresc'],
+        ['STUDIO_UNLOCK', '&studio_unlock'],
+        ['OUTPUT_USB', '&out OUT_USB'],
+        ['OUTPUT_BLUETOOTH', '&out OUT_BLE'],
+      ] as const;
+
+      for (const [keycode, binding] of cases) {
+        expect(actionToZmkString({ action: 'tap', keycode })).toBe(binding);
+        expect(zmkStringToAction(binding)).toEqual({ action: 'tap', keycode });
+        expect(zmkStringToAction(`${binding} 0 0`)).toEqual({ action: 'tap', keycode });
+      }
+    });
+
+    it('should map added universal HID keys to official ZMK names', () => {
+      expect(actionToZmkString({ action: 'tap', keycode: 'COPY' })).toBe('&kp K_COPY');
+      expect(actionToZmkString({ action: 'tap', keycode: 'MFFD' })).toBe('&kp C_FF');
+      expect(actionToZmkString({ action: 'tap', keycode: 'WSCH' })).toBe('&kp C_AC_SEARCH');
+      expect(actionToZmkString({ action: 'tap', keycode: 'SLEEP' })).toBe('&kp SYS_SLEEP');
     });
 
     it('should parse and format ZMK layer operations', () => {
@@ -839,6 +872,70 @@ describe('protocols conversion tests', () => {
       zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
 
       expect(zmk.getCachedKeymapActions()[0][0]).toEqual({ action: 'none' });
+    });
+
+    it('should decode ZMK output selection constants using the official numeric values', () => {
+      const zmk = new ZmkProtocol();
+      zmk['keymapAvailable'] = true;
+      zmk['behaviorNames'] = { 18: 'out' };
+      zmk['fetchedKeymap'] = {
+        layers: [{
+          id: 0,
+          name: 'Base',
+          bindings: [
+            { behaviorId: 18, param1: 1, param2: 0 },
+            { behaviorId: 18, param1: 2, param2: 0 },
+          ],
+        }],
+        availableLayers: 0,
+        maxLayerNameLength: 20,
+      };
+      zmk['physicalPositions'] = [
+        { row: 0, col: 0, index: 0 },
+        { row: 0, col: 1, index: 1 },
+      ];
+
+      expect(zmk.getCachedKeymapActions()[0]).toEqual([
+        { action: 'tap', keycode: 'OUTPUT_USB' },
+        { action: 'tap', keycode: 'OUTPUT_BLUETOOTH' },
+      ]);
+    });
+
+    it('should encode ZMK USB output selection as OUT_USB = 1', async () => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]),
+        new Uint8Array([0x0a, 0x12, 0x08, 0x04, 0x2a, 0x0e, 0x0a, 0x0c, 0x0a, 0x0a, 0x08, 0x00, 0x12, 0x00, 0x1a, 0x04, 0x08, 0x24, 0x10, 0x00]),
+      ];
+
+      await zmk.initialize({
+        isConnected: true,
+        connect: async () => true,
+        disconnect: async () => {},
+        send: async (data: Uint8Array) => { sent.push(data); },
+        receive: async () => responses[responseIndex++],
+      });
+
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 18, param1: 0, param2: 0 }] }],
+        availableLayers: 1,
+        maxLayerNameLength: 20,
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { out: 18 };
+
+      await zmk.setKey(0, 0, 0, { action: 'tap', keycode: 'OUTPUT_USB' });
+
+      expect(containsSubsequence(Array.from(sent[1]), [
+        0x08, 0x24,
+        0x10, 0x01,
+        0x18, 0x00,
+      ])).toBe(true);
     });
 
     it('should remove the last ZMK layer without re-fetching the keymap', async () => {

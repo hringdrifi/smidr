@@ -153,6 +153,13 @@ UP DOWN LEFT RIGHT
 INS DEL HOME END PGUP PGDN
 ```
 
+### 編集 / アプリケーション
+
+```text
+EXEC HELP MENU SELECT STOP AGAIN
+UNDO CUT COPY PASTE FIND
+```
+
 ### 修飾キー
 
 ```text
@@ -164,10 +171,36 @@ RCTL RSFT RALT RGUI
 
 ```text
 MPLY MSTP MNXT MPRV
+MFFD MRWD MSEL EJCT
 VOLU VOLD MUTE
 BRIU BRID
+MAIL CALC MYCM
+WSCH WHOM WBAK WFWD WSTP WREF WFAV
+PWR SLEEP WAKE
 BOOTLOADER SYSTEM_RESET
 ```
+
+### 押下で実行する機能
+
+```text
+CAPS_WORD KEY_REPEAT GRAVE_ESCAPE
+STUDIO_UNLOCK OUTPUT_USB OUTPUT_BLUETOOTH
+```
+
+これらは独立した `UniversalAction` を増やさず、Bootloader / Reset と同様に `{ action: 'tap', keycode: '...' }` として扱います。
+
+| UniversalKey | QMK / VIA / Vial | ZMK | RMK | 備考 |
+| --- | --- | --- | --- | --- |
+| `BOOTLOADER` | 対応 | 対応 | 対応 | ZMK は `&bootloader` |
+| `SYSTEM_RESET` | 対応 | 対応 | 対応 | ZMK は `&sys_reset` |
+| `CAPS_WORD` | 対応 | 対応 | 対応 | QMK / Vial 出力では機能を自動で有効化 |
+| `KEY_REPEAT` | 対応 | 対応 | 対応 | RMK では同じHID用途の `Again` を使用 |
+| `GRAVE_ESCAPE` | 対応 | 対応 | 非対応 | RMK に同等の組み込みキーがないため |
+| `STUDIO_UNLOCK` | 非対応 | 対応 | 非対応 | ZMK Studio 固有のため |
+| `OUTPUT_USB` | 対応 | 対応 | 非対応 | RMK に同等の共通キーコードがないため |
+| `OUTPUT_BLUETOOTH` | 対応 | 対応 | 非対応 | RMK に同等の共通キーコードがないため |
+
+編集、メディア、ブラウザー、アプリケーションの各HIDキーは、同じ意味を保てる QMK / VIA / Vial / ZMK / RMK へ変換します。`PWR` / `SLEEP` / `WAKE` はRMKの公式キーコード一覧にないため、QMK / VIA / Vial / ZMKのみ対応します。
 
 ### ライティング
 

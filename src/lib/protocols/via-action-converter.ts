@@ -6,7 +6,7 @@ export interface KeyMapEntry {
 }
 
 // 記号類も完全に KC_ を取り除いたQMK定数短縮名でマッピング
-export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
+export const KEY_MAP: Partial<Record<UniversalKey, KeyMapEntry>> = {
   // Letters
   "A": { qmk: "KC_A", hid: 0x0004 },
   "B": { qmk: "KC_B", hid: 0x0005 },
@@ -142,6 +142,17 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "PCMM": { qmk: "KC_PCMM", hid: 0x0085 },
   "PEQL": { qmk: "KC_PEQL", hid: 0x0067 },
   "APP": { qmk: "KC_APP", hid: 0x0065 },
+  "EXEC": { qmk: "KC_EXEC", hid: 0x0074 },
+  "HELP": { qmk: "KC_HELP", hid: 0x0075 },
+  "MENU": { qmk: "KC_MENU", hid: 0x0076 },
+  "SELECT": { qmk: "KC_SLCT", hid: 0x0077 },
+  "STOP": { qmk: "KC_STOP", hid: 0x0078 },
+  "AGAIN": { qmk: "KC_AGIN", hid: 0x0079 },
+  "UNDO": { qmk: "KC_UNDO", hid: 0x007A },
+  "CUT": { qmk: "KC_CUT", hid: 0x007B },
+  "COPY": { qmk: "KC_COPY", hid: 0x007C },
+  "PASTE": { qmk: "KC_PSTE", hid: 0x007D },
+  "FIND": { qmk: "KC_FIND", hid: 0x007E },
 
   // Modifiers
   "LCTL": { qmk: "KC_LCTL", hid: 0x00E0 },
@@ -163,6 +174,23 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   "MPLY": { qmk: "KC_MPLY", hid: 0x00AE },
   "BRIU": { qmk: "KC_BRIU", hid: 0x00BD },
   "BRID": { qmk: "KC_BRID", hid: 0x00BE },
+  "MSEL": { qmk: "KC_MSEL", hid: 0x00AF },
+  "EJCT": { qmk: "KC_EJCT", hid: 0x00B0 },
+  "MAIL": { qmk: "KC_MAIL", hid: 0x00B1 },
+  "CALC": { qmk: "KC_CALC", hid: 0x00B2 },
+  "MYCM": { qmk: "KC_MYCM", hid: 0x00B3 },
+  "WSCH": { qmk: "KC_WSCH", hid: 0x00B4 },
+  "WHOM": { qmk: "KC_WHOM", hid: 0x00B5 },
+  "WBAK": { qmk: "KC_WBAK", hid: 0x00B6 },
+  "WFWD": { qmk: "KC_WFWD", hid: 0x00B7 },
+  "WSTP": { qmk: "KC_WSTP", hid: 0x00B8 },
+  "WREF": { qmk: "KC_WREF", hid: 0x00B9 },
+  "WFAV": { qmk: "KC_WFAV", hid: 0x00BA },
+  "MFFD": { qmk: "KC_MFFD", hid: 0x00BB },
+  "MRWD": { qmk: "KC_MRWD", hid: 0x00BC },
+  "PWR": { qmk: "KC_PWR", hid: 0x00A5 },
+  "SLEEP": { qmk: "KC_SLEP", hid: 0x00A6 },
+  "WAKE": { qmk: "KC_WAKE", hid: 0x00A7 },
 
   // Lighting
   "UG_TOGG": { qmk: "UG_TOGG", hid: 0x7820 },
@@ -231,6 +259,11 @@ export const KEY_MAP: Record<UniversalKey, KeyMapEntry> = {
   // System
   "BOOTLOADER": { qmk: "QK_BOOT", hid: 0x7C00 },
   "SYSTEM_RESET": { qmk: "QK_REBOOT", hid: 0x7C01 },
+  "CAPS_WORD": { qmk: "CW_TOGG", hid: 0x7C73 },
+  "KEY_REPEAT": { qmk: "QK_REP", hid: 0x7C79 },
+  "GRAVE_ESCAPE": { qmk: "QK_GESC", hid: 0x7C16 },
+  "OUTPUT_USB": { qmk: "QK_OUTPUT_USB", hid: 0x7784 },
+  "OUTPUT_BLUETOOTH": { qmk: "QK_OUTPUT_BLUETOOTH", hid: 0x7786 },
   "TRNS": { qmk: "KC_TRNS", hid: 0x0001 },
   "NO": { qmk: "KC_NO", hid: 0x0000 }
 };
@@ -242,6 +275,9 @@ export const QMK_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(KEY
 }, {} as Record<string, UniversalKey>);
 QMK_TO_UNIVERSAL.QK_BOOTLOADER = "BOOTLOADER";
 QMK_TO_UNIVERSAL.QK_RBT = "SYSTEM_RESET";
+QMK_TO_UNIVERSAL.QK_CAPS_WORD_TOGGLE = "CAPS_WORD";
+QMK_TO_UNIVERSAL.QK_REPEAT_KEY = "KEY_REPEAT";
+QMK_TO_UNIVERSAL.QK_GRAVE_ESCAPE = "GRAVE_ESCAPE";
 
 export const HID_TO_UNIVERSAL: Record<number, UniversalKey> = Object.entries(KEY_MAP).reduce((acc, [k, v]) => {
   if (!acc[v.hid]) acc[v.hid] = k as UniversalKey;

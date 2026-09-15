@@ -418,6 +418,7 @@ ${settings.features.backlight ? `
   // No [kbName].h is generated, allowing QMK to auto-generate the LAYOUT macro from keyboard.json.
 
   const keymapC = generateKeymapC(validKeys, settings.layers || 4, settings, settings.tapDances || []);
+  const universalKeyRules = `${keymapC.includes('CW_TOGG') ? 'CAPS_WORD_ENABLE = yes\n' : ''}${keymapC.includes('QK_REP') ? 'REPEAT_KEY_ENABLE = yes\n' : ''}`;
   const tapDanceRules = (settings.tapDances || []).length > 0 ? `TAP_DANCE_ENABLE = yes\n` : '';
   const comboRules = hasConfiguredCombos(settings.combos || []) ? `COMBO_ENABLE = yes\n` : '';
   const encoderMapRules = encoders.length > 0 ? `ENCODER_MAP_ENABLE = yes\n` : '';
@@ -426,7 +427,7 @@ ${settings.features.backlight ? `
   const defaultFolder = kbFolder.folder('keymaps')?.folder('default');
   if (defaultFolder) {
     defaultFolder.file('keymap.c', keymapC);
-    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${encoderMapRules}${tapDanceRules}${comboRules}`);
+    defaultFolder.file('rules.mk', `# Default keymap uses keyboard-level settings\n${encoderMapRules}${tapDanceRules}${comboRules}${universalKeyRules}`);
   }
 
   // 5. keymaps/via/
@@ -437,7 +438,7 @@ ${settings.features.backlight ? `
     viaFolder.file('keymap.c', keymapC);
 
     // keymaps/via/rules.mk
-    viaFolder.file('rules.mk', `VIA_ENABLE = yes\n${encoderMapRules}${tapDanceRules}${comboRules}`);
+    viaFolder.file('rules.mk', `VIA_ENABLE = yes\n${encoderMapRules}${tapDanceRules}${comboRules}${universalKeyRules}`);
   }
 
   return await zip.generateAsync({ type: 'blob' });

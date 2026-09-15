@@ -25,8 +25,16 @@ describe('keycode palette support target', () => {
     expect(getKeycodeSupport('LM_ON', 'qmk').supported).toBe(true);
     expect(getKeycodeSupport('BL_TOGG', 'zmk').supported).toBe(true);
     expect(getKeycodeSupport('MOUSE_ACCEL0', 'zmk').supported).toBe(false);
-    expect(getKeycodeSupport('BOOTLOADER', 'zmk').supported).toBe(false);
+    expect(getKeycodeSupport('BOOTLOADER', 'zmk').supported).toBe(true);
     expect(getKeycodeSupport('BOOTLOADER', 'qmk').supported).toBe(true);
+    expect(getKeycodeSupport('CAPS_WORD', 'zmk').supported).toBe(true);
+    expect(getKeycodeSupport('CAPS_WORD', 'qmk').supported).toBe(true);
+    expect(getKeycodeSupport('CAPS_WORD', 'rmk').supported).toBe(true);
+    expect(getKeycodeSupport('STUDIO_UNLOCK', 'zmk').supported).toBe(true);
+    expect(getKeycodeSupport('STUDIO_UNLOCK', 'qmk').supported).toBe(false);
+    expect(getKeycodeSupport('GRAVE_ESCAPE', 'rmk').supported).toBe(false);
+    expect(getKeycodeSupport('SLEEP', 'zmk').supported).toBe(true);
+    expect(getKeycodeSupport('SLEEP', 'rmk').supported).toBe(false);
     expect(getKeycodeSupport('MOUSE_BTN1', 'rmk').supported).toBe(true);
     expect(getKeycodeSupport('MOUSE_WHEEL_UP', 'rmk').supported).toBe(false);
     expect(getKeycodeSupport('TD_0', 'rmk').supported).toBe(false);

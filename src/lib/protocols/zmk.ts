@@ -1320,17 +1320,36 @@ function decodeZmkUsageToZmkKeyName(encodedUsage: number): string {
     const consumerMap: Record<number, string> = {
       0x00B5: "C_NEXT",
       0x00B6: "C_PREV",
-      0x00B9: "C_VOL_UP",
-      0x00BA: "C_VOL_DN",
       0x00CD: "C_PP",   // Play/Pause
-      0x00CC: "C_STOP",
+      0x00B7: "C_STOP",
       0x00E2: "C_MUTE",
       0x006F: "C_BRI_UP",
       0x0070: "C_BRI_DN",
       0x00E9: "C_VOL_UP", // Consumer Volume Up
       0x00EA: "C_VOL_DN", // Consumer Volume Down
+      0x00B3: "C_FF",
+      0x00B4: "C_RW",
+      0x00B8: "C_EJECT",
+      0x0183: "C_AL_CCC",
+      0x018A: "C_AL_MAIL",
+      0x0192: "C_AL_CALC",
+      0x0194: "C_AL_MY_COMPUTER",
+      0x0221: "C_AC_SEARCH",
+      0x0223: "C_AC_HOME",
+      0x0224: "C_AC_BACK",
+      0x0225: "C_AC_FORWARD",
+      0x0226: "C_AC_STOP",
+      0x0227: "C_AC_REFRESH",
+      0x022A: "C_AC_BOOKMARKS",
     };
     return consumerMap[usageId] || `C_0x${usageId.toString(16).toUpperCase()}`;
+  } else if (usagePage === 0x01) {
+    const systemMap: Record<number, string> = {
+      0x0081: "SYS_PWR",
+      0x0082: "SYS_SLEEP",
+      0x0083: "SYS_WAKE",
+    };
+    return systemMap[usageId] || `SYS_0x${usageId.toString(16).toUpperCase()}`;
   } else if (usagePage === 0x00) {
     return hidToZmkKeyName(usageId);
   }
@@ -1341,19 +1360,42 @@ function encodeZmkKeyNameToUsage(name: string): number {
   const uKey = ZMK_TO_UNIVERSAL[name] || name;
 
   const consumerKeys: Record<string, number> = {
-    "C_NEXT": 0x00B5,
-    "C_PREV": 0x00B6,
-    "C_VOL_UP": 0x00B9,
-    "C_VOL_DN": 0x00BA,
-    "C_PP": 0x00CD,
-    "C_STOP": 0x00CC,
-    "C_MUTE": 0x00E2,
-    "C_BRI_UP": 0x006F,
-    "C_BRI_DN": 0x0070
+    "MNXT": 0x00B5,
+    "MPRV": 0x00B6,
+    "VOLU": 0x00E9,
+    "VOLD": 0x00EA,
+    "MPLY": 0x00CD,
+    "MSTP": 0x00B7,
+    "MUTE": 0x00E2,
+    "BRIU": 0x006F,
+    "BRID": 0x0070,
+    "MFFD": 0x00B3,
+    "MRWD": 0x00B4,
+    "EJCT": 0x00B8,
+    "MSEL": 0x0183,
+    "MAIL": 0x018A,
+    "CALC": 0x0192,
+    "MYCM": 0x0194,
+    "WSCH": 0x0221,
+    "WHOM": 0x0223,
+    "WBAK": 0x0224,
+    "WFWD": 0x0225,
+    "WSTP": 0x0226,
+    "WREF": 0x0227,
+    "WFAV": 0x022A,
   };
 
   if (consumerKeys[uKey]) {
     return (0x0C << 16) | consumerKeys[uKey];
+  }
+
+  const systemKeys: Record<string, number> = {
+    PWR: 0x0081,
+    SLEEP: 0x0082,
+    WAKE: 0x0083,
+  };
+  if (systemKeys[uKey]) {
+    return (0x01 << 16) | systemKeys[uKey];
   }
 
   const entry = KEY_MAP[uKey as UniversalKey];
@@ -1492,6 +1534,19 @@ function bindingToZmkString(
   if (name === "trans" || name === "transparent") {
     return "&trans";
   }
+  const simpleBehaviors: Record<string, string> = {
+    bootloader: '&bootloader',
+    sysreset: '&sys_reset',
+    systemreset: '&sys_reset',
+    capsword: '&caps_word',
+    keyrepeat: '&key_repeat',
+    graveescape: '&gresc',
+    gresc: '&gresc',
+    studiounlock: '&studio_unlock',
+  };
+  if (simpleBehaviors[name]) {
+    return simpleBehaviors[name];
+  }
   if (name === "kp" || name === "keypress" || name === "key") {
     return `&kp ${zmkModifiedUsageToString(binding.param1)}`;
   }
@@ -1564,6 +1619,15 @@ function bindingToZmkString(
       5: "BL_CYCLE"
     };
     return `&bl ${cmdMap[binding.param1] || "BL_TOG"}`;
+  }
+  if (name === "out" || name === "output" || name === "outputselection") {
+    const cmdMap: Record<number, string> = {
+      0: 'OUT_TOG',
+      1: 'OUT_USB',
+      2: 'OUT_BLE',
+      3: 'OUT_NONE',
+    };
+    return `&out ${cmdMap[binding.param1] || binding.param1}`;
   }
   
   const dtsName = rawName.replace(/[\s_]+/g, '_');
@@ -1757,6 +1821,21 @@ function zmkStringToBinding(
       behaviorId,
       param1: cmdMap[cmd] !== undefined ? cmdMap[cmd] : 2,
       param2: cmd === "BL_SET" ? parseInt(match[2] || "0", 10) : 0
+    };
+  }
+
+  match = trimmed.match(/^&out\s+(OUT_TOG|OUT_USB|OUT_BLE|OUT_NONE)$/i);
+  if (match) {
+    const cmdMap: Record<string, number> = {
+      OUT_TOG: 0,
+      OUT_USB: 1,
+      OUT_BLE: 2,
+      OUT_NONE: 3,
+    };
+    return {
+      behaviorId: resolveBehaviorId(behaviorIds, "out"),
+      param1: cmdMap[match[1].toUpperCase()],
+      param2: 0,
     };
   }
   

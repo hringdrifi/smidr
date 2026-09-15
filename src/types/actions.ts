@@ -31,6 +31,9 @@ export type UniversalKey =
   | "P0" | "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "P9"
   | "PSLS" | "PAST" | "PMNS" | "PPLS" | "PENT" | "PDOT" | "PCMM" | "PEQL"
   | "APP"
+  // 編集・アプリケーションキー
+  | "EXEC" | "HELP" | "MENU" | "SELECT" | "STOP" | "AGAIN"
+  | "UNDO" | "CUT" | "COPY" | "PASTE" | "FIND"
   // 統一された修飾キー
   | "LCTL" | "LSFT" | "LALT" | "LGUI"
   | "RCTL" | "RSFT" | "RALT" | "RGUI"
@@ -38,6 +41,10 @@ export type UniversalKey =
   | "MPLY" | "MSTP" | "MNXT" | "MPRV"
   | "VOLU" | "VOLD" | "MUTE"
   | "BRIU" | "BRID"
+  | "MSEL" | "EJCT" | "MFFD" | "MRWD"
+  | "MAIL" | "CALC" | "MYCM"
+  | "WSCH" | "WHOM" | "WBAK" | "WFWD" | "WSTP" | "WREF" | "WFAV"
+  | "PWR" | "SLEEP" | "WAKE"
   // ライティング
   | "UG_TOGG" | "UG_NEXT" | "UG_PREV"
   | "UG_VALU" | "UG_VALD"
@@ -65,6 +72,8 @@ export type UniversalKey =
   | "MOUSE_ACCEL0" | "MOUSE_ACCEL1" | "MOUSE_ACCEL2"
   // システム・ファームウェア
   | "BOOTLOADER" | "SYSTEM_RESET"
+  | "CAPS_WORD" | "KEY_REPEAT" | "GRAVE_ESCAPE"
+  | "STUDIO_UNLOCK" | "OUTPUT_USB" | "OUTPUT_BLUETOOTH"
   // 特別・透過・なし
   | "TRNS" | "NO";
 

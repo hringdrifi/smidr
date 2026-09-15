@@ -1267,6 +1267,64 @@ describe('export generation', () => {
     expect(rulesMk).toContain('TAP_DANCE_ENABLE = yes');
   });
 
+  it.each([
+    ['QMK', generateQmkZip],
+    ['Vial', generateVialZip],
+  ] as const)('%s enables features required by universal Caps Word and Repeat keys', async (_name, generate) => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'Universal Behavior Board',
+      matrix: { rows: 1, cols: 2 },
+      pins: {
+        rows: ['GP0'],
+        cols: ['GP1', 'GP2'],
+        splitRows: [],
+        splitCols: [],
+      },
+    };
+    const keys: PhysicalKey[] = [
+      {
+        row: 0,
+        col: 0,
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'CAPS_WORD' } },
+      },
+      {
+        row: 0,
+        col: 1,
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        r: 0,
+        rx: 0,
+        ry: 0,
+        label: '',
+        keymap: { 0: { action: 'tap', keycode: 'KEY_REPEAT' } },
+      },
+    ];
+
+    const blob = await generate({ settings, keys });
+    expect(blob).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const folder = _name === 'Vial' ? 'vial' : 'default';
+    const keymapC = await zip.file(`universal_behavior_board/keymaps/${folder}/keymap.c`)!.async('string');
+    const rulesMk = await zip.file(`universal_behavior_board/keymaps/${folder}/rules.mk`)!.async('string');
+
+    expect(keymapC).toContain('CW_TOGG');
+    expect(keymapC).toContain('QK_REP');
+    expect(rulesMk).toContain('CAPS_WORD_ENABLE = yes');
+    expect(rulesMk).toContain('REPEAT_KEY_ENABLE = yes');
+  });
+
   it('emits QMK static project macros when configured', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,

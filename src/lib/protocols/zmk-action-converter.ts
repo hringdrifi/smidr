@@ -86,6 +86,17 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "PCMM": "KP_COMMA",
   "PEQL": "KP_EQUAL",
   "APP": "K_APP",
+  "EXEC": "K_EXEC",
+  "HELP": "K_HELP",
+  "MENU": "K_MENU",
+  "SELECT": "K_SELECT",
+  "STOP": "K_STOP",
+  "AGAIN": "K_AGAIN",
+  "UNDO": "K_UNDO",
+  "CUT": "K_CUT",
+  "COPY": "K_COPY",
+  "PASTE": "K_PASTE",
+  "FIND": "K_FIND",
 
   // Modifiers
   "LCTL": "LCTRL",
@@ -107,6 +118,23 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "MUTE": "C_MUTE",
   "BRIU": "C_BRI_UP",
   "BRID": "C_BRI_DN",
+  "MSEL": "C_AL_CCC",
+  "EJCT": "C_EJECT",
+  "MFFD": "C_FF",
+  "MRWD": "C_RW",
+  "MAIL": "C_AL_MAIL",
+  "CALC": "C_AL_CALC",
+  "MYCM": "C_AL_MY_COMPUTER",
+  "WSCH": "C_AC_SEARCH",
+  "WHOM": "C_AC_HOME",
+  "WBAK": "C_AC_BACK",
+  "WFWD": "C_AC_FORWARD",
+  "WSTP": "C_AC_STOP",
+  "WREF": "C_AC_REFRESH",
+  "WFAV": "C_AC_BOOKMARKS",
+  "PWR": "SYS_PWR",
+  "SLEEP": "SYS_SLEEP",
+  "WAKE": "SYS_WAKE",
 
   // Lighting
   "UG_TOGG": "UG_TOGG",
@@ -175,6 +203,12 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   // System
   "BOOTLOADER": "BOOTLOADER",
   "SYSTEM_RESET": "SYS_RESET",
+  "CAPS_WORD": "CAPS_WORD",
+  "KEY_REPEAT": "KEY_REPEAT",
+  "GRAVE_ESCAPE": "GRAVE_ESCAPE",
+  "STUDIO_UNLOCK": "STUDIO_UNLOCK",
+  "OUTPUT_USB": "OUTPUT_USB",
+  "OUTPUT_BLUETOOTH": "OUTPUT_BLUETOOTH",
   "TRNS": "TRANS",
   "NO": "NONE"
 };
@@ -184,6 +218,23 @@ export const ZMK_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(ZMK
   acc[v] = k as UniversalKey;
   return acc;
 }, {} as Record<string, UniversalKey>);
+
+const ZMK_SIMPLE_BEHAVIOR_MAP: Partial<Record<UniversalKey, string>> = {
+  BOOTLOADER: '&bootloader',
+  SYSTEM_RESET: '&sys_reset',
+  CAPS_WORD: '&caps_word',
+  KEY_REPEAT: '&key_repeat',
+  GRAVE_ESCAPE: '&gresc',
+  STUDIO_UNLOCK: '&studio_unlock',
+  OUTPUT_USB: '&out OUT_USB',
+  OUTPUT_BLUETOOTH: '&out OUT_BLE',
+};
+
+const ZMK_SIMPLE_BEHAVIOR_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(ZMK_SIMPLE_BEHAVIOR_MAP)
+  .reduce((acc, [key, binding]) => {
+    if (binding) acc[binding] = key as UniversalKey;
+    return acc;
+  }, {} as Record<string, UniversalKey>);
 
 export const ZMK_BACKLIGHT_KEY_MAP: Partial<Record<UniversalKey, string>> = {
   "BL_ON": "BL_ON",
@@ -237,6 +288,8 @@ export function actionToZmkString(action: UniversalAction): string {
     case 'none':
       return '&none';
     case 'tap': {
+      const simpleBehavior = ZMK_SIMPLE_BEHAVIOR_MAP[action.keycode];
+      if (simpleBehavior) return simpleBehavior;
       const zKey = ZMK_KEY_MAP[action.keycode] || action.keycode;
       if (action.keycode.startsWith('LM_')) {
         throw new Error(`ZMK LED Matrix does not support ${action.keycode}.`);
@@ -312,6 +365,10 @@ export function actionToZmkString(action: UniversalAction): string {
 // Parses ZMK DTS strings back into the unified UniversalAction AST
 export function zmkStringToAction(zmkStr: string): UniversalAction {
   const trimmed = zmkStr.trim();
+
+  const normalizedSimpleBehavior = trimmed.replace(/(?:\s+0){1,2}$/, '');
+  const simpleBehaviorKey = ZMK_SIMPLE_BEHAVIOR_TO_UNIVERSAL[normalizedSimpleBehavior];
+  if (simpleBehaviorKey) return { action: 'tap', keycode: simpleBehaviorKey };
 
   if (trimmed === '&trans') return { action: 'trans' };
   if (trimmed === '&none') return { action: 'none' };

@@ -56,12 +56,17 @@ const RMK_KEY_NAMES: Partial<Record<UniversalKey, string>> = {
   NLCK: 'NumLock', SCRL: 'ScrollLock', PSCR: 'PrintScreen', PAUS: 'Pause',
   P0: 'Kp0', P1: 'Kp1', P2: 'Kp2', P3: 'Kp3', P4: 'Kp4', P5: 'Kp5', P6: 'Kp6', P7: 'Kp7', P8: 'Kp8', P9: 'Kp9',
   PSLS: 'KpSlash', PAST: 'KpAsterisk', PMNS: 'KpMinus', PPLS: 'KpPlus', PENT: 'KpEnter', PDOT: 'KpDot', PCMM: 'KpComma', PEQL: 'KpEqual', APP: 'Menu',
+  EXEC: 'Execute', HELP: 'Help', MENU: 'Menu', SELECT: 'Select', STOP: 'Stop', AGAIN: 'Again',
+  UNDO: 'Undo', CUT: 'Cut', COPY: 'Copy', PASTE: 'Paste', FIND: 'Find',
   LCTL: 'LCtrl', LSFT: 'LShift', LALT: 'LAlt', LGUI: 'LGui', RCTL: 'RCtrl', RSFT: 'RShift', RALT: 'RAlt', RGUI: 'RGui',
   MPLY: 'MediaPlayPause', MSTP: 'MediaStop', MNXT: 'MediaNextTrack', MPRV: 'MediaPrevTrack', VOLU: 'AudioVolUp', VOLD: 'AudioVolDown', MUTE: 'AudioMute',
   BRIU: 'BrightnessUp', BRID: 'BrightnessDown',
+  MSEL: 'MediaSelect', EJCT: 'MediaEject', MFFD: 'MediaFastForward', MRWD: 'MediaRewind',
+  MAIL: 'Mail', CALC: 'Calculator', MYCM: 'MyComputer', WSCH: 'WwwSearch', WHOM: 'WwwHome',
+  WBAK: 'WwwBack', WFWD: 'WwwForward', WSTP: 'WwwStop', WREF: 'WwwRefresh', WFAV: 'WwwFavorites',
   MOUSE_UP: 'MouseUp', MOUSE_DOWN: 'MouseDown', MOUSE_LEFT: 'MouseLeft', MOUSE_RIGHT: 'MouseRight',
   MOUSE_BTN1: 'MouseBtn1', MOUSE_BTN2: 'MouseBtn2', MOUSE_BTN3: 'MouseBtn3', MOUSE_BTN4: 'MouseBtn4', MOUSE_BTN5: 'MouseBtn5',
-  BOOTLOADER: 'Bootloader', SYSTEM_RESET: 'SystemReset', TRNS: '_', NO: 'No',
+  BOOTLOADER: 'Bootloader', SYSTEM_RESET: 'SystemReset', CAPS_WORD: 'CapsWordToggle', KEY_REPEAT: 'Again', TRNS: '_', NO: 'No',
 };
 
 const rmkMod = (mod: Modifier) => RMK_KEY_NAMES[mod] || mod;
