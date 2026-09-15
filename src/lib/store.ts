@@ -29,6 +29,7 @@ import {
   setStoredLayoutUnit
 } from './storage';
 import { getDefaultDevelopmentBoard } from './mcu-presets';
+import { getActionSupport, resolveKeycodeSupportTarget } from './keycode-support';
 import { getKeyVertices, PADDING_X } from './canvas-utils';
 import { normalizeVisualLayout, VisualLayoutId } from './visual-layouts';
 import { createDemoProject, createDemoRemoteKeymap, DEMO_DEVICE, DEMO_TAP_DANCES, isDemoModeEnabled } from './demo';
@@ -334,6 +335,18 @@ const generateRandomVialUid = (): string => {
   const p1 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
   const p2 = Math.floor(Math.random() * 0x100000000).toString(16).toUpperCase().padStart(8, '0');
   return `0x${p1}${p2}`;
+};
+
+const assertActionMatchesKeymapTarget = (state: KeyboardState, action: UniversalAction) => {
+  const target = resolveKeycodeSupportTarget({
+    appMode: state.appMode,
+    connectedProtocol: state.connectedDevice?.protocolType,
+    firmwareTarget: state.settings.firmwareTarget,
+  });
+  const support = getActionSupport(action, target);
+  if (!support.supported) {
+    throw new Error(support.reason || 'The action is not supported by the active keymap target.');
+  }
 };
 
 const initialState: Partial<KeyboardState> = {
@@ -1834,8 +1847,10 @@ export const useKeyboardStore = create<KeyboardState>()(
           return { remoteKeymap: newKm };
         }),
         updateDeviceKeycode: async (layer: number, row: number, col: number, action: UniversalAction) => {
-          const { connectedDevice, updateRemoteKeycode, isDemoMode } = get();
+          const state = get();
+          const { connectedDevice, updateRemoteKeycode, isDemoMode } = state;
           if (!connectedDevice) return;
+          assertActionMatchesKeymapTarget(state, action);
           if (isDemoMode) {
             const remoteIndex = col < 0 ? row : row * 32 + col;
             updateRemoteKeycode(layer, remoteIndex, action);
@@ -2094,6 +2109,7 @@ export const useKeyboardStore = create<KeyboardState>()(
           const s = get();
           const { appMode, currentLayer, selectedKeyIds, keys, connectedDevice } = s;
           if (selectedKeyIds.length === 0) return;
+          assertActionMatchesKeymapTarget(s, action);
 
           const targetKeys = keys.filter(k => selectedKeyIds.includes(k.id));
 
@@ -2204,9 +2220,13 @@ export const useKeyboardStore = create<KeyboardState>()(
           };
         }),
 
-        setKeycode: (id: string, l: number, action: UniversalAction) => set((s) => ({
-          keys: s.keys.map(k => k.id === id ? { ...k, keymap: { ...k.keymap, [l]: action } } : k)
-        })),
+        setKeycode: (id: string, l: number, action: UniversalAction) => {
+          const state = get();
+          assertActionMatchesKeymapTarget(state, action);
+          set((s) => ({
+            keys: s.keys.map(k => k.id === id ? { ...k, keymap: { ...k.keymap, [l]: action } } : k)
+          }));
+        },
 
         setMatrixPosition: (id: string, row: number | undefined, col: number | undefined, side?: MatrixSide) => set((s) => ({
           keys: s.keys.map(k => {

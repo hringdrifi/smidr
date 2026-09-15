@@ -18,7 +18,6 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const SUPPORT_TARGET_LABELS = {
-  all: 'ALL',
   qmk: 'QMK/VIA',
   via: 'VIA',
   vial: 'Vial',
@@ -55,18 +54,31 @@ export const KeycodePanel = () => {
     : isZmkRemap
     ? zmkTapDanceIds.map((id) => ({ code: `TD_${id}`, label: `TD${id}`, category: 'Tap Dance' as const, description: `Smiðr Tap Dance ${id}` }))
     : null;
-  let filteredKeycodes: Keycode[] = activeTab === 'Layers' 
+  const isAvailableOnConnectedDevice = (keycode: Keycode) => {
+    if (appMode !== 'remap' || !deviceCapabilities) return true;
+    if (keycode.category === 'Macro') return deviceCapabilities.hasMacros;
+    if (keycode.category === 'Lighting') return deviceCapabilities.hasLighting;
+    if (keycode.code.startsWith('MOUSE_')) return deviceCapabilities.hasMouseKeys;
+    return true;
+  };
+  const isVisibleKeycode = (keycode: Keycode) => (
+    getKeycodeSupport(keycode.code, supportTarget).supported && isAvailableOnConnectedDevice(keycode)
+  );
+  const getTabKeycodes = (tab: KeycodeCategory): Keycode[] => tab === 'Layers'
     ? [
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `MO(${i})`, label: `MO(${i})`, category: 'Layers' as const, description: layerDescription('layerMomentary', i) })),
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `TG(${i})`, label: `TG(${i})`, category: 'Layers' as const, description: layerDescription('layerToggle', i) })),
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `TO(${i})`, label: `TO(${i})`, category: 'Layers' as const, description: layerDescription('layerDirect', i) })),
         ...Array.from({ length: layersCount }, (_, i) => ({ code: `LT(${i})`, label: `LT(${i})`, category: 'Layers' as const, description: layerDescription('layerTap', i) })),
       ]
-    : activeTab === 'Tap Dance' && tapDanceKeycodes
+    : tab === 'Tap Dance' && tapDanceKeycodes
     ? tapDanceKeycodes
-    : KEYCODES.filter(k => k.category === activeTab).map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
-
-
+    : KEYCODES.filter(k => k.category === tab).map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
+  const visibleTabs = VIAL_TABS.filter(tab => getTabKeycodes(tab).some(isVisibleKeycode));
+  const visibleTabKey = visibleTabs.join('|');
+  const firstVisibleTab = visibleTabs[0];
+  const isActiveTabVisible = visibleTabs.includes(activeTab);
+  const filteredKeycodes = getTabKeycodes(activeTab).filter(isVisibleKeycode);
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -79,6 +91,12 @@ export const KeycodePanel = () => {
     window.addEventListener('resize', checkOverflow);
     return () => window.removeEventListener('resize', checkOverflow);
   }, []);
+
+  useEffect(() => {
+    if (!isActiveTabVisible && firstVisibleTab) {
+      setActiveTab(firstVisibleTab);
+    }
+  }, [firstVisibleTab, isActiveTabVisible, visibleTabKey]);
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
@@ -135,18 +153,12 @@ export const KeycodePanel = () => {
   };
 
   const getDefaultAnyAction = (): UniversalAction => {
-    const protocol = connectedDevice?.protocolType === 'zmk'
-      ? 'zmk'
-      : connectedDevice?.protocolType === 'vial'
-      ? 'vial'
-      : connectedDevice?.protocolType === 'via'
-      ? 'via'
-      : 'qmk';
+    const protocol = supportTarget || 'qmk';
 
     return {
       action: 'custom',
       protocol,
-      rawCode: protocol === 'zmk' ? '&none' : '0x0000',
+      rawCode: protocol === 'zmk' ? '&none' : protocol === 'rmk' ? 'No' : '0x0000',
       label: 'Any'
     };
   };
@@ -277,26 +289,29 @@ export const KeycodePanel = () => {
 
   const selectKeycodes = KEYCODES
     .filter(k => k.category !== 'Layers' && k.code !== 'ISO_ENT_GHOST')
-    .map(k => applyVisualLayoutToKeycode(k, settings.visualLayout));
+    .map(k => applyVisualLayoutToKeycode(k, settings.visualLayout))
+    .filter(isVisibleKeycode);
   const filteredSelectKeycodes = selectKeycodes.filter(k => 
     k.code.toLowerCase().includes(tapSearchQuery.toLowerCase()) || 
     k.label.toLowerCase().includes(tapSearchQuery.toLowerCase())
   );
 
-  const isTabSupported = (tab: KeycodeCategory) => {
-    if (!deviceCapabilities) return true; // Offline design mode: assume support
-    if (tab === 'Macro') return deviceCapabilities.hasMacros;
-    if (tab === 'Lighting') return deviceCapabilities.hasLighting;
-    return true;
-  };
-
-  const getKeycodeTitle = (k: Keycode, support: ReturnType<typeof getKeycodeSupport>) => {
-    if (!support.supported) return `${k.code} (${support.reason})`;
+  const getKeycodeTitle = (k: Keycode) => {
     const translatedDescription = t(`keycodeDescriptions.${k.code}`);
     return translatedDescription === `keycodeDescriptions.${k.code}`
       ? (k.description || k.code)
       : translatedDescription;
   };
+
+  if (!supportTarget) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--bg-panel)] px-6 text-center text-xs font-medium text-[var(--text-muted)]">
+        {appMode === 'remap'
+          ? (t('remap.connectKeyboard') || 'Connect a keyboard to edit its keymap.')
+          : (t('firmwareFlow.selectStep') || 'Select firmware before editing the keymap.')}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-panel)] overflow-hidden">
@@ -308,32 +323,21 @@ export const KeycodePanel = () => {
         </div>
 
         <div ref={tabContainerRef} className="flex-1 flex overflow-hidden no-scrollbar items-end h-full">
-          {VIAL_TABS.map(tab => {
-            const isSupported = isTabSupported(tab);
-            const isDisabled = !isSupported;
-            return (
+          {visibleTabs.map(tab => (
               <button
                 key={tab}
-                disabled={isDisabled}
                 onClick={() => { setActiveTab(tab); }}
                 className={cn(
                   "px-6 py-3 text-xs font-bold transition-all border-r border-[var(--border-main)] shrink-0 relative",
-                  activeTab === tab ? "bg-[var(--bg-panel)] text-amber-500" : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-main)]",
-                  isDisabled && "opacity-30 cursor-not-allowed hover:bg-transparent hover:text-[var(--text-muted)]"
+                  activeTab === tab ? "bg-[var(--bg-panel)] text-amber-500" : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-main)]"
                 )}
               >
                 <span className="flex items-center gap-1.5">
                   {t(`keycodeTabs.${tab}`)}
-                  {!isSupported && (
-                    <span className="text-[7px] leading-none px-1 py-0.5 rounded bg-red-500/20 text-red-400 font-bold border border-red-500/30 uppercase tracking-tighter shrink-0">
-                      Off
-                    </span>
-                  )}
                 </span>
                 {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />}
               </button>
-            );
-          })}
+          ))}
         </div>
 
         <div className="ml-3 flex shrink-0 items-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5">
@@ -395,9 +399,8 @@ export const KeycodePanel = () => {
                       const isIsoEnter = activeTab === 'ISO/JIS' && k.code === 'ENT' && k.w2 !== undefined && k.h2 !== undefined;
                       const w = calcWidth(k.width ?? 1.0);
                       const h = isIsoEnter ? (2 * 48 + G) : 48;
-                      const support = getKeycodeSupport(k.code, supportTarget);
-                      const isKeyDisabled = !hasSelectedKey || !support.supported;
-                      const title = getKeycodeTitle(k, support);
+                      const isKeyDisabled = !hasSelectedKey;
+                      const title = getKeycodeTitle(k);
 
                       return (
                         <div 
@@ -476,8 +479,7 @@ export const KeycodePanel = () => {
               ))
             ) : (
             filteredKeycodes.map(k => {
-                const support = getKeycodeSupport(k.code, supportTarget);
-                const isKeyDisabled = !hasSelectedKey || !support.supported;
+                const isKeyDisabled = !hasSelectedKey;
                 const isLayersTab = activeTab === 'Layers';
 
                 // Layers tab: determine action type and layer number for JSX rendering
@@ -499,7 +501,7 @@ export const KeycodePanel = () => {
                     key={k.code}
                     onClick={() => handleKeycodeClick(k.code)}
                     disabled={isKeyDisabled}
-                    title={getKeycodeTitle(k, support)}
+                    title={getKeycodeTitle(k)}
                     style={{ width: `${U}px` }}
                     className={cn(
                       "flex flex-col items-center justify-center rounded border transition-colors h-12 group shadow-sm gap-0.5 px-1",

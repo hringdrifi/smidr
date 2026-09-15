@@ -82,7 +82,7 @@ export type UniversalAction =
   | { action: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
   | { action: "macro"; macroId: number }                                   // マクロ
   | { action: "td"; tapDanceId: number }                                   // タップダンス
-  | { action: "custom"; protocol: "qmk" | "via" | "vial" | "zmk"; rawCode: string; label?: string };        // エスケープハッチ
+  | { action: "custom"; protocol: "qmk" | "via" | "vial" | "zmk" | "rmk"; rawCode: string; label?: string };        // エスケープハッチ
 
 export interface MacroAction {
   action: 'text' | 'tap' | 'down' | 'up' | 'delay';

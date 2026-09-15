@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getKeycodeSupport, resolveKeycodeSupportTarget } from '@/lib/keycode-support';
+import { getActionSupport, getKeycodeSupport, resolveKeycodeSupportTarget } from '@/lib/keycode-support';
 
 describe('keycode palette support target', () => {
   it('uses the selected firmware while designing', () => {
@@ -15,13 +15,31 @@ describe('keycode palette support target', () => {
     expect(resolveKeycodeSupportTarget({ appMode: 'remap', connectedProtocol: 'via' })).toBe('via');
   });
 
-  it('falls back to all without a selected or connected target', () => {
-    expect(resolveKeycodeSupportTarget({ appMode: 'design', firmwareTarget: null })).toBe('all');
-    expect(resolveKeycodeSupportTarget({ appMode: 'remap' })).toBe('all');
+  it('does not expose an all-target palette without a selected or connected target', () => {
+    expect(resolveKeycodeSupportTarget({ appMode: 'design', firmwareTarget: null })).toBeNull();
+    expect(resolveKeycodeSupportTarget({ appMode: 'remap' })).toBeNull();
   });
 
-  it('applies target-specific support rules automatically', () => {
+  it('builds target-specific keycode catalogs', () => {
     expect(getKeycodeSupport('LM_ON', 'zmk').supported).toBe(false);
     expect(getKeycodeSupport('LM_ON', 'qmk').supported).toBe(true);
+    expect(getKeycodeSupport('BL_TOGG', 'zmk').supported).toBe(true);
+    expect(getKeycodeSupport('MOUSE_ACCEL0', 'zmk').supported).toBe(false);
+    expect(getKeycodeSupport('BOOTLOADER', 'zmk').supported).toBe(false);
+    expect(getKeycodeSupport('BOOTLOADER', 'qmk').supported).toBe(true);
+    expect(getKeycodeSupport('MOUSE_BTN1', 'rmk').supported).toBe(true);
+    expect(getKeycodeSupport('MOUSE_WHEEL_UP', 'rmk').supported).toBe(false);
+    expect(getKeycodeSupport('TD_0', 'rmk').supported).toBe(false);
+  });
+
+  it('rejects missing targets and mismatched raw actions', () => {
+    expect(getKeycodeSupport('A', null).supported).toBe(false);
+    expect(getActionSupport({ action: 'custom', protocol: 'zmk', rawCode: '&kp A' }, 'zmk').supported).toBe(true);
+    expect(getActionSupport({ action: 'custom', protocol: 'qmk', rawCode: 'KC_A' }, 'zmk').supported).toBe(false);
+    expect(getActionSupport({
+      action: 'lt',
+      layerId: 1,
+      tapAction: { action: 'tap', keycode: 'LM_ON' },
+    }, 'zmk').supported).toBe(false);
   });
 });

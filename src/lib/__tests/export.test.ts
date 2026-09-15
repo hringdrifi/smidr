@@ -62,6 +62,40 @@ describe('KiCad export defaults', () => {
 });
 
 describe('export generation', () => {
+  it.each([
+    ['development_board', false],
+    ['development_board', true],
+    ['mcu', false],
+    ['mcu', true],
+  ] as const)('exports project USB IDs for ZMK %s (split=%s)', async (controllerType, split) => {
+    const settings: ProjectSettings = {
+      ...baseSettings,
+      name: 'USB IDs',
+      vendorProductId: 0xABCD0042,
+      hardware: { ...baseSettings.hardware, controllerType, mcu: 'nrf52840', board: 'nice_nano_v2' },
+      features: { ...baseSettings.features, split },
+    };
+    const blob = await generateZmkZip({ settings, keys: [] });
+    expect(blob).not.toBeNull();
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const path = controllerType === 'mcu'
+      ? `boards/arm/usb_ids${split ? '_left' : ''}/Kconfig.defconfig`
+      : 'boards/shields/usb_ids/Kconfig.defconfig';
+    const config = await zip.file(path)!.async('string');
+    expect(config).toContain('config USB_DEVICE_VID\n    default 0xABCD');
+    expect(config).toContain('config USB_DEVICE_PID\n    default 0x0042');
+    if (split && controllerType === 'mcu') {
+      const peripheral = await zip.file('boards/arm/usb_ids_right/Kconfig.defconfig')!.async('string');
+      expect(peripheral).not.toContain('config USB_DEVICE_VID');
+    }
+    if (split && controllerType === 'development_board') {
+      const central = config.split('endif')[0];
+      expect(central).toContain('if SHIELD_USB_IDS_LEFT');
+      expect(central).toContain('config USB_DEVICE_VID');
+      expect(config.slice(central.length)).not.toContain('config USB_DEVICE_VID');
+    }
+  });
+
   it('exports KiCad schematic and PCB data with selected footprints and matrix nets', async () => {
     const settings: ProjectSettings = {
       ...baseSettings,

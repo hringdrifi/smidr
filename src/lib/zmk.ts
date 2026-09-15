@@ -9,6 +9,13 @@ import { sortKeys } from './sorting';
 import { getDefaultZmkBoard, getZmkDevelopmentBoard, getZmkDevelopmentBoardInterconnect, getZmkHardwareTarget, ZmkTarget } from './mcu-presets';
 import { getDirectLocalMatrixPosition, getDirectMatrixSide, getDirectSideDimensions, getFirmwareMatrixPosition, getLocalMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, inferMatrixSideFromGeometry, isDirectPinMatrix, MatrixSide, resolveDirectPin } from './matrix-utils';
 
+const getZmkUsbIdDefaults = (settings: ProjectSettings) => `config USB_DEVICE_VID
+    default 0x${((settings.vendorProductId >>> 16) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}
+
+config USB_DEVICE_PID
+    default 0x${(settings.vendorProductId & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}
+`;
+
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
     .trim()
@@ -814,6 +821,8 @@ if SHIELD_${leftShield.toUpperCase()}
 config ZMK_KEYBOARD_NAME
     default "${settings.name}"
 
+${getZmkUsbIdDefaults(settings)}
+
 config ZMK_SPLIT_ROLE_CENTRAL
     default y
 
@@ -1076,6 +1085,8 @@ config BOARD
 ${side === 'left' ? `config ZMK_KEYBOARD_NAME
     default "${settings.name}"
 
+${getZmkUsbIdDefaults(settings)}
+
 config ZMK_SPLIT_ROLE_CENTRAL
     default y
 ` : ''}
@@ -1315,6 +1326,8 @@ config BOARD
 
 config ZMK_KEYBOARD_NAME
     default "${settings.name}"
+
+${getZmkUsbIdDefaults(settings)}
 
 ${isNordicTarget(zmkTarget) ? `config ZMK_BLE
     default y
@@ -1563,6 +1576,8 @@ if SHIELD_${kbName.toUpperCase()}
 
 config ZMK_KEYBOARD_NAME
     default "${settings.name}"
+
+${getZmkUsbIdDefaults(settings)}
 
 endif
 `;

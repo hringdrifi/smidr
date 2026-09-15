@@ -9,6 +9,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { RightPanelEmptyState } from './RightPanelEmptyState';
 import { getFirmwareMatrixPosition } from '@/lib/matrix-utils';
+import { resolveKeycodeSupportTarget } from '@/lib/keycode-support';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -49,19 +50,18 @@ export const KeycodeConfigPanel = () => {
   const {
     keys, selectedKeyIds, setKeycode, currentLayer,
     settings, remoteKeymap, updateRemoteKeycode, updateDeviceKeycode, appMode, connectedDevice,
-    deviceCapabilities, remoteTapDances, openMacroSettings, openTapDanceSettings,
+    deviceCapabilities, remoteTapDances, zmkTapDanceIds, openMacroSettings, openTapDanceSettings,
     updateEncoder, encoderActionDirection, setEncoderActionDirection
   } = useKeyboardStore();
   const { t } = useTranslation();
-  const defaultCustomProtocol = connectedDevice?.protocolType === 'zmk'
-    ? 'zmk'
-    : connectedDevice?.protocolType === 'vial'
-    ? 'vial'
-    : connectedDevice?.protocolType === 'via'
-    ? 'via'
-    : 'qmk';
+  const supportTarget = resolveKeycodeSupportTarget({
+    appMode,
+    connectedProtocol: connectedDevice?.protocolType,
+    firmwareTarget: settings.firmwareTarget,
+  });
+  const defaultCustomProtocol = supportTarget || 'qmk';
   const [rawDraft, setRawDraft] = useState('');
-  const [rawProtocolDraft, setRawProtocolDraft] = useState<'qmk' | 'via' | 'vial' | 'zmk'>(defaultCustomProtocol);
+  const [rawProtocolDraft, setRawProtocolDraft] = useState<'qmk' | 'via' | 'vial' | 'zmk' | 'rmk'>(defaultCustomProtocol);
 
   const selectedKeyId = selectedKeyIds[0];
   const selectedKey = keys.find(k => k.id === selectedKeyId);
@@ -97,6 +97,12 @@ export const KeycodeConfigPanel = () => {
   const [draftAction, setDraftAction] = useState<UniversalAction>(action);
   const activeAction = draftAction;
   const isVialRemap = appMode === 'remap' && connectedDevice?.protocolType === 'vial';
+  const canUseMacro = supportTarget !== 'rmk' && (
+    appMode === 'design' || !!deviceCapabilities?.hasMacros
+  );
+  const canUseTapDance = supportTarget !== 'rmk' && (
+    appMode === 'design' || !!deviceCapabilities?.hasTapDance || (supportTarget === 'zmk' && zmkTapDanceIds.length > 0)
+  );
 
   useEffect(() => {
     setDraftAction(action);
@@ -105,9 +111,9 @@ export const KeycodeConfigPanel = () => {
   useEffect(() => {
     if (activeAction.action === 'custom') {
       setRawDraft(activeAction.rawCode);
-      setRawProtocolDraft(activeAction.protocol);
+      setRawProtocolDraft(defaultCustomProtocol);
     } else {
-      setRawDraft(defaultCustomProtocol === 'zmk' ? '&kp A' : '0x0004');
+      setRawDraft(defaultCustomProtocol === 'zmk' ? '&kp A' : defaultCustomProtocol === 'rmk' ? 'A' : '0x0004');
       setRawProtocolDraft(defaultCustomProtocol);
     }
   }, [activeAction, defaultCustomProtocol]);
@@ -237,11 +243,13 @@ export const KeycodeConfigPanel = () => {
         newAction = { action: 'macro', macroId: activeAction.action === 'macro' ? activeAction.macroId : 0 };
         break;
       case 'custom': {
-        const protocol = activeAction.action === 'custom' ? activeAction.protocol : defaultCustomProtocol;
+        const protocol = defaultCustomProtocol;
         const rawCode = activeAction.action === 'custom'
           ? activeAction.rawCode
           : protocol === 'zmk'
           ? '&kp A'
+          : protocol === 'rmk'
+          ? 'A'
           : '0x0004';
         newAction = { action: 'custom', protocol, rawCode };
         break;
@@ -399,9 +407,9 @@ export const KeycodeConfigPanel = () => {
   const canOpenDeviceTapDanceSettings = activeAction.action === 'td' && isVialRemap && (
     remoteTapDances.some(td => td.id === activeAction.tapDanceId)
   );
-  const canOpenProjectMacroSettings = activeAction.action === 'macro' && appMode === 'design';
+  const canOpenProjectMacroSettings = activeAction.action === 'macro' && appMode === 'design' && supportTarget !== 'rmk';
   const canOpenDeviceMacroSettings = activeAction.action === 'macro' && appMode === 'remap' && !!deviceCapabilities?.hasMacros;
-  const canOpenProjectTapDanceSettings = activeAction.action === 'td' && appMode === 'design';
+  const canOpenProjectTapDanceSettings = activeAction.action === 'td' && appMode === 'design' && supportTarget !== 'rmk';
   const canOpenMacroSettings = canOpenProjectMacroSettings || canOpenDeviceMacroSettings;
   const canOpenTapDanceSettingsButton = canOpenProjectTapDanceSettings || canOpenDeviceTapDanceSettings;
 
@@ -547,8 +555,8 @@ export const KeycodeConfigPanel = () => {
             <option value="tg">{t('keycodeConfig.typeToggle') || 'Toggle Layer (TG)'}</option>
             <option value="to">{t('keycodeConfig.typeTo') || 'Direct Layer (TO)'}</option>
             <option value="lt">{t('keycodeConfig.typeTap') || 'Layer Tap (LT)'}</option>
-            <option value="macro">{t('keycodeConfig.typeMacro') || 'Macro'}</option>
-            <option value="td">{t('keycodeConfig.typeTapDance') || 'Tap Dance (TD)'}</option>
+            {(canUseMacro || currentType === 'macro') && <option value="macro">{t('keycodeConfig.typeMacro') || 'Macro'}</option>}
+            {(canUseTapDance || currentType === 'td') && <option value="td">{t('keycodeConfig.typeTapDance') || 'Tap Dance (TD)'}</option>}
             <option value="custom">{t('keycodeConfig.customKeycode') || 'Any'}</option>
           </select>
         </div>
@@ -568,13 +576,10 @@ export const KeycodeConfigPanel = () => {
             </div>
             <select
               value={rawProtocolDraft}
-              onChange={(e) => setRawProtocolDraft(e.target.value as 'qmk' | 'via' | 'vial' | 'zmk')}
-              className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg px-3 py-2 text-xs font-bold text-[var(--text-highlight)] focus:outline-none focus:border-amber-500 cursor-pointer transition-colors"
+              disabled
+              className="w-full bg-[var(--bg-app)]/85 border border-[var(--border-main)] rounded-lg px-3 py-2 text-xs font-bold text-[var(--text-muted)] cursor-not-allowed transition-colors"
             >
-              <option value="qmk">QMK</option>
-              <option value="via">VIA</option>
-              <option value="vial">Vial</option>
-              <option value="zmk">ZMK</option>
+              <option value={rawProtocolDraft}>{rawProtocolDraft.toUpperCase()}</option>
             </select>
             <textarea
               value={rawDraft}
@@ -582,7 +587,7 @@ export const KeycodeConfigPanel = () => {
               spellCheck={false}
               rows={4}
               className="w-full resize-none bg-zinc-950/60 border border-[var(--border-main)] rounded-lg p-3 text-xs text-[var(--text-main)] focus:outline-none focus:border-amber-500/70 transition-colors font-mono leading-relaxed"
-              placeholder={rawProtocolDraft === 'zmk' ? '&kp A' : '0x0004'}
+              placeholder={rawProtocolDraft === 'zmk' ? '&kp A' : rawProtocolDraft === 'rmk' ? 'A' : '0x0004'}
             />
             <button
               onClick={handleApplyRawAction}

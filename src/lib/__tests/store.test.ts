@@ -570,6 +570,21 @@ describe('useKeyboardStore', () => {
     expect(state.keys[3].keymap?.[0]).toEqual({ action: 'tap', keycode: 'B' });
   });
 
+  it('should reject actions that do not match the selected firmware target', () => {
+    const store = useKeyboardStore.getState();
+    useKeyboardStore.setState({
+      editorMode: 'keymap',
+      appMode: 'design',
+      settings: { ...store.settings, firmwareTarget: 'zmk' },
+    });
+    store.addKeys([{ x: 0, y: 0, w: 1, h: 1 }], { skipCollision: true });
+    const keyId = useKeyboardStore.getState().keys[0].id!;
+
+    expect(() => store.setKeycode(keyId, 0, { action: 'tap', keycode: 'LM_ON' })).toThrow('ZMK unsupported');
+    expect(useKeyboardStore.getState().keys[0].keymap?.[0]).toBeUndefined();
+    expect(() => store.setKeycode(keyId, 0, { action: 'tap', keycode: 'A' })).not.toThrow();
+  });
+
   it('should handle copying and pasting universal actions in keymap mode (remap app mode)', () => {
     const store = useKeyboardStore.getState();
     const remoteKeymap: Record<number, UniversalAction[]> = {
@@ -579,8 +594,10 @@ describe('useKeyboardStore', () => {
     remoteKeymap[0][1] = { action: 'tap', keycode: 'Y' };
 
     useKeyboardStore.setState({ 
-      editorMode: 'keymap', 
-      appMode: 'remap', 
+      editorMode: 'keymap',
+      appMode: 'remap',
+      connectedDevice: { vid: 0xFEED, pid: 0x0001, protocolType: 'via' },
+      isDemoMode: true,
       currentLayer: 0,
       remoteKeymap
     });
