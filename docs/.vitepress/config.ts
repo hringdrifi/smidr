@@ -33,7 +33,7 @@ export default {
       {
         text: 'ハードウェア',
         items: [
-          { text: '設計ワークフロー', link: '/design/' },
+          { text: 'ハードウェア設計ワークフロー', link: '/design/' },
           { text: 'ハードウェア設定', link: '/design/hardware' },
           { text: 'レイアウト編集', link: '/design/layout' },
           { text: 'マトリクス編集', link: '/design/matrix' },
@@ -42,6 +42,7 @@ export default {
       {
         text: 'ファームウェア',
         items: [
+          { text: 'ファームウェア設計ワークフロー', link: '/design/firmware' },
           { text: 'キーマップ編集', link: '/design/keymap' },
           { text: 'ファームウェア対応表', link: '/reference/firmware-compatibility' },
           { text: 'アクション / キーコード', link: '/reference/actions' },
