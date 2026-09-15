@@ -4,234 +4,53 @@ title: アクション / キーコード
 
 # アクション / キーコード
 
-Smiðr は、QMK / VIA / Vial / ZMK のキー割り当てをそのまま文字列として扱うのではなく、内部では `UniversalAction` という共通のデータ構造として扱います。`UniversalAction` は、ファームウェアごとのキーコード表記やレイヤー操作の違いを吸収する中間レイヤです。
+Smiðr は、ファームウェア固有の文字列を直接キーマップの中心データにせず、キーの動作を `UniversalAction`、通常キーや機能キーを `UniversalKey` として保持します。出力時または実機への書き込み時に、QMK/VIA、Vial、ZMK、RMKの表現へ変換します。
 
-UI はこの中間レイヤを編集し、接続先や出力先に応じて QMK / VIA / Vial / ZMK 向けの形式へ変換します。これにより、設計モードのキーマップ、リマップモードの実機通信、各ファームウェア向けの出力を同じ考え方で扱えます。
-
-キーコードそのものは `UniversalKey` として表します。`UniversalKey` には、文字や記号のようなベーシックなキーコードだけでなく、メディアキー、マウスキー、ブートローダー呼び出しのような特殊な機能を表すキーも含まれます。
+どの対象で利用できるかは[ファームウェア対応表](/reference/firmware-compatibility)を参照してください。
 
 ## UniversalAction
 
-`UniversalAction` は、キーに割り当てる動作を表します。
-
-| action | 画面上のアクションタイプ | 意味 | 例 |
+| `action` | 画面上の項目 | 意味 | 例 |
 | --- | --- | --- | --- |
-| `trans` | アクションタイプではなく、透過キーとして選択 | 透過。下位レイヤーの割り当てを使います。 | `{ action: 'trans' }` |
-| `none` | アクションタイプではなく、何もしないキーとして選択 | 何もしないキーです。 | `{ action: 'none' }` |
-| `tap` | タップキー | 通常のキー入力です。修飾キー同時押しやライティング操作も `keycode` で表します。 | `{ action: 'tap', keycode: 'A' }`<br>`{ action: 'tap', keycode: 'A', mods: ['LCTL', 'LSFT'] }`<br>`{ action: 'tap', keycode: 'RGB_TOG' }` |
-| `mo` | レイヤー一時切り替え | 押している間だけ指定レイヤーへ移動します。 | `{ action: 'mo', layerId: 1 }` |
-| `tg` | レイヤートグル | 指定レイヤーの有効/無効を切り替えます。 | `{ action: 'tg', layerId: 2 }` |
-| `to` | レイヤー置換 | 指定レイヤーへ直接切り替えます。 | `{ action: 'to', layerId: 3 }` |
-| `lt` | レイヤータップ | ホールドでレイヤー、タップで別アクションを実行します。 | `{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'SPC' } }`<br>`{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'A', mods: ['LCTL'] } }` |
-| `mt` | モッドタップ | ホールドで修飾キー、タップで別アクションを実行します。 | `{ action: 'mt', modifiers: ['LCTL'], tapAction: { action: 'tap', keycode: 'A' } }` |
-| `macro` | キーコードパレットのマクロ | マクロを呼び出します。 | `{ action: 'macro', macroId: 0 }` |
-| `custom` | 任意 | Smiðr の標準アクションでは表しきれないコードを扱います。 | `{ action: 'custom', protocol: 'qmk', rawCode: 'QK_USER_0' }` |
+| `trans` | 透過 | 下位レイヤーの割り当てを使います。 | `{ action: 'trans' }` |
+| `none` | 何もしない | キー入力を行いません。 | `{ action: 'none' }` |
+| `tap` | タップキー | `UniversalKey`を押します。`mods`で同時押し修飾を追加できます。 | `{ action: 'tap', keycode: 'A' }` |
+| `mo` | レイヤー一時切り替え | 押している間だけ対象レイヤーを有効にします。 | `{ action: 'mo', layerId: 1 }` |
+| `tg` | レイヤートグル | 対象レイヤーの有効・無効を切り替えます。 | `{ action: 'tg', layerId: 2 }` |
+| `to` | レイヤー置換 | 対象レイヤーへ切り替えます。 | `{ action: 'to', layerId: 3 }` |
+| `lt` | レイヤータップ | Holdでレイヤー、Tapで別のアクションを実行します。 | `{ action: 'lt', layerId: 1, tapAction: { action: 'tap', keycode: 'SPC' } }` |
+| `mt` | モッドタップ | Holdで修飾キー、Tapで別のアクションを実行します。 | `{ action: 'mt', modifiers: ['LCTL'], tapAction: { action: 'tap', keycode: 'A' } }` |
+| `macro` | マクロ | IDでMacroスロットまたは生成定義を参照します。 | `{ action: 'macro', macroId: 0 }` |
+| `td` | Tap Dance | IDでTap Dance定義を参照します。 | `{ action: 'td', tapDanceId: 0 }` |
+| `custom` | 任意 / Any | 対象固有のRawコードを変換せず保持します。 | `{ action: 'custom', protocol: 'zmk', rawCode: '&caps_word' }` |
 
-## tap
+## 修飾キーとタップ側アクション
 
-`tap` は通常のキー入力です。`keycode` に `UniversalKey` を指定します。
+`tap` の `mods` と `mt` の `modifiers` には、`LCTL`、`LSFT`、`LALT`、`LGUI`、`RCTL`、`RSFT`、`RALT`、`RGUI`を指定できます。選択した修飾キーが0個の場合、`tap.mods`は保存データから省略されます。
 
-```ts
-{ action: 'tap', keycode: 'A' }
-{ action: 'tap', keycode: 'SPC' }
-{ action: 'tap', keycode: 'RGB_TOG' }
-```
+`lt.tapAction` と `mt.tapAction` も `UniversalAction` です。ただし、実際のファームウェア表現には入れ子にできる動作の制限があります。通常はタップ側に単純な `tap` を指定してください。
 
-修飾キーを同時に押す場合は `mods` を使います。
+## Macro、Combo、Tap Dance
 
-```ts
-{ action: 'tap', keycode: 'A', mods: ['LCTL', 'LSFT'] }
-```
+設計モードではMacro、Combo、Tap Danceの定義をプロジェクトへ保存し、対応するファームウェアソースへ変換します。リマップモードでは接続機器が公開するDynamic Macro、Dynamic Combo、Dynamic Tap Danceを直接編集し、プロジェクト側の定義とは分けて扱います。
 
-## レイヤー操作
-
-レイヤー操作は、対象レイヤーを `layerId` で指定します。
-
-```ts
-{ action: 'mo', layerId: 1 }
-{ action: 'tg', layerId: 2 }
-{ action: 'to', layerId: 3 }
-```
-
-`lt` は、ホールド時のレイヤー移動とタップ時の動作を組み合わせます。
-
-```ts
-{
-  action: 'lt',
-  layerId: 1,
-  tapAction: { action: 'tap', keycode: 'SPC' }
-}
-```
-
-タップ側のアクションにも `mods` を含められます。
-
-```ts
-{
-  action: 'lt',
-  layerId: 1,
-  tapAction: { action: 'tap', keycode: 'A', mods: ['LCTL'] }
-}
-```
-
-## モッドタップ
-
-`mt` は、ホールド時の修飾キーとタップ時の動作を組み合わせます。
-
-```ts
-{
-  action: 'mt',
-  modifiers: ['LCTL'],
-  tapAction: { action: 'tap', keycode: 'A' }
-}
-```
-
-複数の修飾キーを指定することもできます。
-
-```ts
-{
-  action: 'mt',
-  modifiers: ['LCTL', 'LSFT'],
-  tapAction: { action: 'tap', keycode: 'SPC' }
-}
-```
-
-## Modifier
-
-`Modifier` は修飾キーを表します。
-
-| 値 | 意味 |
-| --- | --- |
-| `LCTL` | 左 Control |
-| `LSFT` | 左 Shift |
-| `LALT` | 左 Alt |
-| `LGUI` | 左 GUI |
-| `RCTL` | 右 Control |
-| `RSFT` | 右 Shift |
-| `RALT` | 右 Alt |
-| `RGUI` | 右 GUI |
+Vialソース出力はDynamic Tap Dance側が同名シンボルを持つため、プロジェクトの静的Tap Dance定義を生成しません。ZMK Studioでは既存behaviorの割り当てはできますが、behavior定義の追加にはソース出力と再ビルドが必要です。
 
 ## UniversalKey
 
-`UniversalKey` は、Smiðr 内部で使うキー名です。英数字や記号のような基本キー、JIS 固有キー、メディアキー、マウスキー、ブートローダー呼び出しのような特殊キーを同じ一覧で扱います。
+`UniversalKey` は、英数字、記号、ISO/JISキー、ファンクションキー、修飾キー、メディアキー、ライティング、マウス操作、ファームウェア操作を表すSmiðr内部の名前です。たとえば次のアクションは、出力先に応じて `KC_A`、`&kp A`、`A`などへ変換されます。
 
-### 英数字
-
-```text
-A B C ... Z
-1 2 3 ... 0
+```ts
+{ action: 'tap', keycode: 'A' }
 ```
 
-### ファンクションキー
+主要な分類と対象ごとの可否は[ファームウェア対応表](/reference/firmware-compatibility)にまとめています。画面のパレットは選択中の対象に対する正のカタログであり、非対応キーを含む「ALL」一覧ではありません。
 
-```text
-F1 F2 ... F24
-```
-
-### 基本キー
-
-```text
-ESC TAB CAPS ENT BSPC SPC
-```
-
-### 記号
-
-```text
-MINS EQL LBRC RBRC BSLS
-SCLN QUOT GRV COMM DOT SLSH NUHS NUBS
-```
-
-### JIS 固有キー
-
-```text
-YEN RO MHEN HENK KANA EISU
-```
-
-### ナビゲーション
-
-```text
-UP DOWN LEFT RIGHT
-INS DEL HOME END PGUP PGDN
-```
-
-### 編集 / アプリケーション
-
-```text
-EXEC HELP MENU SELECT STOP AGAIN
-UNDO CUT COPY PASTE FIND
-```
-
-### 修飾キー
-
-```text
-LCTL LSFT LALT LGUI
-RCTL RSFT RALT RGUI
-```
-
-### メディア / システム
-
-```text
-MPLY MSTP MNXT MPRV
-MFFD MRWD MSEL EJCT
-VOLU VOLD MUTE
-BRIU BRID
-MAIL CALC MYCM
-WSCH WHOM WBAK WFWD WSTP WREF WFAV
-PWR SLEEP WAKE
-BOOTLOADER SYSTEM_RESET
-```
-
-### 押下で実行する機能
-
-```text
-CAPS_WORD KEY_REPEAT GRAVE_ESCAPE
-STUDIO_UNLOCK OUTPUT_USB OUTPUT_BLUETOOTH
-```
-
-これらは独立した `UniversalAction` を増やさず、Bootloader / Reset と同様に `{ action: 'tap', keycode: '...' }` として扱います。
-
-| UniversalKey | QMK / VIA / Vial | ZMK | RMK | 備考 |
-| --- | --- | --- | --- | --- |
-| `BOOTLOADER` | 対応 | 対応 | 対応 | ZMK は `&bootloader` |
-| `SYSTEM_RESET` | 対応 | 対応 | 対応 | ZMK は `&sys_reset` |
-| `CAPS_WORD` | 対応 | 対応 | 対応 | QMK / Vial 出力では機能を自動で有効化 |
-| `KEY_REPEAT` | 対応 | 対応 | 対応 | RMK では同じHID用途の `Again` を使用 |
-| `GRAVE_ESCAPE` | 対応 | 対応 | 非対応 | RMK に同等の組み込みキーがないため |
-| `STUDIO_UNLOCK` | 非対応 | 対応 | 非対応 | ZMK Studio 固有のため |
-| `OUTPUT_USB` | 対応 | 対応 | 非対応 | RMK に同等の共通キーコードがないため |
-| `OUTPUT_BLUETOOTH` | 対応 | 対応 | 非対応 | RMK に同等の共通キーコードがないため |
-
-編集、メディア、ブラウザー、アプリケーションの各HIDキーは、同じ意味を保てる QMK / VIA / Vial / ZMK / RMK へ変換します。`PWR` / `SLEEP` / `WAKE` はRMKの公式キーコード一覧にないため、QMK / VIA / Vial / ZMKのみ対応します。
-
-### ライティング
-
-```text
-RGB_TOG RGB_MOD RGB_RMOD
-RGB_VAI RGB_VAD
-RGB_HUI RGB_HUD
-RGB_SAI RGB_SAD
-RGB_SPI RGB_SPD
-```
-
-### マウスキー
-
-```text
-MOUSE_UP MOUSE_DOWN MOUSE_LEFT MOUSE_RIGHT
-MOUSE_BTN1 MOUSE_BTN2 MOUSE_BTN3 MOUSE_BTN4 MOUSE_BTN5
-```
-
-### 特別なキー
-
-```text
-TRNS NO
-```
-
-`TRNS` は透過、`NO` は無操作を表すキーコードです。`UniversalAction` として扱う場合は、通常は `{ action: 'trans' }` または `{ action: 'none' }` を使います。
+`TRNS` と `NO` はキー名としても存在しますが、通常は `{ action: 'trans' }` と `{ action: 'none' }` を使用します。
 
 ## custom
 
-`custom` は、Smiðr の標準アクションでは表しきれない QMK / VIA / Vial / ZMK のコードを、そのまま保持するためのアクションです。
-
-たとえば、Smiðr がまだ `UniversalKey` として扱っていない QMK のキーコードや、ファームウェア固有の記法を入力したい場合に使います。`rawCode` に入力した値は、指定した `protocol` のコードとして出力または送信されます。
+標準モデルにないコードは `custom` で保持できます。
 
 ```ts
 {
@@ -242,4 +61,4 @@ TRNS NO
 }
 ```
 
-`protocol` には `qmk`、`via`、`vial`、`zmk` のいずれかを指定します。
+`protocol` は `qmk`、`via`、`vial`、`zmk`、`rmk` のいずれかです。Rawコードは他のプロトコルへ翻訳されません。VIA実機へ書き込むRawコードは `0x1234` のような16bit値を使用します。

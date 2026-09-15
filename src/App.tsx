@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown, Hammer, Braces, Home, Menu, PanelRight, Code2 } from 'lucide-react';
+import { LayoutGrid, Settings, CircuitBoard, Save, Download, Keyboard, X, FolderOpen, FileUp, FileDown, Trash2, Undo2, Redo2, Move, Wrench, SlidersHorizontal, SquarePen, Sun, Moon, Languages, Cpu, ChevronDown, Plus, MousePointer2, Sparkles, Loader2, Check, ScrollText, WandSparkles, Workflow, Hash, Lightbulb, ImageDown, Hammer, Braces, Home, Menu, PanelRight, Code2, BookOpen } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useTranslation } from '@/hooks/useTranslation';
 import { LANGUAGE_NAMES } from '@/lib/i18n';
@@ -1231,6 +1231,17 @@ export default function App() {
 
 
           <div className="flex items-center gap-2">
+            <a
+              href="https://hringdrifi.github.io/smidr/docs/"
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 text-[var(--text-muted)] transition-all hover:border-[var(--border-main)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)]"
+              title={t('header.documentation')}
+              aria-label={t('header.documentation')}
+            >
+              <BookOpen size={14} />
+              <span className="hidden text-[10px] font-bold uppercase tracking-wider 2xl:inline">Docs</span>
+            </a>
             {/* Language Switcher */}
             <div className="relative">
               <button

@@ -15,6 +15,7 @@ export default {
     siteTitle: 'Smiðr Docs',
     nav: [
       { text: 'Guide', link: '/' },
+      { text: '対応表', link: '/reference/firmware-compatibility' },
       { text: 'Smiðr', link: 'https://hringdrifi.github.io/smidr/' },
       { text: 'GitHub', link: 'https://github.com/hringdrifi/smidr' },
     ],
@@ -32,11 +33,11 @@ export default {
       {
         text: '設計',
         items: [
-          { text: '設計モード', link: '/design/' },
+          { text: '設計ワークフロー', link: '/design/' },
+          { text: 'ハードウェア設定', link: '/design/hardware' },
           { text: 'レイアウト編集', link: '/design/layout' },
           { text: 'マトリクス編集', link: '/design/matrix' },
           { text: 'キーマップ編集', link: '/design/keymap' },
-          { text: 'ハードウェア設定', link: '/design/hardware' },
         ],
       },
       {
@@ -46,6 +47,7 @@ export default {
       {
         text: 'リファレンス',
         items: [
+          { text: 'ファームウェア対応表', link: '/reference/firmware-compatibility' },
           { text: 'ショートカット', link: '/reference/shortcuts' },
           { text: 'アクション / キーコード', link: '/reference/actions' },
           { text: '用語集', link: '/reference/glossary' },
