@@ -24,7 +24,7 @@ Smiðrでは、プロジェクトの保存、外部レイアウトの読み込�
 
 ZMKでは標準出力とZMK Studio対応出力を選べます。Studio対応出力にはphysical layoutとStudio用ビルド設定が含まれ、キーマップ内には操作可能なStudio Unlockキーが必要です。
 
-出力されるアクションとキーの差は[ファームウェア対応表](/reference/firmware-compatibility)を参照してください。
+出力されるアクションとキーの差は[アクション / キーコード・ファームウェア対応表](/reference/actions)を参照してください。
 
 ## KiCadデータ
 

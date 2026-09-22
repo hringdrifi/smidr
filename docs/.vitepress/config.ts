@@ -15,7 +15,7 @@ export default {
     siteTitle: 'Smiðr Docs',
     nav: [
       { text: 'Guide', link: '/' },
-      { text: '対応表', link: '/reference/firmware-compatibility' },
+      { text: '対応表', link: '/reference/actions' },
       { text: 'Smiðr', link: 'https://hringdrifi.github.io/smidr/' },
       { text: 'GitHub', link: 'https://github.com/hringdrifi/smidr' },
     ],
@@ -44,8 +44,7 @@ export default {
         items: [
           { text: 'ファームウェア設計ワークフロー', link: '/design/firmware' },
           { text: 'キーマップ編集', link: '/design/keymap' },
-          { text: 'ファームウェア対応表', link: '/reference/firmware-compatibility' },
-          { text: 'アクション / キーコード', link: '/reference/actions' },
+          { text: 'アクション / キーコード・対応表', link: '/reference/actions' },
         ],
       },
       {
