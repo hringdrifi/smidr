@@ -593,8 +593,10 @@ const removeLayerFromRemoteKeymap = (
 /**
  * Consistency Middleware
  */
-const withConsistency = (config: any): any => (set: any, get: any, api: any) => config(
-  (args: any) => {
+const withConsistency = (config: any): any => (set: any, get: any, api: any) => {
+  // The allocator stays outside temporal state so branches never reuse revisions.
+  let nextHistoryId = 0;
+  const consistentSet = (args: any, replace?: boolean) => {
     const currentState = get();
     const nextUpdate = typeof args === 'function' ? (args as any)(currentState) : args;
     const nextState = { ...currentState, ...nextUpdate };
@@ -624,11 +626,26 @@ const withConsistency = (config: any): any => (set: any, get: any, api: any) => 
       }
     }
 
-    set(nextUpdate);
-  },
-  get,
-  api
-);
+    if (nextUpdate.historyId === undefined) {
+      const settingsChanged = nextUpdate.settings !== undefined
+        && nextUpdate.settings !== currentState.settings
+        && JSON.stringify(nextUpdate.settings) !== JSON.stringify(currentState.settings);
+      const keysChanged = nextUpdate.keys !== undefined
+        && nextUpdate.keys !== currentState.keys
+        && JSON.stringify(nextUpdate.keys) !== JSON.stringify(currentState.keys);
+      if (settingsChanged || keysChanged) {
+        nextUpdate.historyId = ++nextHistoryId;
+      }
+    } else {
+      // Undo/Redo restores a revision without rewinding the allocator.
+      nextHistoryId = Math.max(nextHistoryId, nextUpdate.historyId);
+    }
+
+    set(nextUpdate, replace);
+  };
+  api.setState = consistentSet;
+  return config(consistentSet, get, api);
+};
 
 export const useKeyboardStore = create<KeyboardState>()(
   withConsistency(
@@ -2929,7 +2946,7 @@ export const useKeyboardStore = create<KeyboardState>()(
             historyId: state.historyId,
           };
         },
-        equality: (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b),
+        equality: (a: any, b: any) => a.historyId === b.historyId,
         limit: 50,
       }
 

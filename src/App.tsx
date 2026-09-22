@@ -364,13 +364,13 @@ export default function App() {
   const [isInspectorOpen, setIsInspectorOpen] = React.useState(false);
   const [newProjectPreset, setNewProjectPreset] = React.useState('Blank Layout');
 
-  const [lastSavedHistoryLength, setLastSavedHistoryLength] = React.useState(0);
+  const [savedRevision, setSavedRevision] = React.useState(storeState.historyId);
   const [currentSavedUpdatedAt, setCurrentSavedUpdatedAt] = React.useState<number | null>(null);
   const [restoredDraftDirty, setRestoredDraftDirty] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [showSavedFeedback, setShowSavedFeedback] = React.useState(false);
   const [saveError, setSaveError] = React.useState(false);
-  const isDirty = restoredDraftDirty || pastStates.length !== lastSavedHistoryLength;
+  const isDirty = restoredDraftDirty || storeState.historyId !== savedRevision;
   const [isRestoring, setIsRestoring] = React.useState(false);
   const remapFileInputRef = React.useRef<HTMLInputElement>(null);
   const keyboardFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -451,7 +451,7 @@ export default function App() {
     setIsHomeVisible(false);
     setProjectWorkspace('hardware');
     setNewProjectPreset('Blank Layout');
-    setLastSavedHistoryLength(0);
+    setSavedRevision(useKeyboardStore.getState().historyId);
     setCurrentSavedUpdatedAt(null);
     setRestoredDraftDirty(false);
   };
@@ -463,11 +463,6 @@ export default function App() {
     }
     refreshProjectList();
   }, [storeState.isDemoMode, storeState.isProjectOpen]);
-
-  // Update lastSavedHistoryLength when project changes
-  React.useEffect(() => {
-    setLastSavedHistoryLength(pastStates.length);
-  }, [currentProjectId]);
 
   const handleSaveProject = async () => {
     setIsSaving(true);
@@ -488,7 +483,7 @@ export default function App() {
         refreshProjectList();
       }
       setSaveError(false);
-      setLastSavedHistoryLength(pastStates.length);
+      setSavedRevision(useKeyboardStore.getState().historyId);
       setShowSavedFeedback(true);
       setTimeout(() => setShowSavedFeedback(false), 1600);
     } catch (error) {
@@ -577,6 +572,7 @@ export default function App() {
     }
     storeState.setAppMode('design');
     loadProject(projectToLoad);
+    setSavedRevision(useKeyboardStore.getState().historyId);
     setCurrentSavedUpdatedAt(project.updatedAt);
     setRestoredDraftDirty(restoredDraft);
     setIsHomeVisible(false);
@@ -791,6 +787,7 @@ export default function App() {
     };
     const savedProject = storeState.isDemoMode ? project : saveProject(project);
     loadProject(savedProject, true);
+    setSavedRevision(useKeyboardStore.getState().historyId);
     setCurrentSavedUpdatedAt(savedProject.updatedAt);
     setRestoredDraftDirty(false);
     refreshProjectList();
@@ -1056,6 +1053,7 @@ export default function App() {
       } else {
         const savedProject = storeState.isDemoMode ? json : saveProject(json);
         loadProject(savedProject);
+        setSavedRevision(useKeyboardStore.getState().historyId);
         setCurrentSavedUpdatedAt(savedProject.updatedAt);
         setRestoredDraftDirty(false);
         setIsHomeVisible(false);

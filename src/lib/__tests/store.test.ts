@@ -33,6 +33,81 @@ const createMemoryStorage = (): Storage => {
   };
 };
 
+describe('save revisions', () => {
+  const temporal = () => (useKeyboardStore as any).temporal.getState();
+
+  beforeEach(() => {
+    useKeyboardStore.getState().resetProject(false);
+    useKeyboardStore.setState({ previewKeys: null, appMode: 'design' });
+    temporal().clear();
+  });
+
+  it('detects edits after saving at the history limit', () => {
+    for (let index = 0; index < 55; index++) {
+      useKeyboardStore.getState().updateSettings({ name: `Edit ${index}` });
+    }
+    const savedRevision = useKeyboardStore.getState().historyId;
+    expect(temporal().pastStates).toHaveLength(50);
+    useKeyboardStore.getState().updateSettings({ name: 'Unsaved' });
+    expect(temporal().pastStates).toHaveLength(50);
+    expect(useKeyboardStore.getState().historyId).not.toBe(savedRevision);
+    useKeyboardStore.getState().undo();
+    expect(useKeyboardStore.getState().historyId).toBe(savedRevision);
+    expect(useKeyboardStore.getState().settings.name).toBe('Edit 54');
+    useKeyboardStore.getState().redo();
+    expect(useKeyboardStore.getState().historyId).not.toBe(savedRevision);
+    expect(useKeyboardStore.getState().settings.name).toBe('Unsaved');
+  });
+
+  it('does not reuse the saved revision after undo and a branched edit', () => {
+    useKeyboardStore.getState().updateSettings({ name: 'Saved' });
+    const savedRevision = useKeyboardStore.getState().historyId;
+    const savedLength = temporal().pastStates.length;
+    useKeyboardStore.getState().undo();
+    useKeyboardStore.getState().updateSettings({ name: 'Branch' });
+    expect(temporal().pastStates).toHaveLength(savedLength);
+    expect(useKeyboardStore.getState().historyId).toBeGreaterThan(savedRevision);
+    expect(temporal().futureStates).toHaveLength(0);
+  });
+
+  it('only creates a revision when a preview is committed', () => {
+    useKeyboardStore.getState().addKeys([{ x: 0, y: 0, w: 1, h: 1 }]);
+    temporal().clear();
+    const savedRevision = useKeyboardStore.getState().historyId;
+    const keys = useKeyboardStore.getState().keys;
+    for (let x = 1; x <= 3; x++) {
+      useKeyboardStore.getState().setPreviewKeys(keys.map(key => ({ ...key, x })));
+      expect(useKeyboardStore.getState().historyId).toBe(savedRevision);
+    }
+    expect(temporal().pastStates).toHaveLength(0);
+    useKeyboardStore.getState().commitPreviewKeys();
+    expect(temporal().pastStates).toHaveLength(1);
+    expect(useKeyboardStore.getState().historyId).toBeGreaterThan(savedRevision);
+    useKeyboardStore.getState().undo();
+    expect(useKeyboardStore.getState().historyId).toBe(savedRevision);
+    expect(useKeyboardStore.getState().keys[0].x).toBe(0);
+  });
+
+  it('ignores UI, cancelled previews, and equal data updates', () => {
+    const savedRevision = useKeyboardStore.getState().historyId;
+    useKeyboardStore.getState().setTransform({ x: 10, y: 20, scale: 2 });
+    useKeyboardStore.getState().setPreviewKeys([]);
+    useKeyboardStore.getState().setPreviewKeys(null);
+    useKeyboardStore.getState().commitPreviewKeys();
+    useKeyboardStore.getState().updateSettings({ name: useKeyboardStore.getState().settings.name });
+    expect(useKeyboardStore.getState().historyId).toBe(savedRevision);
+    expect(temporal().pastStates).toHaveLength(0);
+  });
+
+  it('tracks direct store updates as well as actions', () => {
+    const savedRevision = useKeyboardStore.getState().historyId;
+    useKeyboardStore.setState(state => ({ settings: { ...state.settings, name: 'Direct edit' } }));
+    expect(useKeyboardStore.getState().historyId).toBeGreaterThan(savedRevision);
+    useKeyboardStore.getState().undo();
+    expect(useKeyboardStore.getState().historyId).toBe(savedRevision);
+  });
+});
+
 describe('useKeyboardStore', () => {
   beforeEach(() => {
     // Reset store state to initial/known isolated values
