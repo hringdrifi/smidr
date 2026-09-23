@@ -2,6 +2,7 @@ import { AlertTriangle, Check, ChevronRight, Code2, Download, ShieldCheck } from
 import { useTranslation } from '@/hooks/useTranslation';
 import { FirmwareTarget, ProjectSettings } from '@/types/keyboard';
 import { FIRMWARE_TARGETS, getFirmwareTargetLabel, isFirmwareTargetSupported } from '@/lib/firmware-targets';
+import { RmkExportFormat } from '@/lib/rmk-hardware';
 
 const targetDescriptionKey = (target: FirmwareTarget) => `firmwareFlow.${target}Description`;
 
@@ -86,11 +87,15 @@ export const FirmwareBuildPanel = ({
   supported,
   onBuild,
   onChangeTarget,
+  rmkFormat = 'toml',
+  onRmkFormatChange,
 }: {
   target: FirmwareTarget;
   supported: boolean;
   onBuild: () => void;
   onChangeTarget: () => void;
+  rmkFormat?: RmkExportFormat;
+  onRmkFormatChange?: (format: RmkExportFormat) => void;
 }) => {
   const { t } = useTranslation();
   const label = getFirmwareTargetLabel(target);
@@ -116,6 +121,18 @@ export const FirmwareBuildPanel = ({
         </div>
       </div>
 
+      {target === 'rmk' && (
+        <label className="block space-y-2 text-sm text-[var(--text-main)]">
+          <span>{t('firmwareFlow.rmkFormat')}</span>
+          <select aria-label={t('firmwareFlow.rmkFormat')} value={rmkFormat}
+            onChange={event => onRmkFormatChange?.(event.target.value as RmkExportFormat)}
+            className="min-h-10 w-full rounded-lg border border-[var(--border-main)] bg-[var(--bg-app)] px-3">
+            <option value="toml">TOML · RMK 0.9</option>
+            <option value="rust">Rust API · RMK 0.9</option>
+          </select>
+          <span className="block text-xs text-[var(--text-muted)]">{t('firmwareFlow.rmkFormatHelp')}</span>
+        </label>
+      )}
       <button
         type="button"
         disabled={!supported}

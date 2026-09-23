@@ -2,6 +2,7 @@ import { getSplitCommunication, getActiveSplitPins } from './split-communication
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { getDevelopmentBoardPins, getMcuPins, getZmkHardwareTarget } from './mcu-presets';
 import { getFirmwareMatrixPosition, getQmkMatrixFromPins, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
+import { getRmkChip, getRmkHardwareErrors, getRmkTrackballs, RmkExportFormat } from './rmk-hardware';
 
 export type FirmwareExportTarget = 'qmk' | 'vial' | 'zmk' | 'rmk';
 export type ExportValidationSeverity = 'error' | 'warning';
@@ -99,7 +100,8 @@ const shouldValidateSwitchInput = (settings: ProjectSettings, key: PhysicalKey, 
 export const validateFirmwareExport = (
   settings: ProjectSettings,
   keys: PhysicalKey[],
-  target: FirmwareExportTarget
+  target: FirmwareExportTarget,
+  options: { rmkFormat?: RmkExportFormat } = {},
 ) => {
   const issues: ExportValidationIssue[] = [];
   const label = targetLabel(target);
@@ -207,12 +209,16 @@ export const validateFirmwareExport = (
   }
 
   if (target === 'rmk') {
+    for (const message of getRmkHardwareErrors(settings, keys, options.rmkFormat ?? 'toml'))
+      issues.push({ severity: 'error', code: 'rmk-hardware-invalid', message });
+    pushInvalidPins(issues, settings, getRmkTrackballs(settings, keys).flatMap(ball =>
+      ['sclk', 'sdio', 'cs', 'motion'].map(name => ({ label: `Trackball ${ball.index} ${name}`, value: ball[name as 'sclk' | 'sdio' | 'cs' | 'motion'] }))));
     const overlappingPins = directPins ? [] : getOverlappingMatrixPins(settings);
     if (overlappingPins.length > 0) {
       issues.push({
-        severity: 'warning',
+        severity: 'error',
         code: 'rmk-bidirectional-matrix-not-represented',
-        message: 'RMK TOML export cannot represent bidirectional matrix yet. Use Rust API or change wiring.',
+        message: 'RMK source export does not support shared row/column pins. Change wiring or implement a bidirectional matrix manually.',
       });
     }
     if (settings.features.split) {
@@ -222,7 +228,7 @@ export const validateFirmwareExport = (
         if ((communication.transport === 'wired' && chip !== 'rp2040') || (communication.transport === 'wireless' && chip !== 'nrf52840' && chip !== 'nrf52832'))
           issues.push({ severity: 'error', code: 'rmk-split-target-unsupported', message: 'RMK split config export supports RP2040 for wired UART and nRF52 for wireless communication.' });
       }
-      issues.push({
+      if (!['rp2040', 'nrf52840'].includes(getRmkChip(settings))) issues.push({
         severity: 'warning',
         code: 'rmk-split-export-experimental',
         message: 'RMK split config export requires firmware entry points and matching chip/split Cargo features for both halves before building.',

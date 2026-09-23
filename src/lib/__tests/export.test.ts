@@ -4026,10 +4026,10 @@ describe('export generation', () => {
     expect(toml).toContain('col_pins = ["PIN_2", "PIN_3"]');
     expect(toml).not.toContain('matrix_map');
     expect(toml).not.toContain('[[layer]]');
-    expect(toml).toContain('keymap = [');
-    expect(toml).toContain('["A", "LT(1, Space)"]');
-    expect(toml).toContain('["MT(Escape, LCtrl)", "WM(B, LShift)"]');
-    expect(toml).toContain('["MO(0)", "_"]');
+    expect(toml).toContain('[keymap]\nlayers = 2');
+    expect(toml).toContain('map = "(0,0) (0,1) (1,0) (1,1)"');
+    expect(toml).toContain('keys = "A LT(1, Space) MT(Escape, LCtrl) WM(B, LShift)"');
+    expect(toml).toContain('keys = "MO(0) _ _ _"');
     expect(JSON.parse(vialJson).name).toBe('RMK Board');
   });
 
@@ -4086,11 +4086,11 @@ describe('export generation', () => {
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
     const toml = await zip.file('keyboard.toml')!.async('string');
 
-    expect(toml).toContain('["A", "F14"]');
+    expect(toml).toContain('keys = "A F14"');
     expect(toml).not.toContain('F13');
   });
 
-  it('warns that RMK TOML export cannot represent bidirectional matrix pin overlap', () => {
+  it('blocks RMK export for shared matrix pins', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       matrix: { rows: 2, cols: 2 },
@@ -4108,9 +4108,9 @@ describe('export generation', () => {
     const issues = validateFirmwareExport(settings, keys, 'rmk');
 
     expect(issues).toContainEqual(expect.objectContaining({
-      severity: 'warning',
+      severity: 'error',
       code: 'rmk-bidirectional-matrix-not-represented',
-      message: 'RMK TOML export cannot represent bidirectional matrix yet. Use Rust API or change wiring.',
+      message: 'RMK source export does not support shared row/column pins. Change wiring or implement a bidirectional matrix manually.',
     }));
   });
 

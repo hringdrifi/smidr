@@ -34,6 +34,7 @@ import { twMerge } from 'tailwind-merge';
 import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson, generateKleJson } from '@/lib/export';
 import { generateQmkZip } from '@/lib/qmk';
 import { generateRmkZip } from '@/lib/rmk';
+import { getRmkChip, RmkExportFormat } from '@/lib/rmk-hardware';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
 import {
@@ -344,6 +345,7 @@ export default function App() {
   const { t, language, setLanguage } = useTranslation();
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
+  const [rmkExportFormat, setRmkExportFormat] = React.useState<RmkExportFormat>('toml');
   const [isHardwareSettingsDialogOpen, setIsHardwareSettingsDialogOpen] = React.useState(false);
   const [isFirmwareSettingsDialogOpen, setIsFirmwareSettingsDialogOpen] = React.useState(false);
   const [isFirmwareDetailDialogOpen, setIsFirmwareDetailDialogOpen] = React.useState(false);
@@ -804,7 +806,7 @@ export default function App() {
   };
 
   const confirmFirmwareExportValidation = (target: FirmwareExportTarget) => {
-    const issues = validateFirmwareExport(settings, keys, target);
+    const issues = validateFirmwareExport(settings, keys, target, { rmkFormat: rmkExportFormat });
     if (issues.length === 0) return true;
 
     const message = formatExportValidationIssues(target, issues);
@@ -851,9 +853,12 @@ export default function App() {
 
   const handleExportRmkZip = async () => {
     if (!confirmFirmwareExportValidation('rmk')) return;
-    const zipBlob = await generateRmkZip({ settings, keys });
-    if (zipBlob) {
-      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_rmk.zip`, zipBlob);
+    try {
+      const zipBlob = await generateRmkZip({ settings, keys }, { format: rmkExportFormat });
+      downloadBlob(`${settings.name.replace(/\s+/g, '_').toLowerCase() || 'keyboard'}_rmk_${rmkExportFormat}.zip`, zipBlob);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+      return;
     }
     setIsProjectMenuOpen(false);
     setIsExportMenuOpen(false);
@@ -1692,8 +1697,10 @@ export default function App() {
                     {activeRightPanel === 'build' && projectWorkspace === 'firmware' && selectedFirmwareTarget && (
                       <FirmwareBuildPanel
                         target={selectedFirmwareTarget}
-                        supported={selectedFirmwareSupported}
+                        supported={selectedFirmwareSupported && (selectedFirmwareTarget !== 'rmk' || rmkExportFormat !== 'rust' || ['rp2040', 'nrf52840'].includes(getRmkChip(settings)))}
                         onBuild={handleBuildSelectedFirmware}
+                        rmkFormat={rmkExportFormat}
+                        onRmkFormatChange={setRmkExportFormat}
                         onChangeTarget={openFirmwareTargetDialog}
                       />
                     )}

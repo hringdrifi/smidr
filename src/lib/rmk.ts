@@ -3,9 +3,12 @@ import JSZip from 'jszip';
 import { UniversalAction, UniversalKey, Modifier } from '@/types/actions';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
 import { generateViaJson } from './export';
-import { getDefaultDevelopmentBoard, getZmkHardwareTarget } from './mcu-presets';
-import { getDirectMatrixSide, getDirectSideDimensions, getQmkMatrixFromPins, getDirectLocalMatrixPosition, getFirmwareMatrixPosition, getMatrixDimensionsFromPositions, getMatrixFromPins, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
+import { getDefaultDevelopmentBoard } from './mcu-presets';
+import { getDirectMatrixSide, getDirectSideDimensions, getQmkMatrixFromPins, getDirectLocalMatrixPosition, getFirmwareMatrixPosition, isDirectPinMatrix, resolveDirectPin } from './matrix-utils';
 import { sortKeys } from './sorting';
+import { getRmkChip, normalizeRmkPin, getRmkTrackballs, getRmkHardwareErrors, RmkExportFormat } from './rmk-hardware';
+import { addRmkProjectFiles } from './rmk-project';
+import { generateRustKeymap, generateRustMain } from './rmk-rust';
 
 const sanitizeIdentifier = (value: string, fallback: string) => {
   const cleaned = value
@@ -20,27 +23,7 @@ const quoteToml = (value: string) => JSON.stringify(value);
 
 const formatHex16 = (value: number) => `0x${(value & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')}`;
 
-const normalizeRmkPin = (pin: string | undefined, fallback: string) => {
-  const raw = pin?.trim();
-  if (!raw) return fallback;
-  const rp = raw.match(/^(?:GP|GPIO)(\d+)$/i);
-  if (rp) return `PIN_${Number(rp[1])}`;
-  const nrf = raw.match(/^P([01])\.(\d{1,2})$/i);
-  if (nrf) return `P${nrf[1]}_${nrf[2].padStart(2, '0')}`;
-  return raw;
-};
-
-const tomlStringArray = (values: string[]) => `[${values.map(value => quoteToml(normalizeRmkPin(value, '_'))).join(', ')}]`;
-
-const getRmkChip = (settings: ProjectSettings) => {
-  const target = getZmkHardwareTarget(settings.hardware);
-  if (target) return target;
-  const mcu = String(settings.hardware.mcu || '').toLowerCase();
-  if (mcu.includes('nrf52840')) return 'nrf52840';
-  if (mcu.includes('stm32f4')) return 'stm32f4';
-  if (mcu.includes('stm32f1')) return 'stm32f1';
-  return mcu || 'rp2040';
-};
+const tomlStringArray = (values: string[]) => '[' + values.map(value => quoteToml(normalizeRmkPin(value))).join(', ') + ']';
 
 const RMK_KEY_NAMES: Partial<Record<UniversalKey, string>> = {
   A: 'A', B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'H', I: 'I', J: 'J', K: 'K', L: 'L', M: 'M',
@@ -66,7 +49,7 @@ const RMK_KEY_NAMES: Partial<Record<UniversalKey, string>> = {
   WBAK: 'WwwBack', WFWD: 'WwwForward', WSTP: 'WwwStop', WREF: 'WwwRefresh', WFAV: 'WwwFavorites',
   MOUSE_UP: 'MouseUp', MOUSE_DOWN: 'MouseDown', MOUSE_LEFT: 'MouseLeft', MOUSE_RIGHT: 'MouseRight',
   MOUSE_BTN1: 'MouseBtn1', MOUSE_BTN2: 'MouseBtn2', MOUSE_BTN3: 'MouseBtn3', MOUSE_BTN4: 'MouseBtn4', MOUSE_BTN5: 'MouseBtn5',
-  BOOTLOADER: 'Bootloader', SYSTEM_RESET: 'SystemReset', CAPS_WORD: 'CapsWordToggle', KEY_REPEAT: 'Again', TRNS: '_', NO: 'No',
+  BOOTLOADER: 'Bootloader', SYSTEM_RESET: 'Reboot', CAPS_WORD: 'CapsWordToggle', KEY_REPEAT: 'Again', TRNS: '_', NO: 'No',
 };
 
 const rmkMod = (mod: Modifier) => RMK_KEY_NAMES[mod] || mod;
@@ -103,12 +86,11 @@ export const actionToRmkString = (action: UniversalAction): string => {
 
 const getRmkMatrixDimensions = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   if (isDirectPinMatrix(settings)) {
-    const positions = keys
-      .map(key => getFirmwareMatrixPosition(settings, key, keys))
-      .filter((pos): pos is { row: number; col: number } => !!pos);
-    return getMatrixDimensionsFromPositions(positions, settings.matrix);
+    const left = getDirectSideDimensions(settings, keys, 'left');
+    const right = settings.features.split ? getDirectSideDimensions(settings, keys, 'right') : { rows: 0, cols: 0 };
+    return { rows: left.rows + right.rows, cols: Math.max(left.cols, right.cols) };
   }
-  return (settings.hardware.splitCommunication ? getQmkMatrixFromPins(settings.pins, settings.features.split) : getMatrixFromPins(settings.pins, settings.features.split)) || settings.matrix;
+  return getQmkMatrixFromPins(settings.pins, settings.features.split) || settings.matrix;
 };
 
 const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
@@ -116,6 +98,10 @@ const getVisibleKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => (
 );
 
 const getValidMatrixKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+  keys = keys.filter(key => !key.decal && (
+    key.kind !== 'trackball' && key.kind !== 'encoder' && !key.trackballId && key.trackballIndex === undefined && !key.encoderId && key.encoderIndex === undefined
+    || (isDirectPinMatrix(settings) ? !!key.directPin || key.directIndex !== undefined : key.row !== undefined && key.col !== undefined)
+  ));
   const matrix = getRmkMatrixDimensions(settings, keys);
   return keys.filter((key, idx) => {
     if (!isDirectPinMatrix(settings) && (key.row === undefined || key.col === undefined)) return false;
@@ -140,29 +126,6 @@ const generateDirectPins = (settings: ProjectSettings, keys: PhysicalKey[], matr
   return direct.map(row => `    [${row.map(quoteToml).join(', ')}]`).join(',\n');
 };
 
-const generateKeymapToml = (settings: ProjectSettings, keys: PhysicalKey[], matrix: ProjectSettings['matrix'], layers: number) => {
-  const layerMaps = Array.from({ length: layers }, () =>
-    Array.from({ length: matrix.rows }, () =>
-      Array.from({ length: matrix.cols }, () => '_')
-    )
-  );
-
-  keys.forEach(key => {
-    const pos = getFirmwareMatrixPosition(settings, key, keys);
-    if (!pos || pos.row < 0 || pos.col < 0 || pos.row >= matrix.rows || pos.col >= matrix.cols) return;
-    for (let layer = 0; layer < layers; layer += 1) {
-      layerMaps[layer][pos.row][pos.col] = actionToRmkString(key.keymap?.[layer] || { action: 'trans' });
-    }
-  });
-
-  const layersToml = layerMaps.map(layer => {
-    const rows = layer.map(row => `        [${row.map(quoteToml).join(', ')}]`);
-    return `    [\n${rows.join(',\n')}\n    ]`;
-  });
-
-  return `[\n${layersToml.join(',\n')}\n]`;
-};
-
 const getUnlockKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   const first = keys[0];
   const last = keys[keys.length - 1] || first;
@@ -180,7 +143,19 @@ const getUnlockKeys = (settings: ProjectSettings, keys: PhysicalKey[]) => {
   ];
 };
 
-const generateSplitToml = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+const generateTrackballToml = (settings: ProjectSettings, keys: PhysicalKey[], side?: 'left' | 'right') =>
+  getRmkTrackballs(settings, keys).filter(trackball => !side || trackball.side === side).map(trackball => `
+[[${side ? `split.${side === 'left' ? 'central' : 'peripheral'}.` : ''}input_device.pmw3610]]
+name = "trackball${trackball.index}"
+id = ${trackball.index}
+spi = { instance = "bitbang${trackball.index}", sck = ${quoteToml(normalizeRmkPin(trackball.sclk))}, mosi = ${quoteToml(normalizeRmkPin(trackball.sdio))}, miso = ${quoteToml(normalizeRmkPin(trackball.sdio))}, cs = ${quoteToml(normalizeRmkPin(trackball.cs))} }
+${trackball.motion?.trim() ? `motion = ${quoteToml(normalizeRmkPin(trackball.motion))}\n` : ''}cpi = ${trackball.cpi ?? 1200}
+invert_x = ${!!trackball.invertX}
+invert_y = ${!!trackball.invertY}
+swap_xy = ${!!trackball.swapXy}
+`).join('\n');
+
+const generateSplitToml = (settings: ProjectSettings, keys: PhysicalKey[], allKeys: PhysicalKey[]) => {
   const { transport, duplex } = getSplitCommunication(settings);
   const chip = getRmkChip(settings);
   if (transport === 'wired' && chip !== 'rp2040')
@@ -208,12 +183,13 @@ ${transport === 'wired' ? 'serial = [{ instance = "PIO0", tx_pin = ' + quoteToml
 
 [split.${name}.matrix]
 ${direct ? 'matrix_type = "direct_pin"\ndirect_pins = [\n' + generateDirectPins(settings, sideKeys, dimensions) + '\n]\ndirect_pin_low_active = true' : 'matrix_type = "normal"\nrow_pins = ' + tomlStringArray(rows) + '\ncol_pins = ' + tomlStringArray(cols) + (settings.hardware.diodeDirection === 'ROW2COL' ? '\nrow2col = true' : '')}
+${generateTrackballToml(settings, allKeys, side)}
 `;
   };
   return '[split]\nconnection = ' + quoteToml(transport === 'wired' ? 'serial' : 'ble') + '\n\n' + section('left') + '\n' + section('right');
 };
 
-const generateKeyboardToml = (settings: ProjectSettings, keys: PhysicalKey[]) => {
+const generateKeyboardToml = (settings: ProjectSettings, keys: PhysicalKey[], allKeys: PhysicalKey[]) => {
   const matrix = getRmkMatrixDimensions(settings, keys);
   const layers = settings.layers || 4;
   const useDirectPins = isDirectPinMatrix(settings);
@@ -227,15 +203,14 @@ product_name = ${quoteToml(settings.name || 'Smidr Keyboard')}
 manufacturer = ${quoteToml(settings.manufacturer || 'Smidr User')}
 vendor_id = ${formatHex16(vid)}
 product_id = ${formatHex16(pid)}
-serial_number = "vial:f64c2b3c:000001"
 chip = ${quoteToml(getRmkChip(settings))}
-usb_enable = true
+usb_enable = ${getRmkChip(settings) !== 'nrf52832'}
 
 [host]
 vial_enabled = true
 unlock_keys = [[${unlockKeys[0].join(', ')}], [${unlockKeys[1].join(', ')}]]
 
-${settings.features.split && settings.hardware.splitCommunication ? generateSplitToml(settings, keys) : `[matrix]
+${settings.features.split ? generateSplitToml(settings, keys, allKeys) : `[matrix]
 ${useDirectPins ? `matrix_type = "direct_pin"
 direct_pins = [
 ${generateDirectPins(settings, keys)}
@@ -247,59 +222,45 @@ ${settings.hardware.diodeDirection === 'ROW2COL' ? 'row2col = true' : ''}`}`}
 [layout]
 rows = ${matrix.rows}
 cols = ${matrix.cols}
+map = ${quoteToml(keys.map(key => { const pos = getFirmwareMatrixPosition(settings, key, keys)!; return '(' + pos.row + ',' + pos.col + ')'; }).join(' '))}
+
+[keymap]
 layers = ${layers}
-keymap = ${generateKeymapToml(settings, keys, matrix, layers)}
+${Array.from({ length: layers }, (_, layer) => '\n[[keymap.layer]]\nkeys = ' + quoteToml(keys.map(key => actionToRmkString(key.keymap?.[layer] || { action: 'trans' })).join(' '))).join('\n')}
+${settings.features.split ? '' : generateTrackballToml(settings, allKeys)}
+${getRmkChip(settings) === 'nrf52840' ? '\n[storage]\nstart_addr = 917504\nnum_sectors = 8\n' : ''}
 `;
 };
 
-const generateReadme = (settings: ProjectSettings) => `# RMK firmware for ${settings.name}
-
-This source bundle was generated by Smidr.
-
-## Files
-- \`keyboard.toml\`: RMK keyboard, matrix, layout, and default keymap configuration.
-- \`vial.json\`: Vial layout definition generated from the same Smidr layout.
-- \`Cargo.toml\`: Minimal dependency manifest using RMK default features.
-
-## Notes
-- RMK expects \`keyboard.toml\` and \`vial.json\` to describe the same key order.
-- GPIO names are normalized for common RP2040 and nRF52 formats. Verify the pin names against the RMK/Embassy target before flashing.
-- Split configuration includes central/peripheral matrices and communication pins when configured in hardware settings. Separate firmware entry points and chip/split Cargo features still need to be supplied for each half.
-- Encoder, RGB Matrix, combo, and project macro definitions may require RMK-specific follow-up code beyond this initial config export.
-`;
-
-const generateCargoToml = (name: string) => `[package]
-name = ${quoteToml(name)}
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-rmk = "0.8"
-`;
-
-export const generateRmkZip = async (state: { settings: ProjectSettings; keys: PhysicalKey[] }) => {
+export const generateRmkZip = async (
+  state: { settings: ProjectSettings; keys: PhysicalKey[] },
+  options: { format?: RmkExportFormat } = {},
+) => {
   const { settings, keys } = state;
+  const format = options.format ?? 'toml';
+  const errors = getRmkHardwareErrors(settings, keys, format);
+  if (errors.length) throw new Error(errors.join('\n'));
   const visibleKeys = getVisibleKeys(settings, keys);
   const validKeys = getValidMatrixKeys(settings, visibleKeys);
-  if (validKeys.length === 0) {
-    throw new Error('Cannot export RMK firmware: no keys have valid matrix row/col assignments.');
-  }
-
+  if (!validKeys.length) throw new Error('Cannot export RMK firmware: no keys have valid matrix row/col assignments.');
   const sortedKeys = sortKeys(validKeys, 0.25);
   const zip = new JSZip();
   const projectName = sanitizeIdentifier(settings.name, 'smidr_keyboard');
-  zip.file('keyboard.toml', generateKeyboardToml(settings, sortedKeys));
+  zip.file('keyboard.toml', generateKeyboardToml(settings, sortedKeys, keys));
   zip.file('vial.json', JSON.stringify(generateViaJson({ settings, keys }), null, 2));
-  zip.file('Cargo.toml', generateCargoToml(projectName));
-  zip.file('README.md', generateReadme(settings));
+  addRmkProjectFiles(zip, settings, projectName, format);
+  if (format === 'rust') {
+    zip.file('src/keymap.rs', generateRustKeymap(settings, sortedKeys, getRmkMatrixDimensions(settings, sortedKeys),
+      (key, layer) => actionToRmkString(key.keymap?.[layer] || { action: 'trans' })));
+    const unlock = getUnlockKeys(settings, sortedKeys);
+    zip.file(settings.features.split ? 'src/central.rs' : 'src/main.rs', generateRustMain(settings, sortedKeys, keys, unlock));
+    if (settings.features.split) zip.file('src/peripheral.rs', generateRustMain(settings, sortedKeys, keys, unlock, 'right'));
+  }
   zip.file('rmk.project.json', JSON.stringify({
-    splitCommunication: settings.features.split ? { ...getSplitCommunication(settings), txPin: settings.pins.splitSerial, rxPin: settings.pins.splitSerialRx } : undefined,
-    generator: 'Smidr',
-    target: 'rmk',
-    board: settings.hardware.controllerType === 'development_board'
-      ? settings.hardware.board || getDefaultDevelopmentBoard(settings.hardware.mcu)
-      : undefined,
+    generator: 'Smidr', target: 'rmk', version: '0.9.0', format,
     chip: getRmkChip(settings),
+    board: settings.hardware.controllerType === 'development_board' ? settings.hardware.board || getDefaultDevelopmentBoard(settings.hardware.mcu) : undefined,
+    splitCommunication: settings.features.split ? { ...getSplitCommunication(settings), txPin: settings.pins.splitSerial, rxPin: settings.pins.splitSerialRx } : undefined,
   }, null, 2));
-  return await zip.generateAsync({ type: 'blob' });
+  return zip.generateAsync({ type: 'blob' });
 };

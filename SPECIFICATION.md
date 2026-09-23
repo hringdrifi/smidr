@@ -182,13 +182,16 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - **ZMK 出力**: 現時点では ZMK RGB Matrix には対応しない。ZMK ソース出力では `features.rgb` の RGB underglow 設定のみを扱い、`features.rgbMatrix` およびキーごとの LED 座標は出力しない。
 
 ### 7.7.1 RMK ソース出力
-- **出力形式**: RMK データは ZIP として出力し、`keyboard.toml`, `vial.json`, `Cargo.toml`, `README.md`, `rmk.project.json` を含める。`keyboard.toml` は RMK の設定方式に合わせ、`[keyboard]`, `[host]`, `[matrix]`, `[layout]` を生成し、`[layout].keymap` は `layer -> row -> col` の3次元配列として出力する。
+- **出力形式**: RMK 0.9.0を対象とし、出力画面でTOML／Rust APIを選択する。ZIP名には形式を付け、`keyboard.toml`, `vial.json`, `Cargo.toml`, `README.md`, `rmk.project.json` を含める。TOMLは `[layout].map` に物理順の `(row,col)`、`[keymap].layers` と `[[keymap.layer]].keys` に同じ順序のアクションを出力する。旧3次元配列は生成しない。形式は出力画面の状態として保持する。
+- **Rust API**: RP2040／nRF52840の単体・分割に対応。`src/keymap.rs` のKeyAction配列と、GPIO・マトリクス・ストレージ・USB／BLE・PMW3610・PointingProcessor・watchdog・`run_all!` を含むエントリーポイントを生成する。分割はcentral.rs／peripheral.rsに分ける。変換できないRaw式はエラーとする。同梱TOMLは等価な設定とコンパイル時容量のために使用し、Rustの実行時キー配列やGPIOを上書きしない。
+- **ビルド用ファイル**: 両形式ともRP2040／nRF52840ではbuild.rs、memory.x、.cargo/config.toml、rust-toolchain.tomlとエントリーポイントを含める。TOML形式はRMKの設定マクロを使用する。他MCUはTOML設定のみでボード固有コードを別途用意する。RP2040はFlash 2 MiBを仮定する。nRF52840は0xE0000から8セクタをストレージ用に確保し、Adafruit UF2使用時は0x1000、それ以外は0x0からコードを配置する。実機のブートローダーとの一致はREADMEで確認を促す。
+- **PMW3610**: nRF52／RP2040向けにSCLK・SDIO・CS・MOTION・CPI・軸交換・反転を出力する。SCLK／SDIO／CSは必須、MOTION省略時はポーリング。CPIは200〜3200の200刻み。TOMLはinput_device.pmw3610、RustはPointingDeviceとPointingProcessorを使う。単線SPIのMOSI／MISOは同じSDIOにする。分割は配置側にセンサーを生成し、全センサーのPointingProcessorをcentralに生成する。IDは0〜254の重複しない番号で対応付ける。非アクティブな配置オプションのセンサーは出力しない。
 - **キーコード**: Smiðr の `UniversalAction` から RMK の keymap 文字列へ変換する。通常キーは RMK の `KeyCode` 名（例: `A`, `Kc1`, `Escape`）、レイヤー操作は `MO(n)`, `TG(n)`, `TO(n)`, `LT(n, key)`, `MT(key, modifier)`、Tap Dance は `TD(n)`、Macro 割当は `Macro(n)` として出力する。
-- **Vial 連携**: RMK の Vial サポート向けに、Smiðr の既存 VIA/Vial レイアウト定義と同じ `vial.json` を ZIP ルートに出力する。`keyboard.toml` の `serial_number` は Vial 認識用プレフィックスを持つ値を設定し、`[host].vial_enabled = true` と unlock keys を出力する。
+- **Vial 連携**: SmiðrのVIA/Vialレイアウト定義をvial.jsonに出力し、build.rsで圧縮する。Vial UIDと解除キーを両形式に反映する。USBシリアルはRMK 0.9の既定値を使い、TOMLでは `[host].vial_enabled = true` を出力する。
 - **マトリクス**: 通常マトリクスでは `row_pins`, `col_pins`, `row2col` を出力する。ダイレクトピン配線では `matrix_type = "direct_pin"` と `direct_pins` の2次元配列を出力する。GPIO 名は RP2040 (`GPn`/`GPIOn` -> `PIN_n`) と nRF52 (`P0.nn`/`P1.nn` -> `P0_nn`/`P1_nn`) を RMK/Embassy 形式へ正規化する。
-- **Bidirectional Matrix**: RMK は Rust API では bidirectional matrix を扱えるが、初期実装の TOML export では表現しない。通常マトリクスで row pin と column pin に同じ物理ピンが含まれる場合は `RMK TOML export cannot represent bidirectional matrix yet. Use Rust API or change wiring.` warning を出す。
+- **Bidirectional Matrix**: RMK自体はRust APIで扱えるが、Smiðrの両形式では未対応。同一側のrow／columnに共有ピンがある場合は出力を拒否する。センサーの必須ピン不足、不正CPI、ピン重複、非対応MCUも検証する。
 - **レイアウトオプション**: `keyboard.toml` の firmware layout / keymap は現在の `activeOptions` で表示されているキーだけを対象にする。`vial.json` は Vial レイアウト定義として全オプションを保持する。
-- **制限**: 初期実装では Split の central/peripheral matrix、Encoder、RGB/Backlight、Combo 定義、Macro 定義の RMK 固有コード生成は警告対象とし、キー上の `TD(n)` / `Macro(n)` 参照のみを出力する。
+- **制限**: Encoder、RGB/Backlight、Combo定義、Macro定義のコード生成は引き続き警告対象。Macro参照は出力するが定義本体は生成しない。
 
 ### 7.8 KiCad MVP 出力
 - **出力形式**: KiCad データは ZIP として出力し、`<project>.kicad_pro`, `<project>.kicad_sch`, `<project>.kicad_pcb`, `<project>_plate.kicad_pcb`, `sym-lib-table`, `fp-lib-table`, `README.md`, `smidr.kicad_sym`, `smidr.pretty/*.kicad_mod` を含める。
@@ -213,7 +216,7 @@ Smiðr は、VIA/Vial 規格に準拠したレイアウトオプション設計�
 - 無線選択中はUARTピンを表示・予約しない。半二重選択中はRXを予約しない。切り替えても入力済みのピン値は保持する。通信ピンは左右両方のマトリクス、ダイレクトピン、周辺機能と重複できない。全二重は異なるTX/RXが必須。
 - QMK/Vialは従来の半二重出力に加え、全二重では `SERIAL_USART_FULL_DUPLEX` とTX/RX定義を生成する。全二重出力はRP2040（vendor/PIO）とSTM32（usart）が対象。STM32のUARTインスタンス・代替機能設定は生成後の確認が必要。無線は出力エラーとする。
 - ZMKは共通設定からBLE／有線を選び、有線全二重ではRP2040 PIOまたはnRF52 UARTのpinctrlを生成する。単線半二重の生成は未対応のため出力エラーとし、全二重へ暗黙変換しない。旧ファイルのUARTデバイス指定は旧方式での直接出力時に保持する。
-- RMKの共通設定付き分割出力はcentral/peripheralの行オフセット付きマトリクスと通信設定を生成する。有線はRP2040 PIOで同一TX/RXなら半二重、別ピンなら全二重、無線はnRF52が対象。各側のRustエントリーポイントとCargo機能設定は引き続き生成対象外。
+- RMKの分割出力はcentral/peripheralの行オフセット付きマトリクスと通信設定を生成する。有線はRP2040 PIOの半二重／全二重、無線はnRF52が対象。RP2040／nRF52840では各側のRustエントリーポイントとCargo機能設定も生成する。
 
 ### 7.9 Smiðr 0.5 プロジェクト形式
 - `.smidr` は `schemaVersion: "0.5"` を持ち、`metadata`、`layout`、`hardware`、`firmware` の用途別オブジェクトへ設定を保存する。

@@ -133,6 +133,7 @@ export const TRANSLATIONS = {
       setupHint: 'Set only the starting point here. Pins, firmware options, and identifiers remain available in their workflow steps.',
     },
     firmwareFlow: {
+      rmkFormat: 'Source format', rmkFormatHelp: 'RMK 0.9. Rust API projects support RP2040 and nRF52840, including split keyboards.',
       selectStep: 'Choose firmware', selectTitle: 'Choose firmware', selectDescription: 'Your selection changes the available workflow, settings, and build output for this project.', basicSettingsDescription: 'Configure the identity and USB identifiers used by the selected firmware.',
       qmkDescription: 'QMK source with a VIA-enabled keymap target.', vialDescription: 'QMK-based Vial firmware with Vial UID and unlock settings.', zmkDescription: 'Zephyr-based wireless and wired firmware with optional ZMK Studio support.', rmkDescription: 'Rust-based keyboard firmware with a focused configuration workflow.',
       compatible: 'Compatible', incompatible: 'Hardware warning', continueSetup: 'Continue to basic settings', backToSelection: 'Back to firmware selection', continueTargetSettings: 'Continue to detailed settings', continueKeymap: 'Continue to keymap', changeTarget: 'Change firmware', targetSettings: 'Detailed settings', targetSettingsDescription: 'Configure settings specific to the selected firmware.', backToSetup: 'Back to basic settings', buildStep: '{target} output',
@@ -1602,6 +1603,7 @@ export const TRANSLATIONS = {
       setupHint: 'ここでは開始に必要な項目だけを設定します。ピン、ファームウェア設定、識別情報は作成後に各工程で変更できます。',
     },
     firmwareFlow: {
+      rmkFormat: 'ソース形式', rmkFormatHelp: 'RMK 0.9対応。Rust APIはRP2040・nRF52840の単体／分割構成に対応します。',
       selectStep: 'ファーム選択', selectTitle: 'ファームを選択', selectDescription: '選択したファームに合わせて、このプロジェクトの工程、設定項目、ビルド出力が切り替わります。', basicSettingsDescription: '選択したファームで使用する識別情報とUSB識別子を設定します。',
       qmkDescription: 'VIA対応キーマップを含むQMKソースを生成します。', vialDescription: 'Vial UIDとアンロック設定を含む、QMKベースのVialファームです。', zmkDescription: 'ZMK Studioにも対応できる、Zephyrベースの無線・有線ファームです。', rmkDescription: '設定項目を絞った、Rustベースのキーボードファームです。',
       compatible: '対応', incompatible: 'ハードウェア要確認', continueSetup: '基本設定へ進む', backToSelection: 'ファームを選択へ戻る', continueTargetSettings: '詳細設定へ進む', continueKeymap: 'キーマップへ進む', changeTarget: 'ファームを変更', targetSettings: '詳細設定', targetSettingsDescription: '選択したファーム固有の設定を行います。', backToSetup: '基本設定へ戻る', buildStep: '{target}出力',
