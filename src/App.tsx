@@ -34,7 +34,7 @@ import { twMerge } from 'tailwind-merge';
 import { generateSmidrProjectJson, downloadJson, downloadBlob, generateViaJson, generateKleJson } from '@/lib/export';
 import { generateQmkZip } from '@/lib/qmk';
 import { generateRmkZip } from '@/lib/rmk';
-import { getRmkChip, RmkExportFormat } from '@/lib/rmk-hardware';
+import { isRmkExportSupported, RmkExportFormat } from '@/lib/rmk-hardware';
 import { generateVialZip } from '@/lib/vial';
 import { generateZmkZip } from '@/lib/zmk';
 import {
@@ -1697,7 +1697,7 @@ export default function App() {
                     {activeRightPanel === 'build' && projectWorkspace === 'firmware' && selectedFirmwareTarget && (
                       <FirmwareBuildPanel
                         target={selectedFirmwareTarget}
-                        supported={selectedFirmwareSupported && (selectedFirmwareTarget !== 'rmk' || rmkExportFormat !== 'rust' || ['rp2040', 'nrf52840'].includes(getRmkChip(settings)))}
+                        supported={selectedFirmwareSupported && (selectedFirmwareTarget !== 'rmk' || isRmkExportSupported(settings.hardware, rmkExportFormat))}
                         onBuild={handleBuildSelectedFirmware}
                         rmkFormat={rmkExportFormat}
                         onRmkFormatChange={setRmkExportFormat}

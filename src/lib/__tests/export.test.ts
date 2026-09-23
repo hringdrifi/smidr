@@ -3997,6 +3997,7 @@ describe('export generation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       name: 'RMK Board',
+      hardware: { ...baseSettings.hardware, board: 'promicro_rp2040' },
       matrix: { rows: 2, cols: 2 },
       pins: {
         rows: ['GP0', 'GP1'],
@@ -4037,6 +4038,7 @@ describe('export generation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       name: 'RMK Direct',
+      hardware: { ...baseSettings.hardware, controllerType: 'mcu', mcu: 'nRF52840', board: '' },
       matrix: { rows: 1, cols: 2, wiring: 'direct' },
     };
     const keys: PhysicalKey[] = [
@@ -4056,6 +4058,7 @@ describe('export generation', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
       name: 'RMK Options',
+      hardware: { ...baseSettings.hardware, board: 'promicro_rp2040' },
       matrix: { rows: 1, cols: 2 },
       pins: {
         rows: ['GP0'],
@@ -4093,6 +4096,7 @@ describe('export generation', () => {
   it('blocks RMK export for shared matrix pins', () => {
     const settings: ProjectSettings = {
       ...baseSettings,
+      hardware: { ...baseSettings.hardware, board: 'promicro_rp2040' },
       matrix: { rows: 2, cols: 2 },
       pins: {
         rows: ['GP0', 'GP1'],

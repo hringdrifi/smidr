@@ -63,14 +63,15 @@ ${maps.join('\n')}
 };
 
 export const generateRustMain = (settings: ProjectSettings, keys: PhysicalKey[], allKeys: PhysicalKey[], unlock: number[][], side: 'left' | 'right' = 'left') => {
-  const nrf = getRmkChip(settings) === 'nrf52840';
+  const chip = getRmkChip(settings);
+  const nrf = chip === 'nrf52840' || chip === 'nrf52833';
   const split = settings.features.split;
   const peripheral = split && side === 'right';
   const hal = nrf ? 'embassy_nrf' : 'embassy_rp';
   const outputDrive = nrf ? ', OutputDrive::Standard' : '';
   const pin = (value?: string) => {
     const name = normalizeRmkPin(value);
-    if (!(nrf ? /^P[01]_\d{2}$/ : /^PIN_\d+$/).test(name)) throw new Error(`Invalid ${nrf ? 'nRF52840' : 'RP2040'} pin: ${value}`);
+    if (!(nrf ? /^P[01]_\d{2}$/ : /^PIN_\d+$/).test(name)) throw new Error(`Invalid ${nrf ? chip : 'RP2040'} pin: ${value}`);
     return `p.${name}`;
   };
   const sidePins = (side: 'left' | 'right') => ({
@@ -132,7 +133,7 @@ use embassy_executor::Spawner;
 use ${hal}::gpio::{Input, Output, Flex, Pull, Level${nrf ? ', OutputDrive' : ''}};
 use rmk::debounce::default_debouncer::DefaultDebouncer;
 use rmk::run_all;
-${split ? 'use rmk::split::PeripheralMatrixConfig;' : ''}
+${split && !peripheral ? 'use rmk::split::PeripheralMatrixConfig;' : ''}
 ${nrf ? `use defmt::unwrap;
 use embassy_nrf::{bind_interrupts, rng, usb};
 use embassy_nrf::mode::Async;
@@ -163,7 +164,7 @@ ${nrf ? nrfInit : ''}
     ${matrixCode}
     ${uart}
     ${peripheral && !nrf ? '' : `let flash = ${nrf ? 'nrf_mpsl::Flash::take(mpsl, p.NVMC)' : 'embassy_rp::flash::Flash::<_, embassy_rp::flash::Async, { 2 * 1024 * 1024 }>::new(p.FLASH, p.DMA_CH0, Irqs)'};
-    let storage_config = rmk::config::StorageConfig { ${nrf ? 'start_addr: 0xE0000, num_sectors: 8,' : ''} ..Default::default() };`}
+    let storage_config = rmk::config::StorageConfig { ${nrf ? `start_addr: ${chip === 'nrf52833' ? '0x78000' : '0xE0000'}, num_sectors: 8,` : ''} ..Default::default() };`}
     ${peripheral ? nrf ? 'let mut storage = rmk::storage::new_storage_without_keymap(flash, storage_config).await;' : '' : `let mut keymap_data = rmk::KeymapData::new(keymap::get_default_keymap());
     let mut behavior = rmk::config::BehaviorConfig::default();
     let positional = rmk::config::PositionalConfig::default();

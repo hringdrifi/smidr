@@ -8,15 +8,17 @@ import license from './rmk-templates/LICENSE-MIT.txt?raw';
 /** Build support shared by the config-macro and explicit Rust API entry points. */
 export const addRmkProjectFiles = (zip: JSZip, settings: ProjectSettings, name: string, format: RmkExportFormat) => {
   const chip = getRmkChip(settings);
-  const fullProject = chip === 'rp2040' || chip === 'nrf52840';
-  const nrf = chip === 'nrf52840';
+  const fullProject = ['rp2040', 'nrf52840', 'nrf52833'].includes(chip);
+  const nrf = chip === 'nrf52840' || chip === 'nrf52833';
+  const nrf33 = chip === 'nrf52833';
   const adafruit = usesRmkAdafruitBootloader(settings);
   const split = settings.features.split;
   zip.file('LICENSE-RMK-MIT.txt', license);
   if (!fullProject) {
     zip.file('Cargo.toml', `[package]\nname = "${name}"\nversion = "0.1.0"\nedition = "2024"\n\n[dependencies]\nrmk = "=0.9.0"\n`);
   } else {
-    let cargo = (nrf ? nrfCargo : rpCargo)
+    const cargoTemplate = nrf ? (nrf33 ? nrfCargo.replaceAll('nrf52840', 'nrf52833') : nrfCargo) : rpCargo;
+    let cargo = cargoTemplate
       .replace(/\[package\][\s\S]*?\[dependencies\]/, `[package]\nname = "${name}"\nversion = "0.1.0"\nedition = "2024"\n\n[dependencies]`)
       .replace('path = "../../../rmk"', 'version = "=0.9.0"')
       .replace(', "adafruit_bl"', '')
@@ -29,8 +31,8 @@ export const addRmkProjectFiles = (zip: JSZip, settings: ProjectSettings, name: 
     zip.file('rust-toolchain.toml', `[toolchain]\nchannel = "stable"\ntargets = ["${nrf ? 'thumbv7em-none-eabihf' : 'thumbv6m-none-eabi'}"]\n`);
     // Reserve storage and keep bootloader-specific vector origins consistent with Cargo features.
     zip.file('memory.x', nrf ? `MEMORY {
-  FLASH : ORIGIN = ${adafruit ? '0x00001000' : '0x00000000'}, LENGTH = ${adafruit ? '0xDF000' : '0xE0000'}
-  RAM : ORIGIN = ${adafruit ? '0x20000008' : '0x20000000'}, LENGTH = ${adafruit ? '0x3FFF8' : '0x40000'}
+  FLASH : ORIGIN = ${adafruit ? '0x00001000' : '0x00000000'}, LENGTH = ${adafruit ? '0xDF000' : nrf33 ? '0x78000' : '0xE0000'}
+  RAM : ORIGIN = ${adafruit ? '0x20000008' : '0x20000000'}, LENGTH = ${adafruit ? '0x3FFF8' : nrf33 ? '0x20000' : '0x40000'}
 }
 ` : `MEMORY {
   BOOT2 : ORIGIN = 0x10000000, LENGTH = 0x100
@@ -82,7 +84,7 @@ Install Rust stable and the native build tools for your OS (including a C compil
 ${split ? 'cargo build --release --bin central\ncargo build --release --bin peripheral' : 'cargo build --release'}
 \`\`\`
 
-Target: ${chip}. ${nrf ? `Vector origin is ${adafruit ? '0x1000 (Adafruit UF2 bootloader)' : '0x0 (direct SWD flashing)'}. Storage uses 0xE0000–0xE7FFF. Confirm memory.x against your bootloader before flashing. BLE peers must be re-paired when migrating from RMK 0.8.` : 'The linker assumes 2 MiB of external flash. Adjust memory.x and the Rust Flash size if your board differs.'}` : '## Integration required\n\nThis MCU receives TOML configuration only. Add it to the matching RMK 0.9 board example and supply its HAL dependencies, entry points and linker configuration before building.'}
+Target: ${chip}. ${nrf ? `Vector origin is ${adafruit ? '0x1000 (Adafruit UF2 bootloader)' : '0x0 (direct SWD flashing)'}. Storage uses ${nrf33 ? '0x78000–0x7FFFF' : '0xE0000–0xE7FFF'}. Confirm memory.x against your bootloader before flashing. BLE peers must be re-paired when migrating from RMK 0.8.` : 'The linker assumes 2 MiB of external flash. Adjust memory.x and the Rust Flash size if your board differs.'}` : '## Integration required\n\nThis MCU receives TOML configuration only. Add it to the matching RMK 0.9 board example and supply its HAL dependencies, entry points and linker configuration before building.'}
 
 ## Pointing devices
 

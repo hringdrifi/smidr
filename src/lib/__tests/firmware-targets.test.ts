@@ -11,6 +11,12 @@ const settings: ProjectSettings = {
 };
 
 describe('firmware detail step', () => {
+  it('shows RMK compatibility only for chips with a supported TOML target', () => {
+    expect(isFirmwareTargetSupported('rmk', settings.hardware)).toBe(true);
+    expect(isFirmwareTargetSupported('rmk', { ...settings.hardware, board: 'nrfmicro_nrf52833' })).toBe(true);
+    expect(isFirmwareTargetSupported('rmk', { ...settings.hardware, board: 'promicro' })).toBe(false);
+    expect(isFirmwareTargetSupported('rmk', { ...settings.hardware, controllerType: 'mcu', mcu: 'atmega32u4' })).toBe(false);
+  });
   it.each(['qmk', 'vial'] as const)('%s defaults are complete even on incompatible hardware', target => {
     expect(isFirmwareTargetSupported(target, settings.hardware)).toBe(false);
     expect(isFirmwareDetailSettingsComplete(target, settings)).toBe(true);

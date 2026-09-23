@@ -224,11 +224,11 @@ export const validateFirmwareExport = (
     if (settings.features.split) {
       if (settings.hardware.splitCommunication) {
         const communication = getSplitCommunication(settings);
-        const chip = getZmkHardwareTarget(settings.hardware);
-        if ((communication.transport === 'wired' && chip !== 'rp2040') || (communication.transport === 'wireless' && chip !== 'nrf52840' && chip !== 'nrf52832'))
+        const chip = getRmkChip(settings);
+        if ((communication.transport === 'wired' && chip !== 'rp2040') || (communication.transport === 'wireless' && !['nrf52840', 'nrf52833', 'nrf52832'].includes(chip)))
           issues.push({ severity: 'error', code: 'rmk-split-target-unsupported', message: 'RMK split config export supports RP2040 for wired UART and nRF52 for wireless communication.' });
       }
-      if (!['rp2040', 'nrf52840'].includes(getRmkChip(settings))) issues.push({
+      if (!['rp2040', 'nrf52840', 'nrf52833'].includes(getRmkChip(settings))) issues.push({
         severity: 'warning',
         code: 'rmk-split-export-experimental',
         message: 'RMK split config export requires firmware entry points and matching chip/split Cargo features for both halves before building.',

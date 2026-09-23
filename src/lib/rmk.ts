@@ -228,7 +228,7 @@ map = ${quoteToml(keys.map(key => { const pos = getFirmwareMatrixPosition(settin
 layers = ${layers}
 ${Array.from({ length: layers }, (_, layer) => '\n[[keymap.layer]]\nkeys = ' + quoteToml(keys.map(key => actionToRmkString(key.keymap?.[layer] || { action: 'trans' })).join(' '))).join('\n')}
 ${settings.features.split ? '' : generateTrackballToml(settings, allKeys)}
-${getRmkChip(settings) === 'nrf52840' ? '\n[storage]\nstart_addr = 917504\nnum_sectors = 8\n' : ''}
+${['nrf52840', 'nrf52833'].includes(getRmkChip(settings)) ? `\n[storage]\nstart_addr = ${getRmkChip(settings) === 'nrf52833' ? 491520 : 917504}\nnum_sectors = 8\n` : ''}
 `;
 };
 

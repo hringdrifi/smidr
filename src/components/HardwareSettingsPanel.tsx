@@ -18,16 +18,15 @@ import {
   QMK_MCU_PRESETS,
 } from '@/lib/mcu-presets';
 import { getFirmwareTargetLabel } from '@/lib/firmware-targets';
+import { isRmkExportSupported } from '@/lib/rmk-hardware';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const getSupportBadge = (supportsQmk: boolean, supportsZmk: boolean) => {
-  if (supportsQmk && supportsZmk) return '[QMK/ZMK]';
-  if (supportsQmk) return '[QMK]';
-  if (supportsZmk) return '[ZMK]';
-  return '[Unsupported]';
+const getSupportBadge = (supportsQmk: boolean, supportsZmk: boolean, supportsRmk: boolean) => {
+  const targets = [supportsQmk && 'QMK', supportsZmk && 'ZMK', supportsRmk && 'RMK'].filter(Boolean);
+  return targets.length ? `[${targets.join('/')}]` : '[Unsupported]';
 };
 
 const Section = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
@@ -237,7 +236,8 @@ export const HardwareSettingsPanel = ({
               {QMK_MCU_PRESETS.map(preset => {
                 const badge = getSupportBadge(
                   isQmkMcuSupported(preset.value),
-                  isZmkExportSupported(preset.value)
+                  isZmkExportSupported(preset.value),
+                  isRmkExportSupported({ controllerType: 'mcu', mcu: preset.value })
                 );
                 return (
                   <option key={preset.value} value={preset.value}>{preset.label} {badge}</option>
@@ -259,7 +259,8 @@ export const HardwareSettingsPanel = ({
               {developmentBoardOptions.map(board => {
                 const badge = getSupportBadge(
                   isQmkDevelopmentBoardSupported(board.value),
-                  isZmkDevelopmentBoardSupported(board.value)
+                  isZmkDevelopmentBoardSupported(board.value),
+                  isRmkExportSupported({ controllerType: 'development_board', board: board.value })
                 );
                 return (
                   <option key={board.value} value={board.value}>{board.label} {badge}</option>

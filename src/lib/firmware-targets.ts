@@ -1,6 +1,7 @@
 import { FirmwareTarget, ProjectSettings } from '@/types/keyboard';
 import { isQmkSourceExportSupported, isZmkSourceExportSupported } from '@/lib/mcu-presets';
 import { getSplitCommunication } from './split-communication';
+import { isRmkExportSupported } from './rmk-hardware';
 
 export const FIRMWARE_TARGETS: FirmwareTarget[] = ['qmk', 'vial', 'zmk', 'rmk'];
 
@@ -17,7 +18,7 @@ export const isFirmwareTargetSupported = (
 ) => {
   if (target === 'qmk' || target === 'vial') return isQmkSourceExportSupported(hardware);
   if (target === 'zmk') return isZmkSourceExportSupported(hardware);
-  return true;
+  return isRmkExportSupported(hardware);
 };
 
 /** Optional values use exporter defaults; hardware compatibility belongs to other steps. */

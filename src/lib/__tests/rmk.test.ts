@@ -3,9 +3,10 @@ import JSZip from 'jszip';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { generateRmkZip } from '../rmk';
-import { getRmkHardwareErrors, RmkExportFormat } from '../rmk-hardware';
+import { getRmkChipForHardware, getRmkHardwareErrors, isRmkExportSupported, RmkExportFormat } from '../rmk-hardware';
 import { rmkActionToRust } from '../rmk-rust';
 import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
+import { getDevelopmentBoardPins, getMcuPins } from '../mcu-presets';
 
 const fixture = (chip = 'rp2040', split = false, direct = false) => {
   const pin = (n: number) => chip === 'rp2040' ? `GP${n}` : `P0.${String(n).padStart(2, '0')}`;
@@ -43,7 +44,32 @@ const saveSmokeZip = async (zip: JSZip, name: string) => {
 };
 
 describe('RMK 0.9 source export', () => {
-  for (const chip of ['rp2040', 'nrf52840']) for (const split of [false, true]) for (const format of ['toml', 'rust'] as RmkExportFormat[]) {
+  it('resolves the selected board instead of a stale MCU and separates TOML from Rust support', () => {
+    const board = (name: string) => ({ controllerType: 'development_board' as const, board: name, mcu: 'RP2040' });
+    expect(getRmkChipForHardware(board('nrfmicro_nrf52833'))).toBe('nrf52833');
+    expect(getRmkChipForHardware(board('nice_nano'))).toBe('nrf52840');
+    expect(getRmkChipForHardware(board('blackpill_f411'))).toBe('stm32f411');
+    expect(getRmkChipForHardware(board('promicro'))).toBe('');
+    expect(isRmkExportSupported(board('nrfmicro_nrf52833'))).toBe(true);
+    expect(isRmkExportSupported(board('nrfmicro_nrf52833'), 'rust')).toBe(true);
+    expect(isRmkExportSupported({ controllerType: 'mcu', mcu: 'HY0020' })).toBe(true);
+    expect(isRmkExportSupported({ controllerType: 'mcu', mcu: 'STM32F411' })).toBe(true);
+    expect(isRmkExportSupported({ controllerType: 'mcu', mcu: 'atmega32u4' })).toBe(false);
+    expect(getMcuPins('nRF52833')).toContain('P1.09');
+    expect(getMcuPins('nRF52833')).not.toContain('P1.10');
+    expect(getDevelopmentBoardPins('nrfmicro_nrf52833')).not.toContain('P1.11');
+  });
+  it('rejects nRF52833 sensor pins beyond P1.09', () => {
+    const state = fixture('nrf52833');
+    state.settings.trackballs![0].sclk = 'P1.10';
+    expect(getRmkHardwareErrors(state.settings, state.keys, 'rust').join()).toContain('invalid nrf52833 pin P1_10');
+  });
+  it('rejects unsupported TOML targets before creating an unusable ZIP', async () => {
+    const state = fixture();
+    state.settings.hardware.mcu = 'atmega32u4';
+    await expect(generateRmkZip(state)).rejects.toThrow('does not support the selected MCU');
+  });
+  for (const chip of ['rp2040', 'nrf52840', 'nrf52833']) for (const split of [false, true]) for (const format of ['toml', 'rust'] as RmkExportFormat[]) {
     it(`${chip}, split=${split}, ${format}: emits matching sensor wiring and complete entry points`, async () => {
       const state = fixture(chip, split);
       const zip = await JSZip.loadAsync(await (await generateRmkZip(state, { format })).arrayBuffer());
@@ -62,6 +88,11 @@ describe('RMK 0.9 source export', () => {
       const cargo = await zip.file('Cargo.toml')!.async('string');
       expect(cargo).toContain('version = "=0.9.0"');
       expect(cargo).not.toContain('path = "../../../rmk"');
+      if (chip === 'nrf52833') {
+        expect(cargo).toContain('"nrf52833_ble"');
+        expect(cargo).not.toContain('"nrf52840_ble"');
+        expect(toml).toContain('start_addr = 491520');
+      }
       expect(zip.file('memory.x')).toBeTruthy();
       const source = await zip.file(split ? 'src/central.rs' : 'src/main.rs')!.async('string');
       if (format === 'rust') {
@@ -101,7 +132,7 @@ describe('RMK 0.9 source export', () => {
     state.settings.trackballs![0].sdio = '';
     await expect(generateRmkZip(state)).rejects.toThrow('SCLK, SDIO and CS');
     state.settings.hardware.mcu = 'stm32f411';
-    expect(getRmkHardwareErrors(state.settings, state.keys, 'rust').join()).toContain('RP2040 and nRF52840');
+    expect(getRmkHardwareErrors(state.settings, state.keys, 'rust').join()).toContain('RP2040, nRF52840 and nRF52833');
   });
   it('preserves modifier bits and rejects unsupported raw syntax instead of dropping actions', () => {
     expect(rmkActionToRust('MT(A, LCtrl | RShift)')).toContain('from_bits(33)');

@@ -20,6 +20,7 @@ export type QmkMcu =
   | 'MK64FX512'
   | 'MK66FX1M0'
   | 'MKL26Z64'
+  | 'nRF52833'
   | 'RP2040'
   | 'STM32F042'
   | 'STM32F072'
@@ -48,6 +49,7 @@ type PinSet =
   | 'rp2040'
   | 'hy0020'
   | 'nrf52840'
+  | 'nrf52833'
   | 'avr_u4'
   | 'avr_usb2'
   | 'avr_usb_big'
@@ -255,6 +257,10 @@ const pins = {
     ...nrfPortPins(0, 0, 31),
     ...nrfPortPins(1, 0, 15),
   ],
+  nrf52833: [
+    ...nrfPortPins(0, 0, 31),
+    ...nrfPortPins(1, 0, 9),
+  ],
   hy0020: [
     'P0.02', 'P0.03', 'P0.04', 'P0.05', 'P0.06', 'P0.07', 'P0.08',
     'P0.09', 'P0.10', 'P0.12', 'P0.16', 'P0.18', 'P0.20', 'P0.21',
@@ -397,6 +403,7 @@ export const QMK_MCU_PRESETS: McuPreset[] = [
   { value: 'MK66FX1M0', label: 'MK66FX1M0', bootloader: 'halfkay', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
   { value: 'MKL26Z64', label: 'MKL26Z64', bootloader: 'halfkay', pinSet: 'kinetis', splitSerialDriver: 'bitbang' },
   { value: 'nRF52840', label: 'nRF52840', bootloader: 'custom', pinSet: 'nrf52840', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown', zmkTarget: 'nrf52840' },
+  { value: 'nRF52833', label: 'nRF52833', bootloader: 'custom', pinSet: 'nrf52833', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown' },
   { value: 'HY0020', label: 'HY0020 (nRF52832)', bootloader: 'custom', pinSet: 'hy0020', splitSerialDriver: 'bitbang', qmkProcessor: 'unknown', zmkTarget: 'nrf52832' },
   { value: 'RP2040', label: 'RP2040', bootloader: 'rp2040', pinSet: 'rp2040', splitSerialDriver: 'vendor', zmkTarget: 'rp2040' },
   { value: 'STM32F042', label: 'STM32F042', bootloader: 'stm32-dfu', pinSet: 'stm32f042', splitSerialDriver: 'bitbang' },
@@ -436,6 +443,7 @@ export const getMcuPins = (mcu: string | undefined) =>
   pins[getMcuPreset(mcu)?.pinSet || 'stm32h7'];
 
 export const getDevelopmentBoardPins = (board: string | undefined, fallbackMcu?: string) => {
+  if (board === 'nrfmicro_nrf52833') return developmentBoardPins.nrf52840_promicro.filter(pin => !/^P1\.(?:1[0-5])$/.test(pin));
   const pinSet = DEVELOPMENT_BOARD_OPTIONS.find(option => option.value === board)?.pinSet;
   return pinSet ? developmentBoardPins[pinSet] : getMcuPins(fallbackMcu);
 };
