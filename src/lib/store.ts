@@ -160,7 +160,7 @@ export interface KeyboardState {
   updateEditorSettings: (settings: Partial<EditorSettings>) => void;
   setVisualLayout: (layout: VisualLayoutId) => void;
   setTransform: (transform: { scale: number, x: number, y: number }) => void;
-  setActiveOption: (groupId: string, value: number) => void;
+  setActiveOption: (groupId: string, value: number, options?: { syncDevice?: boolean }) => void;
   
   // Key Manipulation
   addKey: (key: Partial<PhysicalKey>) => void;
@@ -1540,13 +1540,13 @@ export const useKeyboardStore = create<KeyboardState>()(
           }
         },
  
-        setActiveOption: (g: string, i: number) => set((s) => {
+        setActiveOption: (g: string, i: number, options?: { syncDevice?: boolean }) => set((s) => {
           const newActiveOptions = { ...s.settings.activeOptions, [g]: i };
           
           let newKeys = [...(s.baseKeys && s.baseKeys.length > 0 ? s.baseKeys : s.keys)];
           
           // 1. If it's a Vial keyboard, sync layout options to physical device if connected
-          if (s.connectedDevice?.protocolType === 'vial') {
+          if (options?.syncDevice !== false && s.connectedDevice?.protocolType === 'vial') {
             // Update physical device if connected
             if (s.connectedDevice) {
               const labels = Object.keys(s.settings.layoutOptions || {})

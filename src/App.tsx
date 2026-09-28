@@ -61,6 +61,10 @@ import {
   saveProjectDraft,
 } from '@/lib/storage';
 import { fromSmidrProjectFile } from '@/lib/project-format';
+import { getRestorableActiveOptions } from '@/lib/remap-backup';
+import { packLayoutOptions } from '@/lib/protocols/vial-converter';
+import { VialProtocol } from '@/lib/protocols/vial';
+import { hidTransport } from '@/lib/transport/hid';
 import { PRESET_LAYOUTS } from '@/lib/presets';
 import { parseKeyboardDefinition } from '@/lib/parser';
 import { isMatrixPositionWithinConfiguredPins, isMatrixSwitchKey, resolveDirectPin } from '@/lib/matrix-utils';
@@ -1117,6 +1121,7 @@ export default function App() {
 
       const writeQueue: { layer: number; row: number; col: number; action: UniversalAction }[] = [];
       const layersCount = settings.layers || 4;
+      const restoredActiveOptions = getRestorableActiveOptions(json, settings);
       
       importKeys.forEach((k: PhysicalKey) => {
         const pos = k.zmkPosition !== undefined
@@ -1135,7 +1140,7 @@ export default function App() {
         }
       });
 
-      if (writeQueue.length === 0) {
+      if (writeQueue.length === 0 && !restoredActiveOptions) {
         alert(t('remap.noValidMappings'));
         return;
       }
@@ -1148,6 +1153,26 @@ export default function App() {
       }
       
       await storeState.syncKeymap();
+      if (restoredActiveOptions) {
+        if (connectedDevice.protocolType === 'vial' && !storeState.isDemoMode) {
+          const labels = Object.keys(settings.layoutOptions)
+            .sort((a, b) => Number(a) - Number(b))
+            .map(id => {
+              const group = settings.layoutOptions[id];
+              return group.type === 'toggle' ? group.name : [group.name, ...(group.choices || [])];
+            });
+          const protocol = new VialProtocol();
+          if (!await protocol.initialize(storeState.activeTransport || hidTransport)) {
+            throw new Error('Failed to initialize Vial layout options');
+          }
+          await protocol.setLayoutOptions(packLayoutOptions(restoredActiveOptions, labels));
+        }
+        for (const [id, value] of Object.entries(restoredActiveOptions)) {
+          if (settings.activeOptions[id] !== value) {
+            storeState.setActiveOption(id, value, { syncDevice: false });
+          }
+        }
+      }
       alert(t('remap.restoreSuccess'));
     } catch (err) {
       console.error("Failed to restore backup:", err);
