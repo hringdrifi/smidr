@@ -121,7 +121,7 @@ export const TRANSLATIONS = {
       hardware: 'Hardware', firmware: 'Firmware', homeEyebrow: 'Smiðr 0.5 Workspace',
       homeTitle: 'Ready to remap your keyboard?',
       homeDescription: 'Connect a compatible keyboard to get started. You can also create a new keyboard project or continue an existing design.',
-      createProject: 'New project', createProjectDescription: 'Start with a preset or build a layout from scratch.',
+      createProject: 'New project', createProjectDescription: 'Create a blank project and configure its hardware and layout.',
       importProject: 'Import project', importProjectDescription: 'Open a Smiðr project file from your computer.',
       connectKeyboard: 'Connect your keyboard', connectKeyboardDescription: 'Connect a VIA, Vial, or ZMK Studio compatible keyboard and start remapping.',
       recentProjects: 'Recent projects', noRecentProjects: 'Your recent projects will appear here.', keys: 'keys',
@@ -761,7 +761,7 @@ export const TRANSLATIONS = {
     workspace: {
       hardware: '硬件', firmware: '固件', homeEyebrow: 'Smiðr 0.5 工作区', homeTitle: '准备好重映射键盘了吗？',
       homeDescription: '连接兼容键盘即可开始。您也可以新建键盘项目或继续现有设计。',
-      createProject: '新建项目', createProjectDescription: '使用预设或从头创建布局。',
+      createProject: '新建项目', createProjectDescription: '创建空白项目，然后配置硬件和布局。',
       importProject: '导入项目', importProjectDescription: '打开电脑上的 Smiðr 项目文件。',
       connectKeyboard: '连接您的键盘', connectKeyboardDescription: '连接兼容 VIA、Vial 或 ZMK Studio 的键盘并开始重映射。',
       recentProjects: '最近的项目', noRecentProjects: '最近使用的项目将显示在这里。', keys: '键',
@@ -1167,7 +1167,7 @@ export const TRANSLATIONS = {
     workspace: {
       hardware: '하드웨어', firmware: '펌웨어', homeEyebrow: 'Smiðr 0.5 작업 공간', homeTitle: '키보드를 리맵할 준비가 되셨나요?',
       homeDescription: '호환 키보드를 연결하여 바로 시작하세요. 새 키보드 프로젝트를 만들거나 기존 디자인을 이어갈 수도 있습니다.',
-      createProject: '새 프로젝트', createProjectDescription: '프리셋을 사용하거나 처음부터 레이아웃을 만듭니다.',
+      createProject: '새 프로젝트', createProjectDescription: '빈 프로젝트를 만들고 하드웨어와 레이아웃을 설정합니다.',
       importProject: '프로젝트 가져오기', importProjectDescription: '컴퓨터의 Smiðr 프로젝트 파일을 엽니다.',
       connectKeyboard: '키보드 연결', connectKeyboardDescription: 'VIA, Vial 또는 ZMK Studio 호환 키보드를 연결하고 리맵을 시작합니다.',
       recentProjects: '최근 프로젝트', noRecentProjects: '최근 사용한 프로젝트가 여기에 표시됩니다.', keys: '키',
@@ -1591,7 +1591,7 @@ export const TRANSLATIONS = {
       hardware: 'ハードウェア', firmware: 'ファームウェア', homeEyebrow: 'Smiðr 0.5 ワークスペース',
       homeTitle: 'キーボードをリマップしますか？',
       homeDescription: '対応キーボードを接続して、すぐに始められます。新しいキーボードの設計や、既存プロジェクトの続きもここから行えます。',
-      createProject: '新規プロジェクト', createProjectDescription: 'プリセットを使うか、レイアウトを一から作成します。',
+      createProject: '新規プロジェクト', createProjectDescription: '空のプロジェクトを作成し、ハードウェアとレイアウトを設定します。',
       importProject: 'プロジェクトを読み込む', importProjectDescription: 'コンピューター上のSmiðrプロジェクトを開きます。',
       connectKeyboard: 'キーボードを接続', connectKeyboardDescription: 'VIA、Vial、ZMK Studio対応キーボードを接続して、リマップを始めます。',
       recentProjects: '最近のプロジェクト', noRecentProjects: '最近使ったプロジェクトがここに表示されます。', keys: 'キー',
@@ -2231,7 +2231,7 @@ export const TRANSLATIONS = {
     workspace: {
       hardware: 'Hardware', firmware: 'Firmware', homeEyebrow: 'Espacio de trabajo Smiðr 0.5', homeTitle: '¿Listo para remapear tu teclado?',
       homeDescription: 'Conecta un teclado compatible para empezar. También puedes crear un proyecto nuevo o continuar un diseño existente.',
-      createProject: 'Nuevo proyecto', createProjectDescription: 'Usa un preajuste o crea un diseño desde cero.',
+      createProject: 'Nuevo proyecto', createProjectDescription: 'Crea un proyecto vacío y configura el hardware y el diseño.',
       importProject: 'Importar proyecto', importProjectDescription: 'Abre un proyecto Smiðr desde tu equipo.',
       connectKeyboard: 'Conecta tu teclado', connectKeyboardDescription: 'Conecta un teclado compatible con VIA, Vial o ZMK Studio y empieza a remapearlo.',
       recentProjects: 'Proyectos recientes', noRecentProjects: 'Tus proyectos recientes aparecerán aquí.', keys: 'teclas',
@@ -2637,7 +2637,7 @@ export const TRANSLATIONS = {
     workspace: {
       hardware: 'Hardware', firmware: 'Firmware', homeEyebrow: 'Smiðr 0.5 Arbeitsbereich', homeTitle: 'Bereit, deine Tastatur neu zu belegen?',
       homeDescription: 'Verbinde eine kompatible Tastatur und lege direkt los. Du kannst auch ein neues Tastaturprojekt erstellen oder einen vorhandenen Entwurf fortsetzen.',
-      createProject: 'Neues Projekt', createProjectDescription: 'Beginne mit einer Vorlage oder erstelle ein Layout von Grund auf.',
+      createProject: 'Neues Projekt', createProjectDescription: 'Erstelle ein leeres Projekt und konfiguriere Hardware und Layout.',
       importProject: 'Projekt importieren', importProjectDescription: 'Öffne eine Smiðr-Projektdatei von deinem Computer.',
       connectKeyboard: 'Tastatur verbinden', connectKeyboardDescription: 'Verbinde eine VIA-, Vial- oder ZMK-Studio-kompatible Tastatur und beginne mit der Neubelegung.',
       recentProjects: 'Letzte Projekte', noRecentProjects: 'Zuletzt verwendete Projekte erscheinen hier.', keys: 'Tasten',

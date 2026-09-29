@@ -25,7 +25,6 @@ import { TapDancePanel } from '@/components/TapDancePanel';
 import { UnlockModal } from '@/components/UnlockModal';
 import { ZmkUnlockModal } from '@/components/ZmkUnlockModal';
 import { ProjectHome } from '@/components/ProjectHome';
-import { NewProjectSetup } from '@/components/NewProjectSetup';
 import { FirmwareBuildPanel, FirmwareTargetPanel } from '@/components/FirmwarePanels';
 import { getFirmwareTargetLabel, isFirmwareTargetSupported, isFirmwareDetailSettingsComplete } from '@/lib/firmware-targets';
 import { useKeyboardStore } from '@/lib/store';
@@ -65,8 +64,6 @@ import { getRestorableActiveOptions } from '@/lib/remap-backup';
 import { packLayoutOptions } from '@/lib/protocols/vial-converter';
 import { VialProtocol } from '@/lib/protocols/vial';
 import { hidTransport } from '@/lib/transport/hid';
-import { PRESET_LAYOUTS } from '@/lib/presets';
-import { parseKeyboardDefinition } from '@/lib/parser';
 import { isMatrixPositionWithinConfiguredPins, isMatrixSwitchKey, resolveDirectPin } from '@/lib/matrix-utils';
 
 function cn(...inputs: ClassValue[]) {
@@ -368,7 +365,6 @@ export default function App() {
   const [isHomeVisible, setIsHomeVisible] = React.useState(!storeState.isDemoMode);
   const [isLeftNavOpen, setIsLeftNavOpen] = React.useState(false);
   const [isInspectorOpen, setIsInspectorOpen] = React.useState(false);
-  const [newProjectPreset, setNewProjectPreset] = React.useState('Blank Layout');
 
   const [savedRevision, setSavedRevision] = React.useState(storeState.historyId);
   const [currentSavedUpdatedAt, setCurrentSavedUpdatedAt] = React.useState<number | null>(null);
@@ -453,13 +449,23 @@ export default function App() {
     if (isDirty && !confirm(t('common.discardConfirm'))) return;
     storeState.setAppMode('design');
     storeState.resetProject(false);
-    storeState.setIsHardwareModalOpen(true);
+    const project: SmidrProject = {
+      id: crypto.randomUUID(),
+      updatedAt: Date.now(),
+      ...useKeyboardStore.getState().settings,
+      keys: [],
+    };
+    const savedProject = storeState.isDemoMode ? project : saveProject(project);
+    loadProject(savedProject, true);
+    setSavedRevision(useKeyboardStore.getState().historyId);
+    setCurrentSavedUpdatedAt(savedProject.updatedAt);
+    setRestoredDraftDirty(false);
+    refreshProjectList();
     setIsHomeVisible(false);
     setProjectWorkspace('hardware');
-    setNewProjectPreset('Blank Layout');
-    setSavedRevision(useKeyboardStore.getState().historyId);
-    setCurrentSavedUpdatedAt(null);
-    setRestoredDraftDirty(false);
+    setActiveRightPanel('options');
+    setEditorMode('layout');
+    beginSettingsDialog('hardware');
   };
 
   React.useEffect(() => {
@@ -503,7 +509,6 @@ export default function App() {
   React.useEffect(() => {
     if (
       !storeState.isProjectOpen
-      || storeState.isHardwareModalOpen
       || storeState.isDemoMode
       || !currentProjectId
       || currentSavedUpdatedAt === null
@@ -524,7 +529,6 @@ export default function App() {
     currentSavedUpdatedAt,
     isDirty,
     storeState.isProjectOpen,
-    storeState.isHardwareModalOpen,
     storeState.isDemoMode,
   ]);
 
@@ -770,37 +774,6 @@ export default function App() {
     setActiveRightPanel(panel);
     setIsLeftNavOpen(false);
     setIsInspectorOpen(true);
-  };
-
-  const cancelNewProject = () => {
-    storeState.resetProject(false);
-    storeState.setIsHardwareModalOpen(false);
-    setIsHomeVisible(true);
-  };
-
-  const confirmNewProject = () => {
-    const preset = PRESET_LAYOUTS[newProjectPreset as keyof typeof PRESET_LAYOUTS];
-    const parsed = newProjectPreset === 'Blank Layout' ? null : parseKeyboardDefinition(preset);
-    const project: SmidrProject = {
-      id: crypto.randomUUID(),
-      updatedAt: Date.now(),
-      ...settings,
-      name: settings.name.trim() || parsed?.name || newProjectPreset || 'New Project',
-      layoutOptions: parsed?.layoutOptions || {},
-      activeOptions: parsed?.activeOptions || {},
-      matrix: parsed?.matrix || settings.matrix,
-      keys: (parsed?.keys || []).map(key => ({ ...key, id: crypto.randomUUID(), keymap: {} })),
-    };
-    const savedProject = storeState.isDemoMode ? project : saveProject(project);
-    loadProject(savedProject, true);
-    setSavedRevision(useKeyboardStore.getState().historyId);
-    setCurrentSavedUpdatedAt(savedProject.updatedAt);
-    setRestoredDraftDirty(false);
-    refreshProjectList();
-    storeState.setIsHardwareModalOpen(false);
-    setActiveRightPanel('options');
-    setEditorMode('layout');
-    beginSettingsDialog('hardware');
   };
 
   const handleExportCanvasImage = () => {
@@ -2142,44 +2115,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Hardware Setup Modal */}
-      {storeState.isHardwareModalOpen && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-all" onClick={cancelNewProject} />
-          <div className="relative bg-[var(--bg-panel)] border border-[var(--border-main)] rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border-main)] shrink-0 bg-[var(--bg-app)]/50">
-              <div className="flex items-center gap-3">
-                <Settings size={18} className="text-amber-500" />
-                <div>
-                  <h2 className="text-sm font-bold text-[var(--text-highlight)]">{t('workspace.createProject')}</h2>
-                  <p className="text-xs text-[var(--text-muted)] font-medium">{t('workspace.createProjectDescription')}</p>
-                </div>
-              </div>
-              <button 
-                onClick={cancelNewProject}
-                className="p-2 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-highlight)] rounded transition-all active:scale-90"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-panel)]">
-              <NewProjectSetup preset={newProjectPreset} onPresetChange={setNewProjectPreset} />
-            </div>
-            
-            <div className="p-4 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50 flex justify-end shrink-0 gap-3">
-              <button 
-                onClick={confirmNewProject}
-                className="min-h-11 px-6 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-md text-sm font-bold transition-all shadow-lg shadow-amber-500/10 active:scale-95"
-              >
-                {t('hardware.confirmBtn')}
-              </button>
-            </div>
-          </div>
-
-
-        </div>
-      )}
       <UnlockModal />
       <ZmkUnlockModal />
       {editorSettings.debugMode && <DebugOverlay />}

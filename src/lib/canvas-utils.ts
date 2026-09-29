@@ -260,7 +260,9 @@ export const getKeyLabel = (
 
   if (mode === 'layout') {
     const label = [encoderLabel, trackballLabel].filter(Boolean).join('\n');
-    return label ? { type: 'text', text: label } : { type: 'empty' };
+    if (label) return { type: 'text', text: label };
+    const action = k.keymap?.[currentLayer];
+    return action ? formatActionLabel(action, visualLayout) : { type: 'empty' };
   }
 
   if (mode === 'matrix') {

@@ -13,8 +13,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
   const { 
-    settings, keys, editorMode,
-    addKeys, addEncoderKey, addTrackballKey, loadProject, resetProject,
+    settings, keys, editorMode, currentProjectId,
+    addKeys, addEncoderKey, addTrackballKey, loadProject,
     selectedKeyIds, removeKey, generateMatrix,
     matrixPaintMode, setMatrixPaintMode,
     painter, setPainter, clearMatrixMap
@@ -69,30 +69,26 @@ export const EditorTools = ({ floating = false }: { floating?: boolean }) => {
     if (!presetName) return;
     if (presetName === "Blank Layout") {
       if (keys.length > 0 && !confirm(t('common.deleteConfirm'))) return;
-      resetProject(true);
-      return;
-    }
-    if (keys.length > 0 && !confirm(t('tools.confirmReplace'))) return;
+    } else if (keys.length > 0 && !confirm(t('tools.confirmReplace'))) return;
 
     const kleData = PRESET_LAYOUTS[presetName as keyof typeof PRESET_LAYOUTS];
-    if (kleData) {
-      const parsed = parseKeyboardDefinition(kleData);
-      const newKeys: PhysicalKey[] = parsed.keys.map(pk => ({
-        ...pk,
-        id: crypto.randomUUID(),
-        keymap: {}
-      }));
-      loadProject({ 
-        id: crypto.randomUUID(),
-        updatedAt: Date.now(),
-        ...settings,
-        name: parsed.name || presetName,
-        layoutOptions: parsed.layoutOptions || {},
-        activeOptions: parsed.activeOptions || {},
-        matrix: parsed.matrix || settings.matrix,
-        keys: newKeys
-      });
-    }
+    if (!kleData) return;
+    const parsed = presetName === 'Blank Layout' ? null : parseKeyboardDefinition(kleData);
+    const newKeys: PhysicalKey[] = (parsed?.keys || []).map(pk => ({
+      ...pk,
+      id: crypto.randomUUID(),
+      keymap: {}
+    }));
+    loadProject({
+      id: currentProjectId || crypto.randomUUID(),
+      updatedAt: Date.now(),
+      ...settings,
+      name: parsed?.name || (presetName === 'Blank Layout' ? settings.name : presetName),
+      layoutOptions: parsed?.layoutOptions || {},
+      activeOptions: parsed?.activeOptions || {},
+      matrix: parsed?.matrix || settings.matrix,
+      keys: newKeys
+    });
   };
 
   const { t } = useTranslation();
