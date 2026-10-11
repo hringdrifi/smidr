@@ -62,6 +62,28 @@ describe('KiCad export defaults', () => {
 });
 
 describe('export generation', () => {
+  it('exports Bluetooth profile operations as bt behaviors', async () => {
+    const settings: ProjectSettings = {
+      ...baseSettings, name: 'Bluetooth Keys', firmwareTarget: 'zmk', layers: 1,
+      matrix: { rows: 1, cols: 6 }, pins: { ...baseSettings.pins, rows: ['P0.02'], cols: ['P0.03', 'P0.04', 'P0.05', 'P0.06', 'P0.07', 'P0.08'] },
+      hardware: { ...baseSettings.hardware, mcu: 'nrf52840', board: 'nice_nano_v2' },
+    };
+    const codes = ['BT_SEL_0', 'BT_SEL_4', 'BT_NXT', 'BT_PRV', 'BT_CLR_ALL', 'BT_DISC_0'] as const;
+    const keys: PhysicalKey[] = codes.map((keycode, col) => ({
+      row: 0, col, x: col, y: 0, w: 1, h: 1, r: 0, rx: 0, ry: 0, label: '',
+      keymap: { 0: { action: 'tap', keycode } },
+    }));
+    const blob = await generateZmkZip({ settings, keys });
+    expect(blob).not.toBeNull();
+    const zip = await JSZip.loadAsync(await blob!.arrayBuffer());
+    const keymap = await zip.file('config/bluetooth_keys.keymap')!.async('string');
+    expect(keymap).toContain('#include <dt-bindings/zmk/bt.h>');
+    for (const binding of ['&bt BT_SEL 0', '&bt BT_SEL 4', '&bt BT_NXT', '&bt BT_PRV', '&bt BT_CLR_ALL', '&bt BT_DISC 0']) {
+      expect(keymap).toContain(binding);
+    }
+    expect(keymap).not.toContain('&kp BT_');
+  });
+
   it.each([
     ['development_board', false],
     ['development_board', true],

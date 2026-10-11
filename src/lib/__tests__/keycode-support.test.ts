@@ -40,6 +40,18 @@ describe('keycode palette support target', () => {
     expect(getKeycodeSupport('TD_0', 'rmk').supported).toBe(false);
   });
 
+  it('only exposes Bluetooth profile keys for ZMK', () => {
+    const codes = ['BT_NXT', 'BT_PRV', 'BT_CLR', 'BT_CLR_ALL',
+      ...Array.from({ length: 5 }, (_, i) => `BT_SEL_${i}`),
+      ...Array.from({ length: 5 }, (_, i) => `BT_DISC_${i}`)];
+    for (const code of codes) {
+      expect(getKeycodeSupport(code, 'zmk').supported).toBe(true);
+      for (const target of ['qmk', 'via', 'vial', 'rmk'] as const) {
+        expect(getKeycodeSupport(code, target).supported).toBe(false);
+      }
+    }
+  });
+
   it('rejects missing targets and mismatched raw actions', () => {
     expect(getKeycodeSupport('A', null).supported).toBe(false);
     expect(getActionSupport({ action: 'custom', protocol: 'zmk', rawCode: '&kp A' }, 'zmk').supported).toBe(true);

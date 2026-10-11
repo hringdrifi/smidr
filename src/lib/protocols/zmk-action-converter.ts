@@ -209,6 +209,20 @@ export const ZMK_KEY_MAP: Record<UniversalKey, string> = {
   "STUDIO_UNLOCK": "STUDIO_UNLOCK",
   "OUTPUT_USB": "OUTPUT_USB",
   "OUTPUT_BLUETOOTH": "OUTPUT_BLUETOOTH",
+  "BT_SEL_0": "BT_SEL_0",
+  "BT_SEL_1": "BT_SEL_1",
+  "BT_SEL_2": "BT_SEL_2",
+  "BT_SEL_3": "BT_SEL_3",
+  "BT_SEL_4": "BT_SEL_4",
+  "BT_NXT": "BT_NXT",
+  "BT_PRV": "BT_PRV",
+  "BT_CLR": "BT_CLR",
+  "BT_CLR_ALL": "BT_CLR_ALL",
+  "BT_DISC_0": "BT_DISC_0",
+  "BT_DISC_1": "BT_DISC_1",
+  "BT_DISC_2": "BT_DISC_2",
+  "BT_DISC_3": "BT_DISC_3",
+  "BT_DISC_4": "BT_DISC_4",
   "TRNS": "TRANS",
   "NO": "NONE"
 };
@@ -228,6 +242,20 @@ const ZMK_SIMPLE_BEHAVIOR_MAP: Partial<Record<UniversalKey, string>> = {
   STUDIO_UNLOCK: '&studio_unlock',
   OUTPUT_USB: '&out OUT_USB',
   OUTPUT_BLUETOOTH: '&out OUT_BLE',
+  BT_SEL_0: '&bt BT_SEL 0',
+  BT_SEL_1: '&bt BT_SEL 1',
+  BT_SEL_2: '&bt BT_SEL 2',
+  BT_SEL_3: '&bt BT_SEL 3',
+  BT_SEL_4: '&bt BT_SEL 4',
+  BT_NXT: '&bt BT_NXT',
+  BT_PRV: '&bt BT_PRV',
+  BT_CLR: '&bt BT_CLR',
+  BT_CLR_ALL: '&bt BT_CLR_ALL',
+  BT_DISC_0: '&bt BT_DISC 0',
+  BT_DISC_1: '&bt BT_DISC 1',
+  BT_DISC_2: '&bt BT_DISC 2',
+  BT_DISC_3: '&bt BT_DISC 3',
+  BT_DISC_4: '&bt BT_DISC 4',
 };
 
 const ZMK_SIMPLE_BEHAVIOR_TO_UNIVERSAL: Record<string, UniversalKey> = Object.entries(ZMK_SIMPLE_BEHAVIOR_MAP)
@@ -365,6 +393,16 @@ export function actionToZmkString(action: UniversalAction): string {
 // Parses ZMK DTS strings back into the unified UniversalAction AST
 export function zmkStringToAction(zmkStr: string): UniversalAction {
   const trimmed = zmkStr.trim();
+
+  // Bluetooth's second cell is a profile index, including zero. Do not
+  // remove it as padding when normalizing other press-triggered behaviors.
+  if (/^&bt\s/.test(trimmed)) {
+    const normalized = trimmed.replace(/\s+/g, ' ');
+    const bluetoothKey = ZMK_SIMPLE_BEHAVIOR_TO_UNIVERSAL[normalized]
+      || ZMK_SIMPLE_BEHAVIOR_TO_UNIVERSAL[normalized.replace(/\s+0$/, '')];
+    if (bluetoothKey) return { action: 'tap', keycode: bluetoothKey };
+    return { action: 'custom', protocol: 'zmk', rawCode: trimmed };
+  }
 
   const normalizedSimpleBehavior = trimmed.replace(/(?:\s+0){1,2}$/, '');
   const simpleBehaviorKey = ZMK_SIMPLE_BEHAVIOR_TO_UNIVERSAL[normalizedSimpleBehavior];

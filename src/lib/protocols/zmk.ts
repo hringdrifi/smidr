@@ -1475,6 +1475,7 @@ function resolveBehaviorId(behaviorIds: Record<string, number>, shortName: strin
     if (normShort === "lt" && normKey === "layertap") return value;
     if (normShort === "mt" && (normKey === "modtap" || normKey === "holdtap")) return value;
     if (normShort === "bl" && normKey === "backlight") return value;
+    if (normShort === "bt" && normKey === "bluetooth") return value;
   }
 
   // Fallback defaults if not found dynamically from device
@@ -1500,6 +1501,7 @@ function getBehaviorAliases(displayName: string): string[] {
   if (normalized === "transparent") aliases.push("trans");
   if (normalized === "none" || normalized === "nooperation" || normalized === "noop") aliases.push("none");
   if (normalized === "backlight") aliases.push("bl");
+  if (normalized === "bluetooth") aliases.push("bt");
 
   return aliases;
 }
@@ -1619,6 +1621,15 @@ function bindingToZmkString(
       5: "BL_CYCLE"
     };
     return `&bl ${cmdMap[binding.param1] || "BL_TOG"}`;
+  }
+  if (name === "bt" || name === "bluetooth") {
+    const commands: Record<number, string> = {
+      0: 'BT_CLR', 1: 'BT_NXT', 2: 'BT_PRV',
+      3: 'BT_SEL', 4: 'BT_CLR_ALL', 5: 'BT_DISC',
+    };
+    const command = commands[binding.param1];
+    if (!command) return `&bt ${binding.param1} ${binding.param2}`;
+    return `&bt ${command}${binding.param1 === 3 || binding.param1 === 5 ? ` ${binding.param2}` : ''}`;
   }
   if (name === "out" || name === "output" || name === "outputselection") {
     const cmdMap: Record<number, string> = {
@@ -1822,6 +1833,27 @@ function zmkStringToBinding(
       param1: cmdMap[cmd] !== undefined ? cmdMap[cmd] : 2,
       param2: cmd === "BL_SET" ? parseInt(match[2] || "0", 10) : 0
     };
+  }
+
+  match = trimmed.match(/^&bt\s+(BT_CLR|BT_NXT|BT_PRV|BT_SEL|BT_CLR_ALL|BT_DISC)(?:\s+(\d+))?$/i);
+  if (match) {
+    const command = match[1].toUpperCase();
+    const requiresProfile = command === 'BT_SEL' || command === 'BT_DISC';
+    if (requiresProfile && match[2] === undefined) {
+      throw new Error(`${command} requires a Bluetooth profile index.`);
+    }
+    if (!requiresProfile && match[2] !== undefined && match[2] !== '0') {
+      throw new Error(`${command} does not accept a Bluetooth profile index.`);
+    }
+    const commands: Record<string, number> = {
+      BT_CLR: 0, BT_NXT: 1, BT_PRV: 2,
+      BT_SEL: 3, BT_CLR_ALL: 4, BT_DISC: 5,
+    };
+    const behaviorId = resolveBehaviorId(behaviorIds, 'bt');
+    if (!behaviorId) {
+      throw new Error('Unknown ZMK behavior "bt". Connect to a ZMK Studio device with Bluetooth support and sync behavior metadata first.');
+    }
+    return { behaviorId, param1: commands[command], param2: requiresProfile ? Number(match[2]) : 0 };
   }
 
   match = trimmed.match(/^&out\s+(OUT_TOG|OUT_USB|OUT_BLE|OUT_NONE)$/i);

@@ -250,6 +250,7 @@ Smiðr は、VIA/Vial 接続だけでなく、ZMK Studio (Protobuf RPC) 接続�
 - **リマップモードの実機編集**: リマップモードの Macro / Combo / Tap Dance パネルは接続中デバイスの Dynamic Macro / Dynamic Combo / Dynamic Tap Dance を編集する。実機編集内容は接続中デバイスへ書き込むが、ProjectSettings には反映せず、ソース出力にも直接反映しない。Dynamic 定義の初期値流し込みは行わない。
 - **Layer-Tap (LT)**: 正規表現による文字列検索を完全に廃止し、AST のノードレベル（`action: 'lt'`）で対象レイヤーとキーコードの書き換えを実行します。
 - **システムキーの区別**: `BOOTLOADER` は QMK/VIA では `QK_BOOT` (`0x7C00`) としてブートローダーモードに入り、`SYSTEM_RESET` は `QK_REBOOT` (`0x7C01`) としてブートローダーに入らずキーボードを再起動します。ZMK ではそれぞれ `BOOTLOADER` / `SYS_RESET` に対応します。
+- **ZMK Bluetooth キー**: ZMK 専用の Special パレットに `BT_SEL_0`〜`BT_SEL_4`（表示は `BT 0`〜`BT 4`）、`BT_NXT`、`BT_PRV`、`BT_CLR`、`BT_CLR_ALL`、`BT_DISC_0`〜`BT_DISC_4` を掲載する。プロファイル番号は0始まり。選択・指定プロファイル切断は `&bt BT_SEL n` / `&bt BT_DISC n`、その他は同名の `&bt` コマンドとして出力する。Studio RPC は command を第1パラメータ（CLR=0、NXT=1、PRV=2、SEL=3、CLR_ALL=4、DISC=5）、profile を第2パラメータとして読み書きする。BT_CLR は現在のプロファイル、BT_CLR_ALL は全プロファイルのペアリング情報を削除する。BT_DISC は非アクティブな接続の切断用。既定の5プロファイルを超える既存 binding はカスタムとして保持する。
 
 ### 9.5 タップダンス定義 (Tap Dance)
 - **プロジェクト定義**: タップダンス定義は `ProjectSettings.tapDances` に保存する。各定義は Vial の Dynamic Tap Dance 形式を標準モデルとし、`id`, `tapAction`, `holdAction`, `doubleTapAction`, `tapHoldAction`, `tappingTerm` を持つ。

@@ -74,6 +74,9 @@ export type UniversalKey =
   | "BOOTLOADER" | "SYSTEM_RESET"
   | "CAPS_WORD" | "KEY_REPEAT" | "GRAVE_ESCAPE"
   | "STUDIO_UNLOCK" | "OUTPUT_USB" | "OUTPUT_BLUETOOTH"
+  | "BT_SEL_0" | "BT_SEL_1" | "BT_SEL_2" | "BT_SEL_3" | "BT_SEL_4"
+  | "BT_NXT" | "BT_PRV" | "BT_CLR" | "BT_CLR_ALL"
+  | "BT_DISC_0" | "BT_DISC_1" | "BT_DISC_2" | "BT_DISC_3" | "BT_DISC_4"
   // 特別・透過・なし
   | "TRNS" | "NO";
 

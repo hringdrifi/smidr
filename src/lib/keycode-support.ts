@@ -32,7 +32,12 @@ const POINTER_KEYS = [
 const FIRMWARE_CONTROL_KEYS = ['BOOTLOADER', 'SYSTEM_RESET'] as const;
 const UNIVERSAL_BEHAVIOR_KEYS = ['CAPS_WORD', 'KEY_REPEAT'] as const;
 const QMK_ZMK_BEHAVIOR_KEYS = ['GRAVE_ESCAPE', 'OUTPUT_USB', 'OUTPUT_BLUETOOTH'] as const;
-const ZMK_ONLY_BEHAVIOR_KEYS = ['STUDIO_UNLOCK'] as const;
+const ZMK_ONLY_BEHAVIOR_KEYS = [
+  'STUDIO_UNLOCK',
+  'BT_SEL_0', 'BT_SEL_1', 'BT_SEL_2', 'BT_SEL_3', 'BT_SEL_4',
+  'BT_NXT', 'BT_PRV', 'BT_CLR', 'BT_CLR_ALL',
+  'BT_DISC_0', 'BT_DISC_1', 'BT_DISC_2', 'BT_DISC_3', 'BT_DISC_4',
+] as const;
 const QMK_ZMK_SYSTEM_HID_KEYS = ['PWR', 'SLEEP', 'WAKE'] as const;
 
 const ZMK_POINTER_KEYS = POINTER_KEYS.filter(code => !code.startsWith('MOUSE_ACCEL'));

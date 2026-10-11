@@ -474,6 +474,28 @@ describe('protocols conversion tests', () => {
       }
     });
 
+    it('round-trips Bluetooth commands and zero-based profiles', () => {
+      const cases = [
+        ['BT_CLR', '&bt BT_CLR'], ['BT_NXT', '&bt BT_NXT'],
+        ['BT_PRV', '&bt BT_PRV'], ['BT_CLR_ALL', '&bt BT_CLR_ALL'],
+        ['BT_SEL_0', '&bt BT_SEL 0'], ['BT_SEL_1', '&bt BT_SEL 1'],
+        ['BT_SEL_2', '&bt BT_SEL 2'], ['BT_SEL_3', '&bt BT_SEL 3'],
+        ['BT_SEL_4', '&bt BT_SEL 4'],
+        ['BT_DISC_0', '&bt BT_DISC 0'], ['BT_DISC_1', '&bt BT_DISC 1'],
+        ['BT_DISC_2', '&bt BT_DISC 2'], ['BT_DISC_3', '&bt BT_DISC 3'],
+        ['BT_DISC_4', '&bt BT_DISC 4'],
+      ] as const;
+      for (const [keycode, binding] of cases) {
+        const action = { action: 'tap', keycode } as const;
+        expect(actionToZmkString(action)).toBe(binding);
+        expect(zmkStringToAction(binding)).toEqual(action);
+        expect(zmkStringToAction(`${binding} 0`)).toEqual(action);
+      }
+      for (const rawCode of ['&bt BT_SEL 8', '&bt BT_DISC 7', '&bt 9 0']) {
+        expect(zmkStringToAction(rawCode)).toEqual({ action: 'custom', protocol: 'zmk', rawCode });
+      }
+    });
+
     it('should map added universal HID keys to official ZMK names', () => {
       expect(actionToZmkString({ action: 'tap', keycode: 'COPY' })).toBe('&kp K_COPY');
       expect(actionToZmkString({ action: 'tap', keycode: 'MFFD' })).toBe('&kp C_FF');
@@ -872,6 +894,64 @@ describe('protocols conversion tests', () => {
       zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
 
       expect(zmk.getCachedKeymapActions()[0][0]).toEqual({ action: 'none' });
+    });
+
+    it('decodes Bluetooth Studio commands including profile zero and unknown bindings', () => {
+      const zmk = new ZmkProtocol();
+      const bindings = [
+        { behaviorId: 20, param1: 0, param2: 0 },
+        { behaviorId: 20, param1: 1, param2: 0 },
+        { behaviorId: 20, param1: 2, param2: 0 },
+        ...Array.from({ length: 5 }, (_, param2) => ({ behaviorId: 20, param1: 3, param2 })),
+        { behaviorId: 20, param1: 4, param2: 0 },
+        ...Array.from({ length: 5 }, (_, param2) => ({ behaviorId: 20, param1: 5, param2 })),
+        { behaviorId: 20, param1: 3, param2: 8 },
+        { behaviorId: 20, param1: 9, param2: 2 },
+      ];
+      zmk['keymapAvailable'] = true;
+      zmk['behaviorNames'] = { 20: 'Bluetooth' };
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings }],
+        availableLayers: 0, maxLayerNameLength: 20,
+      };
+      zmk['physicalPositions'] = bindings.map((_, index) => ({ row: 0, col: index, index }));
+      expect(zmk.getCachedKeymapActions()[0]).toEqual([
+        ...['BT_CLR', 'BT_NXT', 'BT_PRV',
+          ...Array.from({ length: 5 }, (_, i) => `BT_SEL_${i}`), 'BT_CLR_ALL',
+          ...Array.from({ length: 5 }, (_, i) => `BT_DISC_${i}`),
+        ].map(keycode => ({ action: 'tap', keycode })),
+        { action: 'custom', protocol: 'zmk', rawCode: '&bt BT_SEL 8' },
+        { action: 'custom', protocol: 'zmk', rawCode: '&bt 9 2' },
+      ]);
+    });
+
+    it.each([
+      ['BT_CLR', 0, 0], ['BT_NXT', 1, 0], ['BT_PRV', 2, 0],
+      ['BT_SEL_0', 3, 0], ['BT_SEL_4', 3, 4], ['BT_CLR_ALL', 4, 0],
+      ['BT_DISC_0', 5, 0], ['BT_DISC_4', 5, 4],
+    ] as const)('encodes Bluetooth Studio key %s', async (keycode, command, profile) => {
+      const zmk = new ZmkProtocol();
+      const sent: Uint8Array[] = [];
+      let responseIndex = 0;
+      const responses = [
+        lockStateResponse(1, 1),
+        new Uint8Array([0x0a, 0x06, 0x08, 0x02, 0x2a, 0x02, 0x10, 0x00]),
+        new Uint8Array([0x0a, 0x08, 0x08, 0x03, 0x2a, 0x04, 0x22, 0x02, 0x08, 0x01]),
+      ];
+      await zmk.initialize({
+        isConnected: true, connect: async () => true, disconnect: async () => {},
+        send: async data => { sent.push(data); },
+        receive: async () => responses[responseIndex++],
+      });
+      zmk['keymapAvailable'] = true;
+      zmk['fetchedKeymap'] = {
+        layers: [{ id: 0, name: 'Base', bindings: [{ behaviorId: 20, param1: 0, param2: 0 }] }],
+        availableLayers: 0, maxLayerNameLength: 20,
+      };
+      zmk['physicalPositions'] = [{ row: 0, col: 0, index: 0 }];
+      zmk['behaviorIds'] = { Bluetooth: 20 };
+      await zmk.setKey(0, 0, 0, { action: 'tap', keycode });
+      expect(containsSubsequence(Array.from(sent[1]), [0x08, 40, 0x10, command, 0x18, profile])).toBe(true);
     });
 
     it('should decode ZMK output selection constants using the official numeric values', () => {
