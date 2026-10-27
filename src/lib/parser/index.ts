@@ -1,0 +1,418 @@
+import { PhysicalKey, ProjectSettings } from '@/types/keyboard';
+import { parseKLEData } from './kle-logic';
+import { getDefaultBootloader, getQmkProcessor } from '../mcu-presets';
+
+const roundCoord = (v: number) => Math.round(v * 10000000) / 10000000;
+
+const parseHexOrDec = (val: any): number | undefined => {
+  if (val === undefined || val === null || val === '') return undefined;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : undefined;
+
+  const s = String(val).trim();
+  if (!s) return undefined;
+  const parsed = s.toLowerCase().startsWith('0x')
+    ? parseInt(s.slice(2), 16)
+    : /^[0-9a-f]+$/i.test(s)
+    ? parseInt(s, 16)
+    : parseInt(s, 10);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const getVendorProductId = (input: any): number | undefined => {
+  if (input.vendorProductId !== undefined) {
+    const text = String(input.vendorProductId).trim();
+    const parsed = text.toLowerCase().startsWith('0x')
+      ? parseInt(text.slice(2), 16)
+      : Number(input.vendorProductId);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  const vid = parseHexOrDec(input.vendorId);
+  const pid = parseHexOrDec(input.productId);
+  if (vid === undefined || pid === undefined) return undefined;
+  return (vid << 16) | pid;
+};
+
+const labelMap = [
+  // 0  1  2  3  4  5  6  7  8  9 10 11   # align flags
+  [ 0, 6, 2, 8, 9, 11, 3, 5, 1, 4, 7, 10], // 0 = no centering
+  [ 1, 7, -1, -1, 9, 11, 4, -1, -1, -1, -1, 10], // 1 = center x
+  [ 3, -1, 5, -1, 9, 11, -1, -1, 4, -1, -1, 10], // 2 = center y
+  [ 4, -1, -1, -1, 9, 11, -1, -1, -1, -1, -1, 10], // 3 = center x & y
+  [ 0, 6, 2, 8, 10, -1, 3, 5, 1, 4, 7, -1], // 4 = center front (default)
+  [ 1, 7, -1, -1, 10, -1, 4, -1, -1, -1, -1, -1], // 5 = center front & x
+  [ 3, -1, 5, -1, 10, -1, -1, -1, 4, -1, -1, -1], // 6 = center front & y
+  [ 4, -1, -1, -1, 10, -1, -1, -1, -1, -1, -1, -1], // 7 = center front & x & y
+];
+
+function reorderLabels(parts: string[], align: number): (string | null)[] {
+  const ret: (string | null)[] = new Array(12).fill(null);
+  const map = labelMap[align] || labelMap[4];
+  for (let i = 0; i < parts.length; i++) {
+    const logicalIdx = map[i];
+    if (logicalIdx !== undefined && logicalIdx !== -1) {
+      ret[logicalIdx] = parts[i];
+    }
+  }
+  return ret;
+}
+
+/**
+ * Unified parser for Keyboard definitions (KLE, VIA, Vial).
+ */
+export function parseKeyboardDefinition(input: any, options?: { debug?: boolean }): { 
+  keys: PhysicalKey[], 
+  name?: string,
+  vendorProductId?: number,
+  layoutOptions?: ProjectSettings['layoutOptions'],
+  activeOptions?: ProjectSettings['activeOptions'],
+  matrix?: ProjectSettings['matrix'],
+  pins?: Partial<ProjectSettings['pins']>,
+  encoders?: ProjectSettings['encoders'],
+  hardware?: Partial<ProjectSettings['hardware']>,
+  qmk?: Partial<ProjectSettings['qmk']>,
+  features?: Partial<ProjectSettings['features']>
+} {
+  const isDebug = options?.debug;
+  if (isDebug) console.log('[Parser] Starting unified parse...');
+  let rawKLE: any[][] = [];
+  let name: string | undefined;
+  let vendorProductId: number | undefined;
+  let layoutOptions: ProjectSettings['layoutOptions'] = {};
+  let activeOptions: ProjectSettings['activeOptions'] = {};
+  let matrix: ProjectSettings['matrix'] | undefined;
+
+  // 1. Detect format
+  if (!input) {
+    throw new Error("Empty input provided to parser");
+  }
+
+  if (Array.isArray(input)) {
+    if (isDebug) console.log('[Parser] Detected Format: Raw KLE Array');
+    
+    // Check if first element is metadata
+    const first = input[0];
+    if (first && typeof first === 'object' && !Array.isArray(first)) {
+      if (isDebug) console.log('[Parser] Extracting metadata from first element:', first);
+      name = first.name || first.kbName;
+      vendorProductId = getVendorProductId(first);
+      rawKLE = input.slice(1);
+    } else {
+      rawKLE = input;
+    }
+  } else if (typeof input === 'object') {
+    // 1. VIA/Vial Definition
+    if (input.layouts && input.layouts.keymap) {
+      if (isDebug) console.log('[Parser] Detected Format: VIA/Vial Object');
+      if (typeof input.layouts.keymap === 'string') {
+        try {
+          rawKLE = JSON.parse(input.layouts.keymap);
+        } catch (e) {
+          throw new Error(`Failed to parse KLE string inside VIA definition: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else {
+        rawKLE = input.layouts.keymap;
+      }
+      name = input.name;
+      vendorProductId = getVendorProductId(input);
+      if (Number.isFinite(input.matrix?.rows) && Number.isFinite(input.matrix?.cols)) {
+        matrix = {
+          rows: Number(input.matrix.rows),
+          cols: Number(input.matrix.cols),
+        };
+      }
+      
+      // Parse layout options from VIA labels
+      if (input.layouts.labels) {
+        input.layouts.labels.forEach((label: any, idx: number) => {
+          const groupId = idx.toString();
+          if (Array.isArray(label)) {
+            const [groupName, ...choices] = label;
+            layoutOptions[groupId] = {
+              name: groupName,
+              type: 'list',
+              choices: choices
+            };
+          } else if (typeof label === 'string') {
+            layoutOptions[groupId] = {
+              name: label,
+              type: 'toggle'
+            };
+          }
+          activeOptions[groupId] = 0;
+        });
+      }
+    } else if (input.layouts && Object.values(input.layouts).some((l: any) => typeof l === 'object' && l !== null && Array.isArray(l.layout))) {
+      // 2. QMK info.json Format
+      if (isDebug) console.log('[Parser] Detected Format: QMK info.json');
+      name = input.keyboard_name || input.name;
+      if (input.usb && input.usb.vid !== undefined && input.usb.pid !== undefined) {
+        const vid = parseHexOrDec(input.usb.vid);
+        const pid = parseHexOrDec(input.usb.pid);
+        if (vid !== undefined && pid !== undefined) {
+          vendorProductId = (vid << 16) | pid;
+        }
+      }
+
+      // Parse QMK hardware configuration
+      let pins: any = undefined;
+      const directPins = Array.isArray(input.matrix_pins?.direct) ? input.matrix_pins.direct : undefined;
+      const directPinPool = directPins
+        ? [...new Set(directPins.flat().filter((pin: unknown) => pin && pin !== 'NO_PIN').map(String))]
+        : [];
+      if (input.matrix_pins) {
+        pins = {
+          rows: Array.isArray(input.matrix_pins.rows) ? input.matrix_pins.rows.map(String) : [],
+          cols: Array.isArray(input.matrix_pins.cols) ? input.matrix_pins.cols.map(String) : [],
+          direct: directPinPool,
+        };
+        
+        // Parse RGB light pin if present
+        if (input.rgblight && input.rgblight.pin) {
+          pins.rgb = String(input.rgblight.pin);
+        } else if (input.ws2812 && input.ws2812.pin) {
+          pins.rgb = String(input.ws2812.pin);
+        }
+        if (input.backlight && input.backlight.pin) {
+          pins.backlight = String(input.backlight.pin);
+        }
+      }
+
+      const encoders: ProjectSettings['encoders'] | undefined = input.encoder && Array.isArray(input.encoder.rotary)
+        ? input.encoder.rotary.map((encoder: any) => ({
+          pinA: encoder.pin_a ? String(encoder.pin_a) : undefined,
+          pinB: encoder.pin_b ? String(encoder.pin_b) : undefined,
+        }))
+        : undefined;
+
+      let hardware: any = undefined;
+      if (input.development_board || input.processor || input.bootloader || input.diode_direction) {
+        let mcu = 'RP2040';
+        if (input.processor) {
+          mcu = getQmkProcessor(String(input.processor));
+        }
+        let board = input.development_board ? String(input.development_board) : 'promicro';
+        let bootloader = input.bootloader ? String(input.bootloader) : getDefaultBootloader(mcu);
+        if (!input.development_board && input.bootloader) {
+          const bl = String(input.bootloader).toLowerCase();
+          if (bl.includes('pro_micro') || bl.includes('promicro')) board = 'promicro';
+          else board = bl;
+        }
+        let diodeDirection: 'ROW2COL' | 'COL2ROW' = 'COL2ROW';
+        if (input.diode_direction) {
+          const dd = String(input.diode_direction).toUpperCase();
+          if (dd === 'ROW2COL' || dd === 'COL2ROW') {
+            diodeDirection = dd;
+          }
+        }
+        hardware = {
+          controllerType: input.development_board ? 'development_board' : 'mcu',
+          mcu,
+          bootloader,
+          board,
+          diodeDirection,
+        };
+      }
+
+      const bootmagicMatrix = Array.isArray(input.bootmagic?.matrix) ? input.bootmagic.matrix : undefined;
+      const bootmagicRow = bootmagicMatrix ? Number(bootmagicMatrix[0]) : undefined;
+      const bootmagicCol = bootmagicMatrix ? Number(bootmagicMatrix[1]) : undefined;
+      const qmk: Partial<ProjectSettings['qmk']> = {
+        matrixMasked: input.matrix_pins?.masked === true,
+        bootmagic: {
+          enabled: input.bootmagic?.enabled !== false && input.features?.bootmagic !== false,
+          row: Number.isInteger(bootmagicRow) ? bootmagicRow : undefined,
+          col: Number.isInteger(bootmagicCol) ? bootmagicCol : undefined,
+        },
+      };
+
+      let features: any = undefined;
+      if (input.features) {
+        features = {
+          rgb: !!input.features.rgblight,
+          backlight: !!input.features.backlight,
+          rgbMatrix: !!input.features.rgb_matrix,
+          encoder: !!input.features.encoder,
+          oled: !!input.features.oled,
+          via: !!input.features.via,
+          vial: !!input.features.vial,
+        };
+      }
+
+      const layoutKey = Object.keys(input.layouts).find(k => Array.isArray(input.layouts[k]?.layout));
+      if (layoutKey) {
+        const qmkLayout = input.layouts[layoutKey].layout;
+        const keys: PhysicalKey[] = qmkLayout.map((k: any) => {
+          const id = crypto.randomUUID();
+          const row = Array.isArray(k.matrix) ? k.matrix[0] : undefined;
+          const col = Array.isArray(k.matrix) ? k.matrix[1] : undefined;
+          const directPin = directPins && Number.isInteger(row) && Number.isInteger(col)
+            ? directPins[row]?.[col]
+            : undefined;
+          const directIndex = directPin && directPin !== 'NO_PIN'
+            ? directPinPool.indexOf(String(directPin))
+            : -1;
+          const rgbLed = Array.isArray(input.rgb_matrix?.layout)
+            ? input.rgb_matrix.layout.find((led: any) => Number(led.matrix?.[0]) === row && Number(led.matrix?.[1]) === col)
+            : undefined;
+          return {
+            id,
+            x: k.x ?? 0,
+            y: k.y ?? 0,
+            w: k.w ?? 1,
+            h: k.h ?? 1,
+            r: k.r ?? 0,
+            rx: k.rx ?? (k.x ?? 0),
+            ry: k.ry ?? (k.y ?? 0),
+            label: k.label || '',
+            row: directPins ? undefined : row,
+            col: directPins ? undefined : col,
+            ledIndex: Number.isInteger(rgbLed?.index) ? rgbLed.index : undefined,
+            ledX: Number.isFinite(rgbLed?.x) ? Number(rgbLed.x) : undefined,
+            ledY: Number.isFinite(rgbLed?.y) ? Number(rgbLed.y) : undefined,
+            ledFlags: Number.isInteger(rgbLed?.flags) ? Number(rgbLed.flags) : undefined,
+            directIndex: directIndex >= 0 ? directIndex : undefined,
+            keymap: {}
+          };
+        });
+        return {
+          keys,
+          name,
+          vendorProductId,
+          layoutOptions: {},
+          activeOptions: {},
+          matrix: directPins
+            ? {
+              rows: directPins.length,
+              cols: Math.max(0, ...directPins.map((row: any[]) => Array.isArray(row) ? row.length : 0)),
+              wiring: 'direct',
+            }
+            : undefined,
+          pins,
+          encoders,
+          hardware,
+          qmk,
+          features
+        };
+      } else {
+        throw new Error("Invalid QMK info.json: Layout definitions found but no layout array detected.");
+      }
+    } else {
+      throw new Error("Invalid keyboard definition: unrecognized format (neither VIA/Vial nor QMK info.json).");
+    }
+  } else {
+    throw new Error(`Unsupported input format: ${typeof input}. Expected Array or Object.`);
+  }
+
+  // 2. Parse KLE
+  if (isDebug) console.log('[Parser] Parsing KLE data rows:', rawKLE.length);
+  const parsedKeys = parseKLEData(rawKLE, { debug: isDebug });
+
+  // 3. Convert to Smiðr PhysicalKey format
+  const keys: PhysicalKey[] = parsedKeys.map((pk, i) => {
+    const id = crypto.randomUUID();
+    
+    // Base key properties
+    let w = pk.w || 1;
+    let h = pk.h || 1;
+    let w2 = pk.w2;
+    let h2 = pk.h2;
+    let x2 = pk.x2;
+    let y2 = pk.y2;
+
+    const key: PhysicalKey = {
+      id,
+      x: pk.x,
+      y: pk.y,
+      w,
+      h,
+      r: pk.r || 0,
+      rx: pk.rx ?? pk.x,
+      ry: pk.ry ?? pk.y,
+      label: pk.label,
+      w2,
+      h2,
+      x2,
+      y2,
+      stepped: pk.stepped,
+      keymap: {}
+    };
+    
+    // Extract matrix info
+    if (pk.matrixRow !== undefined && pk.matrixCol !== undefined) {
+      key.row = pk.matrixRow;
+      key.col = pk.matrixCol;
+    }
+    
+    // Layout Options mapping
+    if (pk.optionGroup !== undefined) {
+      key.group = pk.optionGroup.toString();
+      key.option = pk.optionChoice;
+    }
+
+    if (pk.decal) key.decal = true;
+    if (pk.encoderIndex !== undefined) key.encoderIndex = pk.encoderIndex;
+    if (pk.ledIndex !== undefined) key.ledIndex = pk.ledIndex;
+
+    return key;
+  });
+
+  // Align option choices to option 0 choice coordinates (VIA/Vial Style)
+  const groupMinX: Record<string, Record<number, number>> = {};
+  const groupMinY: Record<string, Record<number, number>> = {};
+
+  keys.forEach(k => {
+    if (k.group !== undefined && k.option !== undefined) {
+      const g = k.group;
+      const o = k.option;
+      if (!groupMinX[g]) groupMinX[g] = {};
+      if (!groupMinY[g]) groupMinY[g] = {};
+      
+      groupMinX[g][o] = Math.min(groupMinX[g][o] ?? Infinity, k.x);
+      groupMinY[g][o] = Math.min(groupMinY[g][o] ?? Infinity, k.y);
+    }
+  });
+
+  keys.forEach(k => {
+    if (k.group !== undefined && k.option !== undefined && k.option > 0) {
+      const g = k.group;
+      const o = k.option;
+      const minX0 = groupMinX[g]?.[0];
+      const minY0 = groupMinY[g]?.[0];
+      const minXo = groupMinX[g]?.[o];
+      const minYo = groupMinY[g]?.[o];
+
+      if (minX0 !== undefined && minXo !== undefined) {
+        const dx = minXo - minX0;
+        const dy = minYo - minY0;
+        k.x = roundCoord(k.x - dx);
+        k.y = roundCoord(k.y - dy);
+        if (k.rx !== undefined) k.rx = roundCoord(k.rx - dx);
+        if (k.ry !== undefined) k.ry = roundCoord(k.ry - dy);
+      }
+    }
+  });
+
+  // 4. Ensure all groups in keys exist in layoutOptions to prevent keys from being hidden
+  keys.forEach(k => {
+    if (k.group && !layoutOptions[k.group]) {
+      if (isDebug) console.log(`[Parser] Auto-creating layout group ${k.group} found in keys`);
+      layoutOptions[k.group] = {
+        name: `Group ${k.group}`,
+        type: 'list',
+        choices: ['Option 0', 'Option 1', 'Option 2', 'Option 3'] // Fallback choices
+      };
+      activeOptions[k.group] = 0;
+    }
+  });
+
+  return { 
+    keys, 
+    name, 
+    vendorProductId, 
+    layoutOptions,
+    activeOptions,
+    matrix
+  };
+}

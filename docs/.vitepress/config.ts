@@ -1,0 +1,75 @@
+const base = process.env.NODE_ENV === 'production' ? '/smidr/docs/' : '/';
+
+export default {
+  title: 'Smiðr Docs',
+  description: 'Smiðr の日本語ユーザーガイド',
+  lang: 'ja-JP',
+  base,
+  cleanUrls: true,
+  head: [
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: `${base}favicon-32x32.png` }],
+    ['link', { rel: 'apple-touch-icon', href: `${base}icon.png` }],
+  ],
+  themeConfig: {
+    logo: '/icon.png',
+    siteTitle: 'Smiðr Docs',
+    nav: [
+      { text: 'Guide', link: '/' },
+      { text: '対応表', link: '/reference/actions' },
+      { text: 'Smiðr', link: 'https://hringdrifi.github.io/smidr/' },
+      { text: 'GitHub', link: 'https://github.com/hringdrifi/smidr' },
+    ],
+    sidebar: [
+      {
+        text: '概要',
+        items: [
+          { text: 'はじめに', link: '/' },
+        ],
+      },
+      {
+        text: 'リマップ',
+        items: [{ text: 'リマップモード', link: '/remap/' }],
+      },
+      {
+        text: 'ハードウェア',
+        items: [
+          { text: 'ハードウェア設計ワークフロー', link: '/design/' },
+          { text: 'ハードウェア設定', link: '/design/hardware' },
+          { text: 'レイアウト編集', link: '/design/layout' },
+          { text: 'マトリクス編集', link: '/design/matrix' },
+        ],
+      },
+      {
+        text: 'ファームウェア',
+        items: [
+          { text: 'ファームウェア設計ワークフロー', link: '/design/firmware' },
+          { text: 'キーマップ編集', link: '/design/keymap' },
+          { text: 'アクション / キーコード・対応表', link: '/reference/actions' },
+        ],
+      },
+      {
+        text: 'データ',
+        items: [{ text: 'インポート / エクスポート', link: '/data/import-export' }],
+      },
+      {
+        text: 'リファレンス',
+        items: [
+          { text: 'ショートカット', link: '/reference/shortcuts' },
+          { text: '用語集', link: '/reference/glossary' },
+        ],
+      },
+    ],
+    outline: {
+      label: 'このページ',
+      level: [2, 3],
+    },
+    docFooter: {
+      prev: '前へ',
+      next: '次へ',
+    },
+    darkModeSwitchLabel: 'テーマ',
+    sidebarMenuLabel: 'メニュー',
+    returnToTopLabel: 'トップへ戻る',
+    outlineTitle: 'このページ',
+  },
+};

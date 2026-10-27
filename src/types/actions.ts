@@ -1,0 +1,118 @@
+// src/types/actions.ts
+
+// QMK語彙から接頭辞"KC_"を一貫して除去し、JIS配列キー等も網羅した極めて合理的なキー定義
+export type UniversalKey =
+  // アルファベット
+  | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+  | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+  // 数字
+  | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "0"
+  // ファンクションキー
+  | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12"
+  | "F13" | "F14" | "F15" | "F16" | "F17" | "F18" | "F19" | "F20" | "F21" | "F22" | "F23" | "F24"
+  // コントロールキー (KC_ を除去)
+  | "ESC" | "TAB" | "CAPS" | "ENT" | "BSPC" | "SPC"
+  // 記号・パンクチュエーション (KC_ を除去した短縮名に完全統一)
+  | "MINS" | "EQL" | "LBRC" | "RBRC" | "BSLS"
+  | "SCLN" | "QUOT" | "GRV" | "COMM" | "DOT" | "SLSH" | "NUHS" | "NUBS"
+  // 日本語 JIS 配列固有キー
+  | "YEN"           // ¥キー
+  | "RO"            // _キー
+  | "MHEN"          // 無変換 (KC_MHEN)
+  | "HENK"          // 変換 (KC_HENK)
+  | "KANA"          // かな
+  | "EISU"          // 英数
+  // カーソル・ナビゲーション (KC_ を除去)
+  | "UP" | "DOWN" | "LEFT" | "RIGHT"
+  | "INS" | "DEL" | "HOME" | "END" | "PGUP" | "PGDN"
+  // ロックキー (KC_ を除去)
+  | "NLCK" | "SCRL" | "PSCR" | "PAUS"
+  // テンキー・アプリケーションキー
+  | "P0" | "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8" | "P9"
+  | "PSLS" | "PAST" | "PMNS" | "PPLS" | "PENT" | "PDOT" | "PCMM" | "PEQL"
+  | "APP"
+  // 編集・アプリケーションキー
+  | "EXEC" | "HELP" | "MENU" | "SELECT" | "STOP" | "AGAIN"
+  | "UNDO" | "CUT" | "COPY" | "PASTE" | "FIND"
+  // 統一された修飾キー
+  | "LCTL" | "LSFT" | "LALT" | "LGUI"
+  | "RCTL" | "RSFT" | "RALT" | "RGUI"
+  // 消費者・メディアコントロール (KC_ を除去)
+  | "MPLY" | "MSTP" | "MNXT" | "MPRV"
+  | "VOLU" | "VOLD" | "MUTE"
+  | "BRIU" | "BRID"
+  | "MSEL" | "EJCT" | "MFFD" | "MRWD"
+  | "MAIL" | "CALC" | "MYCM"
+  | "WSCH" | "WHOM" | "WBAK" | "WFWD" | "WSTP" | "WREF" | "WFAV"
+  | "PWR" | "SLEEP" | "WAKE"
+  // ライティング
+  | "UG_TOGG" | "UG_NEXT" | "UG_PREV"
+  | "UG_VALU" | "UG_VALD"
+  | "UG_HUEU" | "UG_HUED"
+  | "UG_SATU" | "UG_SATD"
+  | "UG_SPDU" | "UG_SPDD"
+  | "BL_ON" | "BL_OFF" | "BL_TOGG"
+  | "BL_DOWN" | "BL_UP" | "BL_STEP" | "BL_BRTG"
+  | "LM_ON" | "LM_OFF" | "LM_TOGG"
+  | "LM_NEXT" | "LM_PREV"
+  | "LM_BRIU" | "LM_BRID"
+  | "LM_SPDU" | "LM_SPDD"
+  | "LM_FLGN" | "LM_FLGP"
+  | "RM_ON" | "RM_OFF" | "RM_TOGG"
+  | "RM_NEXT" | "RM_PREV"
+  | "RM_HUEU" | "RM_HUED"
+  | "RM_SATU" | "RM_SATD"
+  | "RM_VALU" | "RM_VALD"
+  | "RM_SPDU" | "RM_SPDD"
+  | "RM_FLGN" | "RM_FLGP"
+  // マウスキー
+  | "MOUSE_UP" | "MOUSE_DOWN" | "MOUSE_LEFT" | "MOUSE_RIGHT"
+  | "MOUSE_BTN1" | "MOUSE_BTN2" | "MOUSE_BTN3" | "MOUSE_BTN4" | "MOUSE_BTN5"
+  | "MOUSE_WHEEL_UP" | "MOUSE_WHEEL_DOWN" | "MOUSE_WHEEL_LEFT" | "MOUSE_WHEEL_RIGHT"
+  | "MOUSE_ACCEL0" | "MOUSE_ACCEL1" | "MOUSE_ACCEL2"
+  // システム・ファームウェア
+  | "BOOTLOADER" | "SYSTEM_RESET"
+  | "CAPS_WORD" | "KEY_REPEAT" | "GRAVE_ESCAPE"
+  | "STUDIO_UNLOCK" | "OUTPUT_USB" | "OUTPUT_BLUETOOTH"
+  | "BT_SEL_0" | "BT_SEL_1" | "BT_SEL_2" | "BT_SEL_3" | "BT_SEL_4"
+  | "BT_NXT" | "BT_PRV" | "BT_CLR" | "BT_CLR_ALL"
+  | "BT_DISC_0" | "BT_DISC_1" | "BT_DISC_2" | "BT_DISC_3" | "BT_DISC_4"
+  // 特別・透過・なし
+  | "TRNS" | "NO";
+
+// 統一されたモディファイア（修飾キー）定義 (UniversalKey と完全一致)
+export type Modifier = "LCTL" | "LSFT" | "LALT" | "LGUI" | "RCTL" | "RSFT" | "RALT" | "RGUI";
+
+export type UniversalAction =
+  | { action: "trans" }                                              // ▽ (レイヤー継承)
+  | { action: "none" }                                                     // キー割り当てなし
+  | { action: "tap"; keycode: UniversalKey; mods?: Modifier[] }            // 通常キー単体押し (例: "A", "SPC", "mods"配列で修飾キー同時押しも兼用)
+  | { action: "mo"; layerId: number }                                     // 一時レイヤー遷移 (MO)
+  | { action: "tg"; layerId: number }                                        // レイヤー有効化トグル (TG)
+  | { action: "to"; layerId: number }                                            // レイヤー直接切り替え (TO)
+  | { action: "lt"; layerId: number; tapAction: UniversalAction }   // レイヤータップ (LT)
+  | { action: "mt"; modifiers: Modifier[]; tapAction: UniversalAction } // モディファイアタップ (MT)
+  | { action: "macro"; macroId: number }                                   // マクロ
+  | { action: "td"; tapDanceId: number }                                   // タップダンス
+  | { action: "custom"; protocol: "qmk" | "via" | "vial" | "zmk" | "rmk"; rawCode: string; label?: string };        // エスケープハッチ
+
+export interface MacroAction {
+  action: 'text' | 'tap' | 'down' | 'up' | 'delay';
+  text?: string;
+  keycodes?: string[]; // UniversalKey or custom raw code strings like "0x1234"
+  duration?: number; // Delay in milliseconds
+}
+
+export interface ComboEntry {
+  inputs: UniversalAction[];
+  output: UniversalAction;
+}
+
+export interface TapDanceEntry {
+  id: number;
+  tapAction: UniversalAction;
+  doubleTapAction?: UniversalAction;
+  holdAction?: UniversalAction;
+  tapHoldAction?: UniversalAction;
+  tappingTerm?: number;
+}
