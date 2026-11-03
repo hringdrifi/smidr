@@ -506,6 +506,38 @@ export default function App() {
     }
   };
 
+  const handleSaveProjectAs = () => {
+    setIsProjectMenuOpen(false);
+    const name = prompt(t('header.saveAsNamePrompt'), settings.name)?.trim();
+    if (!name) return;
+
+    setIsSaving(true);
+    try {
+      const project: SmidrProject = {
+        ...settings,
+        id: crypto.randomUUID(),
+        name,
+        updatedAt: Date.now(),
+        keys,
+      };
+      const savedProject = storeState.isDemoMode ? project : saveProject(project);
+      loadProject(savedProject, true);
+      setCurrentSavedUpdatedAt(savedProject.updatedAt);
+      setRestoredDraftDirty(false);
+      setSavedRevision(useKeyboardStore.getState().historyId);
+      setSaveError(false);
+      refreshProjectList();
+      setShowSavedFeedback(true);
+      setTimeout(() => setShowSavedFeedback(false), 1600);
+    } catch (error) {
+      console.error('Failed to save project as a new project', error);
+      setSaveError(true);
+      alert(t('workspace.saveFailed'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   React.useEffect(() => {
     if (
       !storeState.isProjectOpen
@@ -1442,6 +1474,14 @@ export default function App() {
                       )}
                     </div>
                     <div className="p-1 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50">
+                      <button
+                        onClick={handleSaveProjectAs}
+                        disabled={isSaving || !storeState.isProjectOpen}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold transition-all text-left disabled:opacity-40 disabled:pointer-events-none"
+                      >
+                        <Save size={14} className="text-amber-500 shrink-0" />
+                        <span>{t('header.saveAs')}</span>
+                      </button>
                       <button
                         className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left relative overflow-hidden"
                       >

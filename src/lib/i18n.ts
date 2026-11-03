@@ -54,6 +54,8 @@ export const TRANSLATIONS = {
     header: {
       projectName: 'Project Name',
       saveTooltip: 'Save to Local Storage',
+      saveAs: 'Save as a New Project…',
+      saveAsNamePrompt: 'Enter a name for the new project',
       setupTooltip: 'Hardware Setup',
       projectsTooltip: 'Open...',
       themeLight: 'Switch to Light Mode',
@@ -712,6 +714,8 @@ export const TRANSLATIONS = {
     header: {
       projectName: '项目名称',
       saveTooltip: '保存到本地存储',
+      saveAs: '另存为新项目…',
+      saveAsNamePrompt: '请输入新项目的名称',
       setupTooltip: '硬件设置',
       projectsTooltip: '打开...',
       themeLight: '切换到亮色模式',
@@ -1118,6 +1122,8 @@ export const TRANSLATIONS = {
     header: {
       projectName: '프로젝트 이름',
       saveTooltip: '로컬 저장소에 저장',
+      saveAs: '새 프로젝트로 다른 이름으로 저장…',
+      saveAsNamePrompt: '새 프로젝트의 이름을 입력하세요',
       setupTooltip: '하드웨어 설정',
       projectsTooltip: '열기...',
       themeLight: '라이트 모드로 전환',
@@ -1524,6 +1530,8 @@ export const TRANSLATIONS = {
     header: {
       projectName: 'プロジェクト名',
       saveTooltip: 'ローカルストレージに保存',
+      saveAs: '名前を付けて別プロジェクトとして保存…',
+      saveAsNamePrompt: '新しいプロジェクトの名前を入力してください',
       setupTooltip: 'ハードウェア設定',
       projectsTooltip: '開く...',
       themeLight: 'ライトモードに切替',
@@ -2182,6 +2190,8 @@ export const TRANSLATIONS = {
     header: {
       projectName: 'Nombre del Proyecto',
       saveTooltip: 'Guardar en almacenamiento local',
+      saveAs: 'Guardar como un proyecto nuevo…',
+      saveAsNamePrompt: 'Introduce un nombre para el nuevo proyecto',
       setupTooltip: 'Configuración de Hardware',
       projectsTooltip: 'Abrir...',
       themeLight: 'Cambiar a Modo Claro',
@@ -2588,6 +2598,8 @@ export const TRANSLATIONS = {
     header: {
       projectName: 'Projektname',
       saveTooltip: 'Im lokalen Speicher speichern',
+      saveAs: 'Als neues Projekt speichern…',
+      saveAsNamePrompt: 'Namen für das neue Projekt eingeben',
       setupTooltip: 'Hardware-Setup',
       projectsTooltip: 'Öffnen...',
       themeLight: 'Zum hellen Modus wechseln',
