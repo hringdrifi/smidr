@@ -345,6 +345,7 @@ export default function App() {
   const { undo, redo, pastStates, futureStates } = useStore((useKeyboardStore as any).temporal, (state: any) => state);
   const { t, language, setLanguage } = useTranslation();
   const [isProjectMenuOpen, setIsProjectMenuOpen] = React.useState(false);
+  const [isSaveMenuOpen, setIsSaveMenuOpen] = React.useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = React.useState(false);
   const [rmkExportFormat, setRmkExportFormat] = React.useState<RmkExportFormat>('toml');
   const [isHardwareSettingsDialogOpen, setIsHardwareSettingsDialogOpen] = React.useState(false);
@@ -507,7 +508,7 @@ export default function App() {
   };
 
   const handleSaveProjectAs = () => {
-    setIsProjectMenuOpen(false);
+    setIsSaveMenuOpen(false);
     const name = prompt(t('header.saveAsNamePrompt'), settings.name)?.trim();
     if (!name) return;
 
@@ -1475,14 +1476,6 @@ export default function App() {
                     </div>
                     <div className="p-1 border-t border-[var(--border-main)] bg-[var(--bg-app)]/50">
                       <button
-                        onClick={handleSaveProjectAs}
-                        disabled={isSaving || !storeState.isProjectOpen}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold transition-all text-left disabled:opacity-40 disabled:pointer-events-none"
-                      >
-                        <Save size={14} className="text-amber-500 shrink-0" />
-                        <span>{t('header.saveAs')}</span>
-                      </button>
-                      <button
                         className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-[var(--bg-hover)] text-[var(--text-main)] hover:text-[var(--text-highlight)] text-[10px] font-bold uppercase tracking-wider transition-all text-left relative overflow-hidden"
                       >
                         <FileUp size={14} className="text-amber-500" />
@@ -1519,12 +1512,22 @@ export default function App() {
               className="hidden"
             />
 
+            <div
+              className="relative flex shrink-0"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && isSaveMenuOpen) {
+                  event.stopPropagation();
+                  setIsSaveMenuOpen(false);
+                  event.currentTarget.querySelector<HTMLButtonElement>('#header-save-menu-btn')?.focus();
+                }
+              }}
+            >
             <button
               id="header-save-btn"
               onClick={handleSaveProject}
               disabled={isSaving || !storeState.isProjectOpen}
               className={cn(
-                "flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-all group shrink-0 relative overflow-hidden disabled:pointer-events-none",
+                "flex h-10 min-w-10 items-center justify-center gap-2 rounded-l-lg px-3 text-xs font-semibold transition-all group shrink-0 relative overflow-hidden disabled:pointer-events-none",
                 storeState.isProjectOpen && showSavedFeedback
                   ? "bg-green-500/10 border border-green-500/20 text-green-500"
                   : storeState.isProjectOpen && isDirty
@@ -1553,6 +1556,41 @@ export default function App() {
                       : t('workspace.saved')}
               </span>
             </button>
+            <button
+              id="header-save-menu-btn"
+              onClick={() => setIsSaveMenuOpen(!isSaveMenuOpen)}
+              disabled={isSaving || !storeState.isProjectOpen}
+              aria-label={t('common.save')}
+              aria-haspopup="menu"
+              aria-expanded={isSaveMenuOpen}
+              aria-controls="header-save-menu"
+              title={t('common.save')}
+              className="flex h-10 w-10 items-center justify-center rounded-r-lg border border-l-0 border-[var(--border-main)] bg-[var(--bg-panel)] text-[var(--text-dim)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <ChevronDown size={14} />
+            </button>
+            {isSaveMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsSaveMenuOpen(false)} />
+                <div
+                  id="header-save-menu"
+                  role="menu"
+                  aria-label={t('common.save')}
+                  className="absolute top-full left-0 z-[150] mt-2 w-72 rounded-md border border-[var(--border-main)] bg-[var(--bg-panel)] p-1 shadow-2xl"
+                >
+                  <button
+                    role="menuitem"
+                    autoFocus
+                    onClick={handleSaveProjectAs}
+                    className="flex min-h-10 w-full items-center gap-2 rounded px-3 py-2 text-left text-xs font-semibold text-[var(--text-main)] transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-highlight)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                  >
+                    <Save size={14} className="shrink-0 text-amber-500" />
+                    <span>{t('header.saveAs')}</span>
+                  </button>
+                </div>
+              </>
+            )}
+            </div>
 
             <div className="relative shrink-0">
               <button
